@@ -70,7 +70,7 @@ export class Entity {
       this.color = color;
       this.maxHealth = isEnemy ? 150 : 300; // Increased health
       this.health = this.maxHealth;
-      this.armor = 20; // Base armor for damage reduction
+      this.armorValue = 20; // Base armor for damage reduction
       this.ammo = 30;
       this.weapon = 'Pistole';
       this.maxSpeed = 3;
@@ -97,10 +97,14 @@ export class Entity {
       this.fleeThreshold = 30; // Health percentage to start fleeing
       this.visionRange = 300;
       this.visionAngle = Math.PI / 2;
+
+      // Status effects
+      this.speedBoostMultiplier = 1;
+      this.speedBoostEndTime = null;
     }
 
     getArmorValue() {
-      return this.armor ? this.armor.protection : 0;
+      return this.armor ? this.armor.protection : this.armorValue;
     }
 
     getCamouflageValue() {
@@ -108,7 +112,7 @@ export class Entity {
     }
   
     takeDamage(damage) {
-      const armorReduction = this.armor + (this.getArmorValue() || 0);
+      const armorReduction = this.getArmorValue();
       const actualDamage = Math.max(1, damage - armorReduction);
       this.health -= actualDamage;
       
@@ -157,10 +161,11 @@ export class Entity {
     }
 
     update(controls, map, currentTime, game) {
+      if (this.health <= 0) return;
+
       if (this.isEnemy) {
         this.updateAI(currentTime, game);
-      }
-      
+      } else {
       if (this.vehicle) {
         if (this.role === 'driver') {
           this.updateVehicleControls(controls, map, game);
@@ -171,6 +176,10 @@ export class Entity {
         this.updateHumanControls(controls, map);
       }
     }
+
+    // Update status effects
+    this.updateStatusEffects(currentTime);
+  }
 
     updateAI(currentTime, game) {
       const timeSinceLastStateChange = currentTime - this.lastStateChange;
@@ -320,7 +329,13 @@ export class Entity {
 
     findSafePoint(game) {
       // Implementation to find nearest cover point (building, tree, etc.)
-      return null; // Placeholder
+    // This should return a point object {x, y} or null if none found
+    // Placeholder implementation:
+    const coverPoints = game.getCoverPoints();
+    return coverPoints.find(point => 
+      !game.isPositionOccupied(point.x, point.y) &&
+      distance(this, point) > 100
+    ) || null;
     }
 
     alertSquad() {
@@ -334,36 +349,167 @@ export class Entity {
       }
     }
 
-    updateVehicleControls(controls, map, game) {
-      const v = this.vehicle;
-      if (!v) return;
+  updateHumanControls(controls, map) {
+    // Basic movement
+    if (controls.forward) {
+      this.speed = Math.min(this.maxSpeed, this.speed + 0.2);
+    }
+    if (controls.backward) {
+      this.speed = Math.max(-this.maxSpeed / 2, this.speed - 0.2);
+    }
+    if (!controls.forward && !controls.backward) {
+      this.speed *= 0.9; // Friction/deceleration
+    }
+    
+    // Turning
+    if (controls.left) {
+      this.angle -= 0.05;
+    }
+    if (controls.right) {
+      this.angle += 0.05;
+    }
 
-      if (controls.forward) v.speed = Math.min(v.maxSpeed, v.speed + v.acceleration);
-      if (controls.backward) v.speed = Math.max(-v.maxSpeed / 2, v.speed - v.acceleration);
-      if (!controls.forward && !controls.backward) v.speed *= v.friction;
-      if (controls.left) v.turnSpeed = -v.turnRate;
-      if (controls.right) v.turnSpeed = v.turnRate;
-      if (!controls.left && !controls.right) v.turnSpeed = 0;
-      
+    // Move and handle collisions
+    const oldX = this.x;
+    const oldY = this.y;
+    this.move(map);
+
+    // Handle collision with map boundaries
+    if (this.x < 0) this.x = 0;
+    if (this.x > map[0].length * 40) this.x = map[0].length * 40;
+    if (this.y < 0) this.y = 0;
+    if (this.y > map.length * 40) this.y = map.length * 40;
+  }
+
+    updateVehicleControls(controls, map, game) {
+    if (!this.vehicle) return;
+
+      const v = this.vehicle;
+    
+    // Acceleration
+    if (controls.forward) {
+      v.speed = Math.min(v.maxSpeed, v.speed + v.acceleration);
+    }
+    if (controls.backward) {
+      v.speed = Math.max(-v.maxSpeed / 2, v.speed - v.acceleration);
+    }
+    if (!controls.forward && !controls.backward) {
+      v.speed *= v.friction;
+    }
+
+    // Turning
+    if (controls.left) {
+      v.turnSpeed = -v.turnRate;
+    }
+    if (controls.right) {
+      v.turnSpeed = v.turnRate;
+    }
+    if (!controls.left && !controls.right) {
+      v.turnSpeed = 0;
+    }
+
+    // Store old position for collision resolution
       const oldX = v.x;
       const oldY = v.y;
+    
+    // Move vehicle
       v.move(map);
 
-      // Check for running over entities
-      game.players.concat(game.enemies).forEach(entity => {
-        if (entity !== this && !entity.vehicle && 
-            distance(v, entity) < v.radius + entity.radius) {
-            const impactSpeed = Math.abs(v.speed);
-            const damage = impactSpeed * 30;
-            if (damage > 10) { // Only damage if moving fast enough
-                entity.takeDamage(damage);
-                entity.bounce(impactSpeed * 3, v.angle);
-                // Create impact effect
-                game.createImpactEffect(entity.x, entity.y);
-                game.soundManager.playSound('vehicleImpact');
+    // Check for collisions with other vehicles
+    const hasCollision = game.vehicles.some(otherVehicle => {
+      if (otherVehicle === v) return false;
+      
+      const dist = Math.hypot(otherVehicle.x - v.x, otherVehicle.y - v.y);
+      return dist < (v.radius + otherVehicle.radius);
+    });
+
+    // Resolve collision by moving back
+    if (hasCollision) {
+      v.x = oldX;
+      v.y = oldY;
+      v.speed *= 0.5; // Reduce speed on collision
+    }
+
+    // Update positions of vehicle occupants
+    if (v.driver) {
+      v.driver.x = v.x;
+      v.driver.y = v.y;
+    }
+    if (v.gunner) {
+      v.gunner.x = v.x;
+      v.gunner.y = v.y;
+    }
+  }
+
+  updateGunnerControls(controls) {
+    if (!this.vehicle) return;
+
+    // Turret rotation
+    if (controls.left) {
+      this.vehicle.turretAngle = Math.max(
+        -Math.PI / 2,
+        this.vehicle.turretAngle - 0.05
+      );
+    }
+    if (controls.right) {
+      this.vehicle.turretAngle = Math.min(
+        Math.PI / 2,
+        this.vehicle.turretAngle + 0.05
+      );
+    }
+  }
+
+  updateStatusEffects(currentTime) {
+    // Handle any active status effects (speed boosts, damage over time, etc.)
+    if (this.speedBoostEndTime && currentTime > this.speedBoostEndTime) {
+      this.maxSpeed /= this.speedBoostMultiplier;
+      this.speedBoostEndTime = null;
+      this.speedBoostMultiplier = 1;
+    }
+  }
+
+  applySpeedBoost(multiplier, duration) {
+    // Remove any existing speed boost
+    if (this.speedBoostEndTime) {
+      this.maxSpeed /= this.speedBoostMultiplier;
+    }
+
+    // Apply new speed boost
+    this.speedBoostMultiplier = multiplier;
+    this.maxSpeed *= multiplier;
+    this.speedBoostEndTime = Date.now() + duration;
+  }
+
+  takeDamage(amount) {
+    const effectiveArmor = this.getArmorValue();
+    const reducedDamage = Math.max(1, amount - effectiveArmor);
+    
+    this.health = Math.max(0, this.health - reducedDamage);
+    
+    // Create damage effect
+    if (this.game) {
+      this.game.createDamageEffect(this.x, this.y, reducedDamage);
+    }
+    
+    // Handle death
+    if (this.health <= 0) {
+      this.onDeath();
+    }
+    
+    return reducedDamage;
+  }
+
+  onDeath() {
+    if (this.vehicle) {
+      if (this.role === 'driver') this.vehicle.driver = null;
+      if (this.role === 'gunner') this.vehicle.gunner = null;
+      this.vehicle = null;
+      this.role = null;
             }
-        }
-      });
+
+    if (!this.isEnemy && this.game) {
+      this.game.handlePlayerDeath(this);
+    }
     }
   }
   
@@ -533,7 +679,7 @@ export function isInSight(entity, target, angle, fov, range) {
   
   // Apply stealth modifier if target has camouflage
   const stealthMod = target.getCamouflageValue ? target.getCamouflageValue() / 100 : 0;
-  return angleDifference < fov / 2 * (1 - stealthMod);
+  return angleDifference < (fov / 2) * (1 - stealthMod);
 }
 
 // New classes for equipment system
