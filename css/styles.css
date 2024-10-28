@@ -1,0 +1,96 @@
+body { margin: 0; overflow: hidden; background: #333; font-family: Arial, sans-serif; }
+canvas { display: block; }
+.game-container { display: flex; flex-wrap: nowrap; width: 100vw; height: 100vh; }
+.player-screen { position: relative; width: 50%; height: 100vh; background: #222; }
+.ui {
+  position: absolute; 
+  color: white; 
+  padding: 10px; 
+  z-index: 10; 
+}
+.stats { 
+  background: rgba(0,0,0,0.7); 
+  border-radius: 5px; 
+  padding: 10px; 
+  margin-bottom: 10px; 
+  font-size: 14px;
+  line-height: 1.5;
+}
+.message { 
+  position: absolute; 
+  bottom: 60px; 
+  left: 50%; 
+  transform: translateX(-50%); 
+  background: rgba(0,0,0,0.7); 
+  padding: 10px 20px; 
+  border-radius: 5px; 
+  display: none; 
+  font-size: 14px;
+}
+.minimap1, .minimap2 {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid #fff;
+  border-radius: 5px;
+  z-index: 10;
+}
+.minimap1 {
+  bottom: 10px;
+  left: 10px;
+}
+.minimap2 {
+  bottom: 10px;
+  right: 10px;
+}
+.mode-display {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.5);
+  padding: 5px 10px;
+  border-radius: 5px;
+  color: white;
+  z-index: 10;
+  cursor: pointer;
+  font-size: 16px;
+}
+/* Startbildschirm und Game Over Bildschirm */
+.screen-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+  font-family: Arial, sans-serif;
+}
+.screen-overlay.hidden {
+  display: none;
+}
+.screen-overlay h1 {
+  margin-bottom: 30px;
+  font-size: 48px;
+}
+.screen-overlay button {
+  padding: 15px 30px;
+  margin: 10px;
+  font-size: 20px;
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  background: #444;
+  color: white;
+  transition: background 0.3s;
+}
+.screen-overlay button:hover {
+  background: #666;
+}
