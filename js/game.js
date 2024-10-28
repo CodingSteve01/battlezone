@@ -1,62 +1,99 @@
 // game.js
 import { Entity, Human, Vehicle, isColliding, isVehicleColliding, distance, isInSight } from './entities.js';
 import { Renderer } from './renderer.js';
+import { SoundManager } from './soundManager.js';
 
 export class Game {
   constructor(mode) {
     this.mode = mode;
-    this.renderer = new Renderer(this);
-    this.setupControls();
-    this.setupModeDisplay();
-    this.gameOver = false;
-    this.gameLoopRunning = false;
     this.score = 0;
     this.wave = 1;
+    this.gameOver = false;
+    this.gameLoopRunning = false;
+    
+    // Initialize empty arrays first
     this.bunkers = [];
     this.houses = [];
     this.strategicPoints = [];
     this.enemyGroups = [];
+    this.vehicles = [];
+    this.bullets = [];
+    this.powerUps = [];
+    this.enemies = [];
+    this.explosions = [];
+    this.pickups = [];
+    
+    // Generate map first
+    this.map = this.generateMap();
+    
+    // Then initialize game elements that depend on the map
     this.initializeStrategicLocations();
+    this.renderer = new Renderer(this);
+    this.setupControls();
+    this.setupModeDisplay();
     this.initSoundManager();
     this.initGame();
   }
 
-  initializeStrategicLocations() {
-    // Create bunker clusters
-    for (let i = 0; i < 5; i++) {
-      const cluster = this.createStrategicCluster('bunker');
-      this.bunkers.push(...cluster);
+  isInvalidPosition(x, y) {
+    const tileX = Math.floor(x / 40);
+    const tileY = Math.floor(y / 40);
+    
+    // First check bounds
+    if (tileX < 0 || tileX >= 100 || tileY < 0 || tileY >= 100) {
+      return true;
     }
-  
-    // Create house clusters (villages)
-    for (let i = 0; i < 3; i++) {
-      const cluster = this.createStrategicCluster('house');
-      this.houses.push(...cluster);
+    
+    // Then safely check map tiles
+    if (!this.map || !this.map[tileY]) {
+      console.warn('Map not properly initialized at position check');
+      return true;
     }
-  
-    // Create patrol routes between strategic points
-    this.createPatrolRoutes();
+    
+    const tile = this.map[tileY][tileX];
+    return tile === 4 || tile === 5; // Road or Water
   }
 
   createStrategicCluster(type) {
     const cluster = [];
+    const attempts = 20; // Maximum attempts to find valid positions
+    
+    for (let attempt = 0; attempt < attempts; attempt++) {
     const centerX = Math.random() * 3600 + 200;
     const centerY = Math.random() * 3600 + 200;
+      
+      // Validate center position
+      if (this.isInvalidPosition(centerX, centerY)) {
+        continue;
+      }
+      
     const clusterSize = type === 'bunker' ? 3 : 5;
+      const clusterPoints = [];
+      let validCluster = true;
   
+      // Try to create all points in the cluster
     for (let i = 0; i < clusterSize; i++) {
       const angle = (i / clusterSize) * Math.PI * 2;
       const distance = Math.random() * 100 + 50;
       const x = centerX + Math.cos(angle) * distance;
       const y = centerY + Math.sin(angle) * distance;
   
-      if (!this.isInvalidPosition(x, y)) {
-        cluster.push({
+        if (this.isInvalidPosition(x, y)) {
+          validCluster = false;
+          break;
+        }
+        
+        clusterPoints.push({
           x, y,
           type,
           guards: [],
           supplies: Math.random() < 0.3
         });
+      }
+      
+      if (validCluster) {
+        cluster.push(...clusterPoints);
+        break;
       }
     }
   
@@ -81,6 +118,7 @@ export class Game {
       for (let j = 0; j < groupSize; j++) {
         const spawnPoint = group.patrolPoints[0];
         const enemy = new Human(spawnPoint.x, spawnPoint.y, '#FFD700', true);
+        enemy.game = this; // Set game reference
         enemy.group = group;
         enemy.squadRole = j === 0 ? 'leader' : 'member';
         group.members.push(enemy);
@@ -105,6 +143,18 @@ export class Game {
 
   initSoundManager() {
     this.soundManager = new SoundManager();
+    
+    // Add event listener for initial user interaction to unlock audio
+    const unlockAudio = () => {
+      // Create and play a silent sound to unlock audio
+      const silentSound = new Audio("data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABGwBtbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1t//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAARsxqDVpAAAAAAD/+9DEAAAJdINL855zAKyIaK08zXAEAAAAWGluZwAAAA8AAAACAAABGwBtbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1t//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAARsxqDVpAAAAAAD/+9DEAAAJdINL855zAKyIaK08zXAEAAAAWGluZwAAAA8AAAACAAABGwBtbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1t//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjU0AAAAAAAAAAAAAAAAJAAAAAAAAAAAARsxqDVpAAAAAAAAAAAAAAAAAAAA");
+      silentSound.play().catch(() => {});
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
   }
 
   setupControls() {
@@ -152,17 +202,30 @@ export class Game {
     this.players = [];
     
     if (this.mode === 'SinglePlayer') {
-      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
+      const player1 = new Human(100, 100, '#4444ff');
+      player1.game = this; // Set game reference
+      this.players.push(player1); // Player 1
     } else if (this.mode === 'Cooperative') {
-      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
-      this.players.push(new Human(150, 100, '#ff4444')); // Player 2
+      const player1 = new Human(100, 100, '#4444ff');
+      player1.game = this;
+      const player2 = new Human(150, 100, '#ff4444');
+      player2.game = this;
+      this.players.push(player1); // Player 1
+      this.players.push(player2); // Player 2
     } else if (this.mode === 'Versus') {
-      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
-      this.players.push(new Human(3900, 3900, '#ff4444')); // Player 2
+      const player1 = new Human(100, 100, '#4444ff');
+      player1.game = this;
+      const player2 = new Human(3900, 3900, '#ff4444');
+      player2.game = this;
+      this.players.push(player1); // Player 1
+      this.players.push(player2); // Player 2
     }
 
     this.vehicles = this.generateVehicles();
-    this.vehicles.forEach(v => v.game = this);
+    this.vehicles.forEach(v => { 
+      v.game = this; 
+      // Assuming Vehicle class may need other initializations
+    });
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
     this.enemies = [];
@@ -186,13 +249,15 @@ export class Game {
   }
 
   generateMap() {
-    const map = [];
     const MAP_SIZE = 100;
+    const map = Array(MAP_SIZE).fill().map(() => Array(MAP_SIZE).fill(0));
     
-    // Initialize with grass
-    for(let y = 0; y < MAP_SIZE; y++) {
-      const row = new Array(MAP_SIZE).fill(0);
-      map.push(row);
+    // Generate basic terrain
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        // Default to grass (0)
+        map[y][x] = 0;
+      }
     }
 
     // Generate terrain features using Perlin noise
@@ -205,9 +270,38 @@ export class Game {
     this.addStrategicLocations(map);
     
     // Generate road network
-    this.generateRoadNetwork(map);
+    this.generateRoads(map); // Korrigiert von generateRoadNetwork zu generateRoads
 
     return map;
+  }
+
+  initializeStrategicLocations() {
+    // Create bunker clusters with retry logic
+    let bunkerAttempts = 0;
+    while (this.bunkers.length < 5 && bunkerAttempts < 10) {
+      const cluster = this.createStrategicCluster('bunker');
+      if (cluster.length > 0) {
+        this.bunkers.push(...cluster);
+      }
+      bunkerAttempts++;
+    }
+    
+    // Create house clusters with retry logic
+    let houseAttempts = 0;
+    while (this.houses.length < 3 && houseAttempts < 10) {
+      const cluster = this.createStrategicCluster('house');
+      if (cluster.length > 0) {
+        this.houses.push(...cluster);
+      }
+      houseAttempts++;
+    }
+    
+    // Create patrol routes between strategic points
+    if (this.bunkers.length > 0 || this.houses.length > 0) {
+      this.createPatrolRoutes();
+    } else {
+      console.warn('No strategic locations were created successfully');
+    }
   }
 
   generateForests(map) {
@@ -245,10 +339,29 @@ export class Game {
     for(let y = 0; y < 100; y++) {
       for(let x = 0; x < 100; x++) {
         if (forest[y][x] === 1 && map[y][x] === 0) {
-          map[y][x] = 2; // Tree
+          map[y][x] = 2; // 2 represents trees
         }
       }
     }
+  }
+
+  countNeighbors(grid, x, y) {
+    let count = 0;
+    // Check all 8 neighboring cells
+    for(let dy = -1; dy <= 1; dy++) {
+      for(let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue; // Skip the cell itself
+        
+        const newX = x + dx;
+        const newY = y + dy;
+        
+        // Check bounds
+        if (newX >= 0 && newX < 100 && newY >= 0 && newY < 100) {
+          count += grid[newY][newX];
+        }
+      }
+    }
+    return count;
   }
 
   addStrategicLocations(map) {
@@ -263,23 +376,6 @@ export class Game {
       const tileY = Math.floor(house.y / 40);
       this.generateHouseComplex(map, tileX, tileY);
     });
-  }
-  
-  generateBunkerComplex(map, centerX, centerY) {
-    // Main bunker
-    map[centerY][centerX] = 6;
-    
-    // Defensive walls
-    for(let i = -2; i <= 2; i++) {
-      if (centerX + i >= 0 && centerX + i < 100) {
-        if (centerY - 2 >= 0) map[centerY - 2][centerX + i] = 3;
-        if (centerY + 2 < 100) map[centerY + 2][centerX + i] = 3;
-      }
-      if (centerY + i >= 0 && centerY + i < 100) {
-        if (centerX - 2 >= 0) map[centerY + i][centerX - 2] = 3;
-        if (centerX + 2 < 100) map[centerY + i][centerX + 2] = 3;
-      }
-    }
   }
 
   generateRoads(map) {
@@ -356,54 +452,6 @@ export class Game {
     }
   }
 
-  generateWater(map) {
-    // Main lake
-    const centerX = 50;
-    const centerY = 50;
-    const radius = 10;
-    
-    for(let y = -radius; y <= radius; y++) {
-      for(let x = -radius; x <= radius; x++) {
-        if (Math.hypot(x, y) <= radius &&
-            centerY + y >= 0 && centerY + y < 100 &&
-            centerX + x >= 0 && centerX + x < 100) {
-          map[centerY + y][centerX + x] = 5; // 5 = water
-        }
-      }
-    }
-
-    // Small ponds
-    for(let i = 0; i < 5; i++) {
-      const x = Math.floor(Math.random() * 80 + 10);
-      const y = Math.floor(Math.random() * 80 + 10);
-      this.generateCluster(map, x, y, 5, 0.8);
-    }
-  }
-
-  generateStrategicPoints(map) {
-    // Add bunkers or defensive positions
-    for(let i = 0; i < 6; i++) {
-      const x = Math.floor(Math.random() * 80 + 10);
-      const y = Math.floor(Math.random() * 80 + 10);
-      if (map[y][x] === 0) {
-        this.generateBunker(map, x, y);
-      }
-    }
-  }
-
-  generateBunker(map, x, y) {
-    const size = 3;
-    for(let dy = -size; dy <= size; dy++) {
-      for(let dx = -size; dx <= size; dx++) {
-        if (Math.abs(dx) === size || Math.abs(dy) === size) {
-          if (y + dy >= 0 && y + dy < 100 && x + dx >= 0 && x + dx < 100) {
-            map[y + dy][x + dx] = 3; // Walls
-          }
-        }
-      }
-    }
-  }
-
   generateVehicles() {
     const vehicleTypes = ['tank', 'jeep', 'lkw', 'schuetzenpanzer'];
     const vehicles = [];
@@ -416,7 +464,7 @@ export class Game {
         y = Math.random() * 100 * 40;
         type = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
       } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, vehicles));
-
+  
       vehicles.push(new Vehicle(x, y, type));
     }
     return vehicles;
@@ -434,17 +482,10 @@ export class Game {
         y = Math.random() * 100 * 40;
         type = types[Math.floor(Math.random() * types.length)];
       } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, powerUps, 50));
-
+  
       powerUps.push({x, y, type});
     }
     return powerUps;
-  }
-
-  isInvalidPosition(x, y) {
-    const tileX = Math.floor(x / 40);
-    const tileY = Math.floor(y / 40);
-    return tileX < 0 || tileX >= 100 || tileY < 0 || tileY >= 100 || 
-           this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5;
   }
 
   isPositionOccupied(x, y, entities, minDistance = 40) {
@@ -464,6 +505,7 @@ export class Game {
       );
 
       const enemy = new Human(x, y, '#FFD700', true);
+      enemy.game = this; // Set game reference
       enemy.weapon = Math.random() < 0.3 ? 'Maschinengewehr' : 'Pistole';
       this.enemies.push(enemy);
     }
@@ -578,7 +620,7 @@ export class Game {
       
       // Get and apply controls
       const controls = this.getPlayerControls(index);
-      player.update(controls, this.map, currentTime);
+      player.update(controls, this.map, currentTime, this);
       
       // Handle vehicle interaction
       if (controls.action) {
@@ -606,7 +648,7 @@ export class Game {
 
     // Update enemies
     this.enemies.forEach(enemy => {
-      enemy.update(null, this.map, currentTime);
+      enemy.update(null, this.map, currentTime, this);
       if (enemy.canShoot && enemy.ammo > 0) {
         this.handleEnemyShooting(enemy, currentTime);
       }
@@ -700,7 +742,7 @@ export class Game {
 
   handleBulletCollisions(bullet, bulletIndex) {
     // Check map collision
-    if (isColliding({x: bullet.x, y: bullet.y}, this.map)) {
+    if (isColliding({x: bullet.x, y: bullet.y, radius: 2}, this.map)) { // Added radius
       this.bullets.splice(bulletIndex, 1);
       this.createExplosion(bullet.x, bullet.y, 1);
       this.soundManager.playSound('explosion');
@@ -750,7 +792,7 @@ export class Game {
 
       if (player.health <= 0) {
         if (this.mode === 'Versus') {
-          this.endGame(`Player ${bullet.owner + 1} wins!`);
+          this.endGame(`Player ${bullet.owner + 1} gewinnt!`);
         } else if (this.mode === 'SinglePlayer' || 
                    this.players.every(p => p.health <= 0)) {
           this.endGame(`Game Over! Score: ${this.score}`);
@@ -779,13 +821,13 @@ export class Game {
         const nearestVehicle = this.vehicles.find(v => 
           distance(player, v) < 50 && (!v.driver || !v.gunner));
         if (nearestVehicle) {
-          message.textContent = `Press ${this.controls[index].action} to enter vehicle`;
+          message.textContent = `Drücke ${this.controls[index].action} zum Einsteigen`;
           message.style.display = 'block';
         } else {
           message.style.display = 'none';
         }
       } else {
-        message.textContent = `Press ${this.controls[index].action} to exit vehicle`;
+        message.textContent = `Drücke ${this.controls[index].action} zum Aussteigen`;
         message.style.display = 'block';
       }
     });
@@ -801,7 +843,7 @@ export class Game {
       if (enemy.health <= 0) {
         this.enemies.splice(enemyIndex, 1);
         this.score += 100;
-        // Drop powerup with 30% chance
+        // Drop powerup mit 30% Chance
         if (Math.random() < 0.3) {
           this.powerUps.push({
             x: enemy.x,
@@ -875,7 +917,7 @@ export class Game {
     for (let i = this.powerUps.length - 1; i >= 0; i--) {
       const powerUp = this.powerUps[i];
       
-      // Check collision with players
+      // Check collision mit Spielern
       for (let player of this.players) {
         if (player.health <= 0) continue;
         
@@ -898,7 +940,7 @@ export class Game {
     const playerIndex = this.players.indexOf(player);
     switch(powerUp.type) {
       case 'health':
-        player.health = Math.min(100, player.health + 25);
+        player.health = Math.min(300, player.health + 25); // Max Health angepasst
         document.getElementById(`health${playerIndex +1}`).textContent = player.health;
         break;
       case 'ammo':
@@ -982,6 +1024,7 @@ export class Game {
     this.wave = 1;
     this.score = 0;
     document.getElementById('gameOverScreen').classList.add('hidden');
+    document.getElementById('gameContainer').style.display = 'flex';
     this.initGame();
   }
 
@@ -992,7 +1035,7 @@ export class Game {
     gameOverMessage.textContent = `${message}\nWave: ${this.wave}\nScore: ${this.score}`;
     gameOverScreen.classList.remove('hidden');
   }
-  
+
   handlePlayerDeath(player, killer) {
     if (this.mode === 'Versus') {
       if (killer) {
@@ -1003,116 +1046,13 @@ export class Game {
     
     player.scheduleRespawn();
   }
-}
 
-// SoundManager class to handle sound effects using Web Audio API
-class SoundManager {
-  constructor() {
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    this.sounds = {};
-    this.initSounds();
+  // Füge die fehlenden Methoden hinzu
+  getBunkerSpawnPoints() {
+    return this.bunkers.map(b => ({x: b.x, y: b.y}));
   }
 
-  initSounds() {
-    this.sounds['shoot'] = () => this.playShootSound();
-    this.sounds['enemyShoot'] = () => this.playEnemyShootSound();
-    this.sounds['explosion'] = () => this.playExplosionSound();
-    this.sounds['hit'] = () => this.playHitSound();
-    this.sounds['powerUpCollect'] = () => this.playPowerUpCollectSound();
-    this.sounds['powerUpDrop'] = () => this.playPowerUpDropSound();
-    this.sounds['enterVehicle'] = () => this.playEnterVehicleSound();
-    this.sounds['switchSeat'] = () => this.playSwitchSeatSound();
-    this.sounds['exitVehicle'] = () => this.playExitVehicleSound(); // Added exitVehicle sound
-  }
-
-  playSound(soundName) {
-    if (this.sounds[soundName]) {
-      this.sounds[soundName]();
-    }
-  }
-
-  playShootSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(600, this.audioCtx.currentTime); // frequency in hertz
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
-  }
-
-  playEnemyShootSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(500, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
-  }
-
-  playExplosionSound() {
-    const bufferSize = 2 * this.audioCtx.sampleRate;
-    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
-    }
-    const noise = this.audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    noise.connect(this.audioCtx.destination);
-    noise.start();
-  }
-
-  playHitSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
-  }
-
-  playPowerUpCollectSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(700, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.2);
-  }
-
-  playPowerUpDropSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(400, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.2);
-  }
-
-  playEnterVehicleSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(550, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
-  }
-
-  playSwitchSeatSound() {
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(650, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
-  }
-
-  playExitVehicleSound() { // New sound for exiting vehicle
-    const osc = this.audioCtx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(450, this.audioCtx.currentTime);
-    osc.connect(this.audioCtx.destination);
-    osc.start();
-    osc.stop(this.audioCtx.currentTime + 0.1);
+  getStrategicSpawnPoints() {
+    return this.strategicPoints.map(p => ({x: p.x, y: p.y}));
   }
 }
