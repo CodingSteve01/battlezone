@@ -10,14 +10,28 @@ export class Entity {
       this.radius = 10;
       this.knockbackForce = 0;
       this.knockbackAngle = 0;
+      this.bounceForce = 0;
+      this.bounceAngle = 0;
+      this.bounceDuration = 0;
+      this.bounceDecay = 0.85;
     }
   
     move(map) {
-      // Apply any existing knockback
+        // Apply bounce effect
+        if (this.bounceForce > 0) {
+          const bounceX = Math.cos(this.bounceAngle) * this.bounceForce;
+          const bounceY = Math.sin(this.bounceAngle) * this.bounceForce;
+          this.x += bounceX;
+          this.y += bounceY;
+          this.bounceForce *= this.bounceDecay;
+          if (this.bounceForce < 0.1) this.bounceForce = 0;
+        }
+      
+        // Apply knockback
       if (this.knockbackForce > 0) {
         this.x += Math.cos(this.knockbackAngle) * this.knockbackForce;
         this.y += Math.sin(this.knockbackAngle) * this.knockbackForce;
-        this.knockbackForce *= 0.8; // Reduce knockback force over time
+        this.knockbackForce *= 0.8;
         if (this.knockbackForce < 0.1) this.knockbackForce = 0;
       }
 
@@ -31,10 +45,16 @@ export class Entity {
         this.x = newX;
         this.y = newY;
       } else {
-        // Apply knockback on collision
-        this.applyKnockback(5, this.angle + Math.PI);
-        this.speed *= 0.5;
+    // Enhanced collision response
+    this.bounce(10, this.angle + Math.PI);
+    this.speed *= -0.5; // Reverse and reduce speed
       }
+    }
+
+    bounce(force, angle) {
+      this.bounceForce = force;
+      this.bounceAngle = angle;
+      this.bounceDuration = 10;
     }
 
     applyKnockback(force, angle) {
@@ -48,8 +68,9 @@ export class Entity {
       super(x, y);
       this.type = 'human';
       this.color = color;
-      this.maxHealth = isEnemy ? 100 : 200; // Players have more health
+      this.maxHealth = isEnemy ? 150 : 300; // Increased health
       this.health = this.maxHealth;
+      this.armor = 20; // Base armor for damage reduction
       this.ammo = 30;
       this.weapon = 'Pistole';
       this.maxSpeed = 3;
@@ -57,6 +78,8 @@ export class Entity {
       this.role = null;
       this.canShoot = true;
       this.isEnemy = isEnemy;
+      this.respawnTime = 5000; // 5 seconds respawn time
+      this.lastRespawn = Date.now();
 
       // Equipment slots
       this.armor = null;
@@ -85,7 +108,7 @@ export class Entity {
     }
   
     takeDamage(damage) {
-      const armorReduction = this.getArmorValue();
+      const armorReduction = this.armor + (this.getArmorValue() || 0);
       const actualDamage = Math.max(1, damage - armorReduction);
       this.health -= actualDamage;
       
@@ -95,8 +118,42 @@ export class Entity {
           this.state = 'flee';
         }
       }
+
+      if (this.health <= 0 && !this.isEnemy) {
+        this.scheduleRespawn();
+      }
       
       return this.health <= 0;
+    }
+
+    scheduleRespawn() {
+      setTimeout(() => this.respawn(), this.respawnTime);
+    }
+    
+    respawn() {
+      if (Date.now() - this.lastRespawn < this.respawnTime) return;
+      
+      // Find safe spawn point
+      let spawnPoint = this.findSafeSpawnPoint();
+      if (spawnPoint) {
+        this.x = spawnPoint.x;
+        this.y = spawnPoint.y;
+        this.health = this.maxHealth;
+        this.ammo = 30;
+        this.lastRespawn = Date.now();
+      }
+    }
+    
+    findSafeSpawnPoint() {
+      const spawnPoints = [
+        ...this.game.getBunkerSpawnPoints(),
+        ...this.game.getStrategicSpawnPoints()
+      ];
+      
+      return spawnPoints.find(point => 
+        !this.game.isPositionOccupied(point.x, point.y) &&
+        !this.game.enemies.some(e => distance(e, point) < 200)
+      ) || { x: Math.random() * 4000, y: Math.random() * 4000 };
     }
 
     update(controls, map, currentTime, game) {
@@ -296,9 +353,15 @@ export class Entity {
       game.players.concat(game.enemies).forEach(entity => {
         if (entity !== this && !entity.vehicle && 
             distance(v, entity) < v.radius + entity.radius) {
-          const damage = Math.abs(v.speed) * 20;
-          entity.takeDamage(damage);
-          entity.applyKnockback(Math.abs(v.speed) * 2, v.angle);
+            const impactSpeed = Math.abs(v.speed);
+            const damage = impactSpeed * 30;
+            if (damage > 10) { // Only damage if moving fast enough
+                entity.takeDamage(damage);
+                entity.bounce(impactSpeed * 3, v.angle);
+                // Create impact effect
+                game.createImpactEffect(entity.x, entity.y);
+                game.soundManager.playSound('vehicleImpact');
+            }
         }
       });
     }

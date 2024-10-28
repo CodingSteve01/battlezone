@@ -12,8 +12,95 @@ export class Game {
     this.gameLoopRunning = false;
     this.score = 0;
     this.wave = 1;
+    this.bunkers = [];
+    this.houses = [];
+    this.strategicPoints = [];
+    this.enemyGroups = [];
+    this.initializeStrategicLocations();
     this.initSoundManager();
     this.initGame();
+  }
+
+  initializeStrategicLocations() {
+    // Create bunker clusters
+    for (let i = 0; i < 5; i++) {
+      const cluster = this.createStrategicCluster('bunker');
+      this.bunkers.push(...cluster);
+    }
+  
+    // Create house clusters (villages)
+    for (let i = 0; i < 3; i++) {
+      const cluster = this.createStrategicCluster('house');
+      this.houses.push(...cluster);
+    }
+  
+    // Create patrol routes between strategic points
+    this.createPatrolRoutes();
+  }
+
+  createStrategicCluster(type) {
+    const cluster = [];
+    const centerX = Math.random() * 3600 + 200;
+    const centerY = Math.random() * 3600 + 200;
+    const clusterSize = type === 'bunker' ? 3 : 5;
+  
+    for (let i = 0; i < clusterSize; i++) {
+      const angle = (i / clusterSize) * Math.PI * 2;
+      const distance = Math.random() * 100 + 50;
+      const x = centerX + Math.cos(angle) * distance;
+      const y = centerY + Math.sin(angle) * distance;
+  
+      if (!this.isInvalidPosition(x, y)) {
+        cluster.push({
+          x, y,
+          type,
+          guards: [],
+          supplies: Math.random() < 0.3
+        });
+      }
+    }
+  
+    return cluster;
+  }
+
+  createPatrolRoutes() {
+    const allPoints = [...this.bunkers, ...this.houses];
+    
+    // Create enemy groups
+    for (let i = 0; i < 5; i++) {
+      const groupSize = Math.floor(Math.random() * 3) + 2;
+      const group = {
+        id: i,
+        members: [],
+        patrolPoints: this.generatePatrolRoute(allPoints),
+        currentPoint: 0,
+        state: 'patrol'
+      };
+  
+      // Create group members
+      for (let j = 0; j < groupSize; j++) {
+        const spawnPoint = group.patrolPoints[0];
+        const enemy = new Human(spawnPoint.x, spawnPoint.y, '#FFD700', true);
+        enemy.group = group;
+        enemy.squadRole = j === 0 ? 'leader' : 'member';
+        group.members.push(enemy);
+        this.enemies.push(enemy);
+      }
+  
+      this.enemyGroups.push(group);
+    }
+  }
+
+  generatePatrolRoute(points) {
+    const route = [];
+    const routeLength = Math.floor(Math.random() * 3) + 3;
+    
+    for (let i = 0; i < routeLength; i++) {
+      const point = points[Math.floor(Math.random() * points.length)];
+      route.push(point);
+    }
+    
+    return route;
   }
 
   initSoundManager() {
@@ -108,12 +195,91 @@ export class Game {
       map.push(row);
     }
 
-    this.generateRoads(map);
+    // Generate terrain features using Perlin noise
     this.generateTerrain(map);
-    this.generateWater(map);
-    this.generateStrategicPoints(map);
+    
+    // Add forests using cellular automata
+    this.generateForests(map);
+    
+    // Add strategic locations
+    this.addStrategicLocations(map);
+    
+    // Generate road network
+    this.generateRoadNetwork(map);
 
     return map;
+  }
+
+  generateForests(map) {
+    // Initialize random tree positions
+    let forest = Array(100).fill().map(() => Array(100).fill(0));
+    
+    // Seed initial trees
+    for(let i = 0; i < 1000; i++) {
+      const x = Math.floor(Math.random() * 100);
+      const y = Math.floor(Math.random() * 100);
+      if (map[y][x] === 0) {
+        forest[y][x] = 1;
+      }
+    }
+  
+    // Apply cellular automata rules
+    for(let iteration = 0; iteration < 5; iteration++) {
+      const newForest = forest.map(row => [...row]);
+      
+      for(let y = 0; y < 100; y++) {
+        for(let x = 0; x < 100; x++) {
+          const neighbors = this.countNeighbors(forest, x, y);
+          if (forest[y][x] === 1) {
+            newForest[y][x] = neighbors >= 4 ? 1 : 0;
+          } else {
+            newForest[y][x] = neighbors >= 5 ? 1 : 0;
+          }
+        }
+      }
+      
+      forest = newForest;
+    }
+  
+    // Apply forests to map
+    for(let y = 0; y < 100; y++) {
+      for(let x = 0; x < 100; x++) {
+        if (forest[y][x] === 1 && map[y][x] === 0) {
+          map[y][x] = 2; // Tree
+        }
+      }
+    }
+  }
+
+  addStrategicLocations(map) {
+    this.bunkers.forEach(bunker => {
+      const tileX = Math.floor(bunker.x / 40);
+      const tileY = Math.floor(bunker.y / 40);
+      this.generateBunkerComplex(map, tileX, tileY);
+    });
+  
+    this.houses.forEach(house => {
+      const tileX = Math.floor(house.x / 40);
+      const tileY = Math.floor(house.y / 40);
+      this.generateHouseComplex(map, tileX, tileY);
+    });
+  }
+  
+  generateBunkerComplex(map, centerX, centerY) {
+    // Main bunker
+    map[centerY][centerX] = 6;
+    
+    // Defensive walls
+    for(let i = -2; i <= 2; i++) {
+      if (centerX + i >= 0 && centerX + i < 100) {
+        if (centerY - 2 >= 0) map[centerY - 2][centerX + i] = 3;
+        if (centerY + 2 < 100) map[centerY + 2][centerX + i] = 3;
+      }
+      if (centerY + i >= 0 && centerY + i < 100) {
+        if (centerX - 2 >= 0) map[centerY + i][centerX - 2] = 3;
+        if (centerX + 2 < 100) map[centerY + i][centerX + 2] = 3;
+      }
+    }
   }
 
   generateRoads(map) {
@@ -825,6 +991,17 @@ export class Game {
     const gameOverMessage = document.getElementById('gameOverMessage');
     gameOverMessage.textContent = `${message}\nWave: ${this.wave}\nScore: ${this.score}`;
     gameOverScreen.classList.remove('hidden');
+  }
+  
+  handlePlayerDeath(player, killer) {
+    if (this.mode === 'Versus') {
+      if (killer) {
+        killer.score = (killer.score || 0) + 1;
+        this.updateScoreboard();
+      }
+    }
+    
+    player.scheduleRespawn();
   }
 }
 

@@ -192,35 +192,71 @@ export class Renderer {
   }
 
   drawDetailedTree(ctx, x, y) {
-    // Tree trunk
-    ctx.fillStyle = '#5d4037';
-    ctx.fillRect(x - 4, y, 8, 20);
-
     // Tree shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    const gradient = ctx.createRadialGradient(x, y + 15, 0, x, y + 15, 20);
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.ellipse(x, y + 20, 15, 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y + 15, 20, 10, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Tree foliage layers
-    const layers = 3;
-    for (let i = 0; i < layers; i++) {
-      ctx.fillStyle = `rgb(${30 + i*20}, ${100 + i*20}, ${30 + i*20})`;
+  
+    // Trunk with texture
+    const trunkGradient = ctx.createLinearGradient(x - 4, y, x + 4, y);
+    trunkGradient.addColorStop(0, '#4a3726');
+    trunkGradient.addColorStop(0.5, '#6b4c34');
+    trunkGradient.addColorStop(1, '#4a3726');
+    ctx.fillStyle = trunkGradient;
+    ctx.fillRect(x - 4, y - 5, 8, 25);
+  
+    // Bark texture
+    ctx.strokeStyle = '#2d2319';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
       ctx.beginPath();
-      ctx.moveTo(x - 20 + i*5, y - i*10);
-      ctx.lineTo(x + 20 - i*5, y - i*10);
-      ctx.lineTo(x, y - 30 - i*10);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(x - 4 + Math.random() * 8, y + Math.random() * 20);
+      ctx.lineTo(x - 4 + Math.random() * 8, y + Math.random() * 20 + 5);
+      ctx.stroke();
 
-      // Add detail dots for texture
-      ctx.fillStyle = `rgb(${40 + i*20}, ${110 + i*20}, ${40 + i*20})`;
-      for (let j = 0; j < 10; j++) {
-        const dotX = x - 15 + Math.random() * 30;
-        const dotY = y - i*10 - Math.random() * 20;
+      // Enhanced foliage with multiple layers and lighting
+      const layers = 4;
+      for (let i = 0; i < layers; i++) {
+        const layerSize = 30 - i * 5;
+        const heightOffset = i * 10;
+        
+        // Create gradient for each layer
+        const foliageGradient = ctx.createRadialGradient(
+          x, y - heightOffset, 0,
+          x, y - heightOffset, layerSize
+        );
+        foliageGradient.addColorStop(0, `rgba(${40 + i*20}, ${100 + i*20}, ${40 + i*20}, 0.9)`);
+        foliageGradient.addColorStop(1, `rgba(${30 + i*20}, ${90 + i*20}, ${30 + i*20}, 0.7)`);
+        
+        ctx.fillStyle = foliageGradient;
+        
+        // Create organic-looking foliage shape
         ctx.beginPath();
-        ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+        ctx.moveTo(x, y - heightOffset - layerSize);
+        
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+          const radius = layerSize * (0.8 + Math.random() * 0.4);
+          const leafX = x + Math.cos(angle) * radius;
+          const leafY = y - heightOffset + Math.sin(angle) * radius * 0.7;
+          ctx.lineTo(leafX, leafY);
+        }
+        
+        ctx.closePath();
         ctx.fill();
+    
+        // Add highlight details
+        ctx.fillStyle = `rgba(255, 255, 255, 0.1)`;
+        for (let j = 0; j < 5; j++) {
+          const highlightX = x - layerSize/2 + Math.random() * layerSize;
+          const highlightY = y - heightOffset - layerSize/2 + Math.random() * layerSize;
+          ctx.beginPath();
+          ctx.arc(highlightX, highlightY, 2 + Math.random() * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   }
@@ -361,6 +397,69 @@ export class Renderer {
     }
   }
 
+  drawDetailedBunker(ctx, x, y, size) {
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(x - 2, y - 2, size + 4, size + 4);
+  
+    // Main bunker structure
+    const bunkerGradient = ctx.createLinearGradient(x, y, x + size, y + size);
+    bunkerGradient.addColorStop(0, '#4a4a4a');
+    bunkerGradient.addColorStop(0.5, '#5a5a5a');
+    bunkerGradient.addColorStop(1, '#404040');
+    ctx.fillStyle = bunkerGradient;
+    ctx.fillRect(x, y, size, size);
+  
+    // Reinforced corners
+    ctx.fillStyle = '#333';
+    const cornerSize = 6;
+    ctx.fillRect(x, y, cornerSize, cornerSize);
+    ctx.fillRect(x + size - cornerSize, y, cornerSize, cornerSize);
+    ctx.fillRect(x, y + size - cornerSize, cornerSize, cornerSize);
+    ctx.fillRect(x + size - cornerSize, y + size - cornerSize, cornerSize, cornerSize);
+  
+    // Steel door
+    const doorWidth = size / 3;
+    const doorHeight = size / 2;
+    const doorX = x + size/2 - doorWidth/2;
+    const doorY = y + size - doorHeight;
+    
+    const doorGradient = ctx.createLinearGradient(doorX, doorY, doorX + doorWidth, doorY);
+    doorGradient.addColorStop(0, '#2a2a2a');
+    doorGradient.addColorStop(0.5, '#3a3a3a');
+    doorGradient.addColorStop(1, '#2a2a2a');
+    ctx.fillStyle = doorGradient;
+    ctx.fillRect(doorX, doorY, doorWidth, doorHeight);
+  
+    // Door details
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(doorX + 2, doorY + 2, doorWidth - 4, doorHeight - 4);
+    
+    // Handle
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(doorX + doorWidth - 5, doorY + doorHeight/2, 2, 0, Math.PI * 2);
+    ctx.fill();
+  
+    // Ventilation slits
+    ctx.fillStyle = '#262626';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(x + size/4, y + 5 + i * 7, size/2, 3);
+    }
+  
+    // Wear and damage
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    for (let i = 0; i < 5; i++) {
+      const startX = x + Math.random() * size;
+      const startY = y + Math.random() * size;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(startX + Math.random() * 10 - 5, startY + Math.random() * 10 - 5);
+      ctx.stroke();
+    }
+  }
+
   drawDetailedBuilding(ctx, x, y, size) {
     // Base building
     ctx.fillStyle = '#555';
@@ -486,41 +585,194 @@ export class Renderer {
   }
 
   drawTank(ctx, vehicle) {
-    // Tank tracks
-    ctx.fillStyle = '#333';
-    ctx.fillRect(-20, -12, 40, 6);
-    ctx.fillRect(-20, 6, 40, 6);
-    
-    // Track details
-    ctx.fillStyle = '#222';
-    for(let i = -18; i < 18; i += 4) {
-      ctx.fillRect(i, -12, 2, 6);
-      ctx.fillRect(i, 6, 2, 6);
-    }
-
-    // Main body
-    ctx.fillStyle = vehicle.color;
+    // Enhanced shadow with perspective
+    const shadowGradient = ctx.createRadialGradient(0, 10, 0, 0, 10, vehicle.radius * 1.5);
+    shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
+    shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = shadowGradient;
+    ctx.beginPath();
+    ctx.ellipse(0, 10, vehicle.radius * 1.2, vehicle.radius * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+  
+    // Enhanced tracks with detailed treads
+    this.drawTankTracks(ctx, vehicle);
+  
+    // Main hull with gradient and weathering
+    const hullGradient = ctx.createLinearGradient(-15, -8, 15, 8);
+    hullGradient.addColorStop(0, '#445566');
+    hullGradient.addColorStop(0.5, '#556677');
+    hullGradient.addColorStop(1, '#445566');
+    ctx.fillStyle = hullGradient;
     ctx.fillRect(-15, -8, 30, 16);
-
-    // Turret base
+  
+    // Add armor plates and rivets
+    this.drawTankArmor(ctx);
+  
+    // Enhanced turret with detail
     ctx.save();
     ctx.rotate(vehicle.turretAngle);
-    ctx.fillStyle = '#445566';
+    this.drawTankTurret(ctx, vehicle);
+    ctx.restore();
+  
+    // Battle damage and wear effects
+    if (vehicle.health < vehicle.maxHealth) {
+      this.drawTankDamage(ctx, vehicle);
+    }
+  }
+
+  drawTankTracks(ctx, vehicle) {
+    // Track base
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-20, -12, 40, 6);
+    ctx.fillRect(-20, 6, 40, 6);
+  
+    // Detailed treads
+    ctx.fillStyle = '#111';
+    const treadCount = 10;
+    const treadSpacing = 40 / treadCount;
+    
+    for (let i = 0; i < treadCount; i++) {
+      const x = -20 + i * treadSpacing;
+      // Upper track
+      ctx.fillRect(x, -12, 2, 6);
+      // Lower track
+      ctx.fillRect(x, 6, 2, 6);
+    }
+  
+    // Track wheels
+    for (let i = -1; i <= 1; i++) {
+      const x = i * 15;
+      ctx.beginPath();
+      ctx.arc(x, -9, 3, 0, Math.PI * 2);
+      ctx.arc(x, 9, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#333';
+      ctx.fill();
+      ctx.strokeStyle = '#222';
+      ctx.stroke();
+    }
+  }
+
+  drawTankArmor(ctx) {
+    // Armor plates
+    ctx.strokeStyle = '#334455';
+    ctx.lineWidth = 1;
+    
+    // Front plate
+    ctx.beginPath();
+    ctx.moveTo(-15, -8);
+    ctx.lineTo(15, -8);
+    ctx.lineTo(15, 8);
+    ctx.lineTo(-15, 8);
+    ctx.closePath();
+    ctx.stroke();
+  
+    // Rivets
+    ctx.fillStyle = '#223344';
+    const rivetPositions = [
+      {x: -12, y: -6}, {x: -12, y: 6},
+      {x: 0, y: -6}, {x: 0, y: 6},
+      {x: 12, y: -6}, {x: 12, y: 6}
+    ];
+    
+    rivetPositions.forEach(pos => {
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 1, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  drawTankTurret(ctx, vehicle) {
+    // Turret base with gradient
+    const turretGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 10);
+    turretGradient.addColorStop(0, '#556677');
+    turretGradient.addColorStop(1, '#445566');
+    ctx.fillStyle = turretGradient;
+    
     ctx.beginPath();
     ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Main gun
-    ctx.fillStyle = '#334455';
+  
+    // Turret details
+    ctx.strokeStyle = '#334455';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  
+    // Main gun with enhanced detail
+    const gunGradient = ctx.createLinearGradient(0, 0, vehicle.weaponOffset, 0);
+    gunGradient.addColorStop(0, '#445566');
+    gunGradient.addColorStop(1, '#334455');
+    ctx.fillStyle = gunGradient;
     ctx.fillRect(0, -3, vehicle.weaponOffset, 6);
-    
+  
+    // Gun mantlet
+    ctx.fillStyle = '#334455';
+    ctx.beginPath();
+    ctx.ellipse(2, 0, 5, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  
     // Muzzle brake
     ctx.fillStyle = '#223344';
-    ctx.fillRect(vehicle.weaponOffset, -4, 4, 8);
-    ctx.restore();
-
-    // Details
-    this.drawVehicleDetails(ctx, vehicle);
+    ctx.fillRect(vehicle.weaponOffset - 2, -4, 6, 8);
+    
+    // Muzzle details
+    ctx.fillStyle = '#112233';
+    ctx.fillRect(vehicle.weaponOffset + 2, -3, 1, 6);
+  }
+  
+  drawTankDamage(ctx, vehicle) {
+    const damageLevel = 1 - (vehicle.health / vehicle.maxHealth);
+    
+    // Scorch marks
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    for (let i = 0; i < damageLevel * 10; i++) {
+      const x = (Math.random() - 0.5) * 30;
+      const y = (Math.random() - 0.5) * 20;
+      const size = Math.random() * 5 + 2;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  
+    // Damage holes
+    if (damageLevel > 0.5) {
+      ctx.fillStyle = '#000';
+      for (let i = 0; i < (damageLevel - 0.5) * 10; i++) {
+        const x = (Math.random() - 0.5) * 30;
+        const y = (Math.random() - 0.5) * 20;
+        const size = Math.random() * 3 + 1;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  
+    // Smoke effects for heavily damaged vehicles
+    if (damageLevel > 0.7) {
+      this.drawSmoke(ctx, 0, -10, damageLevel);
+    }
+  }
+  
+  drawSmoke(ctx, x, y, intensity) {
+    const time = Date.now() / 1000;
+    const particleCount = Math.floor(intensity * 10);
+    
+    for (let i = 0; i < particleCount; i++) {
+      const offset = Math.sin(time * 2 + i) * 3;
+      const alpha = (0.3 - (i * 0.03)) * intensity;
+      const size = 4 + i + Math.sin(time * 3 + i) * 2;
+      
+      const gradient = ctx.createRadialGradient(
+        x + offset, y - (i * 5), 0,
+        x + offset, y - (i * 5), size
+      );
+      gradient.addColorStop(0, `rgba(80, 80, 80, ${alpha})`);
+      gradient.addColorStop(1, 'rgba(80, 80, 80, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x + offset, y - (i * 5), size, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   drawJeep(ctx, vehicle) {
