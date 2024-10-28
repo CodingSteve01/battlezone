@@ -202,7 +202,7 @@ function isColliding(entity, map) {
   const tileX = Math.floor(entity.x / TILE_SIZE);
   const tileY = Math.floor(entity.y / TILE_SIZE);
   if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
-  return map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5;
+  return map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5 && map[tileY][tileX] !== 1;
 }
 
 // Zusätzliche Hilfsfunktion für Fahrzeugkollisionen
@@ -543,8 +543,7 @@ class Game {
     this.kisPerWave = 10;
     this.kisToSpawn = this.kisPerWave;
     this.maxWaves = 10;
-    this.maxKis = 100;
-    this.spawnCooldown = 0;
+    this.maxKis = 50; // Reduzierte maximale Anzahl der KI-Gegner zur Performance-Optimierung
     this.achievements = { kills: 0, vehiclesDestroyed: 0 };
     this.gameLoop();
   }
@@ -591,8 +590,8 @@ class Game {
       this.players[1].x = this.players[0].x;
       this.players[1].y = this.players[0].y;
     } else {
-      this.players[1].x = 3900;
-      this.players[1].y = 3900;
+      this.players[1].x = MAP_SIZE * TILE_SIZE - 100;
+      this.players[1].y = MAP_SIZE * TILE_SIZE - 100;
     }
 
     // Sicherstellen, dass Spieler nicht auf Hindernissen spawnen
@@ -622,8 +621,8 @@ class Game {
         player.x = 100;
         player.y = 100;
       } else {
-        player.x = index === 0 ? 100 : 3900;
-        player.y = index === 0 ? 100 : 3900;
+        player.x = index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100;
+        player.y = index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100;
       }
       while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
         player.x = Math.random() * MAP_SIZE * TILE_SIZE;
@@ -644,7 +643,6 @@ class Game {
     this.generateEnemies();
     this.assignEnemyRoles();
     this.wave = 1;
-    this.kisToSpawn = this.kisPerWave;
     this.updateWaveDisplay();
   }
 
@@ -734,7 +732,7 @@ class Game {
     const tileX = Math.floor(x / TILE_SIZE);
     const tileY = Math.floor(y / TILE_SIZE);
     if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
-    return this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5;
+    return this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5 || this.map[tileY][tileX] === 1;
   }
 
   isVehicleOverlapping(x, y, vehiclesList) {
@@ -760,10 +758,9 @@ class Game {
   }
 
   generateEnemies() {
-    // Gegner werden logisch auf der Karte verteilt
-    // Z.B. um Gebäude oder Fahrzeuge, patrouillieren auf Straßen
+    // Gegner logisch auf der Karte verteilen
     this.kis = [];
-    // Gegner um Gebäude platzieren
+    // Gegner um Fahrzeuge platzieren
     this.vehicles.forEach(vehicle => {
       for(let i = 0; i < 2; i++) { // 2 Gegner pro Fahrzeug
         const angle = Math.random() * 2 * Math.PI;
@@ -1411,7 +1408,7 @@ class Game {
           }, 10000);
         }
       });
-    }
+    });
 
     // Power-Ups für KI-Gegner (nur im Kooperativen Modus)
     if (this.mode === 'Cooperative') {
@@ -1510,8 +1507,8 @@ class Game {
     player.health = 100;
     player.ammo = 30;
     player.weapon = 'Pistole';
-    player.x = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
-    player.y = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
+    player.x = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100);
+    player.y = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100);
     while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
       player.x = Math.random() * MAP_SIZE * TILE_SIZE;
       player.y = Math.random() * MAP_SIZE * TILE_SIZE;
@@ -1532,71 +1529,6 @@ class Game {
     setTimeout(() => {
       explosion.remove();
     }, 1000);
-  }
-
-  generateEnemies() {
-    // Gegner logisch auf der Karte verteilen
-    this.kis = [];
-    // Gegner um Fahrzeuge platzieren
-    this.vehicles.forEach(vehicle => {
-      for(let i = 0; i < 2; i++) { // 2 Gegner pro Fahrzeug
-        const angle = Math.random() * 2 * Math.PI;
-        const dist = TILE_SIZE * 2;
-        const x = vehicle.x + Math.cos(angle) * dist;
-        const y = vehicle.y + Math.sin(angle) * dist;
-        if (!isColliding({x, y}, this.map)) {
-          this.kis.push(new Human(x, y, '#FFD700', true));
-        }
-      }
-    });
-
-    // Gegner um Gebäude platzieren
-    for(let y = 15; y < 85; y += 10) {
-      for(let x = 15; x < 85; x += 10) {
-        if (this.map[y][x] === 1) { // Gebäude
-          for(let i = 0; i < 3; i++) { // 3 Gegner pro Gebäude
-            const angle = Math.random() * 2 * Math.PI;
-            const dist = TILE_SIZE * 2;
-            const posX = x * TILE_SIZE + Math.cos(angle) * dist;
-            const posY = y * TILE_SIZE + Math.sin(angle) * dist;
-            if (!isColliding({x: posX, y: posY}, this.map)) {
-              this.kis.push(new Human(posX, posY, '#FFD700', true));
-            }
-          }
-        }
-      }
-    }
-
-    // Gegner auf Straßen patrouillieren
-    for(let y = 20; y < 80; y += 10) {
-      for(let x = 20; x < 80; x += 10) {
-        if (this.map[y][x] === 4) { // Straße
-          for(let i = 0; i < 2; i++) { // 2 Gegner pro Straßenabschnitt
-            const posX = x * TILE_SIZE + Math.random() * TILE_SIZE;
-            const posY = y * TILE_SIZE + Math.random() * TILE_SIZE;
-            if (!isColliding({x: posX, y: posY}, this.map)) {
-              this.kis.push(new Human(posX, posY, '#FFD700', true));
-            }
-          }
-        }
-      }
-    }
-
-    // Limit der Gesamtzahl der Gegner zur Performance-Optimierung
-    this.kis = this.kis.slice(0, this.maxKis);
-    this.assignEnemyRoles();
-  }
-
-  assignEnemyRoles() {
-    // Weisen Sie den Gegnern spezifische Rollen zu, z.B. Bewacher oder Patrouillen
-    this.kis.forEach(ki => {
-      const rand = Math.random();
-      if (rand < 0.5) {
-        ki.state = 'patrol';
-      } else {
-        ki.state = 'engage';
-      }
-    });
   }
 }
 
