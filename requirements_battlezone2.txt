@@ -1,0 +1,105 @@
+## **Komplettliste der Anforderungen**
+
+### **1. Allgemeine Spielstruktur**
+- **Single-File Implementierung**: Alles in einer HTML-Datei mit eingebettetem JavaScript und CSS.
+- **Keine externen Bibliotheken**: Rein HTML, CSS und JavaScript.
+- **Split-Screen**: Zwei Spieler teilen sich denselben Bildschirm mit unabhängigen Kameras.
+
+### **2. Spielmodi**
+- **Kooperativ (Coop)**: Spieler kämpfen gemeinsam gegen KI-gesteuerte Gegner.
+- **Versus-Modus**: Spieler treten gegeneinander an, mit möglichen Fahrzeug- und Waffenwechseln.
+- **Respawn-Mechanik**:
+  - Bei Tod respawnen die Spieler am Startpunkt.
+  - Im Versus-Modus wird der Kill dem gegnerischen Spieler gutgeschrieben.
+
+### **3. Spielwelt und Karte**
+- **Tile-Map (z.B. 50x50)**: Unterschiedliche Terrains wie Gras, Wald, Straßen und Hindernisse.
+- **Sichtfeld und Scrollen**: Kameras folgen den Spielern und scrollen mit ihnen.
+
+### **4. Spieler und Steuerung**
+- **Spieler 1 (Blau)**:
+  - **Bewegung**: Pfeiltasten (↑, ↓, ←, →)
+  - **Schießen**: Ctrl
+  - **Ein-/Ausstiegen**: Enter
+  - **Waffenwechsel**: Möglichkeit, verschiedene Waffen zu tragen (z.B. Pistole, Schrotflinte, Maschinengewehr)
+- **Spieler 2 (Rot)**:
+  - **Bewegung**: W, A, S, D
+  - **Schießen**: F
+  - **Ein-/Ausstiegen**: E
+  - **Waffenwechsel**: Möglichkeit, verschiedene Waffen zu tragen (z.B. Pistole, Schrotflinte, Maschinengewehr)
+- **Bewegung und Rotation**: Spieler können zu Fuß oder in Fahrzeugen rotieren und sich frei bewegen.
+- **Schussmechanik**:
+  - Jeder Spieler kann nur einen Schuss gleichzeitig abfeuern (kein Maschinengewehrfeuer).
+  - Unterschiedliche Waffen für Spieler mit variierendem Schaden und Munitionsverbrauch.
+  - Fahrzeuge haben eigene Waffen und Munition, unabhängig von der Spielermunition.
+
+### **5. Fahrzeuge**
+- **Einsteigen/Aussteigen**: Spieler können Fahrzeuge betreten und verlassen.
+- **Sitzwechsel**: Spieler können zwischen Fahrer und Gunner wechseln (Spieler 1: Shift, Spieler 2: G).
+- **Fahrzeugtypen**: Jeep, Panzer, PKW, LKW, Schützenpanzer, mit unterschiedlichen Eigenschaften (z.B. Geschwindigkeit, Waffen).
+- **Waffen und Munition**:
+  - Fahrzeuge haben eigene Waffen und Munition.
+  - Gesammelte Munition in einem Fahrzeug verbleibt im Fahrzeug.
+  - Fahrzeuge können auch Maschinengewehre besitzen.
+- **Unabhängige Fahrzeugbewaffnung**: Fahrzeugwaffen laufen unabhängig von der Spielermunition.
+
+### **6. Waffen und Schießen**
+- **Spielerwaffen**: Basiswaffe (z.B. Gewehr) mit begrenzter Munition und sichtbarer Schussrichtung.
+- **Fahrzeugwaffen**: Separate Munition und Waffentypen für jedes Fahrzeug.
+- **Nachladen und Aufsammeln**: Munition kann durch Power-Ups oder Ressourcen auf der Karte aufgefüllt werden.
+- **Einzelfeuer Implementierung**: Spieler können nur einen Schuss abfeuern, bis die Schusstaste losgelassen wird.
+
+### **7. Gegner und KI**
+- **Bots im Kooperativen Modus**: KI-gesteuerte Gegner, die Spieler verfolgen und angreifen.
+- **Unterschiedliche Schwierigkeitsgrade und Verhaltensmuster**.
+- **Versus-Modus**: Spieler können sich gegenseitig angreifen.
+- **Sichtfeld der KI**: KI-Gegner haben ein definiertes Sichtfeld, wodurch das Spiel zu einem Schleich-Shooter wird.
+- **KI-Verhalten**: KI reagiert nur, wenn der Spieler im Sichtfeld ist, und verfolgt strategisch die Spieler.
+
+### **8. Power-Ups und Ressourcen**
+- **Power-Up-Typen**: Munition, Gesundheit, temporäre Fähigkeiten wie Geschwindigkeitsschub oder Schutzschild.
+- **Verteilung**: Zufällig auf der Karte verteilt und strategisch platziert.
+- **Munition in Fahrzeugen**: Gesammelte Munition bleibt im Fahrzeug und kann nicht von Spielern übernommen werden.
+
+### **9. Benutzeroberfläche (UI)**
+- **Health Bars**: Gesundheitsbalken für Spieler, Fahrzeuge und Bots zur besseren Übersicht.
+- **Ammo Anzeige**: Verbleibende Munition für Spieler und Fahrzeuge.
+- **Weapon Anzeige**: Aktuell ausgewählte Waffe für jeden Spieler.
+- **Spielmodus-Anzeige**: Aktueller Modus (Kooperativ oder Versus).
+- **Minimap**: Spieler sollten auf der Minimap gut sichtbar eingezeichnet werden.
+
+### **10. Grafik und Performance**
+- **Erkennbare Fahrzeugtypen**: Einfache, klare Formen und Farben zur Unterscheidung.
+- **Optimierte Rendering-Logik**: Effizientes Rendering und Update-Logik für flüssiges Gameplay.
+- **Animationen**: Einfache Animationen für Bewegung, Schießen und Treffer.
+
+### **11. Technische Anforderungen**
+- **Kollisionserkennung**: Für Spieler, Fahrzeuge und Projektile.
+- **Hit-Tests zwischen Spielern**: Verhindern, dass sich Spieler auf denselben Punkt bewegen.
+- **Leistungsoptimierung**: Minimierung von Code-Duplizierungen durch modulare Funktionen.
+- **Responsive Design**: Anpassung der Canvas-Größe bei Fensteränderungen, skalierende UI-Elemente.
+- **Verhinderung von Ineinanderhaken**: Sicherstellen, dass sich Fahrzeuge oder Spieler nicht ineinander verhaken und sich nicht blockieren.
+
+### **12. Weitere Anforderungen**
+- **Begrenzte Fahrzeuganzahl**: Fahrzeuge erscheinen selten und strategisch verteilt.
+- **Spielbalance**: Ausreichende Ressourcen für ein faires Spiel.
+- **Benutzerfreundlichkeit**: Intuitive Steuerung, klare Anweisungen im Menü und sichtbare Hinweise für Interaktionen.
+- **Spawn-Logik**:
+  - Spieler spawnen niemals auf Hindernissen.
+  - Spieler spawnen nicht zu nah beieinander, um Überlappungen zu vermeiden.
+
+### **13. Mini Map**
+- **Spieler**: Sollten auf der Minimap möglichst gut sichtbar eingezeichnet werden.
+- **Fahrzeuge und KI-Gegner**: Ebenfalls auf der Minimap sichtbar für bessere Orientierung.
+
+### **14. Respawn-Mechanik**
+- **Respawn am Startpunkt**: Nach dem Tod werden Spieler automatisch am Startpunkt neu positioniert.
+- **Kill-Zuweisung im Versus-Modus**: Tötete Spieler im Versus-Modus führen zu einem Punktgewinn für den gegnerischen Spieler.
+
+### **15. Schleich-Elemente**
+- **Sichtfeld der KI**: KI-Gegner haben ein definiertes Sichtfeld, das das Schleich-Gameplay unterstützt.
+- **Strategisches Vorgehen**: Spieler müssen sich vorsichtig bewegen und verdeckt agieren, um von der KI nicht entdeckt zu werden.
+
+### **16. Erweiterte Kollisionserkennung**
+- **Kollisionen zwischen Fahrzeugen und Spielern**: Verhindern, dass sich Fahrzeuge und Spieler gegenseitig blockieren.
+- **Kollisionen mit Hindernissen**: Spieler und Fahrzeuge können nicht durch feste Hindernisse hindurch bewegen.
