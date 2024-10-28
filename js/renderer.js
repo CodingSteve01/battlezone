@@ -86,7 +86,7 @@ export class Renderer {
 
     // Draw world
     this.drawMap(ctx, player);
-    this.drawPowerUps(ctx);
+    this.drawPowerUps(ctx); // Ensure this method is defined
     this.drawVehicles(ctx);
     this.drawPlayers(ctx, playerIndex);
     this.drawEnemies(ctx);
@@ -156,6 +156,60 @@ export class Renderer {
         }
       }
     }
+  }
+
+  drawPowerUps(ctx) {
+    this.game.powerUps.forEach(powerUp => {
+      ctx.save();
+      ctx.translate(powerUp.x, powerUp.y);
+      
+      switch(powerUp.type) {
+        case 'health':
+          ctx.fillStyle = '#ff0000'; // Red for health
+          ctx.beginPath();
+          ctx.arc(0, 0, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+          break;
+        case 'ammo':
+          ctx.fillStyle = '#ffff00'; // Yellow for ammo
+          ctx.beginPath();
+          ctx.rect(-10, -10, 20, 20);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+          break;
+        case 'weapon_upgrade':
+          ctx.fillStyle = '#0000ff'; // Blue for weapon upgrade
+          ctx.beginPath();
+          ctx.moveTo(0, -10);
+          ctx.lineTo(10, 10);
+          ctx.lineTo(-10, 10);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+          break;
+        case 'speed_boost':
+          ctx.fillStyle = '#00ff00'; // Green for speed boost
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+          break;
+        default:
+          ctx.fillStyle = '#ffffff'; // White for unknown types
+          ctx.beginPath();
+          ctx.arc(0, 0, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+      }
+
+      ctx.restore();
+    });
   }
 
   drawTree(ctx, x, y) {
