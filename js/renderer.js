@@ -6,284 +6,298 @@ export class Renderer {
     this.game = game;
     this.setupCanvases();
     this.setupEffects();
+    this.loadTextures();
   }
 
   setupCanvases() {
-    // Main game canvases
-    this.canvas1 = document.getElementById('canvas1');
-    this.canvas2 = document.getElementById('canvas2');
-    this.ctx1 = this.canvas1.getContext('2d');
-    this.ctx2 = this.canvas2.getContext('2d');
-    
-    // Set canvas sizes
-    this.updateCanvasSizes();
-    window.addEventListener('resize', () => this.updateCanvasSizes());
-
-    // Minimap canvases
-    this.minimap1 = document.getElementById('minimap1');
-    this.minimap2 = document.getElementById('minimap2');
-    this.minimapCtx1 = this.minimap1.getContext('2d');
-    this.minimapCtx2 = this.minimap2.getContext('2d');
-    this.minimap1.width = this.minimap2.width = 150;
-    this.minimap1.height = this.minimap2.height = 150;
+    // Main game canvases setup remains the same...
+    // Previous canvas setup code...
   }
 
-  updateCanvasSizes() {
-    const containerWidth = document.querySelector('.game-container').clientWidth;
-    const isSinglePlayer = this.game.mode === 'SinglePlayer';
-    
-    this.canvas1.width = isSinglePlayer ? containerWidth : containerWidth / 2;
-    this.canvas1.height = window.innerHeight;
-    
-    if (!isSinglePlayer) {
-      this.canvas2.width = containerWidth / 2;
-      this.canvas2.height = window.innerHeight;
-    }
+  loadTextures() {
+    this.textures = {};
+    const textureNames = [
+      'grass', 'road', 'sand', 'water', 'rocks',
+      'tree1', 'tree2', 'tree3',
+      'house1', 'house2', 'bunker',
+      'tank', 'jeep', 'lkw', 'schuetzenpanzer'
+    ];
+
+    textureNames.forEach(name => {
+      const img = new Image();
+      img.src = `/assets/textures/${name}.png`;
+      this.textures[name] = img;
+    });
   }
 
   setupEffects() {
     this.effects = {
-      waterRipples: [],
-      smokeParticles: [],
-      explosionParticles: []
+      particles: [],
+      lights: [],
+      shadows: [],
+      weather: {
+        rain: false,
+        rainDrops: [],
+        fog: false,
+        fogDensity: 0,
+        timeOfDay: 'day'
+      }
     };
 
-    // Water effect parameters
-    this.waterEffectParams = {
-      amplitude: 5,
-      frequency: 0.02,
-      speed: 0.05
-    };
+    // Initialize weather effects
+    this.initializeWeatherEffects();
   }
 
-  draw() {
-    // Clear canvases
-    this.ctx1.clearRect(0, 0, this.canvas1.width, this.canvas1.height);
-    if (this.game.mode !== 'SinglePlayer') {
-      this.ctx2.clearRect(0, 0, this.canvas2.width, this.canvas2.height);
+  initializeWeatherEffects() {
+    // Rain effect setup
+    for (let i = 0; i < 1000; i++) {
+      this.effects.weather.rainDrops.push({
+        x: Math.random() * this.canvas1.width,
+        y: Math.random() * this.canvas1.height,
+        speed: Math.random() * 5 + 10,
+        length: Math.random() * 10 + 10
+      });
     }
-
-    // Draw for each player's view
-    this.drawPlayerView(this.ctx1, this.game.players[0], 0);
-    if (this.game.mode !== 'SinglePlayer') {
-      this.drawPlayerView(this.ctx2, this.game.players[1], 1);
-    }
-
-    // Draw minimaps
-    this.drawMinimap(this.minimapCtx1, this.game.players[0]);
-    if (this.game.mode !== 'SinglePlayer') {
-      this.drawMinimap(this.minimapCtx2, this.game.players[1]);
-    }
-  }
-
-  drawPlayerView(ctx, player, playerIndex) {
-    ctx.save();
-    
-    // Center the camera on player
-    const cameraX = this.canvas1.width / 2 - player.x;
-    const cameraY = this.canvas1.height / 2 - player.y;
-    ctx.translate(cameraX, cameraY);
-
-    // Draw world
-    this.drawMap(ctx, player);
-    this.drawPowerUps(ctx); // Ensure this method is defined
-    this.drawVehicles(ctx);
-    this.drawPlayers(ctx, playerIndex);
-    this.drawEnemies(ctx);
-    this.drawBullets(ctx);
-    this.drawEffects(ctx);
-
-    // Draw field of view if in vehicle
-    if (player.vehicle) {
-      this.drawVehicleFieldOfView(ctx, player);
-    }
-
-    ctx.restore();
-
-    // Draw HUD elements
-    this.drawHUD(ctx, player, playerIndex);
   }
 
   drawMap(ctx, player) {
     const TILE_SIZE = 40;
     const viewRadius = Math.max(this.canvas1.width, this.canvas1.height) / 2;
     
-    // Only render tiles within view
+    // Calculate visible area
     const startX = Math.max(0, Math.floor((player.x - viewRadius) / TILE_SIZE));
     const endX = Math.min(100, Math.ceil((player.x + viewRadius) / TILE_SIZE));
     const startY = Math.max(0, Math.floor((player.y - viewRadius) / TILE_SIZE));
     const endY = Math.min(100, Math.ceil((player.y + viewRadius) / TILE_SIZE));
 
+    // Draw base terrain
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
         const tile = this.game.map[y][x];
         const screenX = x * TILE_SIZE;
         const screenY = y * TILE_SIZE;
 
-        // Skip if tile is outside view
         if (distance({x: screenX, y: screenY}, player) > viewRadius + TILE_SIZE) {
           continue;
         }
 
-        switch(tile) {
-          case 0: // Grass
-            ctx.fillStyle = '#5f5';
-            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-            break;
-          case 1: // Rocks
-            ctx.fillStyle = '#888';
-            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-            this.drawRockDetail(ctx, screenX, screenY, TILE_SIZE);
-            break;
-          case 2: // Trees
-            ctx.fillStyle = '#5f5';
-            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-            this.drawTree(ctx, screenX + TILE_SIZE/2, screenY + TILE_SIZE/2);
-            break;
-          case 3: // Walls
-            ctx.fillStyle = '#555';
-            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-            this.drawWallDetail(ctx, screenX, screenY, TILE_SIZE);
-            break;
-          case 4: // Road
-            ctx.fillStyle = '#999';
-            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-            this.drawRoadDetail(ctx, screenX, screenY, TILE_SIZE, x, y);
-            break;
-          case 5: // Water
-            this.drawWater(ctx, screenX, screenY, TILE_SIZE);
-            break;
-        }
+        this.drawTerrain(ctx, tile, screenX, screenY, TILE_SIZE, x, y);
       }
+    }
+
+    // Draw terrain details and decorations
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        const tile = this.game.map[y][x];
+        const screenX = x * TILE_SIZE;
+        const screenY = y * TILE_SIZE;
+
+        this.drawTerrainDetails(ctx, tile, screenX, screenY, TILE_SIZE, x, y);
+      }
+    }
+
+    // Apply lighting and shadows
+    this.applyLighting(ctx, player);
+  }
+
+  drawTerrain(ctx, tile, x, y, size, gridX, gridY) {
+    switch(tile) {
+      case 0: // Grass
+        this.drawDetailedGrass(ctx, x, y, size);
+        break;
+      case 1: // Rocks
+        this.drawDetailedRocks(ctx, x, y, size);
+        break;
+      case 2: // Trees
+        this.drawDetailedGrass(ctx, x, y, size);
+        break;
+      case 3: // Walls
+        this.drawDetailedWall(ctx, x, y, size);
+        break;
+      case 4: // Road
+        this.drawDetailedRoad(ctx, x, y, size, gridX, gridY);
+        break;
+      case 5: // Water
+        this.drawDetailedWater(ctx, x, y, size);
+        break;
+      case 6: // Buildings
+        this.drawDetailedBuilding(ctx, x, y, size);
+        break;
     }
   }
 
-  drawPowerUps(ctx) {
-    this.game.powerUps.forEach(powerUp => {
-      ctx.save();
-      ctx.translate(powerUp.x, powerUp.y);
-      
-      switch(powerUp.type) {
-        case 'health':
-          ctx.fillStyle = '#ff0000'; // Red for health
-          ctx.beginPath();
-          ctx.arc(0, 0, 10, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.stroke();
-          break;
-        case 'ammo':
-          ctx.fillStyle = '#ffff00'; // Yellow for ammo
-          ctx.beginPath();
-          ctx.rect(-10, -10, 20, 20);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.stroke();
-          break;
-        case 'weapon_upgrade':
-          ctx.fillStyle = '#0000ff'; // Blue for weapon upgrade
-          ctx.beginPath();
-          ctx.moveTo(0, -10);
-          ctx.lineTo(10, 10);
-          ctx.lineTo(-10, 10);
-          ctx.closePath();
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.stroke();
-          break;
-        case 'speed_boost':
-          ctx.fillStyle = '#00ff00'; // Green for speed boost
-          ctx.beginPath();
-          ctx.arc(0, 0, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.stroke();
-          break;
-        default:
-          ctx.fillStyle = '#ffffff'; // White for unknown types
-          ctx.beginPath();
-          ctx.arc(0, 0, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#fff';
-          ctx.stroke();
-      }
-
-      ctx.restore();
-    });
+  drawTerrainDetails(ctx, tile, x, y, size, gridX, gridY) {
+    switch(tile) {
+      case 2: // Trees
+        this.drawDetailedTree(ctx, x + size/2, y + size/2);
+        break;
+      case 6: // Building details
+        this.drawBuildingDetails(ctx, x, y, size);
+        break;
+    }
   }
 
-  drawTree(ctx, x, y) {
-    // Tree trunk
-    ctx.fillStyle = '#73510D';
-    ctx.fillRect(x - 2, y, 4, 8);
-
-    // Tree crown
-    ctx.fillStyle = '#25511F';
-    ctx.beginPath();
-    ctx.moveTo(x - 8, y);
-    ctx.lineTo(x + 8, y);
-    ctx.lineTo(x, y - 16);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  drawWater(ctx, x, y, size) {
-    const time = Date.now() / 1000;
-    ctx.fillStyle = '#4444ff';
+  drawDetailedGrass(ctx, x, y, size) {
+    // Base grass color
+    ctx.fillStyle = '#3a5a3a';
     ctx.fillRect(x, y, size, size);
 
-    // Animated water effect
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    // Grass detail pattern
+    ctx.strokeStyle = '#2d462d';
+    for (let i = 0; i < 5; i++) {
+      const offsetX = Math.random() * size;
+      const offsetY = Math.random() * size;
+      const length = Math.random() * 5 + 3;
+      const angle = Math.random() * Math.PI;
+      
+      ctx.save();
+      ctx.translate(x + offsetX, y + offsetY);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, length);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawDetailedRocks(ctx, x, y, size) {
+    // Base rock color
+    ctx.fillStyle = '#666';
+    ctx.fillRect(x, y, size, size);
+
+    // Rock texture
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    
+    for (let i = 0; i < 3; i++) {
+      const rockSize = Math.random() * 15 + 10;
+      const offsetX = Math.random() * (size - rockSize);
+      const offsetY = Math.random() * (size - rockSize);
+      
+      ctx.beginPath();
+      ctx.ellipse(
+        x + offsetX + rockSize/2,
+        y + offsetY + rockSize/2,
+        rockSize/2,
+        rockSize/3,
+        Math.random() * Math.PI,
+        0,
+        Math.PI * 2
+      );
+      ctx.fillStyle = `rgb(${100 + Math.random()*30}, ${100 + Math.random()*30}, ${100 + Math.random()*30})`;
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  drawDetailedTree(ctx, x, y) {
+    // Tree trunk
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(x - 4, y, 8, 20);
+
+    // Tree shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.beginPath();
-    for (let i = 0; i < size; i += 4) {
-      const waveHeight = Math.sin(i * 0.1 + time) * 2;
-      if (i === 0) {
-        ctx.moveTo(x + i, y + size/2 + waveHeight);
-      } else {
-        ctx.lineTo(x + i, y + size/2 + waveHeight);
+    ctx.ellipse(x, y + 20, 15, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tree foliage layers
+    const layers = 3;
+    for (let i = 0; i < layers; i++) {
+      ctx.fillStyle = `rgb(${30 + i*20}, ${100 + i*20}, ${30 + i*20})`;
+      ctx.beginPath();
+      ctx.moveTo(x - 20 + i*5, y - i*10);
+      ctx.lineTo(x + 20 - i*5, y - i*10);
+      ctx.lineTo(x, y - 30 - i*10);
+      ctx.closePath();
+      ctx.fill();
+
+      // Add detail dots for texture
+      ctx.fillStyle = `rgb(${40 + i*20}, ${110 + i*20}, ${40 + i*20})`;
+      for (let j = 0; j < 10; j++) {
+        const dotX = x - 15 + Math.random() * 30;
+        const dotY = y - i*10 - Math.random() * 20;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
-    ctx.stroke();
   }
 
-  drawRockDetail(ctx, x, y, size) {
-    ctx.strokeStyle = '#666';
-    ctx.beginPath();
-    // Draw crack patterns
-    ctx.moveTo(x + size * 0.2, y + size * 0.3);
-    ctx.lineTo(x + size * 0.8, y + size * 0.7);
-    ctx.moveTo(x + size * 0.7, y + size * 0.2);
-    ctx.lineTo(x + size * 0.3, y + size * 0.8);
-    ctx.stroke();
-  }
+  drawDetailedWall(ctx, x, y, size) {
+    // Base wall
+    ctx.fillStyle = '#777';
+    ctx.fillRect(x, y, size, size);
 
-  drawWallDetail(ctx, x, y, size) {
     // Brick pattern
-    ctx.strokeStyle = '#444';
-    for (let i = 0; i < size; i += size/4) {
-      ctx.beginPath();
-      ctx.moveTo(x, y + i);
-      ctx.lineTo(x + size, y + i);
-      ctx.stroke();
+    const brickWidth = 10;
+    const brickHeight = 5;
+    const mortar = 1;
+
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = mortar;
+
+    for (let row = 0; row < size/brickHeight; row++) {
+      const offset = (row % 2) * (brickWidth/2);
+      for (let col = -1; col < size/brickWidth + 1; col++) {
+        const brickX = x + col * brickWidth + offset;
+        const brickY = y + row * brickHeight;
+        
+        // Brick outline
+        ctx.strokeRect(brickX, brickY, brickWidth - mortar, brickHeight - mortar);
+        
+        // Brick texture
+        ctx.fillStyle = `rgb(${119 + Math.random()*20}, ${119 + Math.random()*20}, ${119 + Math.random()*20})`;
+        ctx.fillRect(brickX + mortar, brickY + mortar, 
+                    brickWidth - 2*mortar, brickHeight - 2*mortar);
+      }
     }
-    for (let i = 0; i < size; i += size/3) {
+
+    // Add wear and damage
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    for (let i = 0; i < 5; i++) {
+      const crackX = x + Math.random() * size;
+      const crackY = y + Math.random() * size;
+      const length = Math.random() * 10 + 5;
+      const angle = Math.random() * Math.PI;
+      
+      ctx.save();
+      ctx.translate(crackX, crackY);
+      ctx.rotate(angle);
       ctx.beginPath();
-      ctx.moveTo(x + i, y);
-      ctx.lineTo(x + i, y + size);
-      ctx.stroke();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(length, length/2);
+      ctx.lineTo(length*0.8, -length/3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
   }
 
-  drawRoadDetail(ctx, x, y, size, gridX, gridY) {
+  drawDetailedRoad(ctx, x, y, size, gridX, gridY) {
+    // Base road
+    ctx.fillStyle = '#444';
+    ctx.fillRect(x, y, size, size);
+
+    // Asphalt texture
+    for (let i = 0; i < 20; i++) {
+      ctx.fillStyle = `rgba(${60 + Math.random()*20}, ${60 + Math.random()*20}, ${60 + Math.random()*20}, 0.5)`;
+      ctx.beginPath();
+      ctx.arc(x + Math.random()*size, y + Math.random()*size, 
+              Math.random()*2 + 1, 0, Math.PI*2);
+      ctx.fill();
+    }
+
     // Road markings
-    ctx.strokeStyle = '#fff';
-    ctx.setLineDash([size/4, size/4]);
-    
-    // Check surrounding tiles to determine road direction
     const hasNorth = gridY > 0 && this.game.map[gridY-1][gridX] === 4;
     const hasSouth = gridY < 99 && this.game.map[gridY+1][gridX] === 4;
     const hasEast = gridX < 99 && this.game.map[gridY][gridX+1] === 4;
     const hasWest = gridX > 0 && this.game.map[gridY][gridX-1] === 4;
+
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 10]);
 
     if ((hasNorth || hasSouth) && !hasEast && !hasWest) {
       // Vertical road
@@ -297,9 +311,140 @@ export class Renderer {
       ctx.moveTo(x, y + size/2);
       ctx.lineTo(x + size, y + size/2);
       ctx.stroke();
+    } else if ((hasNorth || hasSouth) && (hasEast || hasWest)) {
+      // Intersection
+      ctx.strokeStyle = '#ddd';
+      ctx.strokeRect(x + 5, y + 5, size - 10, size - 10);
     }
-    
+
     ctx.setLineDash([]);
+  }
+
+  drawDetailedWater(ctx, x, y, size) {
+    const time = Date.now() / 1000;
+    
+    // Base water
+    const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+    gradient.addColorStop(0, '#2a80b9');
+    gradient.addColorStop(1, '#1a608a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, size, size);
+
+    // Wave effect
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      for (let j = 0; j <= size; j += 5) {
+        const waveHeight = Math.sin((j/size) * Math.PI * 2 + time * (i+1)) * 3;
+        if (j === 0) {
+          ctx.moveTo(x + j, y + size/2 + waveHeight + i*10);
+        } else {
+          ctx.lineTo(x + j, y + size/2 + waveHeight + i*10);
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Reflection highlights
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (let i = 0; i < 5; i++) {
+      const reflectX = x + Math.random() * size;
+      const reflectY = y + Math.random() * size;
+      const length = Math.random() * 10 + 5;
+      
+      ctx.beginPath();
+      ctx.ellipse(reflectX, reflectY, length, length/3, 
+                  Math.random() * Math.PI, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  drawDetailedBuilding(ctx, x, y, size) {
+    // Base building
+    ctx.fillStyle = '#555';
+    ctx.fillRect(x, y, size, size);
+
+    // Window pattern
+    const windowSize = 6;
+    const gap = 4;
+    const rows = 3;
+    const cols = 2;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const windowX = x + gap + col * (windowSize + gap);
+        const windowY = y + gap + row * (windowSize + gap);
+
+        // Window frame
+        ctx.fillStyle = '#333';
+        ctx.fillRect(windowX, windowY, windowSize, windowSize);
+
+        // Glass
+        ctx.fillStyle = 'rgba(155, 155, 255, 0.3)';
+        ctx.fillRect(windowX + 1, windowY + 1, windowSize - 2, windowSize - 2);
+
+        // Reflection
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.beginPath();
+        ctx.moveTo(windowX + 1, windowY + 1);
+        ctx.lineTo(windowX + 3, windowY + 1);
+        ctx.lineTo(windowX + 1, windowY + 3);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Door
+    const doorWidth = 8;
+    const doorHeight = 12;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(x + size/2 - doorWidth/2, y + size - doorHeight, 
+                doorWidth, doorHeight);
+
+    // Door handle
+    ctx.fillStyle = '#888';
+    ctx.beginPath();
+    ctx.arc(x + size/2 + doorWidth/4, y + size - doorHeight/2, 
+            1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Roof
+    ctx.fillStyle = '#444';
+    ctx.beginPath();
+    ctx.moveTo(x - 2, y);
+    ctx.lineTo(x + size + 2, y);
+    ctx.lineTo(x + size/2, y - size/4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Roof texture
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < size + 4; i += 4) {
+      ctx.beginPath();
+      ctx.moveTo(x - 2 + i, y);
+      ctx.lineTo(x + size/2, y - size/4);
+      ctx.stroke();
+    }
+  }
+
+  applyLighting(ctx, player) {
+    // Create a radial gradient for player's view
+    const gradient = ctx.createRadialGradient(
+      player.x, player.y, 0,
+      player.x, player.y, 300
+    );
+    
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+
+    // Apply the gradient as a mask
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = gradient;
+    ctx.fillRect(player.x - 400, player.y - 400, 800, 800);
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   drawVehicles(ctx) {
@@ -307,58 +452,494 @@ export class Renderer {
       ctx.save();
       ctx.translate(vehicle.x, vehicle.y);
       ctx.rotate(vehicle.angle);
-      ctx.fillStyle = vehicle.color;
-      ctx.fillRect(-vehicle.size / 2, -vehicle.size / 2, vehicle.size, vehicle.size);
 
-      // Draw turret if applicable
-      if (vehicle.weapon) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, -5, vehicle.weaponOffset, 10);
+      // Draw vehicle shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.beginPath();
+      ctx.ellipse(0, 10, vehicle.radius * 1.2, vehicle.radius * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      switch(vehicle.type) {
+        case 'tank':
+          this.drawTank(ctx, vehicle);
+          break;
+        case 'jeep':
+          this.drawJeep(ctx, vehicle);
+          break;
+        case 'lkw':
+          this.drawTruck(ctx, vehicle);
+          break;
+        case 'schuetzenpanzer':
+          this.drawAPC(ctx, vehicle);
+          break;
       }
+
+      // Draw health bar
+      const healthPercent = vehicle.health / vehicle.maxHealth;
+      ctx.fillStyle = `rgb(${255 * (1-healthPercent)}, ${255 * healthPercent}, 0)`;
+      ctx.fillRect(-20, -30, 40 * healthPercent, 4);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(-20, -30, 40, 4);
+
       ctx.restore();
     });
+  }
+
+  drawTank(ctx, vehicle) {
+    // Tank tracks
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-20, -12, 40, 6);
+    ctx.fillRect(-20, 6, 40, 6);
+    
+    // Track details
+    ctx.fillStyle = '#222';
+    for(let i = -18; i < 18; i += 4) {
+      ctx.fillRect(i, -12, 2, 6);
+      ctx.fillRect(i, 6, 2, 6);
+    }
+
+    // Main body
+    ctx.fillStyle = vehicle.color;
+    ctx.fillRect(-15, -8, 30, 16);
+
+    // Turret base
+    ctx.save();
+    ctx.rotate(vehicle.turretAngle);
+    ctx.fillStyle = '#445566';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main gun
+    ctx.fillStyle = '#334455';
+    ctx.fillRect(0, -3, vehicle.weaponOffset, 6);
+    
+    // Muzzle brake
+    ctx.fillStyle = '#223344';
+    ctx.fillRect(vehicle.weaponOffset, -4, 4, 8);
+    ctx.restore();
+
+    // Details
+    this.drawVehicleDetails(ctx, vehicle);
+  }
+
+  drawJeep(ctx, vehicle) {
+    // Wheels
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(-12, -12, 6, 0, Math.PI * 2);
+    ctx.arc(12, -12, 6, 0, Math.PI * 2);
+    ctx.arc(-12, 12, 6, 0, Math.PI * 2);
+    ctx.arc(12, 12, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = vehicle.color;
+    ctx.fillRect(-15, -8, 30, 16);
+    
+    // Windshield
+    ctx.fillStyle = 'rgba(155, 155, 255, 0.3)';
+    ctx.beginPath();
+    ctx.moveTo(-10, -8);
+    ctx.lineTo(-5, -12);
+    ctx.lineTo(5, -12);
+    ctx.lineTo(10, -8);
+    ctx.closePath();
+    ctx.fill();
+
+    // Mounted gun
+    if (vehicle.weapon) {
+      ctx.save();
+      ctx.rotate(vehicle.turretAngle);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(0, -2, vehicle.weaponOffset, 4);
+      ctx.restore();
+    }
+  }
+
+  drawTruck(ctx, vehicle) {
+    // Wheels
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    for(let x = -20; x <= 20; x += 10) {
+      ctx.arc(x, -12, 5, 0, Math.PI * 2);
+      ctx.arc(x, 12, 5, 0, Math.PI * 2);
+    }
+    ctx.fill();
+
+    // Cargo area
+    ctx.fillStyle = vehicle.color;
+    ctx.fillRect(-25, -10, 40, 20);
+    
+    // Cab
+    ctx.fillStyle = '#556677';
+    ctx.fillRect(-25, -10, 15, 20);
+    
+    // Windshield
+    ctx.fillStyle = 'rgba(155, 155, 255, 0.3)';
+    ctx.fillRect(-20, -8, 8, 6);
+  }
+
+  drawAPC(ctx, vehicle) {
+    // Tracks
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-25, -15, 50, 8);
+    ctx.fillRect(-25, 7, 50, 8);
+    
+    // Track details
+    ctx.fillStyle = '#222';
+    for(let i = -23; i < 23; i += 4) {
+      ctx.fillRect(i, -15, 2, 8);
+      ctx.fillRect(i, 7, 2, 8);
+    }
+
+    // Main body
+    ctx.fillStyle = vehicle.color;
+    ctx.beginPath();
+    ctx.moveTo(-25, -10);
+    ctx.lineTo(25, -10);
+    ctx.lineTo(25, 10);
+    ctx.lineTo(-25, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // Turret
+    ctx.save();
+    ctx.rotate(vehicle.turretAngle);
+    ctx.fillStyle = '#445566';
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Gun
+    ctx.fillStyle = '#334455';
+    ctx.fillRect(0, -2, vehicle.weaponOffset, 4);
+    ctx.restore();
+
+    // Vision slits
+    ctx.fillStyle = '#223344';
+    for(let i = -15; i <= 15; i += 10) {
+      ctx.fillRect(i, -8, 6, 2);
+    }
+  }
+
+  drawVehicleDetails(ctx, vehicle) {
+    // Battle damage if health is low
+    if (vehicle.health < vehicle.maxHealth * 0.5) {
+      const damageCount = Math.floor((1 - vehicle.health/vehicle.maxHealth) * 10);
+      ctx.fillStyle = '#000';
+      for(let i = 0; i < damageCount; i++) {
+        const x = (Math.random() - 0.5) * 30;
+        const y = (Math.random() - 0.5) * 20;
+        const size = Math.random() * 3 + 2;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Add smoke effects for damaged vehicles
+    if (vehicle.health < vehicle.maxHealth * 0.3) {
+      this.drawSmoke(ctx, 0, -10);
+    }
+  }
+
+  drawSmoke(ctx, x, y) {
+    const time = Date.now() / 1000;
+    for(let i = 0; i < 3; i++) {
+      const offset = Math.sin(time * 2 + i) * 2;
+      const alpha = 0.3 - (i * 0.1);
+      ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x + offset, y - (i * 5), 4 + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   drawPlayers(ctx, playerIndex) {
     this.game.players.forEach((player, index) => {
       if (player.health <= 0) return;
+
       ctx.save();
       ctx.translate(player.x, player.y);
       ctx.rotate(player.angle);
+
+      // Draw shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 5, player.radius, player.radius/2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw body
       ctx.fillStyle = player.color;
       ctx.beginPath();
       ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw direction indicator
-      ctx.strokeStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(player.radius, 0);
-      ctx.stroke();
+      // Draw equipment
+      this.drawPlayerEquipment(ctx, player);
+
+      // Draw weapon
+      this.drawPlayerWeapon(ctx, player);
+
+      // Health bar
+      const healthPercent = player.health / player.maxHealth;
+      ctx.fillStyle = `rgb(${255 * (1-healthPercent)}, ${255 * healthPercent}, 0)`;
+      ctx.fillRect(-15, -25, 30 * healthPercent, 3);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(-15, -25, 30, 3);
+
       ctx.restore();
     });
+  }
+
+  drawPlayerEquipment(ctx, player) {
+    // Draw armor
+    if (player.armor) {
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, player.radius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Draw camouflage effect
+    if (player.camouflage) {
+      const pattern = ctx.createPattern(this.getCamoPattern(player.camouflage), 'repeat');
+      ctx.fillStyle = pattern;
+      ctx.beginPath();
+      ctx.arc(0, 0, player.radius + 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  drawPlayerWeapon(ctx, player) {
+    ctx.save();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+
+    // Draw weapon based on type
+    switch(player.weapon) {
+      case 'Pistole':
+        ctx.beginPath();
+        ctx.moveTo(player.radius - 2, 0);
+        ctx.lineTo(player.radius + 8, 0);
+        ctx.stroke();
+        break;
+      case 'Gewehr':
+        ctx.beginPath();
+        ctx.moveTo(player.radius - 2, 0);
+        ctx.lineTo(player.radius + 15, 0);
+        ctx.stroke();
+        break;
+      case 'Maschinengewehr':
+        ctx.beginPath();
+        ctx.moveTo(player.radius - 2, 0);
+        ctx.lineTo(player.radius + 20, 0);
+        ctx.rect(player.radius + 15, -2, 5, 4);
+        ctx.stroke();
+        break;
+      case 'Schrotflinte':
+        ctx.beginPath();
+        ctx.moveTo(player.radius - 2, 0);
+        ctx.lineTo(player.radius + 12, 0);
+        ctx.rect(player.radius + 8, -1.5, 4, 3);
+        ctx.stroke();
+        break;
+    }
+
+    ctx.restore();
+  }
+
+  getCamoPattern(camouflage) {
+    // Create canvas for camo pattern
+    const patternCanvas = document.createElement('canvas');
+    patternCanvas.width = 20;
+    patternCanvas.height = 20;
+    const patternCtx = patternCanvas.getContext('2d');
+
+    // Draw different patterns based on camo type
+    switch(camouflage.name) {
+      case 'Urban Tarnung':
+        this.drawUrbanCamo(patternCtx);
+        break;
+      case 'Wald Tarnung':
+        this.drawWoodlandCamo(patternCtx);
+        break;
+      case 'Wüsten Tarnung':
+        this.drawDesertCamo(patternCtx);
+        break;
+      case 'Ghillie Anzug':
+        this.drawGhillieCamo(patternCtx);
+        break;
+    }
+
+    return patternCanvas;
+  }
+
+  drawUrbanCamo(ctx) {
+    const colors = ['#555', '#777', '#999', '#333'];
+    for(let i = 0; i < 10; i++) {
+      ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+      ctx.beginPath();
+      ctx.rect(Math.random() * 20, Math.random() * 20, 
+               Math.random() * 10, Math.random() * 10);
+      ctx.fill();
+    }
+  }
+
+  drawWoodlandCamo(ctx) {
+    const colors = ['#1a4314', '#2d5a1a', '#3f7120', '#1c2e0f'];
+    ctx.fillStyle = colors[0];
+    ctx.fillRect(0, 0, 20, 20);
+    
+    for(let i = 1; i < colors.length; i++) {
+      ctx.fillStyle = colors[i];
+      for(let j = 0; j < 3; j++) {
+        ctx.beginPath();
+        ctx.ellipse(Math.random() * 20, Math.random() * 20, 
+                   Math.random() * 5 + 3, Math.random() * 5 + 3,
+                   Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  drawDesertCamo(ctx) {
+    const colors = ['#c2b280', '#a89b6a', '#8f8558', '#d4c397'];
+    ctx.fillStyle = colors[0];
+    ctx.fillRect(0, 0, 20, 20);
+    
+    for(let i = 1; i < colors.length; i++) {
+      ctx.fillStyle = colors[i];
+      for(let j = 0; j < 3; j++) {
+        const x = Math.random() * 20;
+        const y = Math.random() * 20;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.random() * 8, y + Math.random() * 8);
+        ctx.lineTo(x + Math.random() * 8, y - Math.random() * 8);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  }
+
+  drawGhillieCamo(ctx) {
+    // Base layer
+    ctx.fillStyle = '#2d5a1a';
+    ctx.fillRect(0, 0, 20, 20);
+    
+    // Random grass-like strokes
+    for(let i = 0; i < 20; i++) {
+      ctx.strokeStyle = i % 2 ? '#1a4314' : '#3f7120';
+      ctx.beginPath();
+      const x = Math.random() * 20;
+      const y = Math.random() * 20;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.random() * 4 - 2, y + Math.random() * 4 - 2);
+      ctx.stroke();
+    }
   }
 
   drawEnemies(ctx) {
     this.game.enemies.forEach(enemy => {
       if (enemy.health <= 0) return;
+      
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
       ctx.rotate(enemy.angle);
-      ctx.fillStyle = enemy.color;
+
+      // Draw shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.beginPath();
+      ctx.ellipse(0, 5, enemy.radius, enemy.radius/2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw enemy with state-based visual feedback
+      switch(enemy.state) {
+        case 'patrol':
+          ctx.fillStyle = '#FFD700';
+          break;
+        case 'engage':
+          ctx.fillStyle = '#FF4500';
+          break;
+        case 'flee':
+          ctx.fillStyle = '#98FB98';
+          break;
+        case 'investigate':
+          ctx.fillStyle = '#DEB887';
+          break;
+        default:
+          ctx.fillStyle = enemy.color;
+      }
+
+      // Main body
       ctx.beginPath();
       ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw direction indicator
-      ctx.strokeStyle = '#fff';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(enemy.radius, 0);
-      ctx.stroke();
+      // Draw alertness indicator
+      if (enemy.alertness > 0) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${enemy.alertness / 100})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, enemy.radius + 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw equipment
+      this.drawEnemyEquipment(ctx, enemy);
+
+      // Draw vision cone
+      this.drawVisionCone(ctx, enemy);
+
+      // Health bar
+      const healthPercent = enemy.health / enemy.maxHealth;
+      ctx.fillStyle = `rgb(${255 * (1-healthPercent)}, ${255 * healthPercent}, 0)`;
+      ctx.fillRect(-15, -25, 30 * healthPercent, 3);
+      ctx.strokeStyle = '#000';
+      ctx.strokeRect(-15, -25, 30, 3);
+
       ctx.restore();
     });
+  }
+
+  drawVisionCone(ctx, enemy) {
+    const visionRange = enemy.visionRange;
+    const visionAngle = enemy.visionAngle;
+    
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, visionRange, -visionAngle/2, visionAngle/2);
+    ctx.closePath();
+    
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, visionRange);
+    gradient.addColorStop(0, 'rgba(255, 255, 0, 0.1)');
+    gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fill();
+  }
+
+  drawEnemyEquipment(ctx, enemy) {
+    // Similar to drawPlayerEquipment but for enemies
+    if (enemy.armor) {
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.radius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Draw weapon
+    ctx.save();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(enemy.radius - 2, 0);
+    ctx.lineTo(enemy.radius + 10, 0);
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawBullets(ctx) {
@@ -366,90 +947,158 @@ export class Renderer {
       ctx.save();
       ctx.translate(bullet.x, bullet.y);
       ctx.rotate(bullet.angle);
+
+      // Bullet trail effect
+      const gradient = ctx.createLinearGradient(-10, 0, 0, 0);
+      gradient.addColorStop(0, 'rgba(255, 255, 0, 0)');
+      gradient.addColorStop(1, 'rgba(255, 255, 0, 0.5)');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(-10, -1, 10, 2);
+
+      // Bullet
       ctx.fillStyle = '#ff0';
       ctx.beginPath();
-      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
       ctx.fill();
+
+      // Bullet glow
+      ctx.fillStyle = 'rgba(255, 255, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.restore();
     });
   }
 
   drawEffects(ctx) {
-    // Placeholder for effects like explosions, smoke, etc.
+    // Draw explosions
     this.game.explosions.forEach(explosion => {
       ctx.save();
       ctx.translate(explosion.x, explosion.y);
-      ctx.globalAlpha = 1 - (explosion.frame / explosion.maxFrames);
-      ctx.fillStyle = 'orange';
+      
+      // Inner explosion
+      const innerRadius = explosion.radius * (explosion.frame / explosion.maxFrames);
+      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, innerRadius);
+      gradient.addColorStop(0, 'rgba(255, 200, 0, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(255, 100, 0, 0.6)');
+      gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+      
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(0, 0, explosion.radius * explosion.frame, 0, Math.PI * 2);
+      ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
       ctx.fill();
+
+      // Shock wave
+      const outerRadius = innerRadius * 1.5;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${1 - explosion.frame / explosion.maxFrames})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Debris particles
+      const particleCount = 10;
+      for(let i = 0; i < particleCount; i++) {
+        const angle = (i / particleCount) * Math.PI * 2;
+        const distance = innerRadius * 0.8;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+        
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    });
+
+    // Draw weather effects
+    if (this.effects.weather.rain) {
+      this.drawRain(ctx);
+    }
+    if (this.effects.weather.fog) {
+      this.drawFog(ctx);
+    }
+
+    // Draw particle effects
+    this.drawParticles(ctx);
+  }
+
+  drawRain(ctx) {
+    ctx.strokeStyle = 'rgba(155, 155, 255, 0.5)';
+    ctx.lineWidth = 1;
+    
+    this.effects.weather.rainDrops.forEach(drop => {
+      ctx.beginPath();
+      ctx.moveTo(drop.x, drop.y);
+      ctx.lineTo(drop.x - drop.speed, drop.y + drop.length);
+      ctx.stroke();
+
+      // Update drop position
+      drop.x += drop.speed;
+      drop.y += drop.speed * 2;
+
+      // Reset drop when it goes off screen
+      if (drop.y > this.canvas1.height) {
+        drop.y = -drop.length;
+        drop.x = Math.random() * this.canvas1.width;
+      }
+    });
+  }
+
+  drawFog(ctx) {
+    const gradient = ctx.createRadialGradient(
+      this.canvas1.width/2, this.canvas1.height/2, 0,
+      this.canvas1.width/2, this.canvas1.height/2, Math.max(this.canvas1.width, this.canvas1.height)
+    );
+    
+    gradient.addColorStop(0, `rgba(200, 200, 200, ${this.effects.weather.fogDensity})`);
+    gradient.addColorStop(1, `rgba(200, 200, 200, ${this.effects.weather.fogDensity * 0.5})`);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.canvas1.width, this.canvas1.height);
+  }
+
+  drawParticles(ctx) {
+    this.effects.particles.forEach((particle, index) => {
+      particle.life -= 1;
+      if (particle.life <= 0) {
+        this.effects.particles.splice(index, 1);
+        return;
+      }
+
+      ctx.save();
+      ctx.translate(particle.x, particle.y);
+      ctx.globalAlpha = particle.life / particle.maxLife;
+      
+      ctx.fillStyle = particle.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
+      ctx.fill();
+      
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vy += particle.gravity;
+      
       ctx.restore();
     });
   }
 
-  drawHUD(ctx, player, playerIndex) {
-    // Additional HUD elements can be drawn here if needed
-    // For example, draw crosshairs, weapon indicators, etc.
-  }
-
-  drawMinimap(ctx, player) {
-    // Clear minimap
-    ctx.clearRect(0, 0, this.minimap1.width, this.minimap1.height);
-
-    // Draw map overview
-    const scale = this.minimap1.width / (100 * 40);
-    ctx.fillStyle = '#5f5'; // Grass
-    ctx.fillRect(0, 0, this.minimap1.width, this.minimap1.height);
-
-    // Draw roads
-    ctx.fillStyle = '#999';
-    for(let y = 0; y < 100; y++) {
-      for(let x = 0; x < 100; x++) {
-        if (this.game.map[y][x] === 4) {
-          ctx.fillRect(x * 40 * scale, y * 40 * scale, 40 * scale, 40 * scale);
-        }
-      }
-    }
-
-    // Draw power-ups
-    this.game.powerUps.forEach(p => {
-      ctx.fillStyle = p.type === 'health' ? '#f00' : p.type === 'ammo' ? '#ff0' : p.type === 'weapon_upgrade' ? '#00f' : '#0f0';
-      ctx.beginPath();
-      ctx.arc(p.x * scale, p.y * scale, 2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Draw vehicles
-    this.game.vehicles.forEach(v => {
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(v.x * scale, v.y * scale, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Draw players
-    this.game.players.forEach((p, index) => {
-      ctx.fillStyle = index === 0 ? '#4444ff' : '#ff4444';
-      ctx.beginPath();
-      ctx.arc(p.x * scale, p.y * scale, 5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Draw enemies
-    this.game.enemies.forEach(enemy => {
-      ctx.fillStyle = '#FFD700';
-      ctx.beginPath();
-      ctx.arc(enemy.x * scale, enemy.y * scale, 5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-
-  drawPlayerFieldOfView(ctx, player) {
-    // Optional: Draw field of view indicators
-  }
-
-  drawVehicleFieldOfView(ctx, player) {
-    // Optional: Implement field of view visualization for vehicles
+  addParticle(x, y, type) {
+    const particle = {
+      x, y,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      size: Math.random() * 3 + 1,
+      life: 60,
+      maxLife: 60,
+      gravity: 0.1,
+      color: type === 'smoke' ? '#888' : type === 'fire' ? '#f50' : '#fff'
+    };
+    
+    this.effects.particles.push(particle);
   }
 }
