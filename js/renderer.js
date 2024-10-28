@@ -412,11 +412,27 @@ export class Renderer {
       }
     }
 
+    // Draw power-ups
+    this.game.powerUps.forEach(p => {
+      ctx.fillStyle = p.type === 'health' ? '#f00' : p.type === 'ammo' ? '#ff0' : p.type === 'weapon_upgrade' ? '#00f' : '#0f0';
+      ctx.beginPath();
+      ctx.arc(p.x * scale, p.y * scale, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw vehicles
+    this.game.vehicles.forEach(v => {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(v.x * scale, v.y * scale, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     // Draw players
-    this.game.players.forEach((player, index) => {
+    this.game.players.forEach((p, index) => {
       ctx.fillStyle = index === 0 ? '#4444ff' : '#ff4444';
       ctx.beginPath();
-      ctx.arc(player.x * scale, player.y * scale, 5, 0, Math.PI * 2);
+      ctx.arc(p.x * scale, p.y * scale, 5, 0, Math.PI * 2);
       ctx.fill();
     });
 
@@ -425,14 +441,6 @@ export class Renderer {
       ctx.fillStyle = '#FFD700';
       ctx.beginPath();
       ctx.arc(enemy.x * scale, enemy.y * scale, 5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Draw vehicles
-    this.game.vehicles.forEach(vehicle => {
-      ctx.fillStyle = vehicle.color;
-      ctx.beginPath();
-      ctx.arc(vehicle.x * scale, vehicle.y * scale, 7, 0, Math.PI * 2);
       ctx.fill();
     });
   }

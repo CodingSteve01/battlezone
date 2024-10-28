@@ -28,18 +28,18 @@ export class Game {
         backward: 'ArrowDown', 
         left: 'ArrowLeft', 
         right: 'ArrowRight', 
-        shoot: 'ControlLeft', 
+        shoot: 'Space', 
         action: 'Enter', 
-        switch: 'KeyG' 
+        switch: 'ShiftRight' 
       },
       { 
-        forward: 'KeyI', 
-        backward: 'KeyK', 
-        left: 'KeyJ', 
-        right: 'KeyL', 
-        shoot: 'KeyH', 
-        action: 'KeyU', 
-        switch: 'KeyY' 
+        forward: 'KeyW', 
+        backward: 'KeyS', 
+        left: 'KeyA', 
+        right: 'KeyD', 
+        shoot: 'KeyF', 
+        action: 'KeyE', 
+        switch: 'KeyG' 
       }
     ];
     
@@ -94,7 +94,7 @@ export class Game {
         break;
     }
 
-    this.ensureSafeSpawns(); // Added ensureSafeSpawns call
+    this.ensureSafeSpawns(); // Ensure safe spawning
     this.startGameLoop();
   }
 
@@ -239,8 +239,8 @@ export class Game {
   }
 
   generateVehicles() {
+    const vehicleTypes = ['tank', 'jeep', 'lkw', 'schuetzenpanzer'];
     const vehicles = [];
-    const vehicleTypes = ['tank', 'jeep', 'apc', 'truck'];
     const vehicleCount = this.mode === 'SinglePlayer' ? 5 : 10;
 
     for(let i = 0; i < vehicleCount; i++) {
@@ -298,7 +298,7 @@ export class Game {
       );
 
       const enemy = new Human(x, y, '#FFD700', true);
-      enemy.weapon = Math.random() < 0.3 ? 'Machine Gun' : 'Pistol';
+      enemy.weapon = Math.random() < 0.3 ? 'Maschinengewehr' : 'Pistole';
       this.enemies.push(enemy);
     }
   }
@@ -425,7 +425,7 @@ export class Game {
       }
 
       // Handle shooting
-      if (controls.shoot && player.canShoot && player.ammo > 0) {
+      if (controls.shoot && player.ammo > 0 && player.canShoot) {
         this.createBullet(player, index);
         player.canShoot = false;
         setTimeout(() => { player.canShoot = true; }, 200);
@@ -469,9 +469,9 @@ export class Game {
     
     let damage = 10; // Default damage
     switch(shooter.weapon) {
-      case 'Machine Gun': damage = 5; break;
-      case 'Shotgun': damage = 20; break;
-      case 'Tank Cannon': damage = 50; break;
+      case 'Maschinengewehr': damage = 5; break;
+      case 'Schrotflinte': damage = 20; break;
+      case 'Kanone': damage = 50; break;
     }
 
     this.bullets.push({
@@ -575,7 +575,7 @@ export class Game {
       }
 
       player.health -= bullet.damage;
-      document.getElementById(`health${playerIndex + 1}`).textContent = 
+      document.getElementById(`health${playerIndex +1}`).textContent = 
         Math.max(player.health, 0);
       
       this.bullets.splice(bulletIndex, 1);
@@ -653,12 +653,12 @@ export class Game {
   handleVehicleBulletCollision(bullet, bulletIndex, vehicle, vehicleIndex) {
     if (!bullet.vehicle || bullet.vehicle !== vehicle) {
       if (distance(bullet, vehicle) < 30) {
-        const destroyed = vehicle.takeDamage(bullet.damage);
+        vehicle.health -= bullet.damage;
         this.bullets.splice(bulletIndex, 1);
-        this.createExplosion(bullet.x, bullet.y, destroyed ? 2 : 1);
+        this.createExplosion(bullet.x, bullet.y, vehicle.health <= 0 ? 2 : 1);
         this.soundManager.playSound('explosion');
 
-        if (destroyed) {
+        if (vehicle.health <= 0) {
           // Handle vehicle destruction
           this.handleVehicleDestruction(vehicle, vehicleIndex);
         }
@@ -740,10 +740,10 @@ export class Game {
         document.getElementById(`ammo${playerIndex +1}`).textContent = player.ammo;
         break;
       case 'weapon_upgrade':
-        if (player.weapon === 'Pistol') {
-          player.weapon = 'Machine Gun';
-        } else if (player.weapon === 'Machine Gun') {
-          player.weapon = 'Shotgun';
+        if (player.weapon === 'Pistole') {
+          player.weapon = 'Maschinengewehr';
+        } else if (player.weapon === 'Maschinengewehr') {
+          player.weapon = 'Schrotflinte';
         }
         document.getElementById(`weapon${playerIndex +1}`).textContent = player.weapon;
         break;
@@ -766,6 +766,10 @@ export class Game {
     } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, this.powerUps, 50));
 
     this.powerUps.push({x, y, type});
+  }
+
+  createExplosion(x, y, maxFrames) {
+    this.explosions.push({x, y, frame: 0, maxFrames});
   }
 
   updateExplosions() {
