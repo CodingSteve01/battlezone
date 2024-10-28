@@ -12,7 +12,12 @@ export class Game {
     this.gameLoopRunning = false;
     this.score = 0;
     this.wave = 1;
+    this.initSoundManager();
     this.initGame();
+  }
+
+  initSoundManager() {
+    this.soundManager = new SoundManager();
   }
 
   setupControls() {
@@ -332,10 +337,12 @@ export class Game {
             nearestVehicle.driver = player;
             player.vehicle = nearestVehicle;
             player.role = 'driver';
+            this.soundManager.playSound('enterVehicle');
           } else if (!nearestVehicle.gunner) {
             nearestVehicle.gunner = player;
             player.vehicle = nearestVehicle;
             player.role = 'gunner';
+            this.soundManager.playSound('enterVehicle');
           }
           document.getElementById(`vehicle${index+1}`).textContent = nearestVehicle.type;
         }
@@ -351,10 +358,12 @@ export class Game {
         v.driver = null;
         v.gunner = player;
         player.role = 'gunner';
+        this.soundManager.playSound('switchSeat');
       } else if (player.role === 'gunner' && !v.driver) {
         v.gunner = null;
         v.driver = player;
         player.role = 'driver';
+        this.soundManager.playSound('switchSeat');
       }
       document.getElementById(`vehicle${index+1}`).textContent = v.type;
     }
@@ -401,6 +410,7 @@ export class Game {
         this.createBullet(player, index);
         player.canShoot = false;
         setTimeout(() => { player.canShoot = true; }, 200);
+        this.soundManager.playSound('shoot');
       }
     });
 
@@ -470,9 +480,10 @@ export class Game {
     const target = this.findNearestPlayer(enemy);
     if (target && distance(enemy, target) < 300 && 
         isInSight(enemy, target, enemy.angle, Math.PI / 2, 300)) {
-      this.createBullet(enemy, this.players.length); // Owner index beyond players
+      this.createBullet(enemy, this.players.length + this.enemies.indexOf(enemy));
       enemy.canShoot = false;
       setTimeout(() => { enemy.canShoot = true; }, 1000);
+      this.soundManager.playSound('enemyShoot');
     }
   }
 
@@ -507,6 +518,7 @@ export class Game {
     if (isColliding({x: bullet.x, y: bullet.y}, this.map)) {
       this.bullets.splice(bulletIndex, 1);
       this.createExplosion(bullet.x, bullet.y, 1);
+      this.soundManager.playSound('explosion');
       return true;
     }
 
@@ -549,6 +561,7 @@ export class Game {
       
       this.bullets.splice(bulletIndex, 1);
       this.createExplosion(bullet.x, bullet.y, 1);
+      this.soundManager.playSound('hit');
 
       if (player.health <= 0) {
         if (this.mode === 'Versus') {
@@ -598,6 +611,7 @@ export class Game {
       enemy.health -= bullet.damage;
       this.bullets.splice(bulletIndex, 1);
       this.createExplosion(bullet.x, bullet.y, 1);
+      this.soundManager.playSound('hit');
       
       if (enemy.health <= 0) {
         this.enemies.splice(enemyIndex, 1);
@@ -609,6 +623,7 @@ export class Game {
             y: enemy.y,
             type: Math.random() < 0.5 ? 'health' : 'ammo'
           });
+          this.soundManager.playSound('powerUpDrop');
         }
       }
       return true;
@@ -622,6 +637,7 @@ export class Game {
         const destroyed = vehicle.takeDamage(bullet.damage);
         this.bullets.splice(bulletIndex, 1);
         this.createExplosion(bullet.x, bullet.y, destroyed ? 2 : 1);
+        this.soundManager.playSound('explosion');
 
         if (destroyed) {
           // Handle vehicle destruction
@@ -636,7 +652,8 @@ export class Game {
   handleVehicleDestruction(vehicle, vehicleIndex) {
     // Create large explosion
     this.createExplosion(vehicle.x, vehicle.y, 3);
-    
+    this.soundManager.playSound('explosion');
+
     // Eject occupants
     if (vehicle.driver) {
       vehicle.driver.health -= 50; // Damage from explosion
@@ -680,6 +697,7 @@ export class Game {
         if (distance(player, powerUp) < 20) {
           this.applyPowerUp(player, powerUp);
           this.powerUps.splice(i, 1);
+          this.soundManager.playSound('powerUpCollect');
           break;
         }
       }
@@ -784,5 +802,107 @@ export class Game {
     const gameOverMessage = document.getElementById('gameOverMessage');
     gameOverMessage.textContent = `${message}\nWave: ${this.wave}\nScore: ${this.score}`;
     gameOverScreen.classList.remove('hidden');
+  }
+}
+
+// SoundManager class to handle sound effects using Web Audio API
+class SoundManager {
+  constructor() {
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this.sounds = {};
+    this.initSounds();
+  }
+
+  initSounds() {
+    this.sounds['shoot'] = () => this.playShootSound();
+    this.sounds['enemyShoot'] = () => this.playEnemyShootSound();
+    this.sounds['explosion'] = () => this.playExplosionSound();
+    this.sounds['hit'] = () => this.playHitSound();
+    this.sounds['powerUpCollect'] = () => this.playPowerUpCollectSound();
+    this.sounds['powerUpDrop'] = () => this.playPowerUpDropSound();
+    this.sounds['enterVehicle'] = () => this.playEnterVehicleSound();
+    this.sounds['switchSeat'] = () => this.playSwitchSeatSound();
+  }
+
+  playSound(soundName) {
+    if (this.sounds[soundName]) {
+      this.sounds[soundName]();
+    }
+  }
+
+  playShootSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(600, this.audioCtx.currentTime); // frequency in hertz
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
+  }
+
+  playEnemyShootSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(500, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
+  }
+
+  playExplosionSound() {
+    const bufferSize = 2 * this.audioCtx.sampleRate;
+    const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+    }
+    const noise = this.audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    noise.connect(this.audioCtx.destination);
+    noise.start();
+  }
+
+  playHitSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
+  }
+
+  playPowerUpCollectSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(700, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.2);
+  }
+
+  playPowerUpDropSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(400, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.2);
+  }
+
+  playEnterVehicleSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(550, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
+  }
+
+  playSwitchSeatSound() {
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(650, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
   }
 }

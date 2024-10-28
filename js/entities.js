@@ -243,7 +243,7 @@ export class Entity {
           // Shooting logic handled by game class
           this.canShoot = false;
           setTimeout(() => { this.canShoot = true; }, this.shootCooldown);
-          this.game.createBullet(this, this.game.players.length + this.enemies.indexOf(this));
+          this.game.createBullet(this, this.game.players.length + this.game.enemies.indexOf(this.currentTarget));
         }
       }
     }

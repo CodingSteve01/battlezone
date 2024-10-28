@@ -5,7 +5,6 @@ export class Renderer {
   constructor(game) {
     this.game = game;
     this.setupCanvases();
-    this.loadImages();
     this.setupEffects();
   }
 
@@ -40,46 +39,6 @@ export class Renderer {
       this.canvas2.width = containerWidth / 2;
       this.canvas2.height = window.innerHeight;
     }
-  }
-
-  loadImages() {
-    this.images = {
-      terrain: {},
-      vehicles: {},
-      powerUps: {},
-      effects: {}
-    };
-
-    // Terrain textures
-    const terrainTypes = ['grass', 'rock', 'tree', 'wall', 'road', 'water'];
-    terrainTypes.forEach(type => {
-      const img = new Image();
-      img.src = `assets/terrain/${type}.png`;
-      this.images.terrain[type] = img;
-    });
-
-    // Vehicle textures
-    const vehicleTypes = ['tank', 'jeep', 'apc', 'truck'];
-    vehicleTypes.forEach(type => {
-      const img = new Image();
-      img.src = `assets/vehicles/${type}.png`;
-      this.images.vehicles[type] = img;
-    });
-
-    // Power-up textures
-    const powerUpTypes = ['health', 'ammo', 'weapon_upgrade', 'speed_boost'];
-    powerUpTypes.forEach(type => {
-      const img = new Image();
-      img.src = `assets/powerups/${type}.png`;
-      this.images.powerUps[type] = img;
-    });
-
-    // Effect textures
-    ['explosion', 'smoke', 'splash'].forEach(effect => {
-      const img = new Image();
-      img.src = `assets/effects/${effect}.png`;
-      this.images.effects[effect] = img;
-    });
   }
 
   setupEffects() {
@@ -377,6 +336,7 @@ export class Renderer {
 
   drawHUD(ctx, player, playerIndex) {
     // Additional HUD elements can be drawn here if needed
+    // For example, draw crosshairs, weapon indicators, etc.
   }
 
   drawMinimap(ctx, player) {
