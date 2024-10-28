@@ -1,17 +1,51 @@
-// js/game.js
 import { Entity, Human, Vehicle, isColliding, isVehicleColliding, distance, isInSight } from './entities.js';
 import { Renderer } from './renderer.js';
 
 export class Game {
   constructor(mode) {
-    this.mode = mode; // 'Cooperative' oder 'Versus'
+    this.mode = mode;
     this.renderer = new Renderer(this);
     this.setupControls();
     this.setupModeDisplay();
     this.gameOver = false;
-    this.gameLoopRunning = false; // Flag to prevent multiple loops
+    this.gameLoopRunning = false;
+    this.score = 0;
+    this.wave = 1;
     this.initGame();
-    this.gameLoop();
+  }
+
+  setupControls() {
+    this.keys = {};
+    this.controls = [
+      { 
+        forward: 'KeyW', 
+        backward: 'KeyS', 
+        left: 'KeyA', 
+        right: 'KeyD', 
+        shoot: 'KeyF', 
+        action: 'KeyE', 
+        switch: 'KeyG' 
+      },
+      { 
+        forward: 'KeyI', 
+        backward: 'KeyK', 
+        left: 'KeyJ', 
+        right: 'KeyL', 
+        shoot: 'KeyH', 
+        action: 'KeyU', 
+        switch: 'KeyY' 
+      }
+    ];
+    
+    window.addEventListener('keydown', (e) => {
+      this.keys[e.code] = true;
+      e.preventDefault();
+    });
+    
+    window.addEventListener('keyup', (e) => {
+      this.keys[e.code] = false;
+      e.preventDefault();
+    });
   }
 
   setupModeDisplay() {
@@ -21,195 +55,241 @@ export class Game {
   }
 
   initGame() {
-    this.map = this.generateLogicalMap();
-    this.players = [
-      new Human(100, 100, '#4444ff'),
-      new Human(100, 100, '#ff4444') // In Coop, starten beide am gleichen Ort
-    ];
+    this.map = this.generateMap();
+    this.players = this.mode === 'SinglePlayer' ? 
+      [new Human(100, 100, '#4444ff')] :
+      [new Human(100, 100, '#4444ff'), new Human(100, 100, '#ff4444')];
+    
     this.vehicles = this.generateVehicles();
-    // Assign the game reference to each vehicle
     this.vehicles.forEach(v => v.game = this);
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
-    this.kis = []; // KI-gesteuerte Gegner
-    if (this.mode === 'Cooperative') {
-      this.spawnKIs(30); // Erhöhte Anzahl an KI-Gegner
+    this.enemies = [];
+    this.explosions = [];
+    this.pickups = [];
+
+    switch(this.mode) {
+      case 'SinglePlayer':
+        this.spawnEnemies(5 + this.wave * 2);
+        break;
+      case 'Cooperative':
+        this.spawnEnemies(10 + this.wave * 3);
+        this.players[1].x = this.players[0].x + 50;
+        this.players[1].y = this.players[0].y + 50;
+        break;
+      case 'Versus':
+        this.players[1].x = 3900;
+        this.players[1].y = 3900;
+        break;
     }
-    // Set initial positions based on mode
-    if (this.mode === 'Cooperative') {
-      // Set both players to start at same position
-      this.players[1].x = this.players[0].x;
-      this.players[1].y = this.players[0].y;
-    } else {
-      // Versus mode: separate start positions
-      this.players[1].x = 3900;
-      this.players[1].y = 3900;
-    }
-    // Sicherstellen, dass Spieler nicht auf Hindernissen spawnen
-    this.players.forEach(player => {
-      while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
-        player.x = Math.random() * 100 * 40; // MAP_SIZE * TILE_SIZE
-        player.y = Math.random() * 100 * 40;
-      }
-    });
+
+    this.ensureSafeSpawns();
+    this.startGameLoop();
   }
 
-  resetGame() {
-    // Spielzustand zurücksetzen
-    this.gameOver = false;
-    document.getElementById('gameOverScreen').classList.add('hidden');
-    this.map = this.generateLogicalMap();
-    this.players.forEach((player, index) => {
-      player.health = 100;
-      player.ammo = 30;
-      player.weapon = 'Pistole'; // Reset Weapon
-      player.vehicle = null;
-      player.role = null;
-      player.canShoot = true; // Reset Schussflag
-      if (this.mode === 'Cooperative') {
-        player.x = 100;
-        player.y = 100;
-      } else {
-        player.x = index === 0 ? 100 : 3900;
-        player.y = index === 0 ? 100 : 3900;
-      }
-      // Sicherstellen, dass Spieler nicht auf Hindernissen oder anderen Spielern spawnen
-      while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
-        player.x = Math.random() * 100 * 40;
-        player.y = Math.random() * 100 * 40;
-      }
-      // Update HUD
-      document.getElementById(`health${index+1}`).textContent = player.health;
-      document.getElementById(`ammo${index+1}`).textContent = player.ammo;
-      document.getElementById(`weapon${index+1}`).textContent = player.weapon;
-      document.getElementById(`vehicle${index+1}`).textContent = 'None';
-      document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
-      document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
-    });
-    this.vehicles = this.generateVehicles();
-    // Assign the game reference to each vehicle
-    this.vehicles.forEach(v => v.game = this);
-    this.bullets = [];
-    this.powerUps = this.generatePowerUps();
-    this.kis = [];
-    if (this.mode === 'Cooperative') {
-      this.spawnKIs(30);
-    }
-  }
-
-  isPlayerOverlapping(newPlayer) {
-    return this.players.some(player => distance(player, newPlayer) < 50 && player !== newPlayer);
-  }
-
-  generateLogicalMap() {
+  generateMap() {
     const map = [];
-    for(let y = 0; y < 100; y++) { // MAP_SIZE = 100
-      const row = [];
-      for(let x = 0; x < 100; x++) {
-        // Logische Kartenerstellung mit Straßen und Landschaft
-        if ((y === 20 || y === 80) && x > 10 && x < 90) {
-          row.push(4); // Straße horizontal
-        } else if ((x === 20 || x === 80) && y > 10 && y < 90) {
-          row.push(4); // Straße vertikal
-        } else {
-          // Zufällige Platzierung von Bäumen, Felsen und Wasser
-          if (Math.random() < 0.02) row.push(2); // 2 = Bäume
-          else if (Math.random() < 0.02) row.push(1); // 1 = Felsen
-          else if (Math.random() < 0.01) row.push(3); // 3 = Hindernisse (z.B. Wände)
-          else if (y > 40 && y < 60 && x > 40 && x < 60) row.push(5); // 5 = Wasser
-          else row.push(0); // 0 = Gras
-        }
-      }
+    const MAP_SIZE = 100;
+    
+    // Initialize with grass
+    for(let y = 0; y < MAP_SIZE; y++) {
+      const row = new Array(MAP_SIZE).fill(0);
       map.push(row);
     }
+
+    this.generateRoads(map);
+    this.generateTerrain(map);
+    this.generateWater(map);
+    this.generateStrategicPoints(map);
+
     return map;
   }
 
-  generateVehicles() {
-    const vehicleTypes = ['tank', 'jeep', 'lkw', 'schuetzenpanzer'];
-    const vehicles = [];
-    for(let i = 0; i < 10; i++) { // Anzahl der Fahrzeuge erhöhen
-      let x, y, type;
-      do {
-        x = Math.random() * 100 * 40; // MAP_SIZE * TILE_SIZE
-        y = Math.random() * 100 * 40;
-        type = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
-      } while (isColliding({x, y}, this.map) || this.isVehiclePlacementInvalid(x, y) || this.isVehicleOverlapping(x, y, vehicles));
-      const vehicle = new Vehicle(x, y, type);
-      vehicles.push(vehicle);
+  generateRoads(map) {
+    // Main roads
+    for(let i = 0; i < map.length; i++) {
+      if (i === 20 || i === 80) {
+        for(let j = 10; j < 90; j++) {
+          map[i][j] = 4;
+        }
+      }
+      if (i >= 10 && i <= 90) {
+        map[i][20] = 4;
+        map[i][80] = 4;
+      }
     }
-    return vehicles;
+
+    // Diagonal roads
+    for(let i = 0; i < 30; i++) {
+      map[20 + i][20 + i] = 4;
+      map[20 + i][80 - i] = 4;
+    }
   }
 
-  isVehiclePlacementInvalid(x, y) {
-    // Fahrzeuge nicht auf Straßen oder Wasser platzieren
-    const tileX = Math.floor(x / 40);
-    const tileY = Math.floor(y / 40);
-    if (tileX < 0 || tileX >= 100 || tileY < 0 || tileY >= 100) return true; // Außen der Karte
-    return this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5;
+  generateTerrain(map) {
+    // Forest clusters
+    for(let i = 0; i < 10; i++) {
+      const centerX = Math.floor(Math.random() * 80 + 10);
+      const centerY = Math.floor(Math.random() * 80 + 10);
+      this.generateCluster(map, centerX, centerY, 2, 0.7); // 2 = trees
+    }
+
+    // Rock formations
+    for(let i = 0; i < 8; i++) {
+      const centerX = Math.floor(Math.random() * 80 + 10);
+      const centerY = Math.floor(Math.random() * 80 + 10);
+      this.generateCluster(map, centerX, centerY, 1, 0.5); // 1 = rocks
+    }
+
+    // Barriers/Walls
+    for(let i = 0; i < 6; i++) {
+      const startX = Math.floor(Math.random() * 80 + 10);
+      const startY = Math.floor(Math.random() * 80 + 10);
+      this.generateWall(map, startX, startY);
+    }
   }
 
-  isVehicleOverlapping(x, y, vehiclesList) {
-    return vehiclesList.some(vehicle => distance(vehicle, {x, y}) < 40); // TILE_SIZE = 40
+  generateCluster(map, centerX, centerY, type, density) {
+    const radius = Math.floor(Math.random() * 5) + 3;
+    for(let y = -radius; y <= radius; y++) {
+      for(let x = -radius; x <= radius; x++) {
+        if (Math.random() < density && 
+            Math.hypot(x, y) <= radius &&
+            centerY + y >= 0 && centerY + y < 100 &&
+            centerX + x >= 0 && centerX + x < 100 &&
+            map[centerY + y][centerX + x] === 0) {
+          map[centerY + y][centerX + x] = type;
+        }
+      }
+    }
   }
 
-  generatePowerUps() {
-    const powerUps = [];
-    for(let i = 0; i < 40; i++) { // Anzahl der Power-Ups erhöhen
+  generateWall(map, startX, startY) {
+    const length = Math.floor(Math.random() * 8) + 4;
+    const direction = Math.floor(Math.random() * 4);
+    const dx = [1, 0, -1, 0][direction];
+    const dy = [0, 1, 0, -1][direction];
+
+    for(let i = 0; i < length; i++) {
+      const x = startX + dx * i;
+      const y = startY + dy * i;
+      if (x >= 0 && x < 100 && y >= 0 && y < 100 && map[y][x] === 0) {
+        map[y][x] = 3; // 3 = wall
+      }
+    }
+  }
+
+  generateWater(map) {
+    // Main lake
+    const centerX = 50;
+    const centerY = 50;
+    const radius = 10;
+    
+    for(let y = -radius; y <= radius; y++) {
+      for(let x = -radius; x <= radius; x++) {
+        if (Math.hypot(x, y) <= radius &&
+            centerY + y >= 0 && centerY + y < 100 &&
+            centerX + x >= 0 && centerX + x < 100) {
+          map[centerY + y][centerX + x] = 5; // 5 = water
+        }
+      }
+    }
+
+    // Small ponds
+    for(let i = 0; i < 5; i++) {
+      const x = Math.floor(Math.random() * 80 + 10);
+      const y = Math.floor(Math.random() * 80 + 10);
+      this.generateCluster(map, x, y, 5, 0.8);
+    }
+  }
+
+  generateStrategicPoints(map) {
+    // Add bunkers or defensive positions
+    for(let i = 0; i < 6; i++) {
+      const x = Math.floor(Math.random() * 80 + 10);
+      const y = Math.floor(Math.random() * 80 + 10);
+      if (map[y][x] === 0) {
+        this.generateBunker(map, x, y);
+      }
+    }
+  }
+
+  generateBunker(map, x, y) {
+    const size = 3;
+    for(let dy = -size; dy <= size; dy++) {
+      for(let dx = -size; dx <= size; dx++) {
+        if (Math.abs(dx) === size || Math.abs(dy) === size) {
+          if (y + dy >= 0 && y + dy < 100 && x + dx >= 0 && x + dx < 100) {
+            map[y + dy][x + dx] = 3; // Walls
+          }
+        }
+      }
+    }
+  }
+
+  generateVehicles() {
+    const vehicles = [];
+    const vehicleTypes = ['tank', 'jeep', 'apc', 'truck'];
+    const vehicleCount = this.mode === 'SinglePlayer' ? 5 : 10;
+
+    for(let i = 0; i < vehicleCount; i++) {
       let x, y, type;
       do {
         x = Math.random() * 100 * 40;
         y = Math.random() * 100 * 40;
-        type = Math.random() < 0.5 ? 'health' : 'ammo';
-      } while (isColliding({x, y}, this.map) || this.isPowerUpOverlapping(x, y, powerUps));
+        type = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
+      } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, vehicles));
+
+      vehicles.push(new Vehicle(x, y, type));
+    }
+    return vehicles;
+  }
+
+  generatePowerUps() {
+    const powerUps = [];
+    const types = ['health', 'ammo', 'weapon_upgrade', 'speed_boost'];
+    const powerUpCount = this.mode === 'SinglePlayer' ? 20 : 40;
+
+    for(let i = 0; i < powerUpCount; i++) {
+      let x, y, type;
+      do {
+        x = Math.random() * 100 * 40;
+        y = Math.random() * 100 * 40;
+        type = types[Math.floor(Math.random() * types.length)];
+      } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, powerUps, 50));
+
       powerUps.push({x, y, type});
     }
     return powerUps;
   }
 
-  isPowerUpOverlapping(x, y, powerUpsList) {
-    return powerUpsList.some(pu => distance(pu, {x, y}) < 50);
+  isInvalidPosition(x, y) {
+    const tileX = Math.floor(x / 40);
+    const tileY = Math.floor(y / 40);
+    return tileX < 0 || tileX >= 100 || tileY < 0 || tileY >= 100 || 
+           this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5;
   }
 
-  spawnKIs(count) {
+  isPositionOccupied(x, y, entities, minDistance = 40) {
+    return entities.some(entity => distance({x, y}, entity) < minDistance);
+  }
+
+  spawnEnemies(count) {
     for(let i = 0; i < count; i++) {
       let x, y;
       do {
         x = Math.random() * 100 * 40;
         y = Math.random() * 100 * 40;
-      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y) || this.isKIOverlapping(x, y));
-      this.kis.push(new Human(x, y, '#FFD700')); // KI-Gegner in Gold (#FFD700)
+      } while (
+        this.isInvalidPosition(x, y) || 
+        this.isPositionOccupied(x, y, this.enemies) ||
+        this.players.some(p => distance({x, y}, p) < 200)
+      );
+
+      const enemy = new Human(x, y, '#FFD700', true);
+      enemy.weapon = Math.random() < 0.3 ? 'Machine Gun' : 'Pistol';
+      this.enemies.push(enemy);
     }
-  }
-
-  isKIOverlapping(x, y) {
-    return this.kis.some(ki => distance(ki, {x, y}) < 40);
-  }
-
-  isTooCloseToPlayers(x, y) {
-    return this.players.some(player => distance({x, y}, player) < 200); // Mindestabstand erhöhen
-  }
-
-  setupControls() {
-    this.keys = {};
-    this.controls = [
-      { forward: 'ArrowUp', backward: 'ArrowDown', left: 'ArrowLeft', 
-        right: 'ArrowRight', shoot: 'Space', action: 'Enter', switch: 'ShiftRight' },
-      { forward: 'KeyW', backward: 'KeyS', left: 'KeyA', 
-        right: 'KeyD', shoot: 'KeyF', action: 'KeyE', switch: 'KeyG' }
-    ];
-    
-    // Event Listener für keydown
-    window.addEventListener('keydown', (e) => {
-      e.preventDefault(); // Verhindert Scrolling
-      this.keys[e.code] = true;
-    });
-    
-    // Event Listener für keyup
-    window.addEventListener('keyup', (e) => {
-      e.preventDefault();
-      this.keys[e.code] = false;
-    });
   }
 
   getPlayerControls(index) {
@@ -229,7 +309,7 @@ export class Game {
     const controls = this.getPlayerControls(index);
     if (controls.action) {
       if (player.vehicle) {
-        // Aussteigen
+        // Exit vehicle
         if (player.role === 'driver') player.vehicle.driver = null;
         else if (player.role === 'gunner') player.vehicle.gunner = null;
         player.vehicle = null;
@@ -238,7 +318,7 @@ export class Game {
         player.y += Math.sin(player.angle) * 30;
         document.getElementById(`vehicle${index+1}`).textContent = 'None';
       } else {
-        // Nächstes Fahrzeug betreten
+        // Enter nearest available vehicle
         const nearestVehicle = this.vehicles.find(v => 
           distance(player, v) < 50 && (!v.driver || !v.gunner));
         if (nearestVehicle) {
@@ -246,13 +326,12 @@ export class Game {
             nearestVehicle.driver = player;
             player.vehicle = nearestVehicle;
             player.role = 'driver';
-            document.getElementById(`vehicle${index+1}`).textContent = nearestVehicle.type;
           } else if (!nearestVehicle.gunner) {
             nearestVehicle.gunner = player;
             player.vehicle = nearestVehicle;
             player.role = 'gunner';
-            document.getElementById(`vehicle${index+1}`).textContent = nearestVehicle.type;
           }
+          document.getElementById(`vehicle${index+1}`).textContent = nearestVehicle.type;
         }
       }
     }
@@ -271,406 +350,433 @@ export class Game {
         v.driver = player;
         player.role = 'driver';
       }
-      // Update vehicle status in HUD
       document.getElementById(`vehicle${index+1}`).textContent = v.type;
     }
   }
 
-  updatePlayer(player, index) {
-    const controls = this.getPlayerControls(index);
-    
-    // Fahrzeuginteraktion
-    if (controls.action) {
-      this.handleVehicleInteraction(player, index);
-      this.keys[this.controls[index].action] = false; // Mehrfachauslösung verhindern
-    }
+  startGameLoop() {
+    if (this.gameLoopRunning) return;
+    this.gameLoopRunning = true;
 
-    // Positionswechsel
-    if (controls.switch) {
-      this.handleSwitchPosition(player, index);
-      this.keys[this.controls[index].switch] = false;
-    }
+    const gameLoop = () => {
+      if (this.gameOver) return;
 
-    // Bewegung aktualisieren
-    player.update(controls, this.map);
+      const currentTime = Date.now();
+      this.update(currentTime);
+      this.render();
 
-    // Update Position in HUD
-    document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
-    document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
+      requestAnimationFrame(gameLoop);
+    };
 
-    // Schießen
-    if (controls.shoot && player.ammo > 0 && player.canShoot &&
-        (!player.vehicle || (player.vehicle && player.role === 'gunner'))) {
-      const shootAngle = player.vehicle ? 
-        player.vehicle.angle + player.vehicle.turretAngle : 
-        player.angle;
+    gameLoop();
+  }
+
+  update(currentTime) {
+    // Update players
+    this.players.forEach((player, index) => {
+      if (player.health <= 0) return;
       
-      // Bestimmen der Schadenshöhe basierend auf Waffe
-      let damage = 10; // Standard Schaden
-      if (player.weapon === 'Schrotflinte') damage = 20;
-      else if (player.weapon === 'Maschinengewehr') damage = 5; // Mehrere Schüsse können erfolgen, aber limitierte Rate
+      // Get and apply controls
+      const controls = this.getPlayerControls(index);
+      player.update(controls, this.map, currentTime);
+      
+      // Handle vehicle interaction
+      if (controls.action) {
+        this.handleVehicleInteraction(player, index);
+      }
+      
+      // Handle position switching
+      if (controls.switch) {
+        this.handleSwitchPosition(player, index);
+      }
 
-      this.bullets.push({
-        x: player.vehicle ? player.vehicle.x + Math.cos(shootAngle) * 30 : player.x + Math.cos(shootAngle) * 15,
-        y: player.vehicle ? player.vehicle.y + Math.sin(shootAngle) * 30 : player.y + Math.sin(shootAngle) * 15,
-        angle: shootAngle,
-        speed: 15,
-        damage: damage,
-        owner: index,
-        vehicle: player.vehicle // Reference to the vehicle if shooting from one
-      });
-      player.ammo--;
-      document.getElementById(`ammo${index + 1}`).textContent = player.ammo;
-      player.canShoot = false; // Verhindert weiteres Schießen bis Taste losgelassen wird
+      // Handle shooting
+      if (controls.shoot && player.canShoot && player.ammo > 0) {
+        this.createBullet(player, index);
+        player.canShoot = false;
+        setTimeout(() => { player.canShoot = true; }, 200);
+      }
+    });
+
+    // Update vehicles
+    this.vehicles.forEach(vehicle => {
+      vehicle.update(this.map);
+    });
+
+    // Update enemies
+    this.enemies.forEach(enemy => {
+      enemy.update(null, this.map, currentTime);
+      if (enemy.canShoot && enemy.ammo > 0) {
+        this.handleEnemyShooting(enemy, currentTime);
+      }
+    });
+
+    // Update bullets
+    this.updateBullets();
+
+    // Update power-ups
+    this.updatePowerUps(currentTime);
+
+    // Update explosions
+    this.updateExplosions();
+
+    // Check wave progress
+    this.checkWaveProgress();
+
+    // Update UI
+    this.updateUI();
+  }
+
+  createBullet(shooter, ownerIndex) {
+    const shootAngle = shooter.vehicle ? 
+      shooter.vehicle.angle + shooter.vehicle.turretAngle : 
+      shooter.angle;
+    
+    let damage = 10; // Default damage
+    switch(shooter.weapon) {
+      case 'Machine Gun': damage = 5; break;
+      case 'Shotgun': damage = 20; break;
+      case 'Tank Cannon': damage = 50; break;
     }
 
-    // Reset kannShoot Flag beim Loslassen der Schusstaste
-    if (!controls.shoot && !player.canShoot) {
-      player.canShoot = true;
+    this.bullets.push({
+      x: shooter.vehicle ? 
+        shooter.vehicle.x + Math.cos(shootAngle) * 30 : 
+        shooter.x + Math.cos(shootAngle) * 15,
+      y: shooter.vehicle ? 
+        shooter.vehicle.y + Math.sin(shootAngle) * 30 : 
+        shooter.y + Math.sin(shootAngle) * 15,
+      angle: shootAngle,
+      speed: 15,
+      damage: damage,
+      owner: ownerIndex,
+      vehicle: shooter.vehicle
+    });
+
+    shooter.ammo--;
+    if (shooter === this.players[0] || shooter === this.players[1]) {
+      const playerIndex = this.players.indexOf(shooter);
+      document.getElementById(`ammo${playerIndex + 1}`).textContent = shooter.ammo;
     }
+  }
+
+  handleEnemyShooting(enemy, currentTime) {
+    const target = this.findNearestPlayer(enemy);
+    if (target && distance(enemy, target) < 300 && 
+        isInSight(enemy, target, enemy.angle, Math.PI / 2, 300)) {
+      this.createBullet(enemy, this.players.length);
+      enemy.canShoot = false;
+      setTimeout(() => { enemy.canShoot = true; }, 1000);
+    }
+  }
+
+  findNearestPlayer(entity) {
+    return this.players.reduce((nearest, player) => {
+      if (player.health <= 0) return nearest;
+      const dist = distance(entity, player);
+      return !nearest || dist < distance(entity, nearest) ? player : nearest;
+    }, null);
   }
 
   updateBullets() {
-    for(let i = this.bullets.length -1; i >=0; i--){
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
       const bullet = this.bullets[i];
+      
+      // Move bullet
       bullet.x += Math.cos(bullet.angle) * bullet.speed;
       bullet.y += Math.sin(bullet.angle) * bullet.speed;
-      
-      // Kollision mit Karte
-      const bulletEntity = { x: bullet.x, y: bullet.y };
-      if (isColliding(bulletEntity, this.map)) {
+
+      // Check collisions
+      if (this.handleBulletCollisions(bullet, i)) continue;
+
+      // Remove bullets that go off-map
+      if (this.isInvalidPosition(bullet.x, bullet.y)) {
         this.bullets.splice(i, 1);
-        continue;
-      }
-
-      // Kollision mit Spielern (im Versus-Modus auch andere Spieler)
-      this.players.forEach((player, j) => {
-        if (bullet.owner !== j && distance(bullet, player) < 20) {
-          if (this.mode === 'Cooperative' || (this.mode === 'Versus' && j !== bullet.owner)) {
-            player.health -= bullet.damage;
-            document.getElementById(`health${j + 1}`).textContent = Math.max(player.health, 0);
-            this.bullets.splice(i, 1);
-            if (player.health <= 0) {
-              if (this.mode === 'Versus') {
-                this.endGame(`Player ${j + 1} wurde von Player ${bullet.owner + 1} getötet!`);
-              } else {
-                this.endGame(`Player ${j + 1} ist gestorben!`);
-              }
-              // Respawn Spieler
-              this.respawnPlayer(j);
-            }
-          }
-        }
-      });
-
-      // Kollision mit KI-Gegnern (nur im Kooperativen Modus)
-      if (this.mode === 'Cooperative') {
-        for(let j = this.kis.length -1; j >=0; j--){
-          const ki = this.kis[j];
-          if (bullet.owner < this.players.length && distance(bullet, ki) < 20) { // Bullet from player
-            ki.health -= bullet.damage;
-            this.bullets.splice(i, 1);
-            if (ki.health <= 0) {
-              this.kis.splice(j, 1);
-            }
-            break; // Exit loop since bullet is destroyed
-          }
-        }
-      }
-
-      // Kollision mit Fahrzeugen
-      this.vehicles.forEach((vehicle, j) => {
-        // Check if bullet owner is not the vehicle's owner
-        let isOwnVehicle = false;
-        if (bullet.vehicle && bullet.vehicle === vehicle) {
-          isOwnVehicle = true;
-        }
-        if (!isOwnVehicle && distance(bullet, vehicle) < 30) {
-          vehicle.health -= bullet.damage;
-          // Update HUD für Spieler im Fahrzeug
-          if (vehicle.driver) {
-            const driverIndex = this.players.indexOf(vehicle.driver);
-            if (driverIndex !== -1) {
-              document.getElementById(`vehicle${driverIndex +1}`).textContent = vehicle.type;
-            }
-          }
-          if (vehicle.gunner) {
-            const gunnerIndex = this.players.indexOf(vehicle.gunner);
-            if (gunnerIndex !== -1) {
-              document.getElementById(`vehicle${gunnerIndex +1}`).textContent = vehicle.type;
-            }
-          }
-          this.bullets.splice(i, 1);
-          if (vehicle.health <= 0) {
-            // Entferne zerstörtes Fahrzeug
-            this.vehicles.splice(j, 1);
-            // Entferne Fahrer und Gunners, falls vorhanden
-            if (vehicle.driver) {
-              vehicle.driver.vehicle = null;
-              vehicle.driver.role = null;
-              const driverIndex = this.players.indexOf(vehicle.driver);
-              if (driverIndex !== -1) {
-                document.getElementById(`vehicle${driverIndex +1}`).textContent = 'None';
-              }
-            }
-            if (vehicle.gunner) {
-              vehicle.gunner.vehicle = null;
-              vehicle.gunner.role = null;
-              const gunnerIndex = this.players.indexOf(vehicle.gunner);
-              if (gunnerIndex !== -1) {
-                document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
-              }
-            }
-          }
-        }
-      });
-
-      // Kollision mit anderen Fahrzeugen (Überfahren)
-      for(let j = 0; j < this.vehicles.length; j++) {
-        for(let k = j + 1; k < this.vehicles.length; k++) {
-          const vehicleA = this.vehicles[j];
-          const vehicleB = this.vehicles[k];
-          if (distance(vehicleA, vehicleB) < 40) { // TILE_SIZE = 40
-            // Überfahrkollision: Schaden zufügen
-            vehicleA.health -= 5;
-            vehicleB.health -= 5;
-            if (vehicleA.health <= 0) {
-              // Entferne zerstörtes Fahrzeug
-              this.vehicles.splice(j, 1);
-              // Entferne Fahrer und Gunners, falls vorhanden
-              if (vehicleA.driver) {
-                vehicleA.driver.vehicle = null;
-                vehicleA.driver.role = null;
-                const driverIndex = this.players.indexOf(vehicleA.driver);
-                if (driverIndex !== -1) {
-                  document.getElementById(`vehicle${driverIndex +1}`).textContent = 'None';
-                }
-              }
-              if (vehicleA.gunner) {
-                vehicleA.gunner.vehicle = null;
-                vehicleA.gunner.role = null;
-                const gunnerIndex = this.players.indexOf(vehicleA.gunner);
-                if (gunnerIndex !== -1) {
-                  document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
-                }
-              }
-              k--; // Adjust index after removal
-            }
-            if (vehicleB.health <= 0) {
-              // Entferne zerstörtes Fahrzeug
-              this.vehicles.splice(k, 1);
-              // Entferne Fahrer und Gunners, falls vorhanden
-              if (vehicleB.driver) {
-                vehicleB.driver.vehicle = null;
-                vehicleB.driver.role = null;
-                const driverIndex = this.players.indexOf(vehicleB.driver);
-                if (driverIndex !== -1) {
-                  document.getElementById(`vehicle${driverIndex +1}`).textContent = 'None';
-                }
-              }
-              if (vehicleB.gunner) {
-                vehicleB.gunner.vehicle = null;
-                vehicleB.gunner.role = null;
-                const gunnerIndex = this.players.indexOf(vehicleB.gunner);
-                if (gunnerIndex !== -1) {
-                  document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
-                }
-              }
-              j--; // Adjust index after removal
-            }
-          }
-        }
       }
     }
   }
 
-  drawEntities() {
-    // Rendering wird in Renderer-Klasse gehandhabt
-  }
-
-  checkPowerUpCollisions() {
-    this.players.forEach((player, i) => {
-      this.powerUps.forEach((powerUp, index) => {
-        if (distance(player, powerUp) < 20) {
-          if (powerUp.type === 'health') {
-            player.health = Math.min(100, player.health + 25);
-          } else {
-            player.ammo += 20;
-          }
-          this.powerUps.splice(index, 1);
-          // Update HUD
-          document.getElementById(`health${i+1}`).textContent = player.health;
-          document.getElementById(`ammo${i+1}`).textContent = player.ammo;
-          // Power-Up nach 10 Sekunden neu spawnen
-          setTimeout(() => {
-            let x, y, type;
-            do {
-              x = Math.random() * 100 * 40;
-              y = Math.random() * 100 * 40;
-              type = Math.random() < 0.5 ? 'health' : 'ammo';
-            } while (isColliding({x, y}, this.map) || this.isPowerUpOverlapping(x, y, this.powerUps));
-            this.powerUps.push({
-              x: x,
-              y: y,
-              type: type
-            });
-          }, 10000);
-        }
-      });
-    });
-
-    // Power-Ups für KI-Gegner (nur im Kooperativen Modus)
-    if (this.mode === 'Cooperative') {
-      this.kis.forEach((ki, j) => {
-        this.powerUps.forEach((powerUp, index) => {
-          if (distance(ki, powerUp) < 20) {
-            if (powerUp.type === 'health') {
-              ki.health = Math.min(100, ki.health + 25);
-            } else {
-              ki.ammo += 20;
-            }
-            this.powerUps.splice(index, 1);
-            // Power-Up nach 10 Sekunden neu spawnen
-            setTimeout(() => {
-              let x, y, type;
-              do {
-                x = Math.random() * 100 * 40;
-                y = Math.random() * 100 * 40;
-                type = Math.random() < 0.5 ? 'health' : 'ammo';
-              } while (isColliding({x, y}, this.map) || this.isPowerUpOverlapping(x, y, this.powerUps));
-              this.powerUps.push({
-                x: x,
-                y: y,
-                type: type
-              });
-            }, 10000);
-          }
-        });
-      });
+  handleBulletCollisions(bullet, bulletIndex) {
+    // Check map collision
+    if (isColliding({x: bullet.x, y: bullet.y}, this.map)) {
+      this.bullets.splice(bulletIndex, 1);
+      this.createExplosion(bullet.x, bullet.y, 1);
+      return true;
     }
+
+    // Check player collisions
+    for (let i = 0; i < this.players.length; i++) {
+      if (this.handlePlayerBulletCollision(bullet, bulletIndex, this.players[i], i)) {
+        return true;
+      }
+    }
+
+    // Check enemy collisions
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      if (this.handleEnemyBulletCollision(bullet, bulletIndex, this.enemies[i], i)) {
+        return true;
+      }
+    }
+
+    // Check vehicle collisions
+    for (let i = this.vehicles.length - 1; i >= 0; i--) {
+      if (this.handleVehicleBulletCollision(bullet, bulletIndex, this.vehicles[i], i)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
-  updateKIs() {
-    this.kis.forEach(ki => {
-      if (ki.health <= 0) return; // Tote KI überspringen
-      // KI-Verhalten: Halte Abstand zu Spielern und bewege dich in Richtung
-      const target = this.players.reduce((nearest, player) => {
-        const dist = distance(ki, player);
-        return dist < distance(ki, nearest) ? player : nearest;
-      }, this.players[0]);
+  handlePlayerBulletCollision(bullet, bulletIndex, player, playerIndex) {
+    if (bullet.owner !== playerIndex && 
+        distance(bullet, player) < 20 && 
+        player.health > 0) {
+      
+      if (this.mode === 'Cooperative' && bullet.owner < this.players.length) {
+        return false; // Skip friendly fire in cooperative mode
+      }
 
-      const angleToTarget = Math.atan2(target.y - ki.y, target.x - ki.x);
-      const distanceToTarget = distance(ki, target);
+      player.health -= bullet.damage;
+      document.getElementById(`health${playerIndex + 1}`).textContent = 
+        Math.max(player.health, 0);
+      
+      this.bullets.splice(bulletIndex, 1);
+      this.createExplosion(bullet.x, bullet.y, 1);
 
-      // Halte einen Mindestabstand
-      if (distanceToTarget > 200) { // Erhöhter Mindestabstand
-        ki.angle = angleToTarget;
-        ki.speed = ki.maxSpeed;
+      if (player.health <= 0) {
+        if (this.mode === 'Versus') {
+          this.endGame(`Player ${bullet.owner + 1} wins!`);
+        } else if (this.mode === 'SinglePlayer' || 
+                   this.players.every(p => p.health <= 0)) {
+          this.endGame(`Game Over! Score: ${this.score}`);
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
+  updateUI() {
+    this.players.forEach((player, index) => {
+      if (player.health > 0) {
+        document.getElementById(`health${index+1}`).textContent = Math.max(player.health, 0);
+        document.getElementById(`ammo${index+1}`).textContent = player.ammo;
+        document.getElementById(`weapon${index+1}`).textContent = player.weapon;
+        document.getElementById(`vehicle${index+1}`).textContent = 
+          player.vehicle ? player.vehicle.type : 'None';
+        document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
+        document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
+      }
+
+      // Update interaction messages
+      const message = document.getElementById(`message${index+1}`);
+      if (!player.vehicle) {
+        const nearestVehicle = this.vehicles.find(v => 
+          distance(player, v) < 50 && (!v.driver || !v.gunner));
+        if (nearestVehicle) {
+          message.textContent = `Press ${this.controls[index].action} to enter vehicle`;
+          message.style.display = 'block';
+        } else {
+          message.style.display = 'none';
+        }
       } else {
-        ki.speed = 0;
-      }
-
-      ki.move(this.map);
-
-      // Verhindere, dass KI sich über Spieler bewegt
-      if (distanceToTarget < 100) {
-        ki.x -= Math.cos(angleToTarget) * ki.speed;
-        ki.y -= Math.sin(angleToTarget) * ki.speed;
-        ki.speed = 0;
-      }
-
-      // KI schießt, wenn nahe genug und Sichtfeld trifft
-      if (distanceToTarget < 300 && ki.ammo > 0 && distanceToTarget > 50 &&
-          isInSight(ki, target, ki.angle, Math.PI / 2, 300)) { // Sichtfeld geprüft
-        this.bullets.push({
-          x: ki.vehicle ? ki.vehicle.x + Math.cos(angleToTarget) * 30 : ki.x + Math.cos(angleToTarget) * 15,
-          y: ki.vehicle ? ki.vehicle.y + Math.sin(angleToTarget) * 30 : ki.y + Math.sin(angleToTarget) * 15,
-          angle: angleToTarget,
-          speed: 15,
-          damage: 10,
-          owner: this.players.length + this.kis.indexOf(ki),
-          vehicle: ki.vehicle
-        });
-        ki.ammo--;
-      }
-
-      // Fahrzeugkollisionen für KI
-      if (ki.vehicle) {
-        const v = ki.vehicle;
-        if (isVehicleColliding(v, this.vehicles)) { // Korrigiert: game.vehicles → this.vehicles
-          v.x -= Math.cos(v.angle) * v.speed;
-          v.y -= Math.sin(v.angle) * v.speed;
-          v.speed = 0;
-        }
+        message.textContent = `Press ${this.controls[index].action} to exit vehicle`;
+        message.style.display = 'block';
       }
     });
   }
 
-  gameLoop() {
-    if (this.gameOver) return;
-    if (this.gameLoopRunning) return; // Prevent multiple loops
-    this.gameLoopRunning = true;
-
-    const loop = () => {
-      if (this.gameOver) return;
-
-      // Spielzustand aktualisieren
-      this.players.forEach((p, i) => this.updatePlayer(p, i));
-      this.vehicles.forEach(v => v.update(this.map));
-      this.updateBullets();
-      this.checkPowerUpCollisions();
-      if (this.mode === 'Cooperative') {
-        this.updateKIs();
+  handleEnemyBulletCollision(bullet, bulletIndex, enemy, enemyIndex) {
+    if (bullet.owner < this.players.length && distance(bullet, enemy) < 20) {
+      enemy.health -= bullet.damage;
+      this.bullets.splice(bulletIndex, 1);
+      this.createExplosion(bullet.x, bullet.y, 1);
+      
+      if (enemy.health <= 0) {
+        this.enemies.splice(enemyIndex, 1);
+        this.score += 100;
+        // Drop powerup with 30% chance
+        if (Math.random() < 0.3) {
+          this.powerUps.push({
+            x: enemy.x,
+            y: enemy.y,
+            type: Math.random() < 0.5 ? 'health' : 'ammo'
+          });
+        }
       }
+      return true;
+    }
+    return false;
+  }
 
-      // UI aktualisieren
-      this.players.forEach((p, i) => {
-        document.getElementById(`health${i+1}`).textContent = Math.max(p.health, 0);
-        document.getElementById(`ammo${i+1}`).textContent = p.ammo;
-        document.getElementById(`weapon${i+1}`).textContent = p.weapon;
-        document.getElementById(`vehicle${i+1}`).textContent = p.vehicle ? p.vehicle.type : 'None';
-        document.getElementById(`posX${i+1}`).textContent = Math.round(p.x);
-        document.getElementById(`posY${i+1}`).textContent = Math.round(p.y);
-      });
+  handleVehicleBulletCollision(bullet, bulletIndex, vehicle, vehicleIndex) {
+    if (!bullet.vehicle || bullet.vehicle !== vehicle) {
+      if (distance(bullet, vehicle) < 30) {
+        const destroyed = vehicle.takeDamage(bullet.damage);
+        this.bullets.splice(bulletIndex, 1);
+        this.createExplosion(bullet.x, bullet.y, destroyed ? 2 : 1);
 
-      // Rendern
-      this.renderer.ctx1.clearRect(0, 0, window.innerWidth / 2, window.innerHeight);
-      this.renderer.ctx2.clearRect(0, 0, window.innerWidth / 2, window.innerHeight);
-      this.renderer.drawGame(this.renderer.ctx1, 0);
-      this.renderer.drawGame(this.renderer.ctx2, 1);
+        if (destroyed) {
+          // Handle vehicle destruction
+          this.handleVehicleDestruction(vehicle, vehicleIndex);
+        }
+        return true;
+      }
+    }
+    return false;
+  }
 
-      requestAnimationFrame(loop);
-    };
+  handleVehicleDestruction(vehicle, vehicleIndex) {
+    // Create large explosion
+    this.createExplosion(vehicle.x, vehicle.y, 3);
+    
+    // Eject occupants
+    if (vehicle.driver) {
+      vehicle.driver.health -= 50; // Damage from explosion
+      vehicle.driver.vehicle = null;
+      vehicle.driver.role = null;
+      const driverIndex = this.players.indexOf(vehicle.driver);
+      if (driverIndex !== -1) {
+        document.getElementById(`health${driverIndex+1}`).textContent = 
+          Math.max(vehicle.driver.health, 0);
+        document.getElementById(`vehicle${driverIndex+1}`).textContent = 'None';
+      }
+    }
+    
+    if (vehicle.gunner) {
+      vehicle.gunner.health -= 50;
+      vehicle.gunner.vehicle = null;
+      vehicle.gunner.role = null;
+      const gunnerIndex = this.players.indexOf(vehicle.gunner);
+      if (gunnerIndex !== -1) {
+        document.getElementById(`health${gunnerIndex+1}`).textContent = 
+          Math.max(vehicle.gunner.health, 0);
+        document.getElementById(`vehicle${gunnerIndex+1}`).textContent = 'None';
+      }
+    }
 
-    loop();
+    // Remove vehicle
+    this.vehicles.splice(vehicleIndex, 1);
+
+    // Add score if vehicle was destroyed by player
+    this.score += 200;
+  }
+
+  updatePowerUps(currentTime) {
+    for (let i = this.powerUps.length - 1; i >= 0; i--) {
+      const powerUp = this.powerUps[i];
+      
+      // Check collision with players
+      for (let player of this.players) {
+        if (player.health <= 0) continue;
+        
+        if (distance(player, powerUp) < 20) {
+          this.applyPowerUp(player, powerUp);
+          this.powerUps.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+    // Respawn power-ups if needed
+    if (this.powerUps.length < 10) {
+      this.addNewPowerUp();
+    }
+  }
+
+  applyPowerUp(player, powerUp) {
+    const playerIndex = this.players.indexOf(player);
+    switch(powerUp.type) {
+      case 'health':
+        player.health = Math.min(100, player.health + 25);
+        document.getElementById(`health${playerIndex+1}`).textContent = player.health;
+        break;
+      case 'ammo':
+        player.ammo += 30;
+        document.getElementById(`ammo${playerIndex+1}`).textContent = player.ammo;
+        break;
+      case 'weapon_upgrade':
+        if (player.weapon === 'Pistol') {
+          player.weapon = 'Machine Gun';
+        } else if (player.weapon === 'Machine Gun') {
+          player.weapon = 'Shotgun';
+        }
+        document.getElementById(`weapon${playerIndex+1}`).textContent = player.weapon;
+        break;
+      case 'speed_boost':
+        player.maxSpeed *= 1.5;
+        setTimeout(() => {
+          player.maxSpeed /= 1.5;
+        }, 10000); // 10 second boost
+        break;
+    }
+  }
+
+  addNewPowerUp() {
+    let x, y, type;
+    const types = ['health', 'ammo', 'weapon_upgrade', 'speed_boost'];
+    do {
+      x = Math.random() * 100 * 40;
+      y = Math.random() * 100 * 40;
+      type = types[Math.floor(Math.random() * types.length)];
+    } while (this.isInvalidPosition(x, y) || this.isPositionOccupied(x, y, this.powerUps, 50));
+
+    this.powerUps.push({x, y, type});
+  }
+
+  updateExplosions() {
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      const explosion = this.explosions[i];
+      explosion.frame++;
+      if (explosion.frame >= explosion.maxFrames) {
+        this.explosions.splice(i, 1);
+      }
+    }
+  }
+
+  checkWaveProgress() {
+    if ((this.mode === 'SinglePlayer' || this.mode === 'Cooperative') && 
+        this.enemies.length === 0) {
+      this.wave++;
+      const baseEnemies = this.mode === 'SinglePlayer' ? 5 : 8;
+      this.spawnEnemies(baseEnemies + this.wave * 2);
+      this.addWaveRewards();
+    }
+  }
+
+  addWaveRewards() {
+    // Add bonus power-ups between waves
+    for (let i = 0; i < 3; i++) {
+      this.addNewPowerUp();
+    }
+    
+    // Add bonus score
+    this.score += this.wave * 500;
+    
+    // Add a new vehicle occasionally
+    if (this.wave % 3 === 0) {
+      this.vehicles.push(...this.generateVehicles());
+    }
+  }
+
+  render() {
+    this.renderer.draw();
+  }
+
+  resetGame() {
+    this.gameOver = false;
+    this.wave = 1;
+    this.score = 0;
+    document.getElementById('gameOverScreen').classList.add('hidden');
+    this.initGame();
   }
 
   endGame(message) {
     this.gameOver = true;
     const gameOverScreen = document.getElementById('gameOverScreen');
     const gameOverMessage = document.getElementById('gameOverMessage');
-    gameOverMessage.textContent = message;
+    gameOverMessage.textContent = `${message}\nWave: ${this.wave}\nScore: ${this.score}`;
     gameOverScreen.classList.remove('hidden');
-  }
-
-  respawnPlayer(index) {
-    const player = this.players[index];
-    player.health = 100;
-    player.ammo = 30;
-    player.weapon = 'Pistole'; // Reset Weapon
-    // Setze Spieler zurück zum Startpunkt
-    player.x = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
-    player.y = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
-    // Sicherstellen, dass Spieler nicht auf Hindernissen oder anderen Spielern spawnen
-    while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
-      player.x = Math.random() * 100 * 40;
-      player.y = Math.random() * 100 * 40;
-    }
-    // Update HUD
-    document.getElementById(`health${index+1}`).textContent = player.health;
-    document.getElementById(`ammo${index+1}`).textContent = player.ammo;
-    document.getElementById(`weapon${index+1}`).textContent = player.weapon;
-    document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
-    document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
   }
 }

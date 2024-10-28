@@ -1,21 +1,25 @@
-// js/renderer.js
-import { distance, isInSight, Human, Vehicle } from './entities.js';
+import { Human, Vehicle, distance, isInSight } from './entities.js';
 
 export class Renderer {
   constructor(game) {
     this.game = game;
     this.setupCanvases();
+    this.loadImages();
+    this.setupEffects();
   }
 
   setupCanvases() {
+    // Main game canvases
     this.canvas1 = document.getElementById('canvas1');
     this.canvas2 = document.getElementById('canvas2');
     this.ctx1 = this.canvas1.getContext('2d');
     this.ctx2 = this.canvas2.getContext('2d');
-    this.canvas1.width = this.canvas2.width = window.innerWidth / 2;
-    this.canvas1.height = this.canvas2.height = window.innerHeight;
+    
+    // Set canvas sizes
+    this.updateCanvasSizes();
+    window.addEventListener('resize', () => this.updateCanvasSizes());
 
-    // Minikarten einrichten
+    // Minimap canvases
     this.minimap1 = document.getElementById('minimap1');
     this.minimap2 = document.getElementById('minimap2');
     this.minimapCtx1 = this.minimap1.getContext('2d');
@@ -24,251 +28,263 @@ export class Renderer {
     this.minimap1.height = this.minimap2.height = 150;
   }
 
-  drawEntity(ctx, entity) {
-    ctx.save();
-    ctx.translate(entity.x, entity.y);
-    ctx.rotate(entity.angle);
+  updateCanvasSizes() {
+    const containerWidth = document.querySelector('.game-container').clientWidth;
+    const isSinglePlayer = this.game.mode === 'SinglePlayer';
     
-    if (entity instanceof Human && !entity.vehicle) {
-      // Mensch zeichnen
-      ctx.fillStyle = entity.color;
-      ctx.strokeStyle = '#000'; // Schwarzer Rand
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(0, 0, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      // Waffe zeichnen
-      ctx.fillStyle = '#000';
-      ctx.fillRect(10, -2, 20, 4); // Waffe in Schussrichtung
-    } else if (entity instanceof Vehicle) {
-      // Fahrzeugkörper zeichnen
-      ctx.fillStyle = entity.color;
-      ctx.strokeStyle = '#000'; // Schwarzer Rand
-      ctx.lineWidth = 2;
-      switch(entity.type) {
-        case 'tank':
-          ctx.fillRect(-20, -15, 40, 30); // Panzer
-          break;
-        case 'jeep':
-          ctx.fillRect(-15, -10, 30, 20); // Jeep
-          break;
-        case 'lkw':
-          ctx.fillRect(-25, -15, 50, 30); // LKW
-          break;
-        case 'schuetzenpanzer':
-          ctx.fillRect(-20, -15, 40, 30); // Schützenpanzer
-          break;
-        default:
-          ctx.fillRect(-20, -15, 40, 30);
-      }
-      ctx.stroke();
+    this.canvas1.width = isSinglePlayer ? containerWidth : containerWidth / 2;
+    this.canvas1.height = window.innerHeight;
+    
+    if (!isSinglePlayer) {
+      this.canvas2.width = containerWidth / 2;
+      this.canvas2.height = window.innerHeight;
+    }
+  }
 
-      // Turm zeichnen
-      ctx.save();
-      ctx.rotate(entity.turretAngle);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, -5, entity.weapon === 'Maschinengewehr' ? entity.weaponOffset * 1.5 : entity.weaponOffset, 10); // Waffe
-      ctx.restore();
+  loadImages() {
+    this.images = {
+      terrain: {},
+      vehicles: {},
+      powerUps: {},
+      effects: {}
+    };
+
+    // Terrain textures
+    const terrainTypes = ['grass', 'rock', 'tree', 'wall', 'road', 'water'];
+    terrainTypes.forEach(type => {
+      const img = new Image();
+      img.src = `assets/terrain/${type}.png`;
+      this.images.terrain[type] = img;
+    });
+
+    // Vehicle textures
+    const vehicleTypes = ['tank', 'jeep', 'apc', 'truck'];
+    vehicleTypes.forEach(type => {
+      const img = new Image();
+      img.src = `assets/vehicles/${type}.png`;
+      this.images.vehicles[type] = img;
+    });
+
+    // Power-up textures
+    const powerUpTypes = ['health', 'ammo', 'weapon_upgrade', 'speed_boost'];
+    powerUpTypes.forEach(type => {
+      const img = new Image();
+      img.src = `assets/powerups/${type}.png`;
+      this.images.powerUps[type] = img;
+    });
+
+    // Effect textures
+    ['explosion', 'smoke', 'splash'].forEach(effect => {
+      const img = new Image();
+      img.src = `assets/effects/${effect}.png`;
+      this.images.effects[effect] = img;
+    });
+  }
+
+  setupEffects() {
+    this.effects = {
+      waterRipples: [],
+      smokeParticles: [],
+      explosionParticles: []
+    };
+
+    // Water effect parameters
+    this.waterEffectParams = {
+      amplitude: 5,
+      frequency: 0.02,
+      speed: 0.05
+    };
+  }
+
+  draw() {
+    // Clear canvases
+    this.ctx1.clearRect(0, 0, this.canvas1.width, this.canvas1.height);
+    if (this.game.mode !== 'SinglePlayer') {
+      this.ctx2.clearRect(0, 0, this.canvas2.width, this.canvas2.height);
     }
-    
-    // Lebensbalken zeichnen
-    if (entity instanceof Human || entity instanceof Vehicle) {
-      const maxBarWidth = 30;
-      const barHeight = 4;
-      const maxHealth = entity instanceof Vehicle ? 200 : 100;
-      const healthRatio = entity.health / maxHealth;
-      ctx.fillStyle = '#555';
-      ctx.fillRect(-15, -25, maxBarWidth, barHeight);
-      ctx.fillStyle = '#0f0';
-      ctx.fillRect(-15, -25, maxBarWidth * healthRatio, barHeight);
+
+    // Draw for each player's view
+    this.drawPlayerView(this.ctx1, this.game.players[0], 0);
+    if (this.game.mode !== 'SinglePlayer') {
+      this.drawPlayerView(this.ctx2, this.game.players[1], 1);
     }
+
+    // Draw minimaps
+    this.drawMinimap(this.minimapCtx1, this.game.players[0]);
+    if (this.game.mode !== 'SinglePlayer') {
+      this.drawMinimap(this.minimapCtx2, this.game.players[1]);
+    }
+  }
+
+  drawPlayerView(ctx, player, playerIndex) {
+    ctx.save();
     
+    // Center the camera on player
+    const cameraX = this.canvas1.width / 2 - player.x;
+    const cameraY = this.canvas1.height / 2 - player.y;
+    ctx.translate(cameraX, cameraY);
+
+    // Draw world
+    this.drawMap(ctx, player);
+    this.drawPowerUps(ctx);
+    this.drawVehicles(ctx);
+    this.drawPlayers(ctx, playerIndex);
+    this.drawEnemies(ctx);
+    this.drawBullets(ctx);
+    this.drawEffects(ctx);
+
+    // Draw field of view if in vehicle
+    if (player.vehicle) {
+      this.drawVehicleFieldOfView(ctx, player);
+    }
+
     ctx.restore();
+
+    // Draw HUD elements
+    this.drawHUD(ctx, player, playerIndex);
   }
 
-  drawMinimap(ctx, player) {
-    ctx.clearRect(0, 0, 150, 150);
-    // Skalierungsfaktor für die Minikarte
-    const scale = 150 / (100 * 40); // MAP_SIZE * TILE_SIZE = 100 * 40
+  drawMap(ctx, player) {
+    const TILE_SIZE = 40;
+    const viewRadius = Math.max(this.canvas1.width, this.canvas1.height) / 2;
+    
+    // Only render tiles within view
+    const startX = Math.max(0, Math.floor((player.x - viewRadius) / TILE_SIZE));
+    const endX = Math.min(100, Math.ceil((player.x + viewRadius) / TILE_SIZE));
+    const startY = Math.max(0, Math.floor((player.y - viewRadius) / TILE_SIZE));
+    const endY = Math.min(100, Math.ceil((player.y + viewRadius) / TILE_SIZE));
 
-    // Karte zeichnen
-    for(let y = 0; y < 100; y++) { // MAP_SIZE = 100
-      for(let x = 0; x < 100; x++) {
-        const cell = this.game.map[y][x];
-        if (cell === 1) ctx.fillStyle = '#888'; // Felsen
-        else if (cell === 2) ctx.fillStyle = '#355'; // Bäume
-        else if (cell === 3) ctx.fillStyle = '#555'; // Hindernisse
-        else if (cell === 4) ctx.fillStyle = '#999'; // Straße
-        else if (cell === 5) ctx.fillStyle = '#00f'; // Wasser
-        else ctx.fillStyle = '#5f5'; // Gras
-        ctx.fillRect(x * 40 * scale, y * 40 * scale, 40 * scale, 40 * scale); // TILE_SIZE = 40
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        const tile = this.game.map[y][x];
+        const screenX = x * TILE_SIZE;
+        const screenY = y * TILE_SIZE;
+
+        // Skip if tile is outside view
+        if (distance({x: screenX, y: screenY}, player) > viewRadius + TILE_SIZE) {
+          continue;
+        }
+
+        switch(tile) {
+          case 0: // Grass
+            ctx.fillStyle = '#5f5';
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+            break;
+          case 1: // Rocks
+            ctx.fillStyle = '#888';
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+            this.drawRockDetail(ctx, screenX, screenY, TILE_SIZE);
+            break;
+          case 2: // Trees
+            ctx.fillStyle = '#5f5';
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+            this.drawTree(ctx, screenX + TILE_SIZE/2, screenY + TILE_SIZE/2);
+            break;
+          case 3: // Walls
+            ctx.fillStyle = '#555';
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+            this.drawWallDetail(ctx, screenX, screenY, TILE_SIZE);
+            break;
+          case 4: // Road
+            ctx.fillStyle = '#999';
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+            this.drawRoadDetail(ctx, screenX, screenY, TILE_SIZE, x, y);
+            break;
+          case 5: // Water
+            this.drawWater(ctx, screenX, screenY, TILE_SIZE);
+            break;
+        }
       }
     }
-
-    // Power-Ups zeichnen
-    this.game.powerUps.forEach(p => {
-      ctx.fillStyle = p.type === 'health' ? '#f00' : '#00f';
-      ctx.beginPath();
-      ctx.arc(p.x * scale, p.y * scale, 2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Fahrzeuge zeichnen
-    this.game.vehicles.forEach(v => {
-      ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(v.x * scale, v.y * scale, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Spieler zeichnen
-    this.game.players.forEach(p => {
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x * scale, p.y * scale, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // KI-Gegner zeichnen (nur im Kooperativen Modus)
-    if (this.game.mode === 'Cooperative') {
-      this.game.kis.forEach(ki => {
-        ctx.fillStyle = ki.color;
-        ctx.beginPath();
-        ctx.arc(ki.x * scale, ki.y * scale, 3, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
   }
 
-  drawGame(ctx, playerIndex) {
-    const player = this.game.players[playerIndex];
-    ctx.fillStyle = '#88aa88';
-    ctx.fillRect(0, 0, window.innerWidth / 2, window.innerHeight);
+  drawTree(ctx, x, y) {
+    // Tree trunk
+    ctx.fillStyle = '#73510D';
+    ctx.fillRect(x - 2, y, 4, 8);
 
-    ctx.save();
-    // Kamera-Transformation basierend auf Spielerposition
-    ctx.translate(window.innerWidth / 4 - player.x, window.innerHeight / 2 - player.y);
+    // Tree crown
+    ctx.fillStyle = '#25511F';
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y);
+    ctx.lineTo(x + 8, y);
+    ctx.lineTo(x, y - 16);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-    // Karte zeichnen
-    this.game.map.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        if (cell === 1) {
-          ctx.fillStyle = '#888'; // Felsen
-          ctx.fillRect(x * 40, y * 40, 40, 40); // TILE_SIZE = 40
-        } else if (cell === 2) {
-          ctx.fillStyle = '#355'; // Bäume
-          ctx.fillRect(x * 40, y * 40, 40, 40);
-        } else if (cell === 3) {
-          ctx.fillStyle = '#555'; // Hindernisse
-          ctx.fillRect(x * 40, y * 40, 40, 40);
-        } else if (cell === 4) {
-          ctx.fillStyle = '#999'; // Straße
-          ctx.fillRect(x * 40, y * 40, 40, 40);
-        } else if (cell === 5) {
-          ctx.fillStyle = '#00f'; // Wasser
-          ctx.fillRect(x * 40, y * 40, 40, 40);
-        } else {
-          ctx.fillStyle = '#5f5'; // Gras
-          ctx.fillRect(x * 40, y * 40, 40, 40);
-        }
-      });
-    });
+  drawWater(ctx, x, y, size) {
+    const time = Date.now() / 1000;
+    ctx.fillStyle = '#4444ff';
+    ctx.fillRect(x, y, size, size);
 
-    // Power-Ups zeichnen
-    this.game.powerUps.forEach(p => {
-      ctx.fillStyle = p.type === 'health' ? '#ff8888' : '#8888ff';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Fahrzeuge zeichnen
-    this.game.vehicles.forEach(v => {
-      this.drawEntity(ctx, v);
-    });
-
-    // Kugeln zeichnen
-    this.game.bullets.forEach(b => {
-      ctx.fillStyle = '#ffff00';
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Spieler zeichnen
-    this.game.players.forEach(p => {
-      if (p.vehicle) {
-        this.drawEntity(ctx, p.vehicle);
+    // Animated water effect
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    for (let i = 0; i < size; i += 4) {
+      const waveHeight = Math.sin(i * 0.1 + time) * 2;
+      if (i === 0) {
+        ctx.moveTo(x + i, y + size/2 + waveHeight);
       } else {
-        this.drawEntity(ctx, p);
+        ctx.lineTo(x + i, y + size/2 + waveHeight);
       }
-    });
-
-    // KI-Gegner zeichnen (nur im Kooperativen Modus)
-    if (this.game.mode === 'Cooperative') {
-      this.game.kis.forEach(ki => {
-        if (ki.vehicle) {
-          this.drawEntity(ctx, ki.vehicle);
-        } else {
-          this.drawEntity(ctx, ki);
-        }
-        // Sichtfeld der KI zeichnen (optional visuell anzeigen)
-        ctx.save();
-        ctx.translate(ki.x, ki.y);
-        ctx.rotate(ki.angle);
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, 150, -Math.PI / 4, Math.PI / 4);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      });
     }
+    ctx.stroke();
+  }
 
-    // Interaktionsnachrichten anzeigen
-    this.game.players.forEach((p, i) => {
-      if (i === playerIndex) {
-        let message = '';
-        if (this.game.mode === 'Cooperative') {
-          const nearestVehicle = this.game.vehicles.find(v => 
-            distance(p, v) < 50 && (!v.driver || !v.gunner));
-          if (nearestVehicle && !p.vehicle) {
-            message = `Drücke ${this.game.controls[i].action} zum Einsteigen`;
-            document.getElementById(`message${i+1}`).style.display = 'block';
-            document.getElementById(`message${i+1}`).textContent = message;
-          } else if (p.vehicle) {
-            message = `Drücke ${this.game.controls[i].action} zum Aussteigen`;
-            document.getElementById(`message${i+1}`).style.display = 'block';
-            document.getElementById(`message${i+1}`).textContent = message;
-          } else {
-            document.getElementById(`message${i+1}`).style.display = 'none';
-          }
-        } else if (this.game.mode === 'Versus') {
-          // Im Versus-Modus könnten Interaktionen anders gehandhabt werden
-          document.getElementById(`message${i+1}`).style.display = 'none';
-        }
-      }
-    });
+  drawRockDetail(ctx, x, y, size) {
+    ctx.strokeStyle = '#666';
+    ctx.beginPath();
+    // Draw crack patterns
+    ctx.moveTo(x + size * 0.2, y + size * 0.3);
+    ctx.lineTo(x + size * 0.8, y + size * 0.7);
+    ctx.moveTo(x + size * 0.7, y + size * 0.2);
+    ctx.lineTo(x + size * 0.3, y + size * 0.8);
+    ctx.stroke();
+  }
 
-    ctx.restore();
-
-    // Minikarte zeichnen
-    if (playerIndex === 0) {
-      this.drawMinimap(this.minimapCtx1, player);
-    } else {
-      this.drawMinimap(this.minimapCtx2, player);
+  drawWallDetail(ctx, x, y, size) {
+    // Brick pattern
+    ctx.strokeStyle = '#444';
+    for (let i = 0; i < size; i += size/4) {
+      ctx.beginPath();
+      ctx.moveTo(x, y + i);
+      ctx.lineTo(x + size, y + i);
+      ctx.stroke();
     }
-
-    // Sichtfeld der KI-Gegner zeichnen (nur im Kooperativen Modus)
-    if (this.game.mode === 'Cooperative') {
-      this.game.kis.forEach(ki => {
-        if (isInSight(ki, player, ki.angle, Math.PI / 2, 200)) {
-          // Logik, wenn KI den Spieler sieht
-          // Beispielsweise Spieler als Ziel setzen
-        }
-      });
+    for (let i = 0; i < size; i += size/3) {
+      ctx.beginPath();
+      ctx.moveTo(x + i, y);
+      ctx.lineTo(x + i, y + size);
+      ctx.stroke();
     }
+  }
+
+  drawRoadDetail(ctx, x, y, size, gridX, gridY) {
+    // Road markings
+    ctx.strokeStyle = '#fff';
+    ctx.setLineDash([size/4, size/4]);
+    
+    // Check surrounding tiles to determine road direction
+    const hasNorth = gridY > 0 && this.game.map[gridY-1][gridX] === 4;
+    const hasSouth = gridY < 99 && this.game.map[gridY+1][gridX] === 4;
+    const hasEast = gridX < 99 && this.game.map[gridY][gridX+1] === 4;
+    const hasWest = gridX > 0 && this.game.map[gridY][gridX-1] === 4;
+
+    if ((hasNorth || hasSouth) && !hasEast && !hasWest) {
+      // Vertical road
+      ctx.beginPath();
+      ctx.moveTo(x + size/2, y);
+      ctx.lineTo(x + size/2, y + size);
+      ctx.stroke();
+    } else if (!hasNorth && !hasSouth && (hasEast || hasWest)) {
+      // Horizontal road
+      ctx.beginPath();
+      ctx.moveTo(x, y + size/2);
+      ctx.lineTo(x + size, y + size/2);
+      ctx.stroke();
+    }
+    
+    ctx.setLineDash([]);
   }
 }

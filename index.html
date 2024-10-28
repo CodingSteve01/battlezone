@@ -2,22 +2,22 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Fahrzeugkampf-Spiel</title>
+  <title>Vehicle Combat Game</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <!-- Startbildschirm -->
   <div class="screen-overlay" id="startScreen">
-    <h1>Fahrzeugkampf-Spiel</h1>
-    <button id="cooperativeBtn">Kooperativ</button>
+    <h1>Vehicle Combat Game</h1>
+    <button id="singlePlayerBtn">Single Player</button>
+    <button id="cooperativeBtn">Cooperative</button>
     <button id="versusBtn">Versus</button>
   </div>
   
-  <!-- Game Over Bildschirm -->
   <div class="screen-overlay hidden" id="gameOverScreen">
-    <h1>Spiel vorbei!</h1>
-    <p id="gameOverMessage">Du bist gestorben.</p>
-    <button id="restartBtn">Neustarten</button>
+    <h1>Game Over!</h1>
+    <p id="gameOverMessage"></p>
+    <button id="restartBtn">Restart</button>
+    <button id="menuBtn">Main Menu</button>
   </div>
   
   <div class="game-container" id="gameContainer" style="display: none;">
@@ -28,31 +28,37 @@
           <strong>Player 1</strong><br>
           HP: <span id="health1">100</span><br>
           Ammo: <span id="ammo1">30</span><br>
-          Weapon: <span id="weapon1">Pistole</span><br>
+          Weapon: <span id="weapon1">Pistol</span><br>
           Vehicle: <span id="vehicle1">None</span><br>
           Position: (<span id="posX1">0</span>, <span id="posY1">0</span>)
         </div>
         <div class="message" id="message1"></div>
-        <canvas class="minimap1" id="minimap1"></canvas>
+        <div class="controls-info">
+          <p>WASD: Move | F: Shoot | E: Enter/Exit Vehicle | G: Switch Position</p>
+        </div>
+        <canvas class="minimap" id="minimap1"></canvas>
       </div>
     </div>
-    <div class="player-screen">
+    <div class="player-screen" id="player2Screen">
       <canvas id="canvas2"></canvas>
       <div class="ui">
         <div class="stats">
           <strong>Player 2</strong><br>
           HP: <span id="health2">100</span><br>
           Ammo: <span id="ammo2">30</span><br>
-          Weapon: <span id="weapon2">Pistole</span><br>
+          Weapon: <span id="weapon2">Pistol</span><br>
           Vehicle: <span id="vehicle2">None</span><br>
           Position: (<span id="posX2">0</span>, <span id="posY2">0</span>)
         </div>
         <div class="message" id="message2"></div>
-        <canvas class="minimap2" id="minimap2"></canvas>
+        <div class="controls-info">
+          <p>IJKL: Move | H: Shoot | U: Enter/Exit Vehicle | Y: Switch Position</p>
+        </div>
+        <canvas class="minimap" id="minimap2"></canvas>
       </div>
     </div>
   </div>
-  <div class="mode-display" id="modeDisplay">Mode: Kooperativ</div>
+  <div class="mode-display" id="modeDisplay">Mode: Single Player</div>
   
   <script type="module" src="js/main.js"></script>
 </body>
