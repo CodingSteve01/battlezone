@@ -113,6 +113,24 @@
     from { transform: scale(0.5); opacity: 1; }
     to { transform: scale(2); opacity: 0; }
   }
+  /* Wave Anzeige */
+  .wave-display {
+    margin-top: 10px;
+    font-size: 16px;
+  }
+  /* Weitere UI Elemente */
+  .achievement {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 5px;
+    color: white;
+    z-index: 10;
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -164,12 +182,16 @@
 </div>
 <div class="mode-display" id="modeDisplay">Mode: Kooperativ</div>
 
-<!-- Audio Elemente -->
-<audio id="shootSound" src="https://www.soundjay.com/buttons/sounds/button-16.mp3"></audio>
-<audio id="explosionSound" src="https://www.soundjay.com/explosion/sounds/explosion-01.mp3"></audio>
-<audio id="pickupSound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+<!-- Wave Anzeige -->
+<div class="wave-display" id="waveDisplay" style="position: absolute; top: 10px; right: 10px; color: white; z-index: 10; font-size: 16px;">
+  Wave: 1
+</div>
+
+<!-- Achievement Anzeige -->
+<div class="achievement hidden" id="achievementDisplay"></div>
 
 <script>
+// Konstanten
 const TILE_SIZE = 40;
 const MAP_SIZE = 100;
 const SCREEN_WIDTH = window.innerWidth / 2;
@@ -203,6 +225,62 @@ function isInSight(entity, target, angle, fov, range) {
   return angleDifference < fov / 2;
 }
 
+// Sound Manager mit Web Audio API
+class SoundManager {
+  constructor() {
+    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this.sounds = {};
+    this.loadSounds();
+  }
+
+  loadSounds() {
+    // Hier sollten tatsächliche Audiodateien geladen werden
+    // Für dieses Beispiel werden einfache Töne generiert
+    // Für bessere Sounds, kannst du Audiodateien laden und abspielen
+    this.sounds.shoot = () => {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(600, this.audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + 0.1);
+    };
+
+    this.sounds.explosion = () => {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(100, this.audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.05, this.audioCtx.currentTime);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + 0.5);
+    };
+
+    this.sounds.pickup = () => {
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(800, this.audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.05, this.audioCtx.currentTime);
+      osc.connect(gain);
+      gain.connect(this.audioCtx.destination);
+      osc.start();
+      osc.stop(this.audioCtx.currentTime + 0.3);
+    };
+  }
+
+  play(soundName) {
+    if (this.sounds[soundName]) {
+      this.sounds[soundName]();
+    }
+  }
+}
+
 class Entity {
   constructor(x, y, angle = 0) {
     this.x = x;
@@ -231,7 +309,7 @@ class Entity {
 }
 
 class Human extends Entity {
-  constructor(x, y, color) {
+  constructor(x, y, color, isAI = false) {
     super(x, y);
     this.type = 'human';
     this.color = color;
@@ -242,17 +320,25 @@ class Human extends Entity {
     this.vehicle = null;
     this.role = null;
     this.canShoot = true;
+    this.isAI = isAI;
+    this.patrolPoints = [];
+    this.currentPatrolIndex = 0;
+    this.state = 'patrol'; // patrol, engage, flee, investigate
   }
 
-  update(controls, map) {
+  update(controls, map, soundManager, game) {
     if (this.vehicle) {
       if (this.role === 'driver') {
-        this.updateVehicleControls(controls, map);
+        this.updateVehicleControls(controls, map, game);
       } else if (this.role === 'gunner') {
-        this.updateGunnerControls(controls);
+        this.updateGunnerControls(controls, game);
       }
     } else {
-      this.updateHumanControls(controls, map);
+      if (this.isAI) {
+        this.updateAI(map, soundManager, game);
+      } else {
+        this.updateHumanControls(controls, map);
+      }
     }
   }
 
@@ -265,7 +351,7 @@ class Human extends Entity {
     this.move(map);
   }
 
-  updateVehicleControls(controls, map) {
+  updateVehicleControls(controls, map, game) {
     const v = this.vehicle;
     if (controls.forward) v.speed = Math.min(v.maxSpeed, v.speed + v.acceleration);
     if (controls.backward) v.speed = Math.max(-v.maxSpeed / 2, v.speed - v.acceleration);
@@ -284,10 +370,90 @@ class Human extends Entity {
     }
   }
 
-  updateGunnerControls(controls) {
+  updateGunnerControls(controls, game) {
     const v = this.vehicle;
     if (controls.left) v.turretAngle = Math.max(-Math.PI / 2, v.turretAngle - 0.05);
     if (controls.right) v.turretAngle = Math.min(Math.PI / 2, v.turretAngle + 0.05);
+  }
+
+  updateAI(map, soundManager, game) {
+    switch(this.state) {
+      case 'patrol':
+        this.patrol(map);
+        break;
+      case 'engage':
+        this.engage(game);
+        break;
+      case 'flee':
+        this.flee(game);
+        break;
+      case 'investigate':
+        this.investigate(game);
+        break;
+      default:
+        this.patrol(map);
+    }
+  }
+
+  patrol(map) {
+    if (this.patrolPoints.length === 0) {
+      // Definiere zufällige Patrouillenpunkte
+      for(let i = 0; i < 3; i++) {
+        this.patrolPoints.push({
+          x: Math.random() * MAP_SIZE * TILE_SIZE,
+          y: Math.random() * MAP_SIZE * TILE_SIZE
+        });
+      }
+    }
+
+    const target = this.patrolPoints[this.currentPatrolIndex];
+    const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+    const dist = distance(this, target);
+
+    if (dist < 50) {
+      this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+    } else {
+      this.angle = angleToTarget;
+      this.speed = this.maxSpeed * 0.5;
+      this.move(map);
+    }
+  }
+
+  engage(game) {
+    // Implementiere Kampflogik gegen Spieler oder Fahrzeuge
+    // Beispiel: Schießen auf den nächsten Spieler
+    const target = game.players[0]; // Einfachheitshalber
+    const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+    this.angle = angleToTarget;
+    this.speed = 0;
+    if (distance(this, target) < 300 && this.ammo > 0 && isInSight(this, target, this.angle, Math.PI / 2, 300)) {
+      // Schießen
+      game.bullets.push({
+        x: this.x + Math.cos(this.angle) * 15,
+        y: this.y + Math.sin(this.angle) * 15,
+        angle: this.angle,
+        speed: 15,
+        damage: 10,
+        owner: 'AI',
+        vehicle: this.vehicle
+      });
+      this.ammo--;
+      game.soundManager.play('shoot');
+    }
+  }
+
+  flee(game) {
+    // Implementiere Fluchtlogik
+    this.speed = this.maxSpeed * 0.7;
+    this.angle += Math.PI; // Einfach rückwärts bewegen
+    this.move(game.map);
+  }
+
+  investigate(game) {
+    // Implementiere Untersuchungslogik
+    this.speed = 0;
+    // Wechsel zurück zu Patrouille
+    this.state = 'patrol';
   }
 }
 
@@ -366,6 +532,7 @@ class Vehicle extends Entity {
 class Game {
   constructor(mode) {
     this.mode = mode; // 'Cooperative' oder 'Versus'
+    this.soundManager = new SoundManager();
     this.setupCanvases();
     this.initGame();
     this.setupControls();
@@ -375,6 +542,8 @@ class Game {
     this.wave = 1;
     this.kisPerWave = 10;
     this.kisToSpawn = this.kisPerWave;
+    this.maxWaves = 10;
+    this.maxKis = 100;
     this.spawnCooldown = 0;
     this.achievements = { kills: 0, vehiclesDestroyed: 0 };
     this.gameLoop();
@@ -414,7 +583,8 @@ class Game {
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
     this.kis = [];
-    this.spawnWave();
+    this.generateEnemies();
+    this.assignEnemyRoles();
 
     // Set initial positions based on mode
     if (this.mode === 'Cooperative') {
@@ -432,6 +602,9 @@ class Game {
         player.y = Math.random() * MAP_SIZE * TILE_SIZE;
       }
     });
+
+    // Update Wave Anzeige
+    this.updateWaveDisplay();
   }
 
   resetGame() {
@@ -468,9 +641,11 @@ class Game {
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
     this.kis = [];
+    this.generateEnemies();
+    this.assignEnemyRoles();
     this.wave = 1;
     this.kisToSpawn = this.kisPerWave;
-    this.spawnWave();
+    this.updateWaveDisplay();
   }
 
   isPlayerOverlapping(newPlayer) {
@@ -479,23 +654,63 @@ class Game {
 
   generateLogicalMap() {
     const map = [];
+    // Initialisiere mit Gras (0)
     for(let y = 0; y < MAP_SIZE; y++) {
       const row = [];
       for(let x = 0; x < MAP_SIZE; x++) {
-        if ((y === 20 || y === 80) && x > 10 && x < 90) {
-          row.push(4); // Straße horizontal
-        } else if ((x === 20 || x === 80) && y > 10 && y < 90) {
-          row.push(4); // Straße vertikal
-        } else {
-          if (Math.random() < 0.02) row.push(2); // 2 = Bäume
-          else if (Math.random() < 0.02) row.push(1); // 1 = Felsen
-          else if (Math.random() < 0.01) row.push(3); // 3 = Hindernisse
-          else if (y > 40 && y < 60 && x > 40 && x < 60) row.push(5); // 5 = Wasser
-          else row.push(0); // 0 = Gras
-        }
+        row.push(0);
       }
       map.push(row);
     }
+
+    // Generiere Straßen (Straßen sind Straßen-Tiles: 4)
+    // Horizontale Straßen
+    for(let y = 20; y < 80; y += 10) {
+      for(let x = 10; x < 90; x++) {
+        map[y][x] = 4;
+      }
+    }
+
+    // Vertikale Straßen
+    for(let x = 20; x < 80; x += 10) {
+      for(let y = 10; y < 90; y++) {
+        map[y][x] = 4;
+      }
+    }
+
+    // Platzieren von Gebäuden (1 = Gebäude)
+    for(let y = 15; y < 85; y += 10) {
+      for(let x = 15; x < 85; x += 10) {
+        if (map[y][x] !== 4 && map[y][x] !== 5) {
+          const hasBuilding = Math.random() < 0.6; // 60% Wahrscheinlichkeit für ein Gebäude
+          if (hasBuilding) {
+            for(let dy = y; dy < y + 5; dy++) {
+              for(let dx = x; dx < x + 5; dx++) {
+                if (dx < MAP_SIZE && dy < MAP_SIZE) map[dy][dx] = 1;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Wasser hinzufügen (5 = Wasser)
+    for(let y = 40; y < 60; y++) {
+      for(let x = 40; x < 60; x++) {
+        map[y][x] = 5;
+      }
+    }
+
+    // Hindernisse (Bäume und Felsen)
+    for(let y = 0; y < MAP_SIZE; y++) {
+      for(let x = 0; x < MAP_SIZE; x++) {
+        if (map[y][x] === 0) { // Nur auf Gras
+          if (Math.random() < 0.02) map[y][x] = 2; // Bäume
+          else if (Math.random() < 0.02) map[y][x] = 3; // Hindernisse
+        }
+      }
+    }
+
     return map;
   }
 
@@ -544,44 +759,87 @@ class Game {
     return powerUpsList.some(pu => distance(pu, {x, y}) < 50);
   }
 
-  spawnWave() {
-    for(let i = 0; i < this.kisToSpawn; i++) {
-      let x, y;
-      do {
-        x = Math.random() * MAP_SIZE * TILE_SIZE;
-        y = Math.random() * MAP_SIZE * TILE_SIZE;
-      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y) || this.isKIOverlapping(x, y));
-      this.kis.push(new Human(x, y, '#FFD700'));
+  generateEnemies() {
+    // Gegner werden logisch auf der Karte verteilt
+    // Z.B. um Gebäude oder Fahrzeuge, patrouillieren auf Straßen
+    this.kis = [];
+    // Gegner um Gebäude platzieren
+    this.vehicles.forEach(vehicle => {
+      for(let i = 0; i < 2; i++) { // 2 Gegner pro Fahrzeug
+        const angle = Math.random() * 2 * Math.PI;
+        const dist = TILE_SIZE * 2;
+        const x = vehicle.x + Math.cos(angle) * dist;
+        const y = vehicle.y + Math.sin(angle) * dist;
+        if (!isColliding({x, y}, this.map)) {
+          this.kis.push(new Human(x, y, '#FFD700', true));
+        }
+      }
+    });
+
+    // Gegner um Gebäude platzieren
+    for(let y = 15; y < 85; y += 10) {
+      for(let x = 15; x < 85; x += 10) {
+        if (this.map[y][x] === 1) { // Gebäude
+          for(let i = 0; i < 3; i++) { // 3 Gegner pro Gebäude
+            const angle = Math.random() * 2 * Math.PI;
+            const dist = TILE_SIZE * 2;
+            const posX = x * TILE_SIZE + Math.cos(angle) * dist;
+            const posY = y * TILE_SIZE + Math.sin(angle) * dist;
+            if (!isColliding({x: posX, y: posY}, this.map)) {
+              this.kis.push(new Human(posX, posY, '#FFD700', true));
+            }
+          }
+        }
+      }
     }
+
+    // Gegner auf Straßen patrouillieren
+    for(let y = 20; y < 80; y += 10) {
+      for(let x = 20; x < 80; x += 10) {
+        if (this.map[y][x] === 4) { // Straße
+          for(let i = 0; i < 2; i++) { // 2 Gegner pro Straßenabschnitt
+            const posX = x * TILE_SIZE + Math.random() * TILE_SIZE;
+            const posY = y * TILE_SIZE + Math.random() * TILE_SIZE;
+            if (!isColliding({x: posX, y: posY}, this.map)) {
+              this.kis.push(new Human(posX, posY, '#FFD700', true));
+            }
+          }
+        }
+      }
+    }
+
+    // Limit der Gesamtzahl der Gegner zur Performance-Optimierung
+    this.kis = this.kis.slice(0, this.maxKis);
+  }
+
+  assignEnemyRoles() {
+    // Weisen Sie den Gegnern spezifische Rollen zu, z.B. Bewacher oder Patrouillen
+    this.kis.forEach(ki => {
+      const rand = Math.random();
+      if (rand < 0.5) {
+        ki.state = 'patrol';
+      } else {
+        ki.state = 'engage';
+      }
+    });
+  }
+
+  spawnWave() {
+    if (this.wave > this.maxWaves || this.kis.length >= this.maxKis) return;
+    // Bei wave-basierten Systemen könnten zusätzliche Gegner hinzugefügt werden
+    // Hier aber schon bei der Initialisierung verteilt
+    this.updateWaveDisplay();
   }
 
   spawnWaveWithDelay() {
-    if (this.wave <= 10) { // Max 10 Wellen
+    if (this.wave < this.maxWaves && this.kis.length === 0) { // Max 10 Wellen und keine KI mehr vorhanden
       setTimeout(() => {
-        this.spawnWave();
+        this.generateEnemies();
+        this.assignEnemyRoles();
         this.wave++;
-        this.kisToSpawn = this.kisPerWave + Math.floor(this.wave / 2); // Erhöhte KI pro Welle
+        this.updateWaveDisplay();
       }, 5000); // 5 Sekunden Pause zwischen Wellen
     }
-  }
-
-  spawnKIs(count) {
-    for(let i = 0; i < count; i++) {
-      let x, y;
-      do {
-        x = Math.random() * MAP_SIZE * TILE_SIZE;
-        y = Math.random() * MAP_SIZE * TILE_SIZE;
-      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y));
-      this.kis.push(new Human(x, y, '#FFD700'));
-    }
-  }
-
-  isKIOverlapping(x, y) {
-    return this.kis.some(ki => distance(ki, {x, y}) < TILE_SIZE);
-  }
-
-  isTooCloseToPlayers(x, y) {
-    return this.players.some(player => distance({x, y}, player) < 200);
   }
 
   setupControls() {
@@ -597,18 +855,18 @@ class Game {
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','ShiftRight',
            'KeyW','KeyA','KeyS','KeyD','KeyF','KeyE','KeyG'].includes(e.code)) {
         e.preventDefault();
-      this.keys[e.code] = true;
+        this.keys[e.code] = true;
       }
     });
     
     window.addEventListener('keyup', (e) => {
       if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','ShiftRight',
            'KeyW','KeyA','KeyS','KeyD','KeyF','KeyE','KeyG'].includes(e.code)) {
-      e.preventDefault();
-      this.keys[e.code] = false;
+        e.preventDefault();
+        this.keys[e.code] = false;
       }
     });
-}
+  }
 
   getPlayerControls(index) {
     const keys = this.controls[index];
@@ -690,7 +948,7 @@ class Game {
     }
 
     // Bewegung aktualisieren
-    player.update(controls, this.map);
+    player.update(controls, this.map, this.soundManager, this);
 
     // Update Position in HUD
     document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
@@ -707,6 +965,7 @@ class Game {
       let damage = 10; // Standard Schaden
       if (player.weapon === 'Schrotflinte') damage = 20;
       else if (player.weapon === 'Maschinengewehr') damage = 5;
+      else if (player.weapon === 'Kanone') damage = 30;
 
       this.bullets.push({
         x: player.vehicle ? player.vehicle.x + Math.cos(shootAngle) * 30 : player.x + Math.cos(shootAngle) * 15,
@@ -722,8 +981,7 @@ class Game {
       player.canShoot = false;
 
       // Sound abspielen
-      document.getElementById('shootSound').currentTime = 0;
-      document.getElementById('shootSound').play();
+      this.soundManager.play('shoot');
     }
 
     // Reset canShoot Flag beim Loslassen der Schusstaste
@@ -754,8 +1012,7 @@ class Game {
             this.bullets.splice(i, 1);
             // Explosion visuell darstellen
             this.createExplosion(player.x, player.y);
-            document.getElementById('explosionSound').currentTime = 0;
-            document.getElementById('explosionSound').play();
+            this.soundManager.play('explosion');
             if (player.health <= 0) {
               this.achievements.kills++;
               if (this.mode === 'Versus') {
@@ -778,8 +1035,7 @@ class Game {
             ki.health -= bullet.damage;
             this.bullets.splice(i, 1);
             this.createExplosion(ki.x, ki.y);
-            document.getElementById('explosionSound').currentTime = 0;
-            document.getElementById('explosionSound').play();
+            this.soundManager.play('explosion');
             if (ki.health <= 0) {
               this.kis.splice(j, 1);
               this.achievements.kills++;
@@ -799,8 +1055,7 @@ class Game {
           vehicle.health -= bullet.damage;
           this.bullets.splice(i, 1);
           this.createExplosion(vehicle.x, vehicle.y);
-          document.getElementById('explosionSound').currentTime = 0;
-          document.getElementById('explosionSound').play();
+          this.soundManager.play('explosion');
           if (vehicle.health <= 0) {
             this.vehicles.splice(j, 1);
             this.achievements.vehiclesDestroyed++;
@@ -953,7 +1208,7 @@ class Game {
     // Karte zeichnen
     for(let y = 0; y < MAP_SIZE; y++) {
       for(let x = 0; x < MAP_SIZE; x++) {
-        if (this.map[y][x] === 1) ctx.fillStyle = '#888'; // Felsen
+        if (this.map[y][x] === 1) ctx.fillStyle = '#888'; // Gebäude
         else if (this.map[y][x] === 2) ctx.fillStyle = '#355'; // Bäume
         else if (this.map[y][x] === 3) ctx.fillStyle = '#555'; // Hindernisse
         else if (this.map[y][x] === 4) ctx.fillStyle = '#999'; // Straße
@@ -1117,14 +1372,12 @@ class Game {
       this.drawMinimap(this.minimapCtx2, player);
     }
 
-    // Sichtfeld der KI-Gegner zeichnen (nur im Kooperativen Modus)
-    if (this.mode === 'Cooperative') {
-      this.kis.forEach(ki => {
-        if (isInSight(ki, player, ki.angle, Math.PI / 2, 200)) {
-          // Weitere KI-Logik kann hier implementiert werden
-        }
-      });
-    }
+    // Wave Anzeige aktualisieren
+    this.updateWaveDisplay();
+  }
+
+  updateWaveDisplay() {
+    document.getElementById('waveDisplay').textContent = `Wave: ${this.wave}`;
   }
 
   checkPowerUpCollisions() {
@@ -1138,8 +1391,7 @@ class Game {
           }
           this.powerUps.splice(index, 1);
           // Sound abspielen
-          document.getElementById('pickupSound').currentTime = 0;
-          document.getElementById('pickupSound').play();
+          this.soundManager.play('pickup');
           // Update HUD
           document.getElementById(`health${i+1}`).textContent = player.health;
           document.getElementById(`ammo${i+1}`).textContent = player.ammo;
@@ -1159,7 +1411,7 @@ class Game {
           }, 10000);
         }
       });
-    });
+    }
 
     // Power-Ups für KI-Gegner (nur im Kooperativen Modus)
     if (this.mode === 'Cooperative') {
@@ -1172,8 +1424,7 @@ class Game {
               ki.ammo += 20;
             }
             this.powerUps.splice(index, 1);
-            document.getElementById('pickupSound').currentTime = 0;
-            document.getElementById('pickupSound').play();
+            this.soundManager.play('pickup');
             // Power-Up nach 10 Sekunden neu spawnen
             setTimeout(() => {
               let x, y, type;
@@ -1197,59 +1448,8 @@ class Game {
   updateKIs() {
     this.kis.forEach(ki => {
       if (ki.health <= 0) return;
-      // KI-Verhalten: Ziel setzen
-      const target = this.players.reduce((nearest, player) => {
-        const dist = distance(ki, player);
-        return dist < distance(ki, nearest) ? player : nearest;
-      }, this.players[0]);
-
-      const angleToTarget = Math.atan2(target.y - ki.y, target.x - ki.x);
-      const distanceToTarget = distance(ki, target);
-
-      // Bewegung
-      if (distanceToTarget > 200) {
-        ki.angle = angleToTarget;
-        ki.speed = ki.maxSpeed;
-      } else {
-        ki.speed = 0;
-      }
-
-      ki.move(this.map);
-
-      // Verhindere, dass KI sich über Spieler bewegt
-      if (distanceToTarget < 100) {
-        ki.x -= Math.cos(angleToTarget) * ki.speed;
-        ki.y -= Math.sin(angleToTarget) * ki.speed;
-        ki.speed = 0;
-      }
-
-      // Schießen
-      if (distanceToTarget < 300 && ki.ammo > 0 && distanceToTarget > 50 &&
-          isInSight(ki, target, ki.angle, Math.PI / 2, 300)) {
-        this.bullets.push({
-          x: ki.vehicle ? ki.vehicle.x + Math.cos(angleToTarget) * 30 : ki.x + Math.cos(angleToTarget) * 15,
-          y: ki.vehicle ? ki.vehicle.y + Math.sin(angleToTarget) * 30 : ki.y + Math.sin(angleToTarget) * 15,
-          angle: angleToTarget,
-          speed: 15,
-          damage: 10,
-          owner: this.players.length + this.kis.indexOf(ki),
-          vehicle: ki.vehicle
-        });
-        ki.ammo--;
-        // Sound abspielen
-        document.getElementById('shootSound').currentTime = 0;
-        document.getElementById('shootSound').play();
-      }
-
-      // Fahrzeugkollisionen für KI
-      if (ki.vehicle) {
-        const v = ki.vehicle;
-        if (isVehicleColliding(v, this.vehicles)) {
-          v.x -= Math.cos(v.angle) * v.speed;
-          v.y -= Math.sin(v.angle) * v.speed;
-          v.speed = 0;
-        }
-      }
+      // KI-Verhalten basierend auf ihrem Zustand
+      ki.update(null, this.map, this.soundManager, this);
     });
   }
 
@@ -1287,7 +1487,7 @@ class Game {
       this.drawGame(this.ctx2, 1);
 
       // Wave Management
-      if (this.mode === 'Cooperative' && this.kis.length === 0 && this.wave < 10) {
+      if (this.mode === 'Cooperative' && this.kis.length === 0 && this.wave < this.maxWaves) {
         this.spawnWaveWithDelay();
       }
 
@@ -1301,7 +1501,7 @@ class Game {
     this.gameOver = true;
     const gameOverScreen = document.getElementById('gameOverScreen');
     const gameOverMessage = document.getElementById('gameOverMessage');
-    gameOverMessage.textContent = message + `\nKills: ${this.achievements.kills}, Vehicles Destroyed: ${this.achievements.vehiclesDestroyed}`;
+    gameOverMessage.textContent = `${message}\nKills: ${this.achievements.kills}, Vehicles Destroyed: ${this.achievements.vehiclesDestroyed}`;
     gameOverScreen.classList.remove('hidden');
   }
 
@@ -1332,6 +1532,71 @@ class Game {
     setTimeout(() => {
       explosion.remove();
     }, 1000);
+  }
+
+  generateEnemies() {
+    // Gegner logisch auf der Karte verteilen
+    this.kis = [];
+    // Gegner um Fahrzeuge platzieren
+    this.vehicles.forEach(vehicle => {
+      for(let i = 0; i < 2; i++) { // 2 Gegner pro Fahrzeug
+        const angle = Math.random() * 2 * Math.PI;
+        const dist = TILE_SIZE * 2;
+        const x = vehicle.x + Math.cos(angle) * dist;
+        const y = vehicle.y + Math.sin(angle) * dist;
+        if (!isColliding({x, y}, this.map)) {
+          this.kis.push(new Human(x, y, '#FFD700', true));
+        }
+      }
+    });
+
+    // Gegner um Gebäude platzieren
+    for(let y = 15; y < 85; y += 10) {
+      for(let x = 15; x < 85; x += 10) {
+        if (this.map[y][x] === 1) { // Gebäude
+          for(let i = 0; i < 3; i++) { // 3 Gegner pro Gebäude
+            const angle = Math.random() * 2 * Math.PI;
+            const dist = TILE_SIZE * 2;
+            const posX = x * TILE_SIZE + Math.cos(angle) * dist;
+            const posY = y * TILE_SIZE + Math.sin(angle) * dist;
+            if (!isColliding({x: posX, y: posY}, this.map)) {
+              this.kis.push(new Human(posX, posY, '#FFD700', true));
+            }
+          }
+        }
+      }
+    }
+
+    // Gegner auf Straßen patrouillieren
+    for(let y = 20; y < 80; y += 10) {
+      for(let x = 20; x < 80; x += 10) {
+        if (this.map[y][x] === 4) { // Straße
+          for(let i = 0; i < 2; i++) { // 2 Gegner pro Straßenabschnitt
+            const posX = x * TILE_SIZE + Math.random() * TILE_SIZE;
+            const posY = y * TILE_SIZE + Math.random() * TILE_SIZE;
+            if (!isColliding({x: posX, y: posY}, this.map)) {
+              this.kis.push(new Human(posX, posY, '#FFD700', true));
+            }
+          }
+        }
+      }
+    }
+
+    // Limit der Gesamtzahl der Gegner zur Performance-Optimierung
+    this.kis = this.kis.slice(0, this.maxKis);
+    this.assignEnemyRoles();
+  }
+
+  assignEnemyRoles() {
+    // Weisen Sie den Gegnern spezifische Rollen zu, z.B. Bewacher oder Patrouillen
+    this.kis.forEach(ki => {
+      const rand = Math.random();
+      if (rand < 0.5) {
+        ki.state = 'patrol';
+      } else {
+        ki.state = 'engage';
+      }
+    });
   }
 }
 
