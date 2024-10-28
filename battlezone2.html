@@ -61,7 +61,7 @@
     cursor: pointer;
     font-size: 16px;
   }
-  /* Startbildschirm und Game Over Bildschirm */
+  /* Start- und Game Over Bildschirme */
   .screen-overlay {
     position: absolute;
     top: 0;
@@ -98,6 +98,21 @@
   .screen-overlay button:hover {
     background: #666;
   }
+  /* Explosion Effekt */
+  .explosion {
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    background: radial-gradient(circle, rgba(255,165,0,1) 0%, rgba(255,0,0,0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: explode 1s forwards;
+    z-index: 30;
+  }
+  @keyframes explode {
+    from { transform: scale(0.5); opacity: 1; }
+    to { transform: scale(2); opacity: 0; }
+  }
 </style>
 </head>
 <body>
@@ -123,7 +138,7 @@
         <strong>Player 1</strong><br>
         HP: <span id="health1">100</span><br>
         Ammo: <span id="ammo1">30</span><br>
-        Weapon: <span id="weapon1">Pistole</span><br> <!-- Neue Anzeige für Weapon -->
+        Weapon: <span id="weapon1">Pistole</span><br>
         Vehicle: <span id="vehicle1">None</span><br>
         Position: (<span id="posX1">0</span>, <span id="posY1">0</span>)
       </div>
@@ -138,7 +153,7 @@
         <strong>Player 2</strong><br>
         HP: <span id="health2">100</span><br>
         Ammo: <span id="ammo2">30</span><br>
-        Weapon: <span id="weapon2">Pistole</span><br> <!-- Neue Anzeige für Weapon -->
+        Weapon: <span id="weapon2">Pistole</span><br>
         Vehicle: <span id="vehicle2">None</span><br>
         Position: (<span id="posX2">0</span>, <span id="posY2">0</span>)
       </div>
@@ -148,9 +163,15 @@
   </div>
 </div>
 <div class="mode-display" id="modeDisplay">Mode: Kooperativ</div>
+
+<!-- Audio Elemente -->
+<audio id="shootSound" src="https://www.soundjay.com/buttons/sounds/button-16.mp3"></audio>
+<audio id="explosionSound" src="https://www.soundjay.com/explosion/sounds/explosion-01.mp3"></audio>
+<audio id="pickupSound" src="https://www.soundjay.com/buttons/sounds/button-09.mp3"></audio>
+
 <script>
 const TILE_SIZE = 40;
-const MAP_SIZE = 100; // Größere Karte
+const MAP_SIZE = 100;
 const SCREEN_WIDTH = window.innerWidth / 2;
 const SCREEN_HEIGHT = window.innerHeight;
 
@@ -158,8 +179,8 @@ const SCREEN_HEIGHT = window.innerHeight;
 function isColliding(entity, map) {
   const tileX = Math.floor(entity.x / TILE_SIZE);
   const tileY = Math.floor(entity.y / TILE_SIZE);
-  if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true; // Außen der Karte
-  return map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5; // 0 = Gras, 4 = Straße, 5 = Wasser
+  if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
+  return map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5;
 }
 
 // Zusätzliche Hilfsfunktion für Fahrzeugkollisionen
@@ -216,11 +237,11 @@ class Human extends Entity {
     this.color = color;
     this.health = 100;
     this.ammo = 30;
-    this.weapon = 'Pistole'; // Neue Eigenschaft für Weapon
+    this.weapon = 'Pistole';
     this.maxSpeed = 3;
     this.vehicle = null;
-    this.role = null; // 'driver' oder 'gunner'
-    this.canShoot = true; // Flag für Einzel-Schuss
+    this.role = null;
+    this.canShoot = true;
   }
 
   update(controls, map) {
@@ -255,7 +276,7 @@ class Human extends Entity {
     v.move(map);
 
     // Fahrzeugkollisionen überprüfen
-    if (isVehicleColliding(v, v.game.vehicles)) { // Korrigiert: game.vehicles → v.game.vehicles
+    if (isVehicleColliding(v, v.game.vehicles)) {
       // Rückgängig machen der letzten Bewegung bei Kollision
       v.x -= Math.cos(v.angle) * v.speed;
       v.y -= Math.sin(v.angle) * v.speed;
@@ -275,13 +296,12 @@ class Vehicle extends Entity {
     super(x, y);
     this.type = type;
     this.health = 200;
-    // Neue Eigenschaft für Fahrzeug-Waffen
     this.weapon = type === 'tank' || type === 'schuetzenpanzer' ? 'Maschinengewehr' : 'Kanone';
     this.ammo = type === 'tank' ? 20 : type === 'schuetzenpanzer' ? 30 : 50;
     this.driver = null;
     this.gunner = null;
     this.turretAngle = 0;
-    this.game = null; // Reference to the game instance
+    this.game = null;
 
     // Fahrzeug-spezifische Eigenschaften
     switch(type) {
@@ -351,7 +371,12 @@ class Game {
     this.setupControls();
     this.setupModeDisplay();
     this.gameOver = false;
-    this.gameLoopRunning = false; // Flag to prevent multiple loops
+    this.gameLoopRunning = false;
+    this.wave = 1;
+    this.kisPerWave = 10;
+    this.kisToSpawn = this.kisPerWave;
+    this.spawnCooldown = 0;
+    this.achievements = { kills: 0, vehiclesDestroyed: 0 };
     this.gameLoop();
   }
 
@@ -382,27 +407,24 @@ class Game {
     this.map = this.generateLogicalMap();
     this.players = [
       new Human(100, 100, '#4444ff'),
-      new Human(100, 100, '#ff4444') // In Coop, starten beide am gleichen Ort
+      new Human(100, 100, '#ff4444')
     ];
     this.vehicles = this.generateVehicles();
-    // Assign the game reference to each vehicle
     this.vehicles.forEach(v => v.game = this);
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
-    this.kis = []; // KI-gesteuerte Gegner
-    if (this.mode === 'Cooperative') {
-      this.spawnKIs(30); // Erhöhte Anzahl an KI-Gegner
-    }
+    this.kis = [];
+    this.spawnWave();
+
     // Set initial positions based on mode
     if (this.mode === 'Cooperative') {
-      // Set both players to start at same position
       this.players[1].x = this.players[0].x;
       this.players[1].y = this.players[0].y;
     } else {
-      // Versus mode: separate start positions
       this.players[1].x = 3900;
       this.players[1].y = 3900;
     }
+
     // Sicherstellen, dass Spieler nicht auf Hindernissen spawnen
     this.players.forEach(player => {
       while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
@@ -413,17 +435,16 @@ class Game {
   }
 
   resetGame() {
-    // Spielzustand zurücksetzen
     this.gameOver = false;
     document.getElementById('gameOverScreen').classList.add('hidden');
     this.map = this.generateLogicalMap();
     this.players.forEach((player, index) => {
       player.health = 100;
       player.ammo = 30;
-      player.weapon = 'Pistole'; // Reset Weapon
+      player.weapon = 'Pistole';
       player.vehicle = null;
       player.role = null;
-      player.canShoot = true; // Reset Schussflag
+      player.canShoot = true;
       if (this.mode === 'Cooperative') {
         player.x = 100;
         player.y = 100;
@@ -431,12 +452,10 @@ class Game {
         player.x = index === 0 ? 100 : 3900;
         player.y = index === 0 ? 100 : 3900;
       }
-      // Sicherstellen, dass Spieler nicht auf Hindernissen oder anderen Spielern spawnen
       while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
         player.x = Math.random() * MAP_SIZE * TILE_SIZE;
         player.y = Math.random() * MAP_SIZE * TILE_SIZE;
       }
-      // Update HUD
       document.getElementById(`health${index+1}`).textContent = player.health;
       document.getElementById(`ammo${index+1}`).textContent = player.ammo;
       document.getElementById(`weapon${index+1}`).textContent = player.weapon;
@@ -445,14 +464,13 @@ class Game {
       document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
     });
     this.vehicles = this.generateVehicles();
-    // Assign the game reference to each vehicle
     this.vehicles.forEach(v => v.game = this);
     this.bullets = [];
     this.powerUps = this.generatePowerUps();
     this.kis = [];
-    if (this.mode === 'Cooperative') {
-      this.spawnKIs(30);
-    }
+    this.wave = 1;
+    this.kisToSpawn = this.kisPerWave;
+    this.spawnWave();
   }
 
   isPlayerOverlapping(newPlayer) {
@@ -464,16 +482,14 @@ class Game {
     for(let y = 0; y < MAP_SIZE; y++) {
       const row = [];
       for(let x = 0; x < MAP_SIZE; x++) {
-        // Logische Kartenerstellung mit Straßen und Landschaft
         if ((y === 20 || y === 80) && x > 10 && x < 90) {
           row.push(4); // Straße horizontal
         } else if ((x === 20 || x === 80) && y > 10 && y < 90) {
           row.push(4); // Straße vertikal
         } else {
-          // Zufällige Platzierung von Bäumen, Felsen und Wasser
           if (Math.random() < 0.02) row.push(2); // 2 = Bäume
           else if (Math.random() < 0.02) row.push(1); // 1 = Felsen
-          else if (Math.random() < 0.01) row.push(3); // 3 = Hindernisse (z.B. Wände)
+          else if (Math.random() < 0.01) row.push(3); // 3 = Hindernisse
           else if (y > 40 && y < 60 && x > 40 && x < 60) row.push(5); // 5 = Wasser
           else row.push(0); // 0 = Gras
         }
@@ -486,7 +502,7 @@ class Game {
   generateVehicles() {
     const vehicleTypes = ['tank', 'jeep', 'lkw', 'schuetzenpanzer'];
     const vehicles = [];
-    for(let i = 0; i < 10; i++) { // Anzahl der Fahrzeuge erhöhen
+    for(let i = 0; i < 10; i++) {
       let x, y, type;
       do {
         x = Math.random() * MAP_SIZE * TILE_SIZE;
@@ -500,10 +516,9 @@ class Game {
   }
 
   isVehiclePlacementInvalid(x, y) {
-    // Fahrzeuge nicht auf Straßen oder Wasser platzieren
     const tileX = Math.floor(x / TILE_SIZE);
     const tileY = Math.floor(y / TILE_SIZE);
-    if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true; // Außen der Karte
+    if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
     return this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5;
   }
 
@@ -513,7 +528,7 @@ class Game {
 
   generatePowerUps() {
     const powerUps = [];
-    for(let i = 0; i < 40; i++) { // Anzahl der Power-Ups erhöhen
+    for(let i = 0; i < 40; i++) {
       let x, y, type;
       do {
         x = Math.random() * MAP_SIZE * TILE_SIZE;
@@ -529,14 +544,35 @@ class Game {
     return powerUpsList.some(pu => distance(pu, {x, y}) < 50);
   }
 
+  spawnWave() {
+    for(let i = 0; i < this.kisToSpawn; i++) {
+      let x, y;
+      do {
+        x = Math.random() * MAP_SIZE * TILE_SIZE;
+        y = Math.random() * MAP_SIZE * TILE_SIZE;
+      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y) || this.isKIOverlapping(x, y));
+      this.kis.push(new Human(x, y, '#FFD700'));
+    }
+  }
+
+  spawnWaveWithDelay() {
+    if (this.wave <= 10) { // Max 10 Wellen
+      setTimeout(() => {
+        this.spawnWave();
+        this.wave++;
+        this.kisToSpawn = this.kisPerWave + Math.floor(this.wave / 2); // Erhöhte KI pro Welle
+      }, 5000); // 5 Sekunden Pause zwischen Wellen
+    }
+  }
+
   spawnKIs(count) {
     for(let i = 0; i < count; i++) {
       let x, y;
       do {
         x = Math.random() * MAP_SIZE * TILE_SIZE;
         y = Math.random() * MAP_SIZE * TILE_SIZE;
-      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y) || this.isKIOverlapping(x, y));
-      this.kis.push(new Human(x, y, '#FFD700')); // KI-Gegner in Gold (#FFD700)
+      } while (isColliding({x, y}, this.map) || this.isTooCloseToPlayers(x, y));
+      this.kis.push(new Human(x, y, '#FFD700'));
     }
   }
 
@@ -545,7 +581,7 @@ class Game {
   }
 
   isTooCloseToPlayers(x, y) {
-    return this.players.some(player => distance({x, y}, player) < 200); // Mindestabstand erhöhen
+    return this.players.some(player => distance({x, y}, player) < 200);
   }
 
   setupControls() {
@@ -557,16 +593,20 @@ class Game {
         right: 'KeyD', shoot: 'KeyF', action: 'KeyE', switch: 'KeyG' }
     ];
     
-    // Event Listener für keydown
     window.addEventListener('keydown', (e) => {
-      e.preventDefault(); // Verhindert Scrolling
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','ShiftRight',
+           'KeyW','KeyA','KeyS','KeyD','KeyF','KeyE','KeyG'].includes(e.code)) {
+        e.preventDefault();
       this.keys[e.code] = true;
+      }
     });
     
-    // Event Listener für keyup
     window.addEventListener('keyup', (e) => {
+      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Enter','ShiftRight',
+           'KeyW','KeyA','KeyS','KeyD','KeyF','KeyE','KeyG'].includes(e.code)) {
       e.preventDefault();
       this.keys[e.code] = false;
+      }
     });
 }
 
@@ -640,7 +680,7 @@ class Game {
     // Fahrzeuginteraktion
     if (controls.action) {
       this.handleVehicleInteraction(player, index);
-      this.keys[this.controls[index].action] = false; // Mehrfachauslösung verhindern
+      this.keys[this.controls[index].action] = false;
     }
 
     // Positionswechsel
@@ -666,7 +706,7 @@ class Game {
       // Bestimmen der Schadenshöhe basierend auf Waffe
       let damage = 10; // Standard Schaden
       if (player.weapon === 'Schrotflinte') damage = 20;
-      else if (player.weapon === 'Maschinengewehr') damage = 5; // Mehrere Schüsse können erfolgen, aber limitierte Rate
+      else if (player.weapon === 'Maschinengewehr') damage = 5;
 
       this.bullets.push({
         x: player.vehicle ? player.vehicle.x + Math.cos(shootAngle) * 30 : player.x + Math.cos(shootAngle) * 15,
@@ -675,14 +715,18 @@ class Game {
         speed: 15,
         damage: damage,
         owner: index,
-        vehicle: player.vehicle // Reference to the vehicle if shooting from one
+        vehicle: player.vehicle
       });
       player.ammo--;
       document.getElementById(`ammo${index + 1}`).textContent = player.ammo;
-      player.canShoot = false; // Verhindert weiteres Schießen bis Taste losgelassen wird
+      player.canShoot = false;
+
+      // Sound abspielen
+      document.getElementById('shootSound').currentTime = 0;
+      document.getElementById('shootSound').play();
     }
 
-    // Reset kannShoot Flag beim Loslassen der Schusstaste
+    // Reset canShoot Flag beim Loslassen der Schusstaste
     if (!controls.shoot && !player.canShoot) {
       player.canShoot = true;
     }
@@ -701,20 +745,25 @@ class Game {
         continue;
       }
 
-      // Kollision mit Spielern (im Versus-Modus auch andere Spieler)
+      // Kollision mit Spielern
       this.players.forEach((player, j) => {
         if (bullet.owner !== j && distance(bullet, player) < 20) {
           if (this.mode === 'Cooperative' || (this.mode === 'Versus' && j !== bullet.owner)) {
             player.health -= bullet.damage;
             document.getElementById(`health${j + 1}`).textContent = Math.max(player.health, 0);
             this.bullets.splice(i, 1);
+            // Explosion visuell darstellen
+            this.createExplosion(player.x, player.y);
+            document.getElementById('explosionSound').currentTime = 0;
+            document.getElementById('explosionSound').play();
             if (player.health <= 0) {
+              this.achievements.kills++;
               if (this.mode === 'Versus') {
                 this.endGame(`Player ${j + 1} wurde von Player ${bullet.owner + 1} getötet!`);
               } else {
                 this.endGame(`Player ${j + 1} ist gestorben!`);
+                this.spawnWaveWithDelay();
               }
-              // Respawn Spieler
               this.respawnPlayer(j);
             }
           }
@@ -728,40 +777,33 @@ class Game {
           if (bullet.owner < this.players.length && distance(bullet, ki) < 20) { // Bullet from player
             ki.health -= bullet.damage;
             this.bullets.splice(i, 1);
+            this.createExplosion(ki.x, ki.y);
+            document.getElementById('explosionSound').currentTime = 0;
+            document.getElementById('explosionSound').play();
             if (ki.health <= 0) {
               this.kis.splice(j, 1);
+              this.achievements.kills++;
             }
-            break; // Exit loop since bullet is destroyed
+            break;
           }
         }
       }
 
       // Kollision mit Fahrzeugen
       this.vehicles.forEach((vehicle, j) => {
-        // Check if bullet owner is not the vehicle's owner
         let isOwnVehicle = false;
         if (bullet.vehicle && bullet.vehicle === vehicle) {
           isOwnVehicle = true;
         }
         if (!isOwnVehicle && distance(bullet, vehicle) < 30) {
           vehicle.health -= bullet.damage;
-          // Update HUD for players occupying this vehicle
-          if (vehicle.driver) {
-            const driverIndex = this.players.indexOf(vehicle.driver);
-            if (driverIndex !== -1) {
-              document.getElementById(`vehicle${driverIndex +1}`).textContent = vehicle.type;
-            }
-          }
-          if (vehicle.gunner) {
-            const gunnerIndex = this.players.indexOf(vehicle.gunner);
-            if (gunnerIndex !== -1) {
-              document.getElementById(`vehicle${gunnerIndex +1}`).textContent = vehicle.type;
-            }
-          }
           this.bullets.splice(i, 1);
+          this.createExplosion(vehicle.x, vehicle.y);
+          document.getElementById('explosionSound').currentTime = 0;
+          document.getElementById('explosionSound').play();
           if (vehicle.health <= 0) {
-            // Entferne zerstörtes Fahrzeug
             this.vehicles.splice(j, 1);
+            this.achievements.vehiclesDestroyed++;
             // Entferne Fahrer und Gunners, falls vorhanden
             if (vehicle.driver) {
               vehicle.driver.vehicle = null;
@@ -793,8 +835,8 @@ class Game {
             vehicleA.health -= 5;
             vehicleB.health -= 5;
             if (vehicleA.health <= 0) {
-              // Entferne zerstörtes Fahrzeug
               this.vehicles.splice(j, 1);
+              this.achievements.vehiclesDestroyed++;
               // Entferne Fahrer und Gunners, falls vorhanden
               if (vehicleA.driver) {
                 vehicleA.driver.vehicle = null;
@@ -812,11 +854,11 @@ class Game {
                   document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
                 }
               }
-              k--; // Adjust index after removal
+              k--;
             }
             if (vehicleB.health <= 0) {
-              // Entferne zerstörtes Fahrzeug
               this.vehicles.splice(k, 1);
+              this.achievements.vehiclesDestroyed++;
               // Entferne Fahrer und Gunners, falls vorhanden
               if (vehicleB.driver) {
                 vehicleB.driver.vehicle = null;
@@ -834,7 +876,6 @@ class Game {
                   document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
                 }
               }
-              j--; // Adjust index after removal
             }
           }
         }
@@ -850,7 +891,7 @@ class Game {
     if (entity instanceof Human && !entity.vehicle) {
       // Mensch zeichnen
       ctx.fillStyle = entity.color;
-      ctx.strokeStyle = '#000'; // Schwarzer Rand
+      ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, 10, 0, Math.PI * 2);
@@ -858,24 +899,24 @@ class Game {
       ctx.stroke();
       // Waffe zeichnen
       ctx.fillStyle = '#000';
-      ctx.fillRect(10, -2, 20, 4); // Waffe in Schussrichtung
+      ctx.fillRect(10, -2, 20, 4);
     } else if (entity instanceof Vehicle) {
       // Fahrzeugkörper zeichnen
       ctx.fillStyle = entity.color;
-      ctx.strokeStyle = '#000'; // Schwarzer Rand
+      ctx.strokeStyle = '#000';
       ctx.lineWidth = 2;
       switch(entity.type) {
         case 'tank':
-          ctx.fillRect(-20, -15, 40, 30); // Panzer
+          ctx.fillRect(-20, -15, 40, 30);
           break;
         case 'jeep':
-          ctx.fillRect(-15, -10, 30, 20); // Jeep
+          ctx.fillRect(-15, -10, 30, 20);
           break;
         case 'lkw':
-          ctx.fillRect(-25, -15, 50, 30); // LKW
+          ctx.fillRect(-25, -15, 50, 30);
           break;
         case 'schuetzenpanzer':
-          ctx.fillRect(-20, -15, 40, 30); // Schützenpanzer
+          ctx.fillRect(-20, -15, 40, 30);
           break;
         default:
           ctx.fillRect(-20, -15, 40, 30);
@@ -886,7 +927,7 @@ class Game {
       ctx.save();
       ctx.rotate(entity.turretAngle);
       ctx.fillStyle = '#000';
-      ctx.fillRect(0, -5, entity.weapon === 'Maschinengewehr' ? entity.weaponOffset * 1.5 : entity.weaponOffset, 10); // Waffe
+      ctx.fillRect(0, -5, entity.weapon === 'Maschinengewehr' ? entity.weaponOffset * 1.5 : entity.weaponOffset, 10);
       ctx.restore();
     }
     
@@ -907,7 +948,6 @@ class Game {
 
   drawMinimap(ctx, player) {
     ctx.clearRect(0, 0, 150, 150);
-    // Skalierungsfaktor für die Minikarte
     const scale = 150 / (MAP_SIZE * TILE_SIZE);
     
     // Karte zeichnen
@@ -971,22 +1011,22 @@ class Game {
     this.map.forEach((row, y) => {
       row.forEach((cell, x) => {
         if (cell === 1) {
-          ctx.fillStyle = '#888'; // Felsen
+          ctx.fillStyle = '#888';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         } else if (cell === 2) {
-          ctx.fillStyle = '#355'; // Bäume
+          ctx.fillStyle = '#355';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         } else if (cell === 3) {
-          ctx.fillStyle = '#555'; // Hindernisse
+          ctx.fillStyle = '#555';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         } else if (cell === 4) {
-          ctx.fillStyle = '#999'; // Straße
+          ctx.fillStyle = '#999';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         } else if (cell === 5) {
-          ctx.fillStyle = '#00f'; // Wasser
+          ctx.fillStyle = '#00f';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         } else {
-          ctx.fillStyle = '#5f5'; // Gras
+          ctx.fillStyle = '#5f5';
           ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       });
@@ -1030,7 +1070,7 @@ class Game {
         } else {
           this.drawEntity(ctx, ki);
         }
-        // Sichtfeld der KI zeichnen (optional visuell anzeigen)
+        // Sichtfeld der KI zeichnen (optional)
         ctx.save();
         ctx.translate(ki.x, ki.y);
         ctx.rotate(ki.angle);
@@ -1063,7 +1103,6 @@ class Game {
             document.getElementById(`message${i+1}`).style.display = 'none';
           }
         } else if (this.mode === 'Versus') {
-          // Im Versus-Modus könnten Interaktionen anders gehandhabt werden
           document.getElementById(`message${i+1}`).style.display = 'none';
         }
       }
@@ -1082,8 +1121,7 @@ class Game {
     if (this.mode === 'Cooperative') {
       this.kis.forEach(ki => {
         if (isInSight(ki, player, ki.angle, Math.PI / 2, 200)) {
-          // Logik, wenn KI den Spieler sieht
-          // Beispielsweise Spieler als Ziel setzen
+          // Weitere KI-Logik kann hier implementiert werden
         }
       });
     }
@@ -1099,6 +1137,9 @@ class Game {
             player.ammo += 20;
           }
           this.powerUps.splice(index, 1);
+          // Sound abspielen
+          document.getElementById('pickupSound').currentTime = 0;
+          document.getElementById('pickupSound').play();
           // Update HUD
           document.getElementById(`health${i+1}`).textContent = player.health;
           document.getElementById(`ammo${i+1}`).textContent = player.ammo;
@@ -1131,6 +1172,8 @@ class Game {
               ki.ammo += 20;
             }
             this.powerUps.splice(index, 1);
+            document.getElementById('pickupSound').currentTime = 0;
+            document.getElementById('pickupSound').play();
             // Power-Up nach 10 Sekunden neu spawnen
             setTimeout(() => {
               let x, y, type;
@@ -1153,8 +1196,8 @@ class Game {
 
   updateKIs() {
     this.kis.forEach(ki => {
-      if (ki.health <= 0) return; // Tote KI überspringen
-      // KI-Verhalten: Halte Abstand zu Spielern und bewege dich in Richtung
+      if (ki.health <= 0) return;
+      // KI-Verhalten: Ziel setzen
       const target = this.players.reduce((nearest, player) => {
         const dist = distance(ki, player);
         return dist < distance(ki, nearest) ? player : nearest;
@@ -1163,8 +1206,8 @@ class Game {
       const angleToTarget = Math.atan2(target.y - ki.y, target.x - ki.x);
       const distanceToTarget = distance(ki, target);
 
-      // Halte einen Mindestabstand
-      if (distanceToTarget > 200) { // Erhöhter Mindestabstand
+      // Bewegung
+      if (distanceToTarget > 200) {
         ki.angle = angleToTarget;
         ki.speed = ki.maxSpeed;
       } else {
@@ -1180,9 +1223,9 @@ class Game {
         ki.speed = 0;
       }
 
-      // KI schießt, wenn nahe genug und Sichtfeld trifft
+      // Schießen
       if (distanceToTarget < 300 && ki.ammo > 0 && distanceToTarget > 50 &&
-          isInSight(ki, target, ki.angle, Math.PI / 2, 300)) { // Sichtfeld geprüft
+          isInSight(ki, target, ki.angle, Math.PI / 2, 300)) {
         this.bullets.push({
           x: ki.vehicle ? ki.vehicle.x + Math.cos(angleToTarget) * 30 : ki.x + Math.cos(angleToTarget) * 15,
           y: ki.vehicle ? ki.vehicle.y + Math.sin(angleToTarget) * 30 : ki.y + Math.sin(angleToTarget) * 15,
@@ -1193,12 +1236,15 @@ class Game {
           vehicle: ki.vehicle
         });
         ki.ammo--;
+        // Sound abspielen
+        document.getElementById('shootSound').currentTime = 0;
+        document.getElementById('shootSound').play();
       }
 
       // Fahrzeugkollisionen für KI
       if (ki.vehicle) {
         const v = ki.vehicle;
-        if (isVehicleColliding(v, this.vehicles)) { // Korrigiert: game.vehicles → this.vehicles
+        if (isVehicleColliding(v, this.vehicles)) {
           v.x -= Math.cos(v.angle) * v.speed;
           v.y -= Math.sin(v.angle) * v.speed;
           v.speed = 0;
@@ -1209,7 +1255,7 @@ class Game {
 
   gameLoop() {
     if (this.gameOver) return;
-    if (this.gameLoopRunning) return; // Prevent multiple loops
+    if (this.gameLoopRunning) return;
     this.gameLoopRunning = true;
 
     const loop = () => {
@@ -1240,6 +1286,11 @@ class Game {
       this.drawGame(this.ctx1, 0);
       this.drawGame(this.ctx2, 1);
 
+      // Wave Management
+      if (this.mode === 'Cooperative' && this.kis.length === 0 && this.wave < 10) {
+        this.spawnWaveWithDelay();
+      }
+
       requestAnimationFrame(loop);
     };
 
@@ -1250,7 +1301,7 @@ class Game {
     this.gameOver = true;
     const gameOverScreen = document.getElementById('gameOverScreen');
     const gameOverMessage = document.getElementById('gameOverMessage');
-    gameOverMessage.textContent = message;
+    gameOverMessage.textContent = message + `\nKills: ${this.achievements.kills}, Vehicles Destroyed: ${this.achievements.vehiclesDestroyed}`;
     gameOverScreen.classList.remove('hidden');
   }
 
@@ -1258,21 +1309,29 @@ class Game {
     const player = this.players[index];
     player.health = 100;
     player.ammo = 30;
-    player.weapon = 'Pistole'; // Reset Weapon
-    // Setze Spieler zurück zum Startpunkt
+    player.weapon = 'Pistole';
     player.x = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
     player.y = this.mode === 'Cooperative' ? 100 : (index === 0 ? 100 : 3900);
-    // Sicherstellen, dass Spieler nicht auf Hindernissen oder anderen Spielern spawnen
     while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
       player.x = Math.random() * MAP_SIZE * TILE_SIZE;
       player.y = Math.random() * MAP_SIZE * TILE_SIZE;
     }
-    // Update HUD
     document.getElementById(`health${index+1}`).textContent = player.health;
     document.getElementById(`ammo${index+1}`).textContent = player.ammo;
     document.getElementById(`weapon${index+1}`).textContent = player.weapon;
     document.getElementById(`posX${index+1}`).textContent = Math.round(player.x);
     document.getElementById(`posY${index+1}`).textContent = Math.round(player.y);
+  }
+
+  createExplosion(x, y) {
+    const explosion = document.createElement('div');
+    explosion.classList.add('explosion');
+    explosion.style.left = `${x - 25}px`;
+    explosion.style.top = `${y - 25}px`;
+    document.body.appendChild(explosion);
+    setTimeout(() => {
+      explosion.remove();
+    }, 1000);
   }
 }
 
