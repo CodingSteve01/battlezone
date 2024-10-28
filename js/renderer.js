@@ -1,5 +1,5 @@
 // js/renderer.js
-import { distance, isInSight } from './entities.js';
+import { distance, isInSight, Human, Vehicle } from './entities.js';
 
 export class Renderer {
   constructor(game) {
@@ -29,7 +29,7 @@ export class Renderer {
     ctx.translate(entity.x, entity.y);
     ctx.rotate(entity.angle);
     
-    if (entity instanceof this.game.Human && !entity.vehicle) {
+    if (entity instanceof Human && !entity.vehicle) {
       // Mensch zeichnen
       ctx.fillStyle = entity.color;
       ctx.strokeStyle = '#000'; // Schwarzer Rand
@@ -41,7 +41,7 @@ export class Renderer {
       // Waffe zeichnen
       ctx.fillStyle = '#000';
       ctx.fillRect(10, -2, 20, 4); // Waffe in Schussrichtung
-    } else if (entity instanceof this.game.Vehicle) {
+    } else if (entity instanceof Vehicle) {
       // Fahrzeugkörper zeichnen
       ctx.fillStyle = entity.color;
       ctx.strokeStyle = '#000'; // Schwarzer Rand
@@ -73,10 +73,10 @@ export class Renderer {
     }
     
     // Lebensbalken zeichnen
-    if (entity instanceof this.game.Human || entity instanceof this.game.Vehicle) {
+    if (entity instanceof Human || entity instanceof Vehicle) {
       const maxBarWidth = 30;
       const barHeight = 4;
-      const maxHealth = entity instanceof this.game.Vehicle ? 200 : 100;
+      const maxHealth = entity instanceof Vehicle ? 200 : 100;
       const healthRatio = entity.health / maxHealth;
       ctx.fillStyle = '#555';
       ctx.fillRect(-15, -25, maxBarWidth, barHeight);
