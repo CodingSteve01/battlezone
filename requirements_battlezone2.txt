@@ -1,105 +1,144 @@
-## **Komplettliste der Anforderungen**
+# Battlezone Feature Analyse - Überarbeitete Version
 
-### **1. Allgemeine Spielstruktur**
-- **Single-File Implementierung**: Alles in einer HTML-Datei mit eingebettetem JavaScript und CSS.
-- **Keine externen Bibliotheken**: Rein HTML, CSS und JavaScript.
-- **Split-Screen**: Zwei Spieler teilen sich denselben Bildschirm mit unabhängigen Kameras.
+## 1. Spielmodi
+- Kooperativ (2 Spieler gegen KI)
+- Versus (2 Spieler gegeneinander)
+- Single Player Mode (implizit vorhanden)
+- Moduswechsel während des Spiels möglich
+- Wave-basiertes Gegner-System im Koop/Single Player
 
-### **2. Spielmodi**
-- **Kooperativ (Coop)**: Spieler kämpfen gemeinsam gegen KI-gesteuerte Gegner.
-- **Versus-Modus**: Spieler treten gegeneinander an, mit möglichen Fahrzeug- und Waffenwechseln.
-- **Respawn-Mechanik**:
-  - Bei Tod respawnen die Spieler am Startpunkt.
-  - Im Versus-Modus wird der Kill dem gegnerischen Spieler gutgeschrieben.
+## 2. Steuerung
+### Spieler 1:
+- Bewegung: Pfeiltasten (↑, ↓, ←, →)
+- Schießen: Space
+- Ein-/Aussteigen: Enter
+- Positionswechsel: Rechte Shift-Taste
 
-### **3. Spielwelt und Karte**
-- **Tile-Map (z.B. 50x50)**: Unterschiedliche Terrains wie Gras, Wald, Straßen und Hindernisse.
-- **Sichtfeld und Scrollen**: Kameras folgen den Spielern und scrollen mit ihnen.
+### Spieler 2:
+- Bewegung: WASD
+- Schießen: F
+- Ein-/Aussteigen: E
+- Positionswechsel: G
 
-### **4. Spieler und Steuerung**
-- **Spieler 1 (Blau)**:
-  - **Bewegung**: Pfeiltasten (↑, ↓, ←, →)
-  - **Schießen**: Ctrl
-  - **Ein-/Ausstiegen**: Enter
-  - **Waffenwechsel**: Möglichkeit, verschiedene Waffen zu tragen (z.B. Pistole, Schrotflinte, Maschinengewehr)
-- **Spieler 2 (Rot)**:
-  - **Bewegung**: W, A, S, D
-  - **Schießen**: F
-  - **Ein-/Ausstiegen**: E
-  - **Waffenwechsel**: Möglichkeit, verschiedene Waffen zu tragen (z.B. Pistole, Schrotflinte, Maschinengewehr)
-- **Bewegung und Rotation**: Spieler können zu Fuß oder in Fahrzeugen rotieren und sich frei bewegen.
-- **Schussmechanik**:
-  - Jeder Spieler kann nur einen Schuss gleichzeitig abfeuern (kein Maschinengewehrfeuer).
-  - Unterschiedliche Waffen für Spieler mit variierendem Schaden und Munitionsverbrauch.
-  - Fahrzeuge haben eigene Waffen und Munition, unabhängig von der Spielermunition.
+## 3. Fahrzeuge
+### Fahrzeugtypen:
+- Tank (schwer, langsam, starke Waffe)
+- Jeep (schnell, leicht bewaffnet)
+- LKW (mittlere Geschwindigkeit, mittlere Bewaffnung)
+- Schützenpanzer (balanced)
 
-### **5. Fahrzeuge**
-- **Einsteigen/Aussteigen**: Spieler können Fahrzeuge betreten und verlassen.
-- **Sitzwechsel**: Spieler können zwischen Fahrer und Gunner wechseln (Spieler 1: Shift, Spieler 2: G).
-- **Fahrzeugtypen**: Jeep, Panzer, PKW, LKW, Schützenpanzer, mit unterschiedlichen Eigenschaften (z.B. Geschwindigkeit, Waffen).
-- **Waffen und Munition**:
-  - Fahrzeuge haben eigene Waffen und Munition.
-  - Gesammelte Munition in einem Fahrzeug verbleibt im Fahrzeug.
-  - Fahrzeuge können auch Maschinengewehre besitzen.
-- **Unabhängige Fahrzeugbewaffnung**: Fahrzeugwaffen laufen unabhängig von der Spielermunition.
+### Fahrzeugsysteme:
+- Individuelle Geschwindigkeiten
+- Unterschiedliche Wendekreise
+- Eigene Waffensysteme
+- Gesundheitssystem
+- Fahrer- und Schützenposition
+- Kollisionssystem zwischen Fahrzeugen
+- Schadensmodell mit visuellen Effekten
+- Turmsystem für bewaffnete Fahrzeuge
+- Überfahrsystem:
+  - Möglichkeit Gegner und Spieler zu überfahren
+  - Schadensberechnung basierend auf Fahrzeuggewicht
+  - Kollisionseffekte
+  - Schadensfeedback
 
-### **6. Waffen und Schießen**
-- **Spielerwaffen**: Basiswaffe (z.B. Gewehr) mit begrenzter Munition und sichtbarer Schussrichtung.
-- **Fahrzeugwaffen**: Separate Munition und Waffentypen für jedes Fahrzeug.
-- **Nachladen und Aufsammeln**: Munition kann durch Power-Ups oder Ressourcen auf der Karte aufgefüllt werden.
-- **Einzelfeuer Implementierung**: Spieler können nur einen Schuss abfeuern, bis die Schusstaste losgelassen wird.
+## 4. Kampfsystem
+### Waffentypen:
+- Pistole
+- Maschinengewehr
+- Schrotflinte
+- Fahrzeugkanonen
 
-### **7. Gegner und KI**
-- **Bots im Kooperativen Modus**: KI-gesteuerte Gegner, die Spieler verfolgen und angreifen.
-- **Unterschiedliche Schwierigkeitsgrade und Verhaltensmuster**.
-- **Versus-Modus**: Spieler können sich gegenseitig angreifen.
-- **Sichtfeld der KI**: KI-Gegner haben ein definiertes Sichtfeld, wodurch das Spiel zu einem Schleich-Shooter wird.
-- **KI-Verhalten**: KI reagiert nur, wenn der Spieler im Sichtfeld ist, und verfolgt strategisch die Spieler.
+### Schadensmodell:
+- Unterschiedliche Schadenstypen
+- Gesundheitssystem
+- Explosionseffekte
+- Visuelles Feedback
 
-### **8. Power-Ups und Ressourcen**
-- **Power-Up-Typen**: Munition, Gesundheit, temporäre Fähigkeiten wie Geschwindigkeitsschub oder Schutzschild.
-- **Verteilung**: Zufällig auf der Karte verteilt und strategisch platziert.
-- **Munition in Fahrzeugen**: Gesammelte Munition bleibt im Fahrzeug und kann nicht von Spielern übernommen werden.
+### Munitionssystem:
+- Begrenzte Munition
+- Aufsammelbare Munition
+- Separate Munition für Fahrzeuge
 
-### **9. Benutzeroberfläche (UI)**
-- **Health Bars**: Gesundheitsbalken für Spieler, Fahrzeuge und Bots zur besseren Übersicht.
-- **Ammo Anzeige**: Verbleibende Munition für Spieler und Fahrzeuge.
-- **Weapon Anzeige**: Aktuell ausgewählte Waffe für jeden Spieler.
-- **Spielmodus-Anzeige**: Aktueller Modus (Kooperativ oder Versus).
-- **Minimap**: Spieler sollten auf der Minimap gut sichtbar eingezeichnet werden.
+## 5. Spielwelt
+### Terrain:
+- Große Karte (100x100 Tiles)
+- Gras
+- Felsen
+- Bäume
+- Straßen
+- Wasser
+- Hindernisse
 
-### **10. Grafik und Performance**
-- **Erkennbare Fahrzeugtypen**: Einfache, klare Formen und Farben zur Unterscheidung.
-- **Optimierte Rendering-Logik**: Effizientes Rendering und Update-Logik für flüssiges Gameplay.
-- **Animationen**: Einfache Animationen für Bewegung, Schießen und Treffer.
+### Strukturen:
+- Bunker
+- Häuser
+- Deckungsmöglichkeiten
 
-### **11. Technische Anforderungen**
-- **Kollisionserkennung**: Für Spieler, Fahrzeuge und Projektile.
-- **Hit-Tests zwischen Spielern**: Verhindern, dass sich Spieler auf denselben Punkt bewegen.
-- **Leistungsoptimierung**: Minimierung von Code-Duplizierungen durch modulare Funktionen.
-- **Responsive Design**: Anpassung der Canvas-Größe bei Fensteränderungen, skalierende UI-Elemente.
-- **Verhinderung von Ineinanderhaken**: Sicherstellen, dass sich Fahrzeuge oder Spieler nicht ineinander verhaken und sich nicht blockieren.
+## 6. KI-System
+### KI-Gegner:
+- Patrouillensystem
+- Sichtfeld-basierte Erkennung
+- Kampfverhalten
+- Squadbasiertes Verhalten
+- Fluchtverhalten bei niedrigen HP
 
-### **12. Weitere Anforderungen**
-- **Begrenzte Fahrzeuganzahl**: Fahrzeuge erscheinen selten und strategisch verteilt.
-- **Spielbalance**: Ausreichende Ressourcen für ein faires Spiel.
-- **Benutzerfreundlichkeit**: Intuitive Steuerung, klare Anweisungen im Menü und sichtbare Hinweise für Interaktionen.
-- **Spawn-Logik**:
-  - Spieler spawnen niemals auf Hindernissen.
-  - Spieler spawnen nicht zu nah beieinander, um Überlappungen zu vermeiden.
+### KI-Zustände:
+- Patrol
+- Engage
+- Flee
+- Investigate
 
-### **13. Mini Map**
-- **Spieler**: Sollten auf der Minimap möglichst gut sichtbar eingezeichnet werden.
-- **Fahrzeuge und KI-Gegner**: Ebenfalls auf der Minimap sichtbar für bessere Orientierung.
+## 7. UI & HUD
+- Gesundheitsanzeige
+- Munitionsanzeige
+- Minimap
+- Fahrzeugstatus
+- Positionsanzeige
+- Interaktionsmeldungen
+- Achievement-System
+- Score-System
+- Wave-Anzeige
+- Debug-Informationen (optional)
 
-### **14. Respawn-Mechanik**
-- **Respawn am Startpunkt**: Nach dem Tod werden Spieler automatisch am Startpunkt neu positioniert.
-- **Kill-Zuweisung im Versus-Modus**: Tötete Spieler im Versus-Modus führen zu einem Punktgewinn für den gegnerischen Spieler.
+## 8. Power-Ups & Ressourcen
+- Gesundheits-Power-Ups
+- Munitions-Power-Ups
+- Waffen-Upgrades
+- Geschwindigkeits-Boosts
+- Automatisches Respawn-System für Power-Ups
 
-### **15. Schleich-Elemente**
-- **Sichtfeld der KI**: KI-Gegner haben ein definiertes Sichtfeld, das das Schleich-Gameplay unterstützt.
-- **Strategisches Vorgehen**: Spieler müssen sich vorsichtig bewegen und verdeckt agieren, um von der KI nicht entdeckt zu werden.
+## 9. Grafische Effekte
+- Explosionseffekte
+- Raucheffekte
+- Schadenseffekte an Fahrzeugen
+- Partikeleffekte
+- Schatten
+- Muzzle-Flash
 
-### **16. Erweiterte Kollisionserkennung**
-- **Kollisionen zwischen Fahrzeugen und Spielern**: Verhindern, dass sich Fahrzeuge und Spieler gegenseitig blockieren.
-- **Kollisionen mit Hindernissen**: Spieler und Fahrzeuge können nicht durch feste Hindernisse hindurch bewegen.
+## 10. Audio
+- Schussgeräusche
+- Explosionseffekte
+- Fahrzeuggeräusche
+- Power-Up Sounds
+- Kollisionsgeräusche
+- Einsteig/Aussteig Sounds
+- Positionswechsel Sound
+
+## 11. Technische Features
+- Split-Screen Rendering
+- Kollisionserkennung
+- Performance-optimiertes Rendering
+- Buffering für statische Elemente
+- Responsive Design
+- Modulares Code-Design
+- Sound Manager System
+- Entity Component System
+
+## 12. Zusätzliche Features
+- Achievement-System
+- Wave-basiertes Progression-System
+- Debug-Modus
+- Erweiterte Fahrzeugdetails
+- Squad-basiertes KI-System
+- Detailliertes Notifikationssystem

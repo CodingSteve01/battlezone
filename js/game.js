@@ -25,6 +25,26 @@ export class Game {
     
     // Generate map first
     this.map = this.generateMap();
+
+    // Initialize weather
+    this.weather = {
+      rain: false,
+      fog: false,
+      fogDensity: 0,
+      raindrops: [],
+      windSpeed: 0,
+      windDirection: 0,
+      lastUpdate: Date.now(),
+
+      // Weather configuration
+      maxRaindrops: 1000,
+      rainSpeed: 10,
+      maxWindSpeed: 5,
+      fogTransitionSpeed: 0.001
+    };
+
+    // Initialize weather after map generation
+    this.initializeWeather();
     
     // Then initialize game elements that depend on the map
     this.initializeStrategicLocations();
@@ -74,9 +94,9 @@ export class Game {
       // Try to create all points in the cluster
     for (let i = 0; i < clusterSize; i++) {
       const angle = (i / clusterSize) * Math.PI * 2;
-      const distance = Math.random() * 100 + 50;
-      const x = centerX + Math.cos(angle) * distance;
-      const y = centerY + Math.sin(angle) * distance;
+        const distanceValue = Math.random() * 100 + 50;
+        const x = centerX + Math.cos(angle) * distanceValue;
+        const y = centerY + Math.sin(angle) * distanceValue;
   
         if (this.isInvalidPosition(x, y)) {
           validCluster = false;
@@ -84,7 +104,8 @@ export class Game {
         }
         
         clusterPoints.push({
-          x, y,
+          x,
+          y,
           type,
           guards: [],
           supplies: Math.random() < 0.3
@@ -270,7 +291,7 @@ export class Game {
     this.addStrategicLocations(map);
     
     // Generate road network
-    this.generateRoads(map); // Korrigiert von generateRoadNetwork zu generateRoads
+    this.generateRoads(map); // Corrected from generateRoadNetwork to generateRoads
 
     return map;
   }
@@ -741,6 +762,9 @@ export class Game {
   }
 
   update(currentTime) {
+    // Update weather
+    this.updateWeather(currentTime);
+
     // Update players
     this.players.forEach((player, index) => {
       if (player.health <= 0) return;
@@ -1067,7 +1091,7 @@ export class Game {
     const playerIndex = this.players.indexOf(player);
     switch(powerUp.type) {
       case 'health':
-        player.health = Math.min(300, player.health + 25); // Max Health angepasst
+        player.health = Math.min(300, player.health + 25); // Max Health adjusted
         document.getElementById(`health${playerIndex +1}`).textContent = player.health;
         break;
       case 'ammo':
@@ -1181,5 +1205,118 @@ export class Game {
 
   getStrategicSpawnPoints() {
     return this.strategicPoints.map(p => ({x: p.x, y: p.y}));
+  }
+
+  initializeWeather() {
+    this.weather = {
+        rain: false,           // Start with no rain
+        fog: false,            // Start with no fog
+        fogDensity: 0,
+        raindrops: [],
+        windSpeed: 0,
+        windDirection: 0,
+        lastUpdate: Date.now(),
+
+        // Weather configuration
+        maxRaindrops: 200,     // Reduced from 1000
+        rainSpeed: 5,          // Reduced from 10
+        maxWindSpeed: 2,       // Reduced from 5
+        fogTransitionSpeed: 0.0005
+    };
+
+    // Initialize raindrops array
+    for (let i = 0; i < this.weather.maxRaindrops; i++) {
+        this.weather.raindrops.push({
+            x: Math.random() * (this.map[0].length * 40),
+            y: Math.random() * (this.map.length * 40),
+            speed: this.weather.rainSpeed + Math.random() * 2
+        });
+    }
+  }
+
+  updateWeather(currentTime) {
+    const deltaTime = currentTime - this.weather.lastUpdate;
+    this.weather.lastUpdate = currentTime;
+
+    // Randomly change weather conditions
+    if (Math.random() < 0.001) { // 0.1% chance per frame to change weather
+      this.weather.rain = !this.weather.rain;
+    }
+    
+    if (Math.random() < 0.0005) { // 0.05% chance per frame to change fog
+      this.weather.fog = !this.weather.fog;
+    }
+
+    // Update fog density
+    if (this.weather.fog) {
+      this.weather.fogDensity = Math.min(0.7, this.weather.fogDensity + this.weather.fogTransitionSpeed * deltaTime);
+    } else {
+      this.weather.fogDensity = Math.max(0, this.weather.fogDensity - this.weather.fogTransitionSpeed * deltaTime);
+    }
+
+    // Update wind
+    if (Math.random() < 0.005) { // 0.5% chance per frame to change wind
+      this.weather.windSpeed = Math.random() * this.weather.maxWindSpeed;
+      this.weather.windDirection = Math.random() * Math.PI * 2;
+    }
+
+    // Update raindrops
+    if (this.weather.rain) {
+      this.weather.raindrops.forEach(drop => {
+        drop.x += Math.cos(this.weather.windDirection) * this.weather.windSpeed;
+        drop.y += drop.speed;
+
+        // Reset raindrop if it goes off screen
+        if (drop.y > 100 * 40) { // MAP_SIZE * 40
+          drop.y = 0;
+          drop.x = Math.random() * (100 * 40);
+        }
+        if (drop.x < 0) drop.x = 100 * 40;
+        if (drop.x > 100 * 40) drop.x = 0;
+      });
+    }
+  }
+
+  getWeatherEffects() {
+    return {
+      rain: this.weather.rain,
+      fog: this.weather.fog,
+      fogDensity: this.weather.fogDensity,
+      raindrops: this.weather.raindrops,
+      windSpeed: this.weather.windSpeed,
+      windDirection: this.weather.windDirection
+    };
+  }
+  
+  getGameStats() {
+    return {
+      score: this.score || 0,
+      wave: this.wave || 1,
+      enemiesRemaining: this.enemies ? this.enemies.length : 0,
+      timeLimit: this.timeLimit,
+      elapsedTime: Date.now() - this.startTime
+    };
+  }
+  
+  getObjectives() {
+    // Default empty array if no objectives system is implemented
+    return this.objectives || [];
+  }
+  
+  getNotifications() {
+    // Default empty array if no notification system is implemented
+    return this.notifications || [];
+  }
+  
+  getFPS() {
+    // Simple FPS calculation - can be enhanced later
+    return Math.round(1000 / (Date.now() - this.lastFrameTime)) || 0;
+  }
+  
+  getEntityCount() {
+    return (this.players?.length || 0) +
+           (this.enemies?.length || 0) +
+           (this.vehicles?.length || 0) +
+           (this.bullets?.length || 0);
   }
 }
