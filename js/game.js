@@ -364,17 +364,144 @@ export class Game {
     return count;
   }
 
+  generateBunkerComplex(map, centerX, centerY) {
+    // Main bunker structure
+    const size = 3;
+    for (let y = -size; y <= size; y++) {
+      for (let x = -size; x <= size; x++) {
+        const mapX = centerX + x;
+        const mapY = centerY + y;
+        
+        // Check bounds
+        if (mapX < 0 || mapX >= 100 || mapY < 0 || mapY >= 100) continue;
+        
+        // Create bunker walls
+        if (Math.abs(x) === size || Math.abs(y) === size) {
+          map[mapY][mapX] = 3; // Wall
+        } else if (Math.abs(x) === size - 1 || Math.abs(y) === size - 1) {
+          map[mapY][mapX] = 3; // Inner wall
+        } else {
+          map[mapY][mapX] = 4; // Floor (road type for movement)
+        }
+      }
+    }
+  
+    // Add defensive structures around bunker
+    this.addDefensiveStructures(map, centerX, centerY, size + 1);
+  }
+  
+  generateHouseComplex(map, centerX, centerY) {
+    // Main house structure
+    const width = 4;
+    const height = 3;
+    
+    for (let y = -height; y <= height; y++) {
+      for (let x = -width; x <= width; x++) {
+        const mapX = centerX + x;
+        const mapY = centerY + y;
+        
+        // Check bounds
+        if (mapX < 0 || mapX >= 100 || mapY < 0 || mapY >= 100) continue;
+        
+        // Create house structure
+        if (Math.abs(x) === width || Math.abs(y) === height) {
+          map[mapY][mapX] = 3; // Outer wall
+        } else if (x === 0 && y === height) { // Door
+          map[mapY][mapX] = 4; // Floor/entrance
+        } else if (Math.abs(x) === width - 1 || Math.abs(y) === height - 1) {
+          map[mapY][mapX] = 3; // Inner wall
+        } else {
+          map[mapY][mapX] = 4; // Floor
+        }
+      }
+    }
+  
+    // Add yard and fence
+    this.addYardAndFence(map, centerX, centerY, width + 1, height + 1);
+  }
+  
+  addDefensiveStructures(map, centerX, centerY, radius) {
+    const positions = [
+      { x: radius + 1, y: 0 },
+      { x: -(radius + 1), y: 0 },
+      { x: 0, y: radius + 1 },
+      { x: 0, y: -(radius + 1) }
+    ];
+  
+    positions.forEach(pos => {
+      const x = centerX + pos.x;
+      const y = centerY + pos.y;
+      
+      if (x >= 0 && x < 100 && y >= 0 && y < 100) {
+        // Create defensive position
+        map[y][x] = 3; // Wall/barrier
+        
+        // Add surrounding sandbags/barriers
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const barricadeX = x + dx;
+            const barricadeY = y + dy;
+            if (barricadeX >= 0 && barricadeX < 100 && 
+                barricadeY >= 0 && barricadeY < 100 && 
+                map[barricadeY][barricadeX] === 0) {
+              if (Math.random() < 0.5) {
+                map[barricadeY][barricadeX] = 1; // Rocks/sandbags
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  addYardAndFence(map, centerX, centerY, width, height) {
+    const yardRadius = Math.max(width, height) + 2;
+    
+    for (let y = -yardRadius; y <= yardRadius; y++) {
+      for (let x = -yardRadius; x <= yardRadius; x++) {
+        const mapX = centerX + x;
+        const mapY = centerY + y;
+        
+        // Check bounds
+        if (mapX < 0 || mapX >= 100 || mapY < 0 || mapY >= 100) continue;
+        
+        // Only modify if it's currently empty (grass)
+        if (map[mapY][mapX] === 0) {
+          const distanceFromCenter = Math.sqrt(x * x + y * y);
+          
+          if (distanceFromCenter === yardRadius) {
+            // Fence
+            map[mapY][mapX] = 1; // Use rocks/low walls for fence
+          } else if (distanceFromCenter < yardRadius && Math.random() < 0.1) {
+            // Random decorative elements in yard
+            map[mapY][mapX] = Math.random() < 0.5 ? 2 : 1; // Trees or rocks
+          }
+        }
+      }
+    }
+  }
+
   addStrategicLocations(map) {
+    // Process bunkers
     this.bunkers.forEach(bunker => {
       const tileX = Math.floor(bunker.x / 40);
       const tileY = Math.floor(bunker.y / 40);
-      this.generateBunkerComplex(map, tileX, tileY);
+      
+      // Ensure we have enough space for the complex
+      if (tileX >= 5 && tileX < 95 && tileY >= 5 && tileY < 95) {
+        this.generateBunkerComplex(map, tileX, tileY);
+      }
     });
   
+    // Process houses
     this.houses.forEach(house => {
       const tileX = Math.floor(house.x / 40);
       const tileY = Math.floor(house.y / 40);
-      this.generateHouseComplex(map, tileX, tileY);
+      
+      // Ensure we have enough space for the complex
+      if (tileX >= 5 && tileX < 95 && tileY >= 5 && tileY < 95) {
+        this.generateHouseComplex(map, tileX, tileY);
+      }
     });
   }
 
