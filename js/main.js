@@ -1,3 +1,4 @@
+// main.js
 import { Game } from './game.js';
 
 let game;

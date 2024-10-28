@@ -1,3 +1,4 @@
+// renderer.js
 import { Human, Vehicle, distance, isInSight } from './entities.js';
 
 export class Renderer {
@@ -286,5 +287,147 @@ export class Renderer {
     }
     
     ctx.setLineDash([]);
+  }
+
+  drawVehicles(ctx) {
+    this.game.vehicles.forEach(vehicle => {
+      ctx.save();
+      ctx.translate(vehicle.x, vehicle.y);
+      ctx.rotate(vehicle.angle);
+      ctx.fillStyle = vehicle.color;
+      ctx.fillRect(-vehicle.size / 2, -vehicle.size / 2, vehicle.size, vehicle.size);
+
+      // Draw turret if applicable
+      if (vehicle.weapon) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, -5, vehicle.weaponOffset, 10);
+      }
+      ctx.restore();
+    });
+  }
+
+  drawPlayers(ctx, playerIndex) {
+    this.game.players.forEach((player, index) => {
+      if (player.health <= 0) return;
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.angle);
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw direction indicator
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(player.radius, 0);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  drawEnemies(ctx) {
+    this.game.enemies.forEach(enemy => {
+      if (enemy.health <= 0) return;
+      ctx.save();
+      ctx.translate(enemy.x, enemy.y);
+      ctx.rotate(enemy.angle);
+      ctx.fillStyle = enemy.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw direction indicator
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(enemy.radius, 0);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  drawBullets(ctx) {
+    this.game.bullets.forEach(bullet => {
+      ctx.save();
+      ctx.translate(bullet.x, bullet.y);
+      ctx.rotate(bullet.angle);
+      ctx.fillStyle = '#ff0';
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  drawEffects(ctx) {
+    // Placeholder for effects like explosions, smoke, etc.
+    this.game.explosions.forEach(explosion => {
+      ctx.save();
+      ctx.translate(explosion.x, explosion.y);
+      ctx.globalAlpha = 1 - (explosion.frame / explosion.maxFrames);
+      ctx.fillStyle = 'orange';
+      ctx.beginPath();
+      ctx.arc(0, 0, explosion.radius * explosion.frame, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
+
+  drawHUD(ctx, player, playerIndex) {
+    // Additional HUD elements can be drawn here if needed
+  }
+
+  drawMinimap(ctx, player) {
+    // Clear minimap
+    ctx.clearRect(0, 0, this.minimap1.width, this.minimap1.height);
+
+    // Draw map overview
+    const scale = this.minimap1.width / (100 * 40);
+    ctx.fillStyle = '#5f5'; // Grass
+    ctx.fillRect(0, 0, this.minimap1.width, this.minimap1.height);
+
+    // Draw roads
+    ctx.fillStyle = '#999';
+    for(let y = 0; y < 100; y++) {
+      for(let x = 0; x < 100; x++) {
+        if (this.game.map[y][x] === 4) {
+          ctx.fillRect(x * 40 * scale, y * 40 * scale, 40 * scale, 40 * scale);
+        }
+      }
+    }
+
+    // Draw players
+    this.game.players.forEach((player, index) => {
+      ctx.fillStyle = index === 0 ? '#4444ff' : '#ff4444';
+      ctx.beginPath();
+      ctx.arc(player.x * scale, player.y * scale, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw enemies
+    this.game.enemies.forEach(enemy => {
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(enemy.x * scale, enemy.y * scale, 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw vehicles
+    this.game.vehicles.forEach(vehicle => {
+      ctx.fillStyle = vehicle.color;
+      ctx.beginPath();
+      ctx.arc(vehicle.x * scale, vehicle.y * scale, 7, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  drawPlayerFieldOfView(ctx, player) {
+    // Optional: Draw field of view indicators
+  }
+
+  drawVehicleFieldOfView(ctx, player) {
+    // Optional: Implement field of view visualization for vehicles
   }
 }

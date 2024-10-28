@@ -1,3 +1,4 @@
+// game.js
 import { Entity, Human, Vehicle, isColliding, isVehicleColliding, distance, isInSight } from './entities.js';
 import { Renderer } from './renderer.js';
 
@@ -18,12 +19,12 @@ export class Game {
     this.keys = {};
     this.controls = [
       { 
-        forward: 'KeyW', 
-        backward: 'KeyS', 
-        left: 'KeyA', 
-        right: 'KeyD', 
-        shoot: 'KeyF', 
-        action: 'KeyE', 
+        forward: 'ArrowUp', 
+        backward: 'ArrowDown', 
+        left: 'ArrowLeft', 
+        right: 'ArrowRight', 
+        shoot: 'ControlLeft', 
+        action: 'Enter', 
         switch: 'KeyG' 
       },
       { 
@@ -56,10 +57,18 @@ export class Game {
 
   initGame() {
     this.map = this.generateMap();
-    this.players = this.mode === 'SinglePlayer' ? 
-      [new Human(100, 100, '#4444ff')] :
-      [new Human(100, 100, '#4444ff'), new Human(100, 100, '#ff4444')];
+    this.players = [];
     
+    if (this.mode === 'SinglePlayer') {
+      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
+    } else if (this.mode === 'Cooperative') {
+      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
+      this.players.push(new Human(150, 100, '#ff4444')); // Player 2
+    } else if (this.mode === 'Versus') {
+      this.players.push(new Human(100, 100, '#4444ff')); // Player 1
+      this.players.push(new Human(3900, 3900, '#ff4444')); // Player 2
+    }
+
     this.vehicles = this.generateVehicles();
     this.vehicles.forEach(v => v.game = this);
     this.bullets = [];
@@ -74,12 +83,9 @@ export class Game {
         break;
       case 'Cooperative':
         this.spawnEnemies(10 + this.wave * 3);
-        this.players[1].x = this.players[0].x + 50;
-        this.players[1].y = this.players[0].y + 50;
         break;
       case 'Versus':
-        this.players[1].x = 3900;
-        this.players[1].y = 3900;
+        // No AI enemies in Versus mode
         break;
     }
 
@@ -464,7 +470,7 @@ export class Game {
     const target = this.findNearestPlayer(enemy);
     if (target && distance(enemy, target) < 300 && 
         isInSight(enemy, target, enemy.angle, Math.PI / 2, 300)) {
-      this.createBullet(enemy, this.players.length);
+      this.createBullet(enemy, this.players.length); // Owner index beyond players
       enemy.canShoot = false;
       setTimeout(() => { enemy.canShoot = true; }, 1000);
     }
@@ -638,9 +644,9 @@ export class Game {
       vehicle.driver.role = null;
       const driverIndex = this.players.indexOf(vehicle.driver);
       if (driverIndex !== -1) {
-        document.getElementById(`health${driverIndex+1}`).textContent = 
+        document.getElementById(`health${driverIndex +1}`).textContent = 
           Math.max(vehicle.driver.health, 0);
-        document.getElementById(`vehicle${driverIndex+1}`).textContent = 'None';
+        document.getElementById(`vehicle${driverIndex +1}`).textContent = 'None';
       }
     }
     
@@ -650,9 +656,9 @@ export class Game {
       vehicle.gunner.role = null;
       const gunnerIndex = this.players.indexOf(vehicle.gunner);
       if (gunnerIndex !== -1) {
-        document.getElementById(`health${gunnerIndex+1}`).textContent = 
+        document.getElementById(`health${gunnerIndex +1}`).textContent = 
           Math.max(vehicle.gunner.health, 0);
-        document.getElementById(`vehicle${gunnerIndex+1}`).textContent = 'None';
+        document.getElementById(`vehicle${gunnerIndex +1}`).textContent = 'None';
       }
     }
 
@@ -690,11 +696,11 @@ export class Game {
     switch(powerUp.type) {
       case 'health':
         player.health = Math.min(100, player.health + 25);
-        document.getElementById(`health${playerIndex+1}`).textContent = player.health;
+        document.getElementById(`health${playerIndex +1}`).textContent = player.health;
         break;
       case 'ammo':
         player.ammo += 30;
-        document.getElementById(`ammo${playerIndex+1}`).textContent = player.ammo;
+        document.getElementById(`ammo${playerIndex +1}`).textContent = player.ammo;
         break;
       case 'weapon_upgrade':
         if (player.weapon === 'Pistol') {
@@ -702,7 +708,7 @@ export class Game {
         } else if (player.weapon === 'Machine Gun') {
           player.weapon = 'Shotgun';
         }
-        document.getElementById(`weapon${playerIndex+1}`).textContent = player.weapon;
+        document.getElementById(`weapon${playerIndex +1}`).textContent = player.weapon;
         break;
       case 'speed_boost':
         player.maxSpeed *= 1.5;

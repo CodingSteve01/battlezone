@@ -1,11 +1,13 @@
+// entities.js
 // Core entity class for shared properties and basic movement
 export class Entity {
-    constructor(x, y, angle = 0) {
+    constructor(x, y, angle = 0, radius = 20) {
       this.x = x;
       this.y = y;
       this.angle = angle;
       this.speed = 0;
       this.turnSpeed = 0;
+      this.radius = radius; // Added radius for scaling and collision
     }
   
     move(map) {
@@ -14,7 +16,7 @@ export class Entity {
       const newY = this.y + Math.sin(newAngle) * this.speed;
   
       // Temporary position for collision detection
-      const tempEntity = { x: newX, y: newY };
+      const tempEntity = { x: newX, y: newY, radius: this.radius };
       if (!isColliding(tempEntity, map)) {
         this.angle = newAngle;
         this.x = newX;
@@ -42,7 +44,7 @@ export class Entity {
   
   export class Human extends Entity {
     constructor(x, y, color, isAI = false) {
-      super(x, y);
+      super(x, y, 0, 15); // Reduced radius for players
       this.type = 'human';
       this.color = color;
       this.health = 100;
@@ -63,7 +65,21 @@ export class Entity {
         this.lastTargetUpdate = 0;
         this.currentTarget = null;
         this.aiState = 'patrol'; // patrol, chase, attack, flee
+        this.patrolPoints = this.generatePatrolPoints();
+        this.currentPatrolIndex = 0;
       }
+    }
+  
+    generatePatrolPoints() {
+      // Generate random patrol points within the map
+      const points = [];
+      for (let i = 0; i < 5; i++) {
+        points.push({
+          x: Math.random() * 4000,
+          y: Math.random() * 4000
+        });
+      }
+      return points;
     }
   
     update(controls, map, currentTime) {
@@ -151,12 +167,12 @@ export class Entity {
   
     updateAITarget() {
       // Find nearest player or vehicle
-      const players = this.vehicle?.game?.players || [];
-      if (players.length > 0) {
-        this.currentTarget = players.reduce((nearest, player) => {
-          const dist = distance(this, player);
-          return dist < distance(this, nearest) ? player : nearest;
-        }, players[0]);
+      const targets = [...this.game.players, ...this.game.vehicles];
+      if (targets.length > 0) {
+        this.currentTarget = targets.reduce((nearest, target) => {
+          const dist = distance(this, target);
+          return dist < distance(this, nearest) ? target : nearest;
+        }, targets[0]);
   
         // Update AI state based on conditions
         const distanceToTarget = distance(this, this.currentTarget);
@@ -173,11 +189,22 @@ export class Entity {
     }
   
     performPatrol(map) {
-      // Random movement pattern
-      if (Math.random() < 0.02) {
-        this.angle += (Math.random() - 0.5) * 0.2;
+      if (this.patrolPoints.length === 0) return;
+      const targetPoint = this.patrolPoints[this.currentPatrolIndex];
+      
+      const angleToPoint = Math.atan2(targetPoint.y - this.y, targetPoint.x - this.x);
+      const angleDiff = normalizeAngle(angleToPoint - this.angle);
+      
+      if (Math.abs(angleDiff) > 0.1) {
+        this.angle += Math.sign(angleDiff) * 0.05;
+      } else {
+        this.angle = angleToPoint;
+        this.speed = this.maxSpeed * 0.5;
+        if (distance(this, targetPoint) < 50) {
+          this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+        }
       }
-      this.speed = this.maxSpeed * 0.5;
+      
       this.move(map);
     }
   
@@ -216,6 +243,7 @@ export class Entity {
           // Shooting logic handled by game class
           this.canShoot = false;
           setTimeout(() => { this.canShoot = true; }, this.shootCooldown);
+          this.game.createBullet(this, this.game.players.length + this.enemies.indexOf(this));
         }
       }
     }
@@ -241,13 +269,14 @@ export class Entity {
   
   export class Vehicle extends Entity {
     constructor(x, y, type) {
-      super(x, y);
+      super(x, y, 0, 25); // Increased radius for vehicles
       this.type = type;
       this.health = 200;
       this.driver = null;
       this.gunner = null;
       this.turretAngle = 0;
       this.game = null;
+      this.size = 50; // Adjusted size for scaling
   
       // Set vehicle-specific properties
       this.setupVehicleProperties(type);
@@ -262,7 +291,7 @@ export class Entity {
           friction: 0.95,
           color: '#556677',
           weaponOffset: 25,
-          weapon: 'Cannon',
+          weapon: 'Tank Cannon',
           ammo: 20,
           armor: 2.0
         },
@@ -363,7 +392,7 @@ export class Entity {
   export function isVehicleColliding(vehicle, vehicles) {
     return vehicles.some(v => 
       v !== vehicle && 
-      distance(v, vehicle) < 40 && 
+      distance(v, vehicle) < (v.radius + vehicle.radius) &&
       !v.driver?.isAI // Don't collide with AI vehicles
     );
   }
@@ -394,5 +423,5 @@ export class Entity {
     const distX = circle.x - testX;
     const distY = circle.y - testY;
     
-    return (distX * distX + distY * distY) < (20 * 20); // Using radius of 20 for entities
+    return (distX * distX + distY * distY) < (circle.radius * circle.radius);
   }
