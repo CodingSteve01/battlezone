@@ -94,7 +94,7 @@ export class Game {
         break;
     }
 
-    this.ensureSafeSpawns();
+    this.ensureSafeSpawns(); // Added ensureSafeSpawns call
     this.startGameLoop();
   }
 
@@ -303,6 +303,24 @@ export class Game {
     }
   }
 
+  ensureSafeSpawns() {
+    // Ensure players are not spawned on obstacles
+    this.players.forEach(player => {
+      while (isColliding(player, this.map) || this.vehicles.some(v => distance(player, v) < v.radius + player.radius + 10)) {
+        player.x = Math.random() * 100 * 40;
+        player.y = Math.random() * 100 * 40;
+      }
+    });
+
+    // Ensure vehicles are not spawned on obstacles or overlapping with each other
+    this.vehicles.forEach(vehicle => {
+      while (isColliding(vehicle, this.map) || this.vehicles.some(v => v !== vehicle && distance(v, vehicle) < v.radius + vehicle.radius + 10)) {
+        vehicle.x = Math.random() * 100 * 40;
+        vehicle.y = Math.random() * 100 * 40;
+      }
+    });
+  }
+
   getPlayerControls(index) {
     const keys = this.controls[index];
     return {
@@ -328,6 +346,7 @@ export class Game {
         player.x += Math.cos(player.angle) * 30;
         player.y += Math.sin(player.angle) * 30;
         document.getElementById(`vehicle${index+1}`).textContent = 'None';
+        this.soundManager.playSound('exitVehicle');
       } else {
         // Enter nearest available vehicle
         const nearestVehicle = this.vehicles.find(v => 
@@ -822,6 +841,7 @@ class SoundManager {
     this.sounds['powerUpDrop'] = () => this.playPowerUpDropSound();
     this.sounds['enterVehicle'] = () => this.playEnterVehicleSound();
     this.sounds['switchSeat'] = () => this.playSwitchSeatSound();
+    this.sounds['exitVehicle'] = () => this.playExitVehicleSound(); // Added exitVehicle sound
   }
 
   playSound(soundName) {
@@ -901,6 +921,15 @@ class SoundManager {
     const osc = this.audioCtx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(650, this.audioCtx.currentTime);
+    osc.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + 0.1);
+  }
+
+  playExitVehicleSound() { // New sound for exiting vehicle
+    const osc = this.audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(450, this.audioCtx.currentTime);
     osc.connect(this.audioCtx.destination);
     osc.start();
     osc.stop(this.audioCtx.currentTime + 0.1);
