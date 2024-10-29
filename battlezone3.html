@@ -4,8 +4,16 @@
 <meta charset="UTF-8">
 <title>Top-Down Stealth Shooter</title>
 <style>
-  body { margin: 0; overflow: hidden; background: #333; font-family: Arial, sans-serif; }
-  canvas { display: block; background: #222; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #333;
+    font-family: Arial, sans-serif;
+  }
+  canvas {
+    display: block;
+    background: #222;
+  }
   #ui {
     position: absolute;
     top: 0;
@@ -22,14 +30,6 @@
     padding: 10px;
     border-radius: 5px;
     width: 45%;
-  }
-  #waveDisplay {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 24px;
-    color: white;
-    z-index: 10;
   }
   #message {
     position: absolute;
@@ -59,8 +59,7 @@
     <h2>Spieler 1</h2>
     <p>Gesundheit: <span id="health1">100</span></p>
     <p>Munition: <span id="ammo1">50</span></p>
-    <p>Waffe: <span id="weapon1">Pistole</span></p>
-    <p>Ausrüstung: <span id="equipment1">Keine</span></p>
+    <p>Waffen: <span id="weapons1">Pistole</span></p>
     <p>Fahrzeug: <span id="vehicle1">Keines</span></p>
     <p>Mission: <span id="mission1">Keine</span></p>
   </div>
@@ -68,13 +67,11 @@
     <h2>Spieler 2</h2>
     <p>Gesundheit: <span id="health2">100</span></p>
     <p>Munition: <span id="ammo2">50</span></p>
-    <p>Waffe: <span id="weapon2">Pistole</span></p>
-    <p>Ausrüstung: <span id="equipment2">Keine</span></p>
+    <p>Waffen: <span id="weapons2">Pistole</span></p>
     <p>Fahrzeug: <span id="vehicle2">Keines</span></p>
     <p>Mission: <span id="mission2">Keine</span></p>
   </div>
 </div>
-<div id="waveDisplay">Welle 1</div>
 <div id="message"></div>
 <canvas id="minimap"></canvas>
 
@@ -97,8 +94,12 @@ const SIGHT_RADIUS = 300;
 
 const keys = {};
 
-document.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+document.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+});
+document.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
 
 // Kachelbasierte Karte erstellen
 const map = [];
@@ -124,13 +125,26 @@ for (let y = 0; y < MAP_HEIGHT; y++) {
 // Missionen generieren
 const missions = [];
 function generateMissions() {
+  const missionTypes = [
+    'Finde ein Fahrzeug',
+    'Eliminiere den Kommandanten',
+    'Sammle Geheimdaten',
+    'Zerstöre das feindliche Lager',
+    'Rette den Verbündeten'
+  ];
   for (let i = 0; i < 5; i++) {
     let x, y;
     do {
       x = Math.floor(Math.random() * MAP_WIDTH);
       y = Math.floor(Math.random() * MAP_HEIGHT);
     } while (map[y][x] !== 0);
-    missions.push({ x: x * TILE_SIZE + TILE_SIZE / 2, y: y * TILE_SIZE + TILE_SIZE / 2, active: true });
+    const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
+    missions.push({
+      x: x * TILE_SIZE + TILE_SIZE / 2,
+      y: y * TILE_SIZE + TILE_SIZE / 2,
+      active: true,
+      type: type
+    });
   }
 }
 
@@ -147,7 +161,12 @@ class GameObject {
 
   draw() {
     ctx.fillStyle = this.color;
-    ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+    ctx.fillRect(
+      this.x - this.size / 2,
+      this.y - this.size / 2,
+      this.size,
+      this.size
+    );
   }
 }
 
@@ -157,8 +176,8 @@ class Player extends GameObject {
     this.controls = controls;
     this.speed = 3;
     this.ammo = 50;
-    this.weapon = 'Pistole';
-    this.equipment = [];
+    this.weapons = ['Pistole'];
+    this.currentWeaponIndex = 0;
     this.vehicle = null;
     this.canShoot = true;
     this.angle = 0;
@@ -193,12 +212,23 @@ class Player extends GameObject {
       this.angle = Math.atan2(dy, dx);
     }
 
+    // Waffen wechseln
+    if (keys[this.controls.switchWeapon]) {
+      this.currentWeaponIndex =
+        (this.currentWeaponIndex + 1) % this.weapons.length;
+      keys[this.controls.switchWeapon] = false;
+    }
+
     // Schießen
     if (keys[this.controls.shoot] && this.canShoot && this.ammo > 0) {
-      bullets.push(new Bullet(this.x, this.y, this.angle, this.color, this));
+      bullets.push(
+        new Bullet(this.x, this.y, this.angle, this.color, this)
+      );
       this.ammo--;
       this.canShoot = false;
-      setTimeout(() => { this.canShoot = true; }, 300);
+      setTimeout(() => {
+        this.canShoot = true;
+      }, 300);
     }
 
     // Ein-/Aussteigen
@@ -206,24 +236,20 @@ class Player extends GameObject {
       if (this.vehicle) {
         this.vehicle.removePassenger(this);
         this.vehicle = null;
-        document.getElementById(`vehicle${this.index+1}`).textContent = 'Keines';
+        document.getElementById(`vehicle${this.index + 1}`).textContent =
+          'Keines';
       } else {
-        const nearbyVehicle = vehicles.find(v => Math.hypot(this.x - v.x, this.y - v.y) < 50);
+        const nearbyVehicle = vehicles.find(
+          v => Math.hypot(this.x - v.x, this.y - v.y) < 50
+        );
         if (nearbyVehicle) {
           nearbyVehicle.addPassenger(this);
           this.vehicle = nearbyVehicle;
-          document.getElementById(`vehicle${this.index+1}`).textContent = this.vehicle.type;
+          document.getElementById(`vehicle${this.index + 1}`).textContent =
+            this.vehicle.type;
         }
       }
       keys[this.controls.action] = false;
-    }
-
-    // Positionswechsel
-    if (keys[this.controls.switch]) {
-      if (this.vehicle) {
-        this.vehicle.switchRole(this);
-      }
-      keys[this.controls.switch] = false;
     }
 
     // Stealth (Ducken)
@@ -237,7 +263,7 @@ class Player extends GameObject {
 
     // Nahkampf
     if (keys[this.controls.melee]) {
-      enemies.forEach((enemy) => {
+      enemies.forEach(enemy => {
         if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 40) {
           if (Math.abs(this.angle - enemy.angle) < Math.PI / 4) {
             enemy.health = 0;
@@ -251,20 +277,35 @@ class Player extends GameObject {
 
     // Pickup von Power-Ups
     powerUps.forEach((pu, index) => {
-      if (Math.hypot(this.x - pu.x, this.y - pu.y) < (this.size + pu.size)/2) {
+      if (
+        Math.hypot(this.x - pu.x, this.y - pu.y) <
+        (this.size + pu.size) / 2
+      ) {
         pu.applyEffect(this);
         powerUps.splice(index, 1);
       }
     });
 
     // Missionen
-    missions.forEach((mission) => {
-      if (mission.active && Math.hypot(this.x - mission.x, this.y - mission.y) < 50) {
-        mission.active = false;
-        this.currentMission = "Mission erfüllt!";
-        document.getElementById(`mission${this.index+1}`).textContent = this.currentMission;
+    if (!this.currentMission) {
+      this.currentMission = missions.find(m => m.active);
+      if (this.currentMission) {
+        document.getElementById(
+          `mission${this.index + 1}`
+        ).textContent = this.currentMission.type;
       }
-    });
+    } else {
+      if (
+        Math.hypot(this.x - this.currentMission.x, this.y - this.currentMission.y) <
+        50
+      ) {
+        this.currentMission.active = false;
+        this.currentMission = null;
+        document.getElementById(
+          `mission${this.index + 1}`
+        ).textContent = 'Erledigt!';
+      }
+    }
   }
 
   draw() {
@@ -312,7 +353,9 @@ class Enemy extends GameObject {
     if (!this.isAlive) return;
 
     // Wahrnehmung
-    const playerDetected = players.find(player => this.canSee(player) || this.canHear(player));
+    const playerDetected = players.find(
+      player => this.canSee(player) || this.canHear(player)
+    );
     if (playerDetected) {
       this.state = 'chase';
       this.target = playerDetected;
@@ -332,7 +375,7 @@ class Enemy extends GameObject {
   }
 
   canSee(player) {
-    if (!player.isAlive || player.equipment.includes('Tarnanzug')) return false;
+    if (!player.isAlive) return false;
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.hypot(dx, dy);
@@ -353,7 +396,8 @@ class Enemy extends GameObject {
     const point = this.patrolPoints[this.currentPatrolIndex];
     this.moveTowards(point.x, point.y);
     if (Math.hypot(this.x - point.x, this.y - point.y) < 10) {
-      this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+      this.currentPatrolIndex =
+        (this.currentPatrolIndex + 1) % this.patrolPoints.length;
     }
   }
 
@@ -361,8 +405,13 @@ class Enemy extends GameObject {
     if (this.target && this.target.isAlive) {
       this.moveTowards(this.target.x, this.target.y);
       // Schießen
-      if (Math.hypot(this.x - this.target.x, this.y - this.target.y) < 300 && Math.random() < 0.05) {
-        bullets.push(new Bullet(this.x, this.y, this.angle, 'red', this));
+      if (
+        Math.hypot(this.x - this.target.x, this.y - this.target.y) < 300 &&
+        Math.random() < 0.05
+      ) {
+        bullets.push(
+          new Bullet(this.x, this.y, this.angle, 'red', this)
+        );
       }
     } else {
       this.state = 'search';
@@ -438,7 +487,12 @@ class Bullet extends GameObject {
     }
 
     // Grenzen prüfen
-    if (this.x < 0 || this.x > MAP_WIDTH * TILE_SIZE || this.y < 0 || this.y > MAP_HEIGHT * TILE_SIZE) {
+    if (
+      this.x < 0 ||
+      this.x > MAP_WIDTH * TILE_SIZE ||
+      this.y < 0 ||
+      this.y > MAP_HEIGHT * TILE_SIZE
+    ) {
       bullets.splice(bullets.indexOf(this), 1);
     }
   }
@@ -459,6 +513,7 @@ class Vehicle extends GameObject {
     this.maxSpeed = 5;
     this.angle = 0;
     this.passengers = [];
+    this.condition = 100; // Zustand des Fahrzeugs
   }
 
   addPassenger(player) {
@@ -469,11 +524,6 @@ class Vehicle extends GameObject {
 
   removePassenger(player) {
     this.passengers = this.passengers.filter(p => p !== player);
-  }
-
-  switchRole(player) {
-    // Rollenwechsel zwischen Fahrer und Schütze
-    // Für Einfachheit hier nicht weiter implementiert
   }
 
   update() {
@@ -502,7 +552,10 @@ class Vehicle extends GameObject {
     }
     // Kollision mit Feinden
     enemies.forEach(enemy => {
-      if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < (this.size + enemy.size)/2) {
+      if (
+        Math.hypot(this.x - enemy.x, this.y - enemy.y) <
+        (this.size + enemy.size) / 2
+      ) {
         enemy.health -= 50;
         if (enemy.health <= 0) {
           enemy.isAlive = false;
@@ -543,36 +596,23 @@ class PowerUp extends GameObject {
       case 'ammo':
         player.ammo += 30;
         break;
-      case 'schalldaempfer':
-        if (!player.equipment.includes('Schalldämpfer')) {
-          player.equipment.push('Schalldämpfer');
-        }
-        break;
-      case 'tarnanzug':
-        if (!player.equipment.includes('Tarnanzug')) {
-          player.equipment.push('Tarnanzug');
-        }
-        break;
-      case 'schutzweste':
-        if (!player.equipment.includes('Schutzweste')) {
-          player.equipment.push('Schutzweste');
-        }
-        break;
       case 'schrotflinte':
       case 'maschinengewehr':
       case 'sniper':
-        player.weapon = this.type.charAt(0).toUpperCase() + this.type.slice(1);
+        if (!player.weapons.includes(this.type)) {
+          player.weapons.push(this.type);
+        }
         break;
     }
     // UI aktualisieren
-    document.getElementById(`equipment${player.index+1}`).textContent = player.equipment.join(', ') || 'Keine';
-    document.getElementById(`weapon${player.index+1}`).textContent = player.weapon;
+    document.getElementById(`weapons${player.index + 1}`).textContent =
+      player.weapons.join(', ');
   }
 
   draw() {
     ctx.fillStyle = this.color;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size/2, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -581,7 +621,13 @@ class PowerUp extends GameObject {
 function isColliding(x, y) {
   const tileX = Math.floor(x / TILE_SIZE);
   const tileY = Math.floor(y / TILE_SIZE);
-  if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
+  if (
+    tileX < 0 ||
+    tileX >= MAP_WIDTH ||
+    tileY < 0 ||
+    tileY >= MAP_HEIGHT
+  )
+    return true;
   return map[tileY][tileX] === 1 || map[tileY][tileX] === 3;
 }
 
@@ -599,20 +645,50 @@ function lineOfSightBlocked(x1, y1, x2, y2) {
 
 // Spielobjekte
 const players = [
-  new Player(100, 100, 'blue', { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright', shoot: 'shift', action: 'enter', switch: 'numpad0', crouch: 'alt', melee: 'm' }, 0),
-  new Player(200, 100, 'green', { up: 'w', down: 's', left: 'a', right: 'd', shoot: 'q', action: 'e', switch: 'g', crouch: 'z', melee: 'x' }, 1),
+  new Player(
+    100,
+    100,
+    'blue',
+    {
+      up: 'arrowup',
+      down: 'arrowdown',
+      left: 'arrowleft',
+      right: 'arrowright',
+      shoot: ' ',
+      action: 'enter',
+      switchWeapon: 'shift',
+      crouch: 'alt',
+      melee: 'm'
+    },
+    0
+  ),
+  new Player(
+    200,
+    100,
+    'green',
+    {
+      up: 'w',
+      down: 's',
+      left: 'a',
+      right: 'd',
+      shoot: 'q',
+      action: 'e',
+      switchWeapon: 'tab',
+      crouch: 'z',
+      melee: 'x'
+    },
+    1
+  ),
 ];
 
 const enemies = [];
 const bullets = [];
 const vehicles = [];
 const powerUps = [];
-let wave = 1;
-let waveCountdown = 300;
 
-// Wellen von Gegnern erzeugen
+// Gegner spawnen
 function spawnEnemies() {
-  for (let i = 0; i < wave * 10; i++) {
+  for (let i = 0; i < 30; i++) {
     let x, y;
     do {
       x = Math.random() * MAP_WIDTH * TILE_SIZE;
@@ -623,12 +699,14 @@ function spawnEnemies() {
 }
 
 function isInPlayerSight(x, y) {
-  return players.some(player => Math.hypot(player.x - x, player.y - y) < SIGHT_RADIUS);
+  return players.some(
+    player => Math.hypot(player.x - x, player.y - y) < SIGHT_RADIUS
+  );
 }
 
 // Fahrzeuge platzieren
 function spawnVehicles() {
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 10; i++) {
     let x, y;
     do {
       x = Math.random() * MAP_WIDTH * TILE_SIZE;
@@ -640,8 +718,14 @@ function spawnVehicles() {
 
 // Power-Ups platzieren
 function spawnPowerUps() {
-  const types = ['health', 'ammo', 'schalldaempfer', 'tarnanzug', 'schutzweste', 'schrotflinte', 'maschinengewehr', 'sniper'];
-  for (let i = 0; i < 20; i++) {
+  const types = [
+    'health',
+    'ammo',
+    'schrotflinte',
+    'maschinengewehr',
+    'sniper'
+  ];
+  for (let i = 0; i < 40; i++) {
     let x, y;
     do {
       x = Math.random() * MAP_WIDTH * TILE_SIZE;
@@ -669,25 +753,50 @@ function update() {
     for (let x = 0; x < MAP_WIDTH; x++) {
       if (map[y][x] === 1) {
         ctx.fillStyle = '#555';
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(
+          x * TILE_SIZE,
+          y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
       } else if (map[y][x] === 2) {
         ctx.fillStyle = '#2f4f2f';
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(
+          x * TILE_SIZE,
+          y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
       } else if (map[y][x] === 3) {
         ctx.fillStyle = '#1e90ff';
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(
+          x * TILE_SIZE,
+          y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
       } else if (map[y][x] === 4) {
         ctx.fillStyle = '#999';
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(
+          x * TILE_SIZE,
+          y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
       } else {
         ctx.fillStyle = '#777';
-        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(
+          x * TILE_SIZE,
+          y * TILE_SIZE,
+          TILE_SIZE,
+          TILE_SIZE
+        );
       }
     }
   }
 
   // Missionen zeichnen
-  missions.forEach((mission) => {
+  missions.forEach(mission => {
     if (mission.active) {
       ctx.fillStyle = 'gold';
       ctx.beginPath();
@@ -701,12 +810,18 @@ function update() {
     player.update();
     player.draw();
     // UI aktualisieren
-    document.getElementById(`health${index+1}`).textContent = player.health;
-    document.getElementById(`ammo${index+1}`).textContent = player.ammo;
-    document.getElementById(`weapon${index+1}`).textContent = player.weapon;
-    document.getElementById(`vehicle${index+1}`).textContent = player.vehicle ? player.vehicle.type : 'Keines';
-    document.getElementById(`equipment${index+1}`).textContent = player.equipment.join(', ') || 'Keine';
-    document.getElementById(`mission${index+1}`).textContent = player.currentMission || 'Keine';
+    document.getElementById(`health${index + 1}`).textContent =
+      player.health;
+    document.getElementById(`ammo${index + 1}`).textContent =
+      player.ammo;
+    document.getElementById(`weapons${index + 1}`).textContent =
+      player.weapons.join(', ');
+    document.getElementById(`vehicle${index + 1}`).textContent =
+      player.vehicle ? player.vehicle.type : 'Keines';
+    document.getElementById(`mission${index + 1}`).textContent =
+      player.currentMission
+        ? player.currentMission.type
+        : 'Keine';
   });
 
   // Fahrzeuge aktualisieren und zeichnen
@@ -716,17 +831,22 @@ function update() {
   });
 
   // Gegner aktualisieren und zeichnen
-  enemies.forEach((enemy) => {
+  enemies.forEach(enemy => {
     enemy.update();
     enemy.draw();
 
     // Kollision mit Spielern
-    players.forEach((player) => {
-      if (player.isAlive && Math.hypot(player.x - enemy.x, player.y - enemy.y) < (player.size + enemy.size)/2) {
+    players.forEach(player => {
+      if (
+        player.isAlive &&
+        Math.hypot(player.x - enemy.x, player.y - enemy.y) <
+          (player.size + enemy.size) / 2
+      ) {
         player.health -= 1;
         if (player.health <= 0) {
           player.isAlive = false;
-          document.getElementById('message').textContent = 'Spieler gestorben!';
+          document.getElementById('message').textContent =
+            'Spieler gestorben!';
           document.getElementById('message').style.display = 'block';
         }
       }
@@ -734,14 +854,17 @@ function update() {
   });
 
   // Kugeln aktualisieren und zeichnen
-  bullets.forEach((bullet) => {
+  bullets.forEach(bullet => {
     bullet.update();
     bullet.draw();
 
     // Kollision mit Feinden
     if (bullet.owner instanceof Player) {
-      enemies.forEach((enemy) => {
-        if (Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) < (bullet.size + enemy.size)/2) {
+      enemies.forEach(enemy => {
+        if (
+          Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) <
+          (bullet.size + enemy.size) / 2
+        ) {
           enemy.health -= 50;
           bullets.splice(bullets.indexOf(bullet), 1);
           if (enemy.health <= 0) {
@@ -751,13 +874,18 @@ function update() {
         }
       });
     } else if (bullet.owner instanceof Enemy) {
-      players.forEach((player) => {
-        if (player.isAlive && Math.hypot(bullet.x - player.x, bullet.y - player.y) < (bullet.size + player.size)/2) {
+      players.forEach(player => {
+        if (
+          player.isAlive &&
+          Math.hypot(bullet.x - player.x, bullet.y - player.y) <
+            (bullet.size + player.size) / 2
+        ) {
           player.health -= 20;
           bullets.splice(bullets.indexOf(bullet), 1);
           if (player.health <= 0) {
             player.isAlive = false;
-            document.getElementById('message').textContent = 'Spieler gestorben!';
+            document.getElementById('message').textContent =
+              'Spieler gestorben!';
             document.getElementById('message').style.display = 'block';
           }
         }
@@ -773,18 +901,6 @@ function update() {
   // Minikarte zeichnen
   drawMinimap();
 
-  // Wellenmanagement
-  if (enemies.length === 0 && waveCountdown === 0) {
-    wave++;
-    document.getElementById('waveDisplay').textContent = `Welle ${wave}`;
-    setTimeout(() => {
-      spawnEnemies();
-    }, 2000);
-    waveCountdown = 300;
-  } else if (waveCountdown > 0) {
-    waveCountdown--;
-  }
-
   requestAnimationFrame(update);
 }
 
@@ -797,26 +913,46 @@ function drawMinimap() {
   // Spieler zeichnen
   players.forEach(player => {
     minimapCtx.fillStyle = player.color;
-    minimapCtx.fillRect(player.x * scaleX - 2, player.y * scaleY - 2, 4, 4);
+    minimapCtx.fillRect(
+      player.x * scaleX - 2,
+      player.y * scaleY - 2,
+      4,
+      4
+    );
   });
 
   // Gegner zeichnen
   enemies.forEach(enemy => {
     minimapCtx.fillStyle = 'red';
-    minimapCtx.fillRect(enemy.x * scaleX - 2, enemy.y * scaleY - 2, 4, 4);
+    minimapCtx.fillRect(
+      enemy.x * scaleX - 2,
+      enemy.y * scaleY - 2,
+      4,
+      4
+    );
   });
 
   // Fahrzeuge zeichnen
   vehicles.forEach(vehicle => {
     minimapCtx.fillStyle = 'gray';
-    minimapCtx.fillRect(vehicle.x * scaleX - 3, vehicle.y * scaleY - 3, 6, 6);
+    minimapCtx.fillRect(
+      vehicle.x * scaleX - 3,
+      vehicle.y * scaleY - 3,
+      6,
+      6
+    );
   });
 
   // Missionen zeichnen
   missions.forEach(mission => {
     if (mission.active) {
       minimapCtx.fillStyle = 'gold';
-      minimapCtx.fillRect(mission.x * scaleX - 3, mission.y * scaleY - 3, 6, 6);
+      minimapCtx.fillRect(
+        mission.x * scaleX - 3,
+        mission.y * scaleY - 3,
+        6,
+        6
+      );
     }
   });
 }
