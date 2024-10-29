@@ -32,21 +32,21 @@
     font-size: 14px;
   }
   .minimap1, .minimap2 {
-    position: absolute;
-    width: 150px;
-    height: 150px;
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid #fff;
-    border-radius: 5px;
-    z-index: 10;
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid #fff;
+      border-radius: 5px;
+      z-index: 100;
   }
   .minimap1 {
-    bottom: 10px;
-    left: 10px;
+      top: 10px;
+      left: 10px;
   }
   .minimap2 {
-    bottom: 10px;
-    right: 10px;
+      top: 10px;
+      right: 10px;
   }
   .mode-display {
     position: absolute;
@@ -545,44 +545,44 @@ class Vehicle extends Entity {
     // Fahrzeug-spezifische Eigenschaften
     switch (type) {
       case 'tank':
-        this.maxSpeed = 2;
-        this.acceleration = 0.1;
-        this.turnRate = 0.02;
-        this.friction = 0.95;
-        this.color = '#556677';
-        this.weaponOffset = 25;
-        break;
+          this.maxSpeed = 2;
+          this.acceleration = 0.1;
+          this.turnRate = 0.015; // Weniger Lenkempfindlichkeit
+          this.friction = 0.98; // Höhere Stabilität
+          this.color = '#556677';
+          this.weaponOffset = 25;
+          break;
       case 'jeep':
-        this.maxSpeed = 4;
-        this.acceleration = 0.2;
-        this.turnRate = 0.04;
-        this.friction = 0.92;
-        this.color = '#887766';
-        this.weaponOffset = 20;
-        break;
+          this.maxSpeed = 4;
+          this.acceleration = 0.2;
+          this.turnRate = 0.03;
+          this.friction = 0.96;
+          this.color = '#887766';
+          this.weaponOffset = 20;
+          break;
       case 'lkw':
-        this.maxSpeed = 3;
-        this.acceleration = 0.15;
-        this.turnRate = 0.03;
-        this.friction = 0.93;
-        this.color = '#666666';
-        this.weaponOffset = 30;
-        break;
+          this.maxSpeed = 3;
+          this.acceleration = 0.15;
+          this.turnRate = 0.02;
+          this.friction = 0.97;
+          this.color = '#666666';
+          this.weaponOffset = 30;
+          break;
       case 'schuetzenpanzer':
-        this.maxSpeed = 3;
-        this.acceleration = 0.15;
-        this.turnRate = 0.03;
-        this.friction = 0.93;
-        this.color = '#ff8800';
-        this.weaponOffset = 30;
-        break;
+          this.maxSpeed = 3;
+          this.acceleration = 0.15;
+          this.turnRate = 0.02;
+          this.friction = 0.97;
+          this.color = '#ff8800';
+          this.weaponOffset = 30;
+          break;
       default:
-        this.maxSpeed = 3;
-        this.acceleration = 0.15;
-        this.turnRate = 0.03;
-        this.friction = 0.93;
-        this.color = '#888888';
-        this.weaponOffset = 25;
+          this.maxSpeed = 3;
+          this.acceleration = 0.15;
+          this.turnRate = 0.03;
+          this.friction = 0.95;
+          this.color = '#888888';
+          this.weaponOffset = 25;
     }
   }
 
@@ -1267,57 +1267,85 @@ class Game {
       ctx.fillStyle = '#000';
       ctx.fillRect(10, -2, 20, 4);
     } else if (entity instanceof Vehicle) {
-      // Fahrzeugkörper zeichnen
-      ctx.fillStyle = entity.color;
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      switch (entity.type) {
-        case 'tank':
-          ctx.fillRect(-20, -15, 40, 30);
-          break;
-        case 'jeep':
-          ctx.fillRect(-15, -10, 30, 20);
-          break;
-        case 'lkw':
-          ctx.fillRect(-25, -15, 50, 30);
-          break;
-        case 'schuetzenpanzer':
-          ctx.fillRect(-20, -15, 40, 30);
-          break;
-        default:
-          ctx.fillRect(-20, -15, 40, 30);
-      }
-      ctx.stroke();
+        // Detaillierter Fahrzeugkörper zeichnen
+        ctx.fillStyle = entity.color;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        switch (entity.type) {
+            case 'tank':
+                // Ketten zeichnen
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-22, -18, 44, 6);
+                ctx.fillRect(-22, 12, 44, 6);
+                // Panzerkörper
+                ctx.fillStyle = entity.color;
+                ctx.fillRect(-20, -15, 40, 30);
+                break;
+            case 'jeep':
+                // Räder zeichnen
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-15, -12, 6, 6);
+                ctx.fillRect(9, -12, 6, 6);
+                ctx.fillRect(-15, 6, 6, 6);
+                ctx.fillRect(9, 6, 6, 6);
+                // Karosserie
+                ctx.fillStyle = entity.color;
+                ctx.fillRect(-15, -10, 30, 20);
+                break;
+            case 'lkw':
+                // Räder zeichnen
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-25, -12, 6, 6);
+                ctx.fillRect(19, -12, 6, 6);
+                ctx.fillRect(-25, 6, 6, 6);
+                ctx.fillRect(19, 6, 6, 6);
+                // Anhänger
+                ctx.fillStyle = entity.color;
+                ctx.fillRect(-25, -15, 50, 30);
+                break;
+            case 'schuetzenpanzer':
+                // Ketten zeichnen
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-22, -18, 44, 6);
+                ctx.fillRect(-22, 12, 44, 6);
+                // Fahrzeugkörper
+                ctx.fillStyle = entity.color;
+                ctx.fillRect(-20, -15, 40, 30);
+                break;
+            default:
+                ctx.fillRect(-20, -15, 40, 30);
+        }
+        ctx.stroke();
 
-      // Turm zeichnen
-      ctx.save();
-      ctx.rotate(entity.turretAngle);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, -5, entity.weapon === 'Maschinengewehr' ? entity.weaponOffset * 1.5 : entity.weaponOffset, 10);
-      ctx.restore();
+        // Turm zeichnen
+        ctx.save();
+        ctx.rotate(entity.turretAngle);
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, -5, entity.weapon === 'Maschinengewehr' ? entity.weaponOffset * 1.5 : entity.weaponOffset, 10);
+        ctx.restore();
     }
 
     // Lebensbalken zeichnen
     if (entity instanceof Human || entity instanceof Vehicle) {
-      const maxBarWidth = 30;
-      const barHeight = 4;
-      const maxHealth = entity instanceof Vehicle ? 200 : 100;
-      const healthRatio = entity.health / maxHealth;
-      ctx.fillStyle = '#555';
-      ctx.fillRect(-15, -25, maxBarWidth, barHeight);
-      ctx.fillStyle = '#0f0';
-      ctx.fillRect(-15, -25, maxBarWidth * healthRatio, barHeight);
+        const maxBarWidth = 30;
+        const barHeight = 4;
+        const maxHealth = entity instanceof Vehicle ? 200 : 100;
+        const healthRatio = entity.health / maxHealth;
+        ctx.fillStyle = '#555';
+        ctx.fillRect(-15, -25, maxBarWidth, barHeight);
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(-15, -25, maxBarWidth * healthRatio, barHeight);
     }
 
     // Debug-Informationen
     if (this.debugMode && entity instanceof Human) {
-      ctx.fillStyle = 'yellow';
-      ctx.font = '12px Arial';
-      ctx.fillText(entity.state, -10, -35);
+        ctx.fillStyle = 'yellow';
+        ctx.font = '12px Arial';
+        ctx.fillText(entity.state, -10, -35);
     }
 
     ctx.restore();
-  }
+}
 
   drawMinimap(ctx, player) {
     ctx.clearRect(0, 0, 150, 150);
@@ -1486,9 +1514,9 @@ class Game {
 
     // Minikarte zeichnen
     if (playerIndex === 0) {
-      this.drawMinimap(this.minimapCtx1, player);
+        this.drawMinimap(this.minimapCtx1, player);
     } else {
-      this.drawMinimap(this.minimapCtx2, player);
+        this.drawMinimap(this.minimapCtx2, player);
     }
 
     // Wave Anzeige aktualisieren
