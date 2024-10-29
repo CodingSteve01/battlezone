@@ -216,11 +216,15 @@ const SCREEN_WIDTH = window.innerWidth / 2;
 const SCREEN_HEIGHT = window.innerHeight;
 
 // Hilfsfunktion für Kollisionserkennung
-function isColliding(entity, map) {
+function isColliding(entity, map, vehicles = []) {
   const tileX = Math.floor(entity.x / TILE_SIZE);
   const tileY = Math.floor(entity.y / TILE_SIZE);
   if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
-  return map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5 && map[tileY][tileX] !== 1;
+  if (map[tileY][tileX] !== 0 && map[tileY][tileX] !== 4 && map[tileY][tileX] !== 5) return true;
+  for (let vehicle of vehicles) {
+    if (distance(entity, vehicle) < 30) return true;
+  }
+  return false;
 }
 
 // Zusätzliche Hilfsfunktion für Fahrzeugkollisionen
@@ -320,14 +324,14 @@ class Entity {
     this.turnSpeed = 0;
   }
 
-  move(map) {
+  move(map, vehicles = []) {
     const newAngle = this.angle + this.turnSpeed;
     const newX = this.x + Math.cos(newAngle) * this.speed;
     const newY = this.y + Math.sin(newAngle) * this.speed;
 
     // Temporäre Position für Kollisionserkennung
     const tempEntity = { x: newX, y: newY };
-    if (!isColliding(tempEntity, map)) {
+    if (!isColliding(tempEntity, map, vehicles)) {
       this.angle = newAngle;
       this.x = newX;
       this.y = newY;
@@ -346,6 +350,7 @@ class Human extends Entity {
     this.health = 100;
     this.ammo = 30;
     this.weapon = 'Pistole';
+    this.weapons = ['Pistole'];
     this.maxSpeed = 3;
     this.vehicle = null;
     this.role = null;
@@ -371,18 +376,18 @@ class Human extends Entity {
       if (this.isAI) {
         this.updateAI(map, soundManager, game);
       } else {
-        this.updateHumanControls(controls, map);
+        this.updateHumanControls(controls, map, game);
       }
     }
   }
 
-  updateHumanControls(controls, map) {
+  updateHumanControls(controls, map, game) {
     if (controls.forward) this.speed = Math.min(this.maxSpeed, this.speed + 0.2);
     if (controls.backward) this.speed = Math.max(-this.maxSpeed / 2, this.speed - 0.2);
     if (!controls.forward && !controls.backward) this.speed *= 0.9;
     if (controls.left) this.angle -= 0.05;
     if (controls.right) this.angle += 0.05;
-    this.move(map);
+    this.move(map, game.vehicles);
   }
 
   updateVehicleControls(controls, map, game) {
@@ -393,10 +398,10 @@ class Human extends Entity {
     if (controls.left) v.turnSpeed = -v.turnRate;
     if (controls.right) v.turnSpeed = v.turnRate;
     if (!controls.left && !controls.right) v.turnSpeed = 0;
-    v.move(map);
+    v.move(map, game.vehicles);
 
     // Fahrzeugkollisionen überprüfen
-    if (isVehicleColliding(v, v.game.vehicles)) {
+    if (isVehicleColliding(v, game.vehicles)) {
       // Rückgängig machen der letzten Bewegung bei Kollision
       v.x -= Math.cos(v.angle) * v.speed;
       v.y -= Math.sin(v.angle) * v.speed;
@@ -418,7 +423,7 @@ class Human extends Entity {
   updateAI(map, soundManager, game) {
     switch (this.state) {
       case 'patrol':
-        this.patrol(map);
+        this.patrol(map, game);
         this.lookForTargets(game);
         break;
       case 'engage':
@@ -431,7 +436,7 @@ class Human extends Entity {
         this.investigate(game);
         break;
       default:
-        this.patrol(map);
+        this.patrol(map, game);
     }
 
     // Fluchtverhalten bei niedriger Gesundheit
@@ -440,7 +445,7 @@ class Human extends Entity {
     }
   }
 
-  patrol(map) {
+  patrol(map, game) {
     if (this.patrolPoints.length === 0) {
       // Definiere zufällige Patrouillenpunkte
       for (let i = 0; i < 3; i++) {
@@ -460,7 +465,7 @@ class Human extends Entity {
     } else {
       this.angle = angleToTarget;
       this.speed = this.maxSpeed * 0.5;
-      this.move(map);
+      this.move(map, game.vehicles);
     }
   }
 
@@ -514,7 +519,7 @@ class Human extends Entity {
     // Fluchtlogik
     this.speed = this.maxSpeed * 0.7;
     this.angle += Math.PI; // In entgegengesetzte Richtung laufen
-    this.move(game.map);
+    this.move(game.map, game.vehicles);
     if (this.health > 50) {
       this.state = 'patrol';
     }
@@ -586,9 +591,9 @@ class Vehicle extends Entity {
     }
   }
 
-  update(map) {
+  update(map, vehicles) {
     if (this.driver) {
-      this.move(map);
+      this.move(map, vehicles);
       // Position der Insassen aktualisieren
       if (this.driver) {
         this.driver.x = this.x;
@@ -659,21 +664,16 @@ class Game {
     this.generateEnemies();
     this.assignEnemyRoles();
 
-    // Set initial positions based on mode
-    if (this.mode === 'Cooperative') {
-      this.players[1].x = this.players[0].x;
-      this.players[1].y = this.players[0].y;
-    } else {
-      this.players[1].x = MAP_SIZE * TILE_SIZE - 100;
-      this.players[1].y = MAP_SIZE * TILE_SIZE - 100;
-    }
-
-    // Sicherstellen, dass Spieler nicht auf Hindernissen spawnen
+    // Spielerpositionen festlegen
     this.players.forEach((player) => {
-      while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
+      do {
         player.x = Math.random() * MAP_SIZE * TILE_SIZE;
         player.y = Math.random() * MAP_SIZE * TILE_SIZE;
-      }
+      } while (
+        isColliding(player, this.map, this.vehicles) ||
+        this.isPlayerOverlapping(player) ||
+        this.isNearEnemies(player)
+      );
     });
 
     // Update Wave Anzeige
@@ -683,106 +683,35 @@ class Game {
   resetGame() {
     this.gameOver = false;
     document.getElementById('gameOverScreen').classList.add('hidden');
-    this.map = this.generateLogicalMap();
-    this.players.forEach((player, index) => {
-      player.health = 100;
-      player.ammo = 30;
-      player.weapon = 'Pistole';
-      player.vehicle = null;
-      player.role = null;
-      player.canShoot = true;
-      if (this.mode === 'Cooperative') {
-        player.x = 100;
-        player.y = 100;
-      } else {
-        player.x = index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100;
-        player.y = index === 0 ? 100 : MAP_SIZE * TILE_SIZE - 100;
-      }
-      while (isColliding(player, this.map) || this.isPlayerOverlapping(player)) {
-        player.x = Math.random() * MAP_SIZE * TILE_SIZE;
-        player.y = Math.random() * MAP_SIZE * TILE_SIZE;
-      }
-      document.getElementById(`health${index + 1}`).textContent = player.health;
-      document.getElementById(`ammo${index + 1}`).textContent = player.ammo;
-      document.getElementById(`weapon${index + 1}`).textContent = player.weapon;
-      document.getElementById(`vehicle${index + 1}`).textContent = 'None';
-      document.getElementById(`posX${index + 1}`).textContent = Math.round(player.x);
-      document.getElementById(`posY${index + 1}`).textContent = Math.round(player.y);
-    });
-    this.vehicles = this.generateVehicles();
-    this.vehicles.forEach((v) => (v.game = this));
-    this.bullets = [];
-    this.powerUps = this.generatePowerUps();
-    this.kis = [];
-    this.generateEnemies();
-    this.assignEnemyRoles();
-    this.wave = 1;
-    this.updateWaveDisplay();
+    this.initGame();
+    this.gameLoopRunning = false;
+    this.gameLoop();
   }
 
   isPlayerOverlapping(newPlayer) {
     return this.players.some((player) => distance(player, newPlayer) < 50 && player !== newPlayer);
   }
 
+  isNearEnemies(player) {
+    return this.kis.some((ki) => distance(player, ki) < 200);
+  }
+
   generateLogicalMap() {
     const map = [];
-    // Initialisiere mit Gras (0)
     for (let y = 0; y < MAP_SIZE; y++) {
       const row = [];
       for (let x = 0; x < MAP_SIZE; x++) {
-        row.push(0);
+        let cellType = 0; // Standard ist Gras
+        const rand = Math.random();
+        if (rand < 0.05) cellType = 1; // Gebäude
+        else if (rand < 0.1) cellType = 2; // Bäume
+        else if (rand < 0.12) cellType = 3; // Hindernisse
+        else if (rand < 0.15) cellType = 5; // Wasser
+        else if (rand < 0.2) cellType = 4; // Straße
+        row.push(cellType);
       }
       map.push(row);
     }
-
-    // Generiere Straßen (Straßen sind Straßen-Tiles: 4)
-    // Horizontale Straßen
-    for (let y = 20; y < 80; y += 10) {
-      for (let x = 10; x < 90; x++) {
-        map[y][x] = 4;
-      }
-    }
-
-    // Vertikale Straßen
-    for (let x = 20; x < 80; x += 10) {
-      for (let y = 10; y < 90; y++) {
-        map[y][x] = 4;
-      }
-    }
-
-    // Platzieren von Gebäuden (1 = Gebäude)
-    for (let y = 15; y < 85; y += 10) {
-      for (let x = 15; x < 85; x += 10) {
-        if (map[y][x] !== 4 && map[y][x] !== 5) {
-          const hasBuilding = Math.random() < 0.6; // 60% Wahrscheinlichkeit für ein Gebäude
-          if (hasBuilding) {
-            for (let dy = y; dy < y + 5; dy++) {
-              for (let dx = x; dx < x + 5; dx++) {
-                if (dx < MAP_SIZE && dy < MAP_SIZE) map[dy][dx] = 1;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Wasser hinzufügen (5 = Wasser)
-    for (let y = 40; y < 60; y++) {
-      for (let x = 40; x < 60; x++) {
-        map[y][x] = 5;
-      }
-    }
-
-    // Hindernisse (Bäume und Felsen)
-    for (let y = 0; y < MAP_SIZE; y++) {
-      for (let x = 0; x < MAP_SIZE; x++) {
-        if (map[y][x] === 0) {
-          if (Math.random() < 0.02) map[y][x] = 2; // Bäume
-          else if (Math.random() < 0.02) map[y][x] = 3; // Hindernisse
-        }
-      }
-    }
-
     return map;
   }
 
@@ -810,7 +739,7 @@ class Game {
     const tileX = Math.floor(x / TILE_SIZE);
     const tileY = Math.floor(y / TILE_SIZE);
     if (tileX < 0 || tileX >= MAP_SIZE || tileY < 0 || tileY >= MAP_SIZE) return true;
-    return this.map[tileY][tileX] === 4 || this.map[tileY][tileX] === 5 || this.map[tileY][tileX] === 1;
+    return this.map[tileY][tileX] === 5 || this.map[tileY][tileX] === 1;
   }
 
   isVehicleOverlapping(x, y, vehiclesList) {
@@ -825,11 +754,17 @@ class Game {
         x = Math.random() * MAP_SIZE * TILE_SIZE;
         y = Math.random() * MAP_SIZE * TILE_SIZE;
         const rand = Math.random();
-        if (rand < 0.4) type = 'health';
-        else if (rand < 0.8) type = 'ammo';
-        else type = 'speed';
+        if (rand < 0.3) type = 'health';
+        else if (rand < 0.6) type = 'ammo';
+        else if (rand < 0.8) type = 'speed';
+        else type = 'weapon';
+        let weaponType = null;
+        if (type === 'weapon') {
+          const weapons = ['Maschinengewehr', 'Schrotflinte'];
+          weaponType = weapons[Math.floor(Math.random() * weapons.length)];
+        }
       } while (isColliding({ x, y }, this.map) || this.isPowerUpOverlapping(x, y, powerUps));
-      powerUps.push({ x, y, type });
+      powerUps.push({ x, y, type, weapon: weaponType });
     }
     return powerUps;
   }
@@ -841,59 +776,20 @@ class Game {
   generateEnemies() {
     // Gegner logisch auf der Karte verteilen
     this.kis = [];
-    // Gegner um Fahrzeuge platzieren
-    this.vehicles.forEach((vehicle) => {
-      for (let i = 0; i < 2; i++) {
-        const angle = Math.random() * 2 * Math.PI;
-        const dist = TILE_SIZE * 2;
-        const x = vehicle.x + Math.cos(angle) * dist;
-        const y = vehicle.y + Math.sin(angle) * dist;
-        if (!isColliding({ x, y }, this.map)) {
+    // Gegner zufällig platzieren
+    for (let i = 0; i < this.maxKis; i++) {
+      let x, y;
+      do {
+        x = Math.random() * MAP_SIZE * TILE_SIZE;
+        y = Math.random() * MAP_SIZE * TILE_SIZE;
+      } while (isColliding({ x, y }, this.map) || this.isNearPlayers({ x, y }));
           const ki = new Human(x, y, '#FFD700', true);
-          ki.squad = vehicle;
           this.kis.push(ki);
         }
       }
-    });
 
-    // Gegner um Gebäude platzieren
-    for (let y = 15; y < 85; y += 10) {
-      for (let x = 15; x < 85; x += 10) {
-        if (this.map[y][x] === 1) {
-          for (let i = 0; i < 3; i++) {
-            const angle = Math.random() * 2 * Math.PI;
-            const dist = TILE_SIZE * 2;
-            const posX = x * TILE_SIZE + Math.cos(angle) * dist;
-            const posY = y * TILE_SIZE + Math.sin(angle) * dist;
-            if (!isColliding({ x: posX, y: posY }, this.map)) {
-              const ki = new Human(posX, posY, '#FFD700', true);
-              ki.squad = { x: x * TILE_SIZE, y: y * TILE_SIZE };
-              this.kis.push(ki);
-            }
-          }
-        }
-      }
-    }
-
-    // Gegner auf Straßen patrouillieren
-    for (let y = 20; y < 80; y += 10) {
-      for (let x = 20; x < 80; x += 10) {
-        if (this.map[y][x] === 4) {
-          for (let i = 0; i < 2; i++) {
-            const posX = x * TILE_SIZE + Math.random() * TILE_SIZE;
-            const posY = y * TILE_SIZE + Math.random() * TILE_SIZE;
-            if (!isColliding({ x: posX, y: posY }, this.map)) {
-              const ki = new Human(posX, posY, '#FFD700', true);
-              ki.squad = { x: posX, y: posY };
-              this.kis.push(ki);
-            }
-          }
-        }
-      }
-    }
-
-    // Limit der Gesamtzahl der Gegner zur Performance-Optimierung
-    this.kis = this.kis.slice(0, this.maxKis);
+  isNearPlayers(entity) {
+    return this.players.some((player) => distance(player, entity) < 200);
   }
 
   assignEnemyRoles() {
@@ -938,6 +834,7 @@ class Game {
         action: 'Enter',
         switch: 'ShiftRight',
         debug: 'KeyP',
+        changeWeapon: 'KeyQ',
       },
       {
         forward: 'KeyW',
@@ -948,6 +845,7 @@ class Game {
         action: 'KeyE',
         switch: 'KeyG',
         debug: 'KeyO',
+        changeWeapon: 'KeyR',
       },
     ];
 
@@ -970,6 +868,8 @@ class Game {
           'KeyG',
           'KeyP',
           'KeyO',
+          'KeyQ',
+          'KeyR',
         ].includes(e.code)
       ) {
         e.preventDefault();
@@ -996,6 +896,8 @@ class Game {
           'KeyG',
           'KeyP',
           'KeyO',
+          'KeyQ',
+          'KeyR',
         ].includes(e.code)
       ) {
         e.preventDefault();
@@ -1015,6 +917,7 @@ class Game {
       action: this.keys[keys.action],
       switch: this.keys[keys.switch],
       debug: this.keys[keys.debug],
+      changeWeapon: this.keys[keys.changeWeapon],
     };
   }
 
@@ -1078,6 +981,14 @@ class Game {
       this.debugMode = !this.debugMode;
       document.getElementById('debugInfo').style.display = this.debugMode ? 'block' : 'none';
       this.keys[this.controls[index].debug] = false;
+    }
+
+    // Waffen wechseln
+    if (controls.changeWeapon) {
+      const currentIndex = player.weapons.indexOf(player.weapon);
+      player.weapon = player.weapons[(currentIndex + 1) % player.weapons.length];
+      document.getElementById(`weapon${index + 1}`).textContent = player.weapon;
+      this.keys[this.controls[index].changeWeapon] = false;
     }
 
     // Fahrzeuginteraktion
@@ -1233,14 +1144,26 @@ class Game {
       this.players.forEach((player, index) => {
         if (player.vehicle && player.vehicle.driver === player) {
           const vehicle = player.vehicle;
+          // Gegner überfahren
           this.kis.forEach((ki, kiIndex) => {
             if (distance(vehicle, ki) < 30) {
-              ki.health -= 20; // Schaden beim Überfahren
+              ki.health -= 50; // Schaden beim Überfahren
               if (ki.health <= 0) {
                 this.kis.splice(kiIndex, 1);
                 this.createExplosion(ki.x, ki.y);
                 this.soundManager.play('explosion');
                 this.achievements.kills++;
+              }
+            }
+          });
+          // Andere Spieler überfahren
+          this.players.forEach((otherPlayer, otherIndex) => {
+            if (otherIndex !== index && distance(vehicle, otherPlayer) < 30) {
+              otherPlayer.health -= 50; // Schaden beim Überfahren
+              if (otherPlayer.health <= 0) {
+                this.createExplosion(otherPlayer.x, otherPlayer.y);
+                this.soundManager.play('explosion');
+                this.respawnPlayer(otherIndex);
               }
             }
           });
@@ -1255,6 +1178,7 @@ class Game {
     ctx.rotate(entity.angle);
 
     if (entity instanceof Human && !entity.vehicle) {
+      ctx.scale(0.7, 0.7); // Verkleinern Sie die Spielerfigur
       // Mensch zeichnen
       ctx.fillStyle = entity.color;
       ctx.strokeStyle = '#000';
@@ -1267,6 +1191,7 @@ class Game {
       ctx.fillStyle = '#000';
       ctx.fillRect(10, -2, 20, 4);
     } else if (entity instanceof Vehicle) {
+      ctx.scale(1.2, 1.2); // Vergrößern Sie das Fahrzeug
       // Fahrzeugkörper zeichnen
       ctx.fillStyle = entity.color;
       ctx.strokeStyle = '#000';
