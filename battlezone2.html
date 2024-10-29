@@ -763,8 +763,8 @@ class Game {
           const weapons = ['Maschinengewehr', 'Schrotflinte'];
           weaponType = weapons[Math.floor(Math.random() * weapons.length)];
         }
+        powerUps.push({ x, y, type, weapon: weaponType });
       } while (isColliding({ x, y }, this.map) || this.isPowerUpOverlapping(x, y, powerUps));
-      powerUps.push({ x, y, type, weapon: weaponType });
     }
     return powerUps;
   }
