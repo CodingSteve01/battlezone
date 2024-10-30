@@ -908,6 +908,7 @@
 			return tiles;
 		}
 	}
+
 	class Mission {
 		constructor(type, x, y) {
 			this.type = type;
@@ -967,7 +968,7 @@
 					this.description = 'Lokalisiere und zerstöre das feindliche Lager';
 					if (!this.target) {
 						// Lager erstellen
-                        const camp = new Structure(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, 'Camp');
+						const camp = new Structure(x * TILE_SIZE + TILE_SIZE / 2, y * TILE_SIZE + TILE_SIZE / 2, 'Camp');
 						camp.enemies = [];
 						structures.push(camp);
 
@@ -1346,7 +1347,7 @@
 			super(x, y, 30, color);
 			this.controls = controls;
 			this.speed = 3;
-			this.inventory = []; // Begrenztes Inventar
+			this.inventory = new Map(); // Begrenztes Inventar
 			this.maxInventorySize = 4;
 			this.currentItemIndex = 0;
 			this.vehicle = null;
@@ -1355,10 +1356,56 @@
 			this.index = index;
 			this.isCrouching = false;
 			this.currentMission = null;
-			this.equipment = [];
+			this.equipment = new Set();
+			this.grenades = 0;
+			this.mines = 0;
 			this.autoAimTargets = [];
 			this.currentTargetIndex = 0;
 			this.spottedEnemies = new Set(); // Für die Minikarte
+
+			// Startausrüstung
+			this.addWeapon(WEAPONS.PISTOL);
+		}
+
+		addWeapon(weapon) {
+			if (this.inventory.size < this.maxInventorySize) {
+				// Prüfen ob Waffe bereits vorhanden
+				if ([...this.inventory.values()].some(w => w.name === weapon.name)) {
+					return false;
+				}
+				this.inventory.set(this.inventory.size, weapon);
+				return true;
+			}
+			return false;
+		}
+
+		useWeapon() {
+			const currentWeapon = this.inventory.get(this.currentItemIndex);
+			if (currentWeapon && currentWeapon.fire()) {
+				bullets.push(new Bullet(this.x, this.y, this.angle, this.color, this, currentWeapon));
+				return true;
+			}
+			return false;
+		}
+
+		addAmmo(weaponName, amount) {
+			for (const weapon of this.inventory.values()) {
+				if (weapon.name === weaponName) {
+					weapon.addAmmo(amount);
+					return true;
+				}
+			}
+			return false;
+		}
+
+		dropWeapon() {
+			const weapon = this.inventory.get(this.currentItemIndex);
+			if (weapon) {
+				this.inventory.delete(this.currentItemIndex);
+				powerUps.push(new PowerUp(this.x, this.y, 'weapon', weapon));
+				return true;
+			}
+			return false;
 		}
 
 		update() {
@@ -1408,7 +1455,7 @@
 			}
 
 			// Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
-			const currentWeapon = this.inventory[this.currentItemIndex];
+			const currentWeapon = this.inventory.get(this.currentItemIndex);
 			const weaponRange = currentWeapon ? currentWeapon.range : 100;
 			const screenBounds = {
 				left: this.x - canvas.width / 2,
@@ -1459,27 +1506,20 @@
 
 			// Gegenstand verwenden
 			if (keys[this.controls.useItem] && this.canUseItem) {
-				const currentItem = this.inventory[this.currentItemIndex];
-				if (currentItem) {
-					if (currentItem.type === 'Waffe') {
-						// Schießen
-						bullets.push(
-							new Bullet(this.x, this.y, this.angle, this.color, this, currentItem)
-						);
-						// Lärm erzeugen
-						this.makeNoise(currentItem.noise);
-					} else if (currentItem.type === 'Granate') {
-						grenades.push(new Grenade(this.x, this.y, this.angle, this));
-						this.inventory.splice(this.currentItemIndex, 1);
-					} else if (currentItem.type === 'Mine') {
-						mines.push(new Mine(this.x, this.y));
-						this.inventory.splice(this.currentItemIndex, 1);
-					}
-					this.canUseItem = false;
-					setTimeout(() => {
-						this.canUseItem = true;
-					}, currentItem.fireRate || 500);
+				if (this.useWeapon()) {
+					const currentWeapon = this.inventory.get(this.currentItemIndex);
+					this.makeNoise(currentWeapon.noise);
+				} else if (this.grenades > 0) {
+					grenades.push(new Grenade(this.x, this.y, this.angle, this));
+					this.grenades--;
+				} else if (this.mines > 0) {
+					mines.push(new Mine(this.x, this.y));
+					this.mines--;
 				}
+				this.canUseItem = false;
+				setTimeout(() => {
+					this.canUseItem = true;
+				}, currentWeapon?.fireRate || 500);
 			}
 
 			// Nahkampf (immer verfügbar)
@@ -1504,12 +1544,7 @@
 
 			// Gegenstand ablegen
 			if (keys[this.controls.dropItem]) {
-				const droppedItem = this.inventory.splice(this.currentItemIndex, 1)[0];
-				if (droppedItem) {
-					powerUps.push(new PowerUp(this.x, this.y, droppedItem.name));
-					// UI aktualisieren
-					keys[this.controls.dropItem] = false;
-				}
+				this.dropWeapon();
 			}
 
 			// Entering/Exiting Vehicles
@@ -1613,11 +1648,11 @@
 			}
 
 			// HUD aktualisieren
-			const currentItem = this.inventory[this.currentItemIndex];
+			const currentItem = this.inventory.get(this.currentItemIndex);
 			document.getElementById(`weapon${this.index + 1}`).textContent =
-				currentItem ? currentItem.name : 'Keine';
+				currentItem ? `${currentItem.name} (${currentItem.currentAmmo}/${currentItem.maxAmmo})` : 'Keine';
 			document.getElementById(`equipment${this.index + 1}`).textContent =
-				this.equipment.join(', ') || 'Keine';
+				[...this.equipment].join(', ') || 'Keine';
 			document.getElementById(`mission${this.index + 1}`).textContent =
 				this.currentMission ? this.currentMission.type : 'Keine';
 		}
@@ -1650,18 +1685,18 @@
 			ctx.fillRect(-15, -15, 30, 30);
 
 			// Ausrüstung anzeigen
-			if (this.equipment.includes('schutzweste')) {
+			if (this.equipment.has('schutzweste')) {
 				ctx.fillStyle = 'gray';
 				ctx.fillRect(-10, -10, 20, 20);
 			}
-			if (this.equipment.includes('tarnanzug')) {
+			if (this.equipment.has('tarnanzug')) {
 				ctx.strokeStyle = 'green';
 				ctx.strokeRect(-15, -15, 30, 30);
 			}
 
 			// Waffe
 			ctx.fillStyle = 'black';
-			const currentItem = this.inventory[this.currentItemIndex];
+			const currentItem = this.inventory.get(this.currentItemIndex);
 			if (currentItem) {
 				if (currentItem.name === 'Pistole' || currentItem.name === 'Pistole mit Schalldämpfer') {
 					ctx.fillRect(0, -5, 15, 5);
@@ -1773,11 +1808,20 @@
 			bullets.forEach(bullet => {
 				if (bullet.owner instanceof Player) {
 					const distToShot = Math.hypot(bullet.x - this.x, bullet.y - this.y);
-					const shotNoiseRange = bullet.owner.currentVehicle ? 800 : 600; // Erhöhte Reichweite
+					let shotNoiseRange = 600; // Basis-Reichweite
+
+					// Erhöhte Reichweite für Fahrzeug-Waffen
+					if (bullet.owner.currentVehicle) {
+						if (bullet.owner.currentVehicle.type === 'Panzer') {
+							shotNoiseRange = 2000; // Panzer sind SEHR laut
+						} else {
+							shotNoiseRange = 800; // Andere Fahrzeuge
+						}
+					}
 
 					if (distToShot < shotNoiseRange) {
 						// Gedämpfte Waffen machen weniger Lärm
-						const isSilenced = bullet.owner.inventory[bullet.owner.currentItemIndex]?.name.toLowerCase().includes('silenced');
+						const isSilenced = bullet.owner.inventory.get(bullet.owner.currentItemIndex)?.name.toLowerCase().includes('silenced');
 						if (!isSilenced || distToShot < shotNoiseRange / 3) {
 							// Verzögerung für die Reaktion einbauen
 							setTimeout(() => {
@@ -1786,22 +1830,23 @@
 									y: bullet.y,
 									time: Date.now()
 								};
+
+								// Nach verfügbarem Fahrzeug suchen
+								if (!this.currentVehicle) {
+									const nearbyVehicle = this.findNearbyVehicle();
+									if (nearbyVehicle) {
+										this.enterVehicle(nearbyVehicle);
+									}
+								}
+
 								this.alertness = 'alert'; // Direkt auf alert setzen
 								this.alertnessLevel = Math.min(this.alertnessLevel + 5, 10);
 								this.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
 
-								// Andere Gegner in der Nähe alarmieren
-								enemies.forEach(enemy => {
-									if (enemy !== this) {
-										const distToEnemy = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-										if (distToEnemy < shotNoiseRange * 1.5) {
-											enemy.alertness = 'alert';
-											enemy.alertnessLevel = Math.min(enemy.alertnessLevel + 4, 10);
-											enemy.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
-										}
-									}
-								});
-							}, 100); // 100ms Verzögerung für die Reaktion
+								// Andere Gegner alarmieren
+								this.alertAllNearbyEnemies(bullet, shotNoiseRange);
+
+							}, 250); // 250ms Verzögerung für die Reaktion
 						}
 					}
 				}
@@ -1870,8 +1915,11 @@
 		}
 
 		getRandomEquipment() {
+            const equipment = new Set();
 			const equipments = ['schutzweste', 'tarnanzug', ''];
-			return equipments[Math.floor(Math.random() * equipments.length)];
+			const selected = equipments[Math.floor(Math.random() * equipments.length)];
+			if (selected) equipment.add(selected);
+			return equipment;
 		}
 
 		update() {
@@ -1941,7 +1989,7 @@
 
 		checkForPlayers() {
 			players.forEach(player => {
-				if (!player.isAlive || player.equipment.includes('tarnanzug')) return;
+				if (!player.isAlive || player.equipment.has('tarnanzug')) return;
 
 				const inView = this.isInView(player);
 				const canHear = this.canHear(player);
@@ -2078,6 +2126,52 @@
 			// Fahrzeug-spezifische Aktionen
 			if (this.currentVehicle.type === 'Panzer') {
 				this.alertness = 'aggressive'; // Panzer sind aggressiver
+			}
+		}
+
+		// Neue Methode: Alarmierung aller Gegner in der Nähe
+		alertAllNearbyEnemies(bullet, range) {
+			enemies.forEach(enemy => {
+				if (enemy !== this) {
+					const distToEnemy = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+					if (distToEnemy < range * 1.5) {
+						enemy.alertness = 'alert';
+						enemy.alertnessLevel = Math.min(enemy.alertnessLevel + 4, 10);
+						enemy.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
+
+						// Auch andere Gegner sollen Fahrzeuge suchen
+						if (!enemy.currentVehicle) {
+							const nearbyVehicle = enemy.findNearbyVehicle();
+							if (nearbyVehicle) {
+								enemy.enterVehicle(nearbyVehicle);
+							}
+						}
+					}
+				}
+			});
+		}
+
+		// Neue Methode: Nächstgelegenes verfügbares Fahrzeug finden
+		findNearbyVehicle() {
+			const searchRadius = 300;
+			return vehicles.find(vehicle =>
+				!vehicle.isDestroyed &&
+				vehicle.passengers.length < 2 &&
+				Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < searchRadius
+			);
+		}
+
+		// Neue Methode: In Fahrzeug einsteigen
+		enterVehicle(vehicle) {
+			if (vehicle && !vehicle.isDestroyed && vehicle.passengers.length < 2) {
+				vehicle.addPassenger(this);
+				this.currentVehicle = vehicle;
+				// Wenn erster Passagier, dann als Fahrer
+				if (vehicle.passengers.length === 1) {
+					vehicle.roleAssignment[this.id] = 'driver';
+				} else {
+					vehicle.roleAssignment[this.id] = 'gunner';
+				}
 			}
 		}
 
@@ -2245,7 +2339,7 @@
 		}
 
 		canSee(player) {
-			if (!player.isAlive || player.equipment.includes('tarnanzug')) return false;
+			if (!player.isAlive || player.equipment.has('tarnanzug')) return false;
 			const dx = player.x - this.x;
 			const dy = player.y - this.y;
 			const dist = Math.hypot(dx, dy);
@@ -2414,11 +2508,11 @@
 			ctx.fillRect(-15, -15, 30, 30);
 
 			// Ausrüstung anzeigen
-			if (this.equipment.includes('schutzweste')) {
+			if (this.equipment.has('schutzweste')) {
 				ctx.fillStyle = 'gray';
 				ctx.fillRect(-10, -10, 20, 20);
 			}
-			if (this.equipment.includes('tarnanzug')) {
+			if (this.equipment.has('tarnanzug')) {
 				ctx.strokeStyle = 'green';
 				ctx.strokeRect(-15, -15, 30, 30);
 			}
@@ -2875,7 +2969,7 @@
 
 			// Fahrzeugbewegung - nur wenn ein Fahrer da ist
 			const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
-			if (driver) {
+			if (driver && driver.controls) {
 				if (keys[driver.controls.up]) this.speed = this.maxSpeed;
 				if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
 				if (keys[driver.controls.left]) this.angle -= 0.05;
@@ -2932,7 +3026,7 @@
 			}
 
 			// Kollision mit Feinden - nur ab bestimmter geschwindigkeit überfahren
-            if (this.speed > 2) {
+			if (this.speed > 2) {
 				enemies.forEach(enemy => {
 					if (
 						enemy.isAlive &&
@@ -3007,6 +3101,177 @@
 		}
 	}
 
+	// Waffendefinitionen
+	class Weapon {
+		constructor(config) {
+			this.name = config.name;
+			this.damage = config.damage;
+			this.range = config.range;
+			this.noise = config.noise;
+			this.fireRate = config.fireRate;
+			this.maxAmmo = config.maxAmmo;
+			this.currentAmmo = config.maxAmmo;
+			this.type = config.type || 'primary';
+			this.isRare = config.isRare || false;
+		}
+
+		canFire() {
+			return this.currentAmmo > 0;
+		}
+
+		fire() {
+			if (this.canFire()) {
+				this.currentAmmo--;
+				return true;
+			}
+			return false;
+		}
+
+		addAmmo(amount) {
+			this.currentAmmo = Math.min(this.currentAmmo + amount, this.maxAmmo);
+		}
+	}
+
+	// Waffenkonfigurationen
+	const WEAPONS = {
+		PISTOL: new Weapon({
+			name: 'Pistole',
+			damage: 25,
+			range: 400,  // Erhöht von 200
+			noise: 150,
+			fireRate: 500,
+			maxAmmo: 12,
+			type: 'secondary'
+		}),
+
+		SILENCED_PISTOL: new Weapon({
+			name: 'Schallgedämpfte Pistole',
+			damage: 20,
+			range: 350,  // Erhöht von 150
+			noise: 50,
+			fireRate: 500,
+			maxAmmo: 12,
+			type: 'secondary',
+			isRare: true
+		}),
+
+		ASSAULT_RIFLE: new Weapon({
+			name: 'Sturmgewehr',
+			damage: 30,
+			range: 600,  // Erhöht von 300
+			noise: 200,
+			fireRate: 150,
+			maxAmmo: 30,
+			isRare: true
+		}),
+
+		SHOTGUN: new Weapon({
+			name: 'Schrotflinte',
+			damage: 80,
+			range: 200,  // Erhöht von 100
+			noise: 250,
+			fireRate: 800,
+			maxAmmo: 6,
+			isRare: true
+		})
+	};
+
+	// Überarbeitetes PowerUp-Spawning System
+	class PowerUpManager {
+		constructor() {
+			this.spawnConfig = {
+				screenSize: {
+					width: 1920, // Fester Wert statt window.innerWidth
+					height: 1080 // Fester Wert statt window.innerHeight
+				},
+				spawnRates: {
+					medipack: 0.5,  // Pro Bildschirmausschnitt
+					ammo: 0.5,      // Pro Bildschirmausschnitt
+					weapon: 0.1,    // Sehr selten
+					granate: 0.2,
+					mine: 0.2,
+					schutzweste: 0.15,
+					tarnanzug: 0.15
+				},
+				maxCounts: {
+					weapon: 5,      // Maximal auf der ganzen Karte
+					panzer: 1,      // Nur ein Panzer pro Karte
+					jeep: 4,        // Begrenzte Anzahl Jeeps
+					medipack: 15,   // Vernünftige Obergrenze für Medikits
+					schutzweste: 8,
+					tarnanzug: 8
+				}
+			};
+			this.powerUps = [];
+		}
+
+		trySpawnNearPlayer(player, type) {
+			const distance = Math.random() * 300; // Fester Radius von 300
+			const angle = Math.random() * Math.PI * 2;
+			const x = player.x + Math.cos(angle) * distance;
+			const y = player.y + Math.sin(angle) * distance;
+
+			if (!isColliding(x, y)) {
+				this.powerUps.push(new PowerUp(x, y, type));
+			}
+		}
+
+		calculateSpawnCount(type, mapArea) {
+			const screenArea = this.spawnConfig.screenSize.width * this.spawnConfig.screenSize.height;
+			const screensInMap = mapArea / screenArea;
+			// Math.ceil statt Math.ceiling
+			return Math.ceil(screensInMap * this.spawnConfig.spawnRates[type]);
+		}
+
+		spawnPowerUps(mapWidth, mapHeight) {
+			// Wichtig: Kartenbreite und -höhe mit TILE_SIZE multiplizieren
+			const mapArea = (mapWidth * TILE_SIZE) * (mapHeight * TILE_SIZE);
+			const types = Object.keys(this.spawnConfig.spawnRates);
+			console.log('Spawning power-ups for map area:', mapArea);
+
+			types.forEach(type => {
+				const count = Math.min(
+					this.calculateSpawnCount(type, mapArea),
+					this.spawnConfig.maxCounts[type] || Infinity
+				);
+				console.log(`Spawning ${count} ${type} power-ups`);
+
+				for (let i = 0; i < count; i++) {
+					this.spawnSinglePowerUp(type, mapWidth * TILE_SIZE, mapHeight * TILE_SIZE);
+				}
+			});
+		}
+
+		spawnSinglePowerUp(type, mapWidth, mapHeight) {
+			let x, y;
+			let attempts = 0;
+			const maxAttempts = 50;
+
+			do {
+				x = Math.random() * mapWidth;
+				y = Math.random() * mapHeight;
+				attempts++;
+			} while (isColliding(x, y) && attempts < maxAttempts);
+
+			if (attempts < maxAttempts) {
+				if (type === 'weapon') {
+					const rareWeapons = [WEAPONS.ASSAULT_RIFLE, WEAPONS.SHOTGUN, WEAPONS.SILENCED_PISTOL];
+					const weapon = rareWeapons[Math.floor(Math.random() * rareWeapons.length)];
+					const powerUp = new PowerUp(x, y, type);
+					powerUp.weapon = weapon;
+					powerUps.push(powerUp);
+				} else {
+					powerUps.push(new PowerUp(x, y, type));
+				}
+			}
+		}
+
+		update() {
+			// PowerUps aktualisieren und ggf. entfernen
+			powerUps = powerUps.filter(pu => !pu.collected);
+		}
+	}
+
 	class PowerUp extends GameObject {
 		constructor(x, y, type) {
 			super(x, y, 20, 'yellow');
@@ -3014,38 +3279,41 @@
 		}
 
 		applyEffect(player) {
-			if (this.type === 'geheimdaten') {
-				// Complete the mission
-				const mission = missions.find(m => m.type === 'Sammle Geheimdaten' && m.active);
-				if (mission) {
-					mission.active = false;
-					player.currentMission = null;
-				}
-				return;
-			}
-			if (player.inventory.length >= player.maxInventorySize) {
-				// Inventar voll
-				return;
-			}
-			if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole (silenced)'].includes(this.type)) {
-				player.inventory.push({
-					name: this.type.charAt(0).toUpperCase() + this.type.slice(1),
-					type: 'Waffe',
-					damage: 100,
-					range: 300,
-					noise: 200
-				});
-			} else if (this.type === 'granate') {
-				player.inventory.push({name: 'Granate', type: 'Granate'});
-			} else if (this.type === 'mine') {
-				player.inventory.push({name: 'Mine', type: 'Mine'});
-			} else if (this.type === 'schutzweste' || this.type === 'tarnanzug') {
-				if (!player.equipment.includes(this.type)) {
-					player.equipment.push(this.type);
-				}
-			} else if (this.type === 'medipack') {
-				// Medi-Pack: Gesundheit wiederherstellen
-				player.health = Math.min(player.health + 50, 100); // Stelle sicher, dass Gesundheit 100 nicht überschreitet
+			switch (this.type) {
+				case 'weapon':
+					if (this.weapon && player.addWeapon(this.weapon)) {
+						this.collected = true;
+					}
+					break;
+				case 'ammo':
+					for (let weapon of player.inventory.values()) {
+						if (player.addAmmo(weapon.name, weapon.maxAmmo / 2)) {
+							this.collected = true;
+							break;
+						}
+					}
+					break;
+				case 'medipack':
+					if (player.health < 100) {
+						player.health = Math.min(player.health + 50, 100);
+						this.collected = true;
+					}
+					break;
+				case 'granate':
+					player.grenades++;
+					this.collected = true;
+					break;
+				case 'mine':
+					player.mines++;
+					this.collected = true;
+					break;
+				case 'schutzweste':
+				case 'tarnanzug':
+					if (!player.equipment.has(this.type)) {
+						player.equipment.add(this.type);
+						this.collected = true;
+					}
+					break;
 			}
 		}
 
@@ -3214,6 +3482,7 @@
 	let mines = [];
 	let vehicles = [];
 	let powerUps = [];
+	const powerUpManager = new PowerUpManager();
 	let structures = [];
 	let allies = [];
 
@@ -3224,7 +3493,7 @@
 		generateMissions();
 		spawnEnemies();
 		spawnVehicles();
-		spawnPowerUps();
+		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
 
 		// Spawn players at safe positions near each other
 		players = [];
@@ -3285,7 +3554,7 @@
 
 		// Standardausrüstung für Spieler
 		players.forEach(player => {
-			player.inventory.push({name: 'Pistole', type: 'Waffe', damage: 100, range: 300, noise: 200});
+			player.addWeapon(WEAPONS.PISTOL);
 		});
 
 		// Spielerfarben im HUD anzeigen
@@ -3340,68 +3609,53 @@
 		});
 	}
 
-	// Fahrzeuge platzieren
+	// Überarbeitetes Fahrzeug-Spawning
 	function spawnVehicles() {
 		vehicles = [];
-
-		// Fahrzeuge auf Straßen und in Dörfern platzieren
-		const roadTiles = MapGenerator.findTilesByType(map, TILE_TYPES.ROAD);
 		const villageTiles = MapGenerator.findTilesByType(map, TILE_TYPES.VILLAGE_CENTER);
+		const roadTiles = MapGenerator.findTilesByType(map, TILE_TYPES.ROAD);
 
-		// Militärfahrzeuge hauptsächlich auf Straßen
-		roadTiles.forEach(tile => {
-			if (Math.random() < 0.05) { // 5% Chance pro Straßenkachel
-				const type = Math.random() < 0.7 ? 'Jeep' : 'Panzer';
+		// Ein Panzer an strategischer Position
+		const panzerSpawnTile = roadTiles[Math.floor(Math.random() * roadTiles.length)];
+		if (panzerSpawnTile) {
+			vehicles.push(new Vehicle(
+				panzerSpawnTile.x * TILE_SIZE + TILE_SIZE / 2,
+				panzerSpawnTile.y * TILE_SIZE + TILE_SIZE / 2,
+				'Panzer'
+			));
+		}
+
+		// Jeeps auf wichtigen Straßenpositionen
+		const jeepCount = Math.min(4, Math.floor(roadTiles.length / 20));
+		for (let i = 0; i < jeepCount; i++) {
+			const tile = roadTiles[Math.floor(Math.random() * roadTiles.length)];
+			if (tile) {
 				vehicles.push(new Vehicle(
 					tile.x * TILE_SIZE + TILE_SIZE / 2,
 					tile.y * TILE_SIZE + TILE_SIZE / 2,
-					type
+					'Jeep'
 				));
 			}
-		});
+		}
 
-		// Zivile Fahrzeuge in und um Dörfer
+		// LKWs in Dörfern
 		villageTiles.forEach(tile => {
-			if (Math.random() < 0.8) { // 80% Chance pro Dorf
-				const type = 'LKW';
-				const offset = (Math.random() - 0.5) * TILE_SIZE * 3;
+			if (Math.random() < 0.6) { // 60% Chance pro Dorf
+				const offset = (Math.random() - 0.5) * TILE_SIZE * 2;
 				vehicles.push(new Vehicle(
 					tile.x * TILE_SIZE + offset,
 					tile.y * TILE_SIZE + offset,
-					type
+					'LKW'
 				));
 			}
 		});
-	}
-
-	// Power-Ups platzieren
-	function spawnPowerUps() {
-		powerUps = [];
-		const types = [
-			'pistole',
-			'schrotflinte',
-			'maschinengewehr',
-			'pistole (silenced)',
-			'schutzweste',
-			'tarnanzug',
-			'granate',
-			'mine',
-			'medipack'
-		];
-		for (let i = 0; i < 60; i++) {
-			let x, y;
-			do {
-				x = Math.random() * MAP_WIDTH * TILE_SIZE;
-				y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-			} while (isColliding(x, y));
-			const type = types[Math.floor(Math.random() * types.length)];
-			powerUps.push(new PowerUp(x, y, type));
-		}
 	}
 
 	// Hauptupdate-Funktion
 	function update() {
 		if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+
+        powerUpManager.update()
 
 		// Enemy respawning
 		spawnEnemiesAroundPlayers();
@@ -3458,7 +3712,7 @@
 				player.currentMission.draw(ctx, player, viewport);
 			}
 		});
-    }
+	}
 
 	// Optimierte Terrain-Rendering-Funktion
 	function renderTerrain(viewport) {
