@@ -50,6 +50,16 @@
     background: rgba(0,0,0,0.5);
     z-index: 10;
   }
+  #controls {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    width: 300px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 10px;
+    z-index: 10;
+  }
 </style>
 </head>
 <body>
@@ -60,6 +70,7 @@
     <p>Gesundheit: <span id="health1">100</span></p>
     <p>Munition: <span id="ammo1">50</span></p>
     <p>Waffen: <span id="weapons1">Pistole</span></p>
+    <p>Ausrüstung: <span id="equipment1">Keine</span></p>
     <p>Fahrzeug: <span id="vehicle1">Keines</span></p>
     <p>Mission: <span id="mission1">Keine</span></p>
   </div>
@@ -68,12 +79,31 @@
     <p>Gesundheit: <span id="health2">100</span></p>
     <p>Munition: <span id="ammo2">50</span></p>
     <p>Waffen: <span id="weapons2">Pistole</span></p>
+    <p>Ausrüstung: <span id="equipment2">Keine</span></p>
     <p>Fahrzeug: <span id="vehicle2">Keines</span></p>
     <p>Mission: <span id="mission2">Keine</span></p>
   </div>
 </div>
 <div id="message"></div>
 <canvas id="minimap"></canvas>
+<div id="controls">
+  <h3>Steuerung Spieler 1:</h3>
+  <p>Pfeiltasten: Bewegung</p>
+  <p>Leertaste: Schießen</p>
+  <p>Enter: Ein-/Aussteigen</p>
+  <p>Shift: Waffen wechseln</p>
+  <p>Alt: Ducken</p>
+  <p>M: Nahkampf</p>
+  <p>Strg: Rollenwechsel im Fahrzeug</p>
+  <h3>Steuerung Spieler 2:</h3>
+  <p>WASD: Bewegung</p>
+  <p>Q: Schießen</p>
+  <p>E: Ein-/Aussteigen</p>
+  <p>Tab: Waffen wechseln</p>
+  <p>Z: Ducken</p>
+  <p>X: Nahkampf</p>
+  <p>F: Rollenwechsel im Fahrzeug</p>
+</div>
 
 <script>
 // Spielvariablen
@@ -184,6 +214,8 @@ class Player extends GameObject {
     this.index = index;
     this.isCrouching = false;
     this.currentMission = null;
+    this.equipment = [];
+    this.autoAimTarget = null;
   }
 
   update() {
@@ -210,6 +242,26 @@ class Player extends GameObject {
       }
 
       this.angle = Math.atan2(dy, dx);
+    }
+
+    // Auto-Aim für Nahkampf
+    const closestEnemy = enemies.reduce((closest, enemy) => {
+      const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+      if (dist < 100 && (!closest || dist < closest.dist)) {
+        return { enemy, dist };
+      } else {
+        return closest;
+      }
+    }, null);
+
+    if (closestEnemy) {
+      this.autoAimTarget = closestEnemy.enemy;
+      this.angle = Math.atan2(
+        closestEnemy.enemy.y - this.y,
+        closestEnemy.enemy.x - this.x
+      );
+    } else {
+      this.autoAimTarget = null;
     }
 
     // Waffen wechseln
@@ -252,6 +304,14 @@ class Player extends GameObject {
       keys[this.controls.action] = false;
     }
 
+    // Rollenwechsel im Fahrzeug
+    if (keys[this.controls.switchRole]) {
+      if (this.vehicle) {
+        this.vehicle.switchRole(this);
+      }
+      keys[this.controls.switchRole] = false;
+    }
+
     // Stealth (Ducken)
     if (keys[this.controls.crouch]) {
       this.isCrouching = true;
@@ -263,15 +323,11 @@ class Player extends GameObject {
 
     // Nahkampf
     if (keys[this.controls.melee]) {
-      enemies.forEach(enemy => {
-        if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 40) {
-          if (Math.abs(this.angle - enemy.angle) < Math.PI / 4) {
-            enemy.health = 0;
-            enemy.isAlive = false;
-            enemies.splice(enemies.indexOf(enemy), 1);
-          }
-        }
-      });
+      if (this.autoAimTarget && Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50) {
+        this.autoAimTarget.health = 0;
+        this.autoAimTarget.isAlive = false;
+        enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
+      }
       keys[this.controls.melee] = false;
     }
 
@@ -295,6 +351,9 @@ class Player extends GameObject {
         ).textContent = this.currentMission.type;
       }
     } else {
+      // Pfeil zum Missionsziel
+      drawMissionArrow(this, this.currentMission);
+
       if (
         Math.hypot(this.x - this.currentMission.x, this.y - this.currentMission.y) <
         50
@@ -315,6 +374,17 @@ class Player extends GameObject {
     // Körper
     ctx.fillStyle = this.color;
     ctx.fillRect(-15, -15, 30, 30);
+
+    // Ausrüstung anzeigen
+    if (this.equipment.includes('Schutzweste')) {
+      ctx.fillStyle = 'gray';
+      ctx.fillRect(-10, -10, 20, 20);
+    }
+    if (this.equipment.includes('Tarnanzug')) {
+      ctx.strokeStyle = 'green';
+      ctx.strokeRect(-15, -15, 30, 30);
+    }
+
     // Waffe
     ctx.fillStyle = 'black';
     ctx.fillRect(0, -5, 20, 10);
@@ -375,7 +445,7 @@ class Enemy extends GameObject {
   }
 
   canSee(player) {
-    if (!player.isAlive) return false;
+    if (!player.isAlive || player.equipment.includes('Tarnanzug')) return false;
     const dx = player.x - this.x;
     const dy = player.y - this.y;
     const dist = Math.hypot(dx, dy);
@@ -514,42 +584,71 @@ class Vehicle extends GameObject {
     this.angle = 0;
     this.passengers = [];
     this.condition = 100; // Zustand des Fahrzeugs
+    this.roleAssignment = {}; // Spielerrollen
+    this.isClosed = type === 'Panzer';
   }
 
   addPassenger(player) {
     if (this.passengers.length < 2) {
       this.passengers.push(player);
+      if (this.passengers.length === 1) {
+        this.roleAssignment[player.index] = 'driver';
+      } else {
+        this.roleAssignment[player.index] = 'gunner';
+      }
     }
   }
 
   removePassenger(player) {
     this.passengers = this.passengers.filter(p => p !== player);
+    delete this.roleAssignment[player.index];
+  }
+
+  switchRole(player) {
+    if (this.passengers.length === 2) {
+      const otherPlayer = this.passengers.find(p => p !== player);
+      const tempRole = this.roleAssignment[player.index];
+      this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
+      this.roleAssignment[otherPlayer.index] = tempRole;
+    }
   }
 
   update() {
-    if (this.passengers.length > 0) {
-      const driver = this.passengers[0];
+    // Fahrzeugbewegung
+    const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
+    if (driver) {
       if (driver.controls) {
         if (keys[driver.controls.up]) this.speed = this.maxSpeed;
         if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
         if (keys[driver.controls.left]) this.angle -= 0.05;
         if (keys[driver.controls.right]) this.angle += 0.05;
       }
-      const newX = this.x + Math.cos(this.angle) * this.speed;
-      const newY = this.y + Math.sin(this.angle) * this.speed;
-      if (!isColliding(newX, newY)) {
-        this.x = newX;
-        this.y = newY;
-      } else {
-        this.speed = 0;
-      }
-      this.speed *= 0.9; // Reibung
-      // Aktualisiere Passagierpositionen
-      this.passengers.forEach(p => {
-        p.x = this.x;
-        p.y = this.y;
-      });
     }
+    const newX = this.x + Math.cos(this.angle) * this.speed;
+    const newY = this.y + Math.sin(this.angle) * this.speed;
+    if (!isColliding(newX, newY)) {
+      this.x = newX;
+      this.y = newY;
+    } else {
+      this.speed = 0;
+    }
+    this.speed *= 0.9; // Reibung
+    // Aktualisiere Passagierpositionen
+    this.passengers.forEach(p => {
+      p.x = this.x;
+      p.y = this.y;
+    });
+
+    // Schütze kann schießen
+    const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
+    if (gunner && gunner.controls && keys[gunner.controls.shoot] && gunner.canShoot) {
+      bullets.push(new Bullet(this.x, this.y, gunner.angle, 'black', gunner));
+      gunner.canShoot = false;
+      setTimeout(() => {
+        gunner.canShoot = true;
+      }, 300);
+    }
+
     // Kollision mit Feinden
     enemies.forEach(enemy => {
       if (
@@ -571,13 +670,24 @@ class Vehicle extends GameObject {
     ctx.rotate(this.angle);
     // Fahrzeugkörper
     ctx.fillStyle = this.color;
-    ctx.fillRect(-25, -15, 50, 30);
-    // Räder
-    ctx.fillStyle = 'black';
-    ctx.fillRect(-20, -20, 10, 10);
-    ctx.fillRect(10, -20, 10, 10);
-    ctx.fillRect(-20, 10, 10, 10);
-    ctx.fillRect(10, 10, 10, 10);
+    if (this.type === 'Jeep') {
+      ctx.fillRect(-25, -15, 50, 30);
+      // Spieler sichtbar
+      this.passengers.forEach(p => {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-10, -10, 20, 20);
+      });
+    } else if (this.type === 'Panzer') {
+      ctx.fillRect(-35, -20, 70, 40);
+      // Turm
+      ctx.fillStyle = 'darkgray';
+      ctx.fillRect(-15, -15, 30, 30);
+      // Kanone
+      ctx.fillRect(15, -5, 30, 10);
+    } else {
+      // Andere Fahrzeuge
+      ctx.fillRect(-25, -15, 50, 30);
+    }
     ctx.restore();
   }
 }
@@ -603,10 +713,18 @@ class PowerUp extends GameObject {
           player.weapons.push(this.type);
         }
         break;
+      case 'schutzweste':
+      case 'tarnanzug':
+        if (!player.equipment.includes(this.type)) {
+          player.equipment.push(this.type);
+        }
+        break;
     }
     // UI aktualisieren
     document.getElementById(`weapons${player.index + 1}`).textContent =
       player.weapons.join(', ');
+    document.getElementById(`equipment${player.index + 1}`).textContent =
+      player.equipment.join(', ');
   }
 
   draw() {
@@ -643,6 +761,25 @@ function lineOfSightBlocked(x1, y1, x2, y2) {
   return false;
 }
 
+function drawMissionArrow(player, mission) {
+  const dx = mission.x - player.x;
+  const dy = mission.y - player.y;
+  const angle = Math.atan2(dy, dx);
+  const arrowX = canvas.width / 2 + Math.cos(angle) * 100;
+  const arrowY = canvas.height / 2 + Math.sin(angle) * 100;
+
+  ctx.save();
+  ctx.translate(player.x - canvas.width / 2, player.y - canvas.height / 2);
+  ctx.fillStyle = 'gold';
+  ctx.beginPath();
+  ctx.moveTo(arrowX, arrowY);
+  ctx.lineTo(arrowX - 10, arrowY - 5);
+  ctx.lineTo(arrowX - 10, arrowY + 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 // Spielobjekte
 const players = [
   new Player(
@@ -658,7 +795,8 @@ const players = [
       action: 'enter',
       switchWeapon: 'shift',
       crouch: 'alt',
-      melee: 'm'
+      melee: 'm',
+      switchRole: 'control'
     },
     0
   ),
@@ -675,7 +813,8 @@ const players = [
       action: 'e',
       switchWeapon: 'tab',
       crouch: 'z',
-      melee: 'x'
+      melee: 'x',
+      switchRole: 'f'
     },
     1
   ),
@@ -706,13 +845,15 @@ function isInPlayerSight(x, y) {
 
 // Fahrzeuge platzieren
 function spawnVehicles() {
+  const vehicleTypes = ['Jeep', 'Panzer', 'LKW'];
   for (let i = 0; i < 10; i++) {
     let x, y;
     do {
       x = Math.random() * MAP_WIDTH * TILE_SIZE;
       y = Math.random() * MAP_HEIGHT * TILE_SIZE;
     } while (isColliding(x, y));
-    vehicles.push(new Vehicle(x, y, 'Jeep'));
+    const type = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
+    vehicles.push(new Vehicle(x, y, type));
   }
 }
 
@@ -723,7 +864,9 @@ function spawnPowerUps() {
     'ammo',
     'schrotflinte',
     'maschinengewehr',
-    'sniper'
+    'sniper',
+    'schutzweste',
+    'tarnanzug'
   ];
   for (let i = 0; i < 40; i++) {
     let x, y;
@@ -818,6 +961,8 @@ function update() {
       player.weapons.join(', ');
     document.getElementById(`vehicle${index + 1}`).textContent =
       player.vehicle ? player.vehicle.type : 'Keines';
+    document.getElementById(`equipment${index + 1}`).textContent =
+      player.equipment.join(', ') || 'Keine';
     document.getElementById(`mission${index + 1}`).textContent =
       player.currentMission
         ? player.currentMission.type
@@ -880,13 +1025,17 @@ function update() {
           Math.hypot(bullet.x - player.x, bullet.y - player.y) <
             (bullet.size + player.size) / 2
         ) {
-          player.health -= 20;
-          bullets.splice(bullets.indexOf(bullet), 1);
-          if (player.health <= 0) {
-            player.isAlive = false;
-            document.getElementById('message').textContent =
-              'Spieler gestorben!';
-            document.getElementById('message').style.display = 'block';
+          if (player.vehicle && player.vehicle.isClosed) {
+            // Spieler ist in einem geschlossenen Fahrzeug und sicher
+          } else {
+            player.health -= 20;
+            bullets.splice(bullets.indexOf(bullet), 1);
+            if (player.health <= 0) {
+              player.isAlive = false;
+              document.getElementById('message').textContent =
+                'Spieler gestorben!';
+              document.getElementById('message').style.display = 'block';
+            }
           }
         }
       });
