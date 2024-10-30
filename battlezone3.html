@@ -1885,6 +1885,7 @@
 			this.speed = 0;
 			this.maxSpeed = 5;
 			this.angle = 0;
+			this.turretAngle = 0; // Neuer Turm-Winkel
 			this.passengers = [];
 			this.condition = 100;
 			this.roleAssignment = {};
@@ -1898,6 +1899,11 @@
 				// Erste Person ist standardmäßig Fahrer
 				this.roleAssignment[player.index] = this.passengers.length === 1 ? 'driver' : 'gunner';
 				player.vehicle = this; // Wichtig: Setze die Fahrzeugreferenz
+
+				// Turm-Winkel beim Einsteigen an Spieler-Winkel anpassen
+				if (this.roleAssignment[player.index] === 'gunner') {
+					this.turretAngle = 0; // Reset beim Einsteigen
+				}
 			}
 		}
 
@@ -1933,7 +1939,7 @@
 					this.speed = 0;
 				}
 			}
-			// Bei zwei Spielern wie bisher die Rollen tauschen
+			// Bei zwei Spielern die Rollen tauschen
 			else if (this.passengers.length === 2) {
 				const otherPlayer = this.passengers.find(p => p !== player);
 				if (otherPlayer) {
@@ -2015,17 +2021,29 @@
 				p.y = this.y;
 			});
 
-			// Schießen erlauben wenn jemand Schütze ist
+			// Turm-Steuerung für den Schützen
 			const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
-			if (gunner && gunner.controls && keys[gunner.controls.useItem] && gunner.canUseItem) {
-				bullets.push(new Bullet(this.x, this.y, gunner.angle, gunner.color, gunner, {
-					damage: this.type === 'Panzer' ? 50 : 25,
-					range: this.type === 'Panzer' ? 500 : 300
-				}));
-				gunner.canUseItem = false;
-				setTimeout(() => {
-					gunner.canUseItem = true;
-				}, this.type === 'Panzer' ? 500 : 300);
+			if (gunner) {
+				// Turm mit A/D oder J/L drehen (je nach Spieler)
+				if (keys[gunner.controls.left]) this.turretAngle -= 0.05;
+				if (keys[gunner.controls.right]) this.turretAngle += 0.05;
+
+				// Schießen
+				if (keys[gunner.controls.useItem] && gunner.canUseItem) {
+					const gunOffset = this.type === 'Panzer' ? 80 : 40; // Länge des Kanonenrohrs
+					const bulletX = this.x + Math.cos(this.angle + this.turretAngle) * gunOffset;
+					const bulletY = this.y + Math.sin(this.angle + this.turretAngle) * gunOffset;
+
+					bullets.push(new Bullet(bulletX, bulletY, this.angle + this.turretAngle, gunner.color, gunner, {
+						damage: this.type === 'Panzer' ? 50 : 25,
+						range: this.type === 'Panzer' ? 500 : 300,
+						speed: this.type === 'Panzer' ? 15 : 10
+					}));
+					gunner.canUseItem = false;
+					setTimeout(() => {
+						gunner.canUseItem = true;
+					}, this.type === 'Panzer' ? 1000 : 300); // Panzer schießt langsamer
+				}
 			}
 
 			// Kollision mit Feinden
@@ -2057,26 +2075,47 @@
 			ctx.save();
 			ctx.translate(this.x, this.y);
 			ctx.rotate(this.angle);
+
 			// Fahrzeugkörper
 			ctx.fillStyle = this.color;
 			if (this.type === 'Jeep') {
 				ctx.fillRect(-60, -30, 120, 60);
+				// Maschinengewehr auf dem Jeep
+				ctx.save();
+				ctx.rotate(this.turretAngle); // Turm dreht sich unabhängig
+				ctx.fillStyle = 'darkgray';
+				ctx.fillRect(20, -5, 30, 10);
+				ctx.restore();
+
 				// Spieler sichtbar
 				this.passengers.forEach(p => {
 					ctx.fillStyle = p.color;
 					ctx.fillRect(-20, -20, 40, 40);
 				});
 			} else if (this.type === 'Panzer') {
+				// Panzer-Körper
 				ctx.fillRect(-100, -50, 200, 100);
-				// Turm
+
+				// Turm (dreht sich unabhängig)
+				ctx.save();
+				ctx.rotate(this.turretAngle);
+				// Turm-Basis
 				ctx.fillStyle = 'darkgray';
 				ctx.fillRect(-30, -30, 60, 60);
-				// Kanone
+				// Kanonenrohr
 				ctx.fillRect(30, -10, 60, 20);
+				// Optional: Visier oder andere Details
+				ctx.strokeStyle = 'black';
+				ctx.beginPath();
+				ctx.moveTo(90, 0);
+				ctx.lineTo(100, 0);
+				ctx.stroke();
+				ctx.restore();
 			} else {
 				// LKW
 				ctx.fillRect(-80, -40, 160, 80);
 			}
+
 			ctx.restore();
 		}
 	}
