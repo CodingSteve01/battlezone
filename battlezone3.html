@@ -101,8 +101,7 @@
     <div class="playerColor" id="player1Color"></div>
     <div>
       <p>Gesundheit: <span id="health1">100</span></p>
-      <p>Munition: <span id="ammo1">50</span></p>
-      <p>Waffe: <span id="weapon1">Pistole</span></p>
+      <p>Aktuelles Item: <span id="weapon1">Keine</span></p>
       <p>Ausrüstung: <span id="equipment1">Keine</span></p>
       <p>Mission: <span id="mission1">Keine</span></p>
     </div>
@@ -111,8 +110,7 @@
     <div class="playerColor" id="player2Color"></div>
     <div>
       <p>Gesundheit: <span id="health2">100</span></p>
-      <p>Munition: <span id="ammo2">50</span></p>
-      <p>Waffe: <span id="weapon2">Pistole</span></p>
+      <p>Aktuelles Item: <span id="weapon2">Keine</span></p>
       <p>Ausrüstung: <span id="equipment2">Keine</span></p>
       <p>Mission: <span id="mission2">Keine</span></p>
     </div>
@@ -128,14 +126,12 @@
 </div>
 <div id="controlsInfo" style="display: none;">
   <h3>Steuerung Einzelspieler:</h3>
-  <p>Bewegung: WASD</p>
-  <p>Schießen: Leertaste</p>
-  <p>Waffen wechseln: 1-5</p>
-  <p>Ausrüstung verwenden: E</p>
-  <p>Granate werfen: G</p>
-  <p>Mine legen: M</p>
+  <p>Bewegung: W, A, S, D</p>
+  <p>Gegenstand verwenden: F</p>
+  <p>Gegenstand wechseln: 1-4</p>
+  <p>Gegenstand ablegen: G</p>
   <p>Ducken (Stealth): C</p>
-  <p>Ein-/Aussteigen: F</p>
+  <p>Ein-/Aussteigen: E</p>
   <p>Rollenwechsel im Fahrzeug: R</p>
   <button id="backToMenu">Zurück</button>
 </div>
@@ -151,6 +147,7 @@ const MAP_HEIGHT = 100;
 const SIGHT_RADIUS = 300;
 const keys = {};
 
+// Event Listener für Tasten
 document.addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
 });
@@ -272,19 +269,17 @@ class Player extends GameObject {
     super(x, y, 30, color);
     this.controls = controls;
     this.speed = 3;
-    this.ammo = 50;
-    this.weapons = ['Pistole', 'Nahkampf'];
-    this.currentWeaponIndex = 0;
+    this.inventory = []; // Begrenztes Inventar
+    this.maxInventorySize = 4;
+    this.currentItemIndex = 0;
     this.vehicle = null;
-    this.canShoot = true;
+    this.canUseItem = true;
     this.angle = 0;
     this.index = index;
     this.isCrouching = false;
     this.currentMission = null;
     this.equipment = [];
     this.autoAimTarget = null;
-    this.grenades = 3;
-    this.mines = 2;
   }
 
   update() {
@@ -292,6 +287,7 @@ class Player extends GameObject {
     let dx = 0;
     let dy = 0;
 
+    // Bewegung
     if (keys[this.controls.up]) dy -= 1;
     if (keys[this.controls.down]) dy += 1;
     if (keys[this.controls.left]) dx -= 1;
@@ -333,48 +329,54 @@ class Player extends GameObject {
       this.autoAimTarget = null;
     }
 
-    // Waffen wechseln
-    if (keys['1']) this.currentWeaponIndex = 0;
-    if (keys['2']) this.currentWeaponIndex = 1;
-    if (keys['3']) this.currentWeaponIndex = 2;
-    if (keys['4']) this.currentWeaponIndex = 3;
-    if (keys['5']) this.currentWeaponIndex = 4;
+    // Gegenstände wechseln
+    if (keys[this.controls.item1]) this.currentItemIndex = 0;
+    if (keys[this.controls.item2]) this.currentItemIndex = 1;
+    if (keys[this.controls.item3]) this.currentItemIndex = 2;
+    if (keys[this.controls.item4]) this.currentItemIndex = 3;
 
-    // Schießen
-    if (keys[this.controls.shoot] && this.canShoot) {
-      if (this.weapons[this.currentWeaponIndex] === 'Nahkampf') {
-        if (
-          this.autoAimTarget &&
-          Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50
-        ) {
-          this.autoAimTarget.health = 0;
-          this.autoAimTarget.isAlive = false;
-          enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
+    // Gegenstand verwenden
+    if (keys[this.controls.useItem] && this.canUseItem) {
+      const currentItem = this.inventory[this.currentItemIndex];
+      if (currentItem) {
+        if (currentItem.type === 'Waffe') {
+          // Schießen oder Nahkampf
+          if (currentItem.name === 'Nahkampf') {
+            if (
+              this.autoAimTarget &&
+              Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50
+            ) {
+              this.autoAimTarget.health = 0;
+              this.autoAimTarget.isAlive = false;
+              enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
+            }
+          } else {
+            bullets.push(
+              new Bullet(this.x, this.y, this.angle, this.color, this)
+            );
+          }
+        } else if (currentItem.type === 'Granate') {
+          grenades.push(new Grenade(this.x, this.y, this.angle, this));
+          this.inventory.splice(this.currentItemIndex, 1);
+        } else if (currentItem.type === 'Mine') {
+          mines.push(new Mine(this.x, this.y));
+          this.inventory.splice(this.currentItemIndex, 1);
         }
-      } else if (this.ammo > 0) {
-        bullets.push(
-          new Bullet(this.x, this.y, this.angle, this.color, this)
-        );
-        this.ammo--;
+        this.canUseItem = false;
+        setTimeout(() => {
+          this.canUseItem = true;
+        }, 300);
       }
-      this.canShoot = false;
-      setTimeout(() => {
-        this.canShoot = true;
-      }, 300);
     }
 
-    // Granate werfen
-    if (keys[this.controls.grenade] && this.grenades > 0) {
-      grenades.push(new Grenade(this.x, this.y, this.angle, this));
-      this.grenades--;
-      keys[this.controls.grenade] = false;
-    }
-
-    // Mine legen
-    if (keys[this.controls.mine] && this.mines > 0) {
-      mines.push(new Mine(this.x, this.y));
-      this.mines--;
-      keys[this.controls.mine] = false;
+    // Gegenstand ablegen
+    if (keys[this.controls.dropItem]) {
+      const droppedItem = this.inventory.splice(this.currentItemIndex, 1)[0];
+      if (droppedItem) {
+        powerUps.push(new PowerUp(this.x, this.y, droppedItem.name));
+        // UI aktualisieren
+        keys[this.controls.dropItem] = false;
+      }
     }
 
     // Ein-/Aussteigen
@@ -382,8 +384,6 @@ class Player extends GameObject {
       if (this.vehicle) {
         this.vehicle.removePassenger(this);
         this.vehicle = null;
-        document.getElementById(`vehicle${this.index + 1}`).textContent =
-          'Keines';
       } else {
         const nearbyVehicle = vehicles.find(
           v =>
@@ -393,8 +393,6 @@ class Player extends GameObject {
         if (nearbyVehicle) {
           nearbyVehicle.addPassenger(this);
           this.vehicle = nearbyVehicle;
-          document.getElementById(`vehicle${this.index + 1}`).textContent =
-            this.vehicle.type;
         }
       }
       keys[this.controls.action] = false;
@@ -432,12 +430,9 @@ class Player extends GameObject {
     if (!this.currentMission) {
       this.currentMission = missions.find(m => m.active);
       if (this.currentMission) {
-        document.getElementById(
-          `mission${this.index + 1}`
-        ).textContent = this.currentMission.type;
         // Missionsziel bestimmen
         if (this.currentMission.type === 'Eliminiere den Kommandanten') {
-          const commander = enemies[Math.floor(Math.random() * enemies.length)];
+          const commander = enemies.find(e => e.isCommander);
           this.currentMission.target = commander;
         } else if (this.currentMission.type === 'Finde und steuere ein Fahrzeug') {
           const vehicle = vehicles.find(v => !v.isDestroyed);
@@ -455,20 +450,23 @@ class Player extends GameObject {
       ) {
         this.currentMission.active = false;
         this.currentMission = null;
-        document.getElementById(
-          `mission${this.index + 1}`
-        ).textContent = 'Erledigt!';
       } else if (
         this.currentMission.type === 'Finde und steuere ein Fahrzeug' &&
         this.vehicle === this.currentMission.target
       ) {
         this.currentMission.active = false;
         this.currentMission = null;
-        document.getElementById(
-          `mission${this.index + 1}`
-        ).textContent = 'Erledigt!';
       }
     }
+
+    // HUD aktualisieren
+    const currentItem = this.inventory[this.currentItemIndex];
+    document.getElementById(`weapon${this.index + 1}`).textContent =
+      currentItem ? currentItem.name : 'Keine';
+    document.getElementById(`equipment${this.index + 1}`).textContent =
+      this.equipment.join(', ') || 'Keine';
+    document.getElementById(`mission${this.index + 1}`).textContent =
+      this.currentMission ? this.currentMission.type : 'Keine';
   }
 
   draw() {
@@ -493,14 +491,17 @@ class Player extends GameObject {
 
     // Waffe
     ctx.fillStyle = 'black';
-    if (this.weapons[this.currentWeaponIndex] === 'Pistole') {
-      ctx.fillRect(0, -5, 15, 5);
-    } else if (this.weapons[this.currentWeaponIndex] === 'Maschinengewehr') {
-      ctx.fillRect(0, -5, 20, 5);
-    } else if (this.weapons[this.currentWeaponIndex] === 'Schrotflinte') {
-      ctx.fillRect(0, -5, 25, 5);
-    } else if (this.weapons[this.currentWeaponIndex] === 'Nahkampf') {
-      ctx.fillRect(0, -5, 10, 5);
+    const currentItem = this.inventory[this.currentItemIndex];
+    if (currentItem) {
+      if (currentItem.name === 'Pistole') {
+        ctx.fillRect(0, -5, 15, 5);
+      } else if (currentItem.name === 'Maschinengewehr') {
+        ctx.fillRect(0, -5, 20, 5);
+      } else if (currentItem.name === 'Schrotflinte') {
+        ctx.fillRect(0, -5, 25, 5);
+      } else if (currentItem.name === 'Nahkampf') {
+        ctx.fillRect(0, -5, 10, 5);
+      }
     }
     ctx.restore();
   }
@@ -596,9 +597,15 @@ class Enemy extends GameObject {
   }
 
   canHear(player) {
-    if (!player.isAlive || player.isCrouching) return false;
+    if (!player.isAlive) return false;
     const dist = Math.hypot(player.x - this.x, player.y - this.y);
-    return dist < this.hearingDistance;
+    if (player.isCrouching) {
+      return dist < 100; // Geringere Hörweite bei geducktem Spieler
+    } else if (player.speed > 3) {
+      return dist < 500; // Größere Hörweite bei rennendem Spieler
+    } else {
+      return dist < 300;
+    }
   }
 
   patrol() {
@@ -683,7 +690,7 @@ class Enemy extends GameObject {
         this.y = newY;
       }
 
-      this.angle = Math.atan2(dirY, dirX);
+      this.angle = Math.atan2(dy, dx);
     }
   }
 
@@ -844,7 +851,7 @@ class Mine extends GameObject {
 
 class Vehicle extends GameObject {
   constructor(x, y, type) {
-    super(x, y, 50, 'gray');
+    super(x, y, type === 'Jeep' ? 120 : 200, 'gray');
     this.type = type;
     this.speed = 0;
     this.maxSpeed = 5;
@@ -945,11 +952,11 @@ class Vehicle extends GameObject {
 
     // Schütze kann schießen
     const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
-    if (gunner && gunner.controls && keys[gunner.controls.shoot] && gunner.canShoot) {
+    if (gunner && gunner.controls && keys[gunner.controls.useItem] && gunner.canUseItem) {
       bullets.push(new Bullet(this.x, this.y, gunner.angle, 'black', gunner));
-      gunner.canShoot = false;
+      gunner.canUseItem = false;
       setTimeout(() => {
-        gunner.canShoot = true;
+        gunner.canUseItem = true;
       }, 300);
     }
 
@@ -973,7 +980,7 @@ class Vehicle extends GameObject {
       ctx.translate(this.x, this.y);
       ctx.rotate(Math.PI / 2); // Umkippen
       ctx.fillStyle = 'black';
-      ctx.fillRect(-25, -15, 50, 30);
+      ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
       ctx.restore();
       return;
     }
@@ -984,22 +991,22 @@ class Vehicle extends GameObject {
     // Fahrzeugkörper
     ctx.fillStyle = this.color;
     if (this.type === 'Jeep') {
-      ctx.fillRect(-25, -15, 50, 30);
+      ctx.fillRect(-60, -30, 120, 60);
       // Spieler sichtbar
       this.passengers.forEach(p => {
         ctx.fillStyle = p.color;
-        ctx.fillRect(-10, -10, 20, 20);
+        ctx.fillRect(-20, -20, 40, 40);
       });
     } else if (this.type === 'Panzer') {
-      ctx.fillRect(-35, -20, 70, 40);
+      ctx.fillRect(-100, -50, 200, 100);
       // Turm
       ctx.fillStyle = 'darkgray';
-      ctx.fillRect(-15, -15, 30, 30);
+      ctx.fillRect(-30, -30, 60, 60);
       // Kanone
-      ctx.fillRect(15, -5, 30, 10);
+      ctx.fillRect(30, -10, 60, 20);
     } else {
       // LKW
-      ctx.fillRect(-30, -15, 60, 30);
+      ctx.fillRect(-80, -40, 160, 80);
     }
     ctx.restore();
   }
@@ -1012,47 +1019,55 @@ class PowerUp extends GameObject {
   }
 
   applyEffect(player) {
-    switch (this.type) {
-      case 'health':
-        player.health = Math.min(100, player.health + 50);
-        break;
-      case 'ammo':
-        player.ammo += 30;
-        break;
-      case 'schrotflinte':
-      case 'maschinengewehr':
-      case 'sniper':
-        if (!player.weapons.includes(this.type)) {
-          player.weapons.push(this.type);
-        }
-        break;
-      case 'schutzweste':
-      case 'tarnanzug':
-        if (!player.equipment.includes(this.type)) {
-          player.equipment.push(this.type);
-        }
-        break;
-      case 'granaten':
-        player.grenades += 2;
-        break;
-      case 'minen':
-        player.mines += 2;
-        break;
+    if (player.inventory.length >= player.maxInventorySize) {
+      // Inventar voll
+      return;
     }
-    // UI aktualisieren
-    document.getElementById(`weapon${player.index + 1}`).textContent =
-      player.weapons[player.currentWeaponIndex];
-    document.getElementById(`equipment${player.index + 1}`).textContent =
-      player.equipment.join(', ') || 'Keine';
-    document.getElementById(`ammo${player.index + 1}`).textContent =
-      player.ammo;
+    if (['pistole', 'schrotflinte', 'maschinengewehr', 'nahkampf'].includes(this.type)) {
+      player.inventory.push({ name: this.type.charAt(0).toUpperCase() + this.type.slice(1), type: 'Waffe' });
+    } else if (this.type === 'granate') {
+      player.inventory.push({ name: 'Granate', type: 'Granate' });
+    } else if (this.type === 'mine') {
+      player.inventory.push({ name: 'Mine', type: 'Mine' });
+    } else if (this.type === 'schutzweste' || this.type === 'tarnanzug') {
+      if (!player.equipment.includes(this.type)) {
+        player.equipment.push(this.type);
+      }
+    }
   }
 
   draw() {
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-    ctx.fill();
+    // Icon basierend auf dem Typ zeichnen
+    switch (this.type) {
+      case 'pistole':
+        ctx.fillStyle = 'black';
+        ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+        break;
+      case 'maschinengewehr':
+        ctx.fillStyle = 'green';
+        ctx.fillRect(this.x - 7, this.y - 3, 14, 6);
+        break;
+      case 'schrotflinte':
+        ctx.fillStyle = 'brown';
+        ctx.fillRect(this.x - 10, this.y - 3, 20, 6);
+        break;
+      case 'granate':
+        ctx.fillStyle = 'olive';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      case 'mine':
+        ctx.fillStyle = 'darkred';
+        ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+        break;
+      default:
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+    }
   }
 }
 
@@ -1124,16 +1139,19 @@ function initGame() {
       100,
       'blue',
       {
-        up: singlePlayer ? 'w' : 'arrowup',
-        down: singlePlayer ? 's' : 'arrowdown',
-        left: singlePlayer ? 'a' : 'arrowleft',
-        right: singlePlayer ? 'd' : 'arrowright',
-        shoot: ' ',
-        action: 'f',
+        up: 'w',
+        down: 's',
+        left: 'a',
+        right: 'd',
+        useItem: 'f',
+        action: 'e',
         switchRole: 'r',
         crouch: 'c',
-        grenade: 'g',
-        mine: 'm'
+        item1: '1',
+        item2: '2',
+        item3: '3',
+        item4: '4',
+        dropItem: 'g',
       },
       0
     )
@@ -1151,12 +1169,15 @@ function initGame() {
           down: 'k',
           left: 'j',
           right: 'l',
-          shoot: 'n',
-          action: 'h',
-          switchRole: 'y',
-          crouch: 'u',
-          grenade: 'b',
-          mine: 'v'
+          useItem: 'o',
+          action: 'u',
+          switchRole: 'p',
+          crouch: ';',
+          item1: '7',
+          item2: '8',
+          item3: '9',
+          item4: '0',
+          dropItem: 'h',
         },
         1
       )
@@ -1214,15 +1235,14 @@ function spawnVehicles() {
 // Power-Ups platzieren
 function spawnPowerUps() {
   const types = [
-    'health',
-    'ammo',
+    'pistole',
     'schrotflinte',
     'maschinengewehr',
-    'sniper',
+    'nahkampf',
     'schutzweste',
     'tarnanzug',
-    'granaten',
-    'minen'
+    'granate',
+    'mine'
   ];
   for (let i = 0; i < 40; i++) {
     let x, y;
@@ -1313,16 +1333,6 @@ function update() {
     // UI aktualisieren
     document.getElementById(`health${index + 1}`).textContent =
       player.health;
-    document.getElementById(`ammo${index + 1}`).textContent =
-      player.ammo;
-    document.getElementById(`weapon${index + 1}`).textContent =
-      player.weapons[player.currentWeaponIndex];
-    document.getElementById(`equipment${index + 1}`).textContent =
-      player.equipment.join(', ') || 'Keine';
-    document.getElementById(`mission${index + 1}`).textContent =
-      player.currentMission
-        ? player.currentMission.type
-        : 'Keine';
   });
 
   // Fahrzeuge aktualisieren und zeichnen
@@ -1355,7 +1365,7 @@ function update() {
   });
 
   // Kugeln aktualisieren und zeichnen
-  bullets.forEach(bullet => {
+  bullets.forEach((bullet, index) => {
     bullet.update();
     bullet.draw();
 
@@ -1367,7 +1377,7 @@ function update() {
           (bullet.size + enemy.size) / 2
         ) {
           enemy.health -= 50;
-          bullets.splice(bullets.indexOf(bullet), 1);
+          bullets.splice(index, 1);
           if (enemy.health <= 0) {
             enemy.isAlive = false;
           }
@@ -1384,7 +1394,7 @@ function update() {
             // Spieler ist in einem geschlossenen Fahrzeug und sicher
           } else {
             player.health -= 20;
-            bullets.splice(bullets.indexOf(bullet), 1);
+            bullets.splice(index, 1);
             if (player.health <= 0) {
               player.isAlive = false;
               document.getElementById('message').textContent =
