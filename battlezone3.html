@@ -172,7 +172,6 @@
 	let gameStarted = false;
 	let gameStartTime = Date.now();
 	let lastMinimapUpdate = Date.now();
-	;
 	let singlePlayer = true;
 	const TILE_SIZE = 50;
 	const MAP_WIDTH = 200; // Größerer Level
@@ -889,6 +888,123 @@
 			return tiles;
 		}
 	}
+	class Mission {
+		constructor(type, x, y) {
+			this.type = type;
+			this.x = x;
+			this.y = y;
+			this.active = true;
+			this.completed = false;
+			this.target = null;
+			this.description = '';
+			this.checkCompletion = null; // Funktion zur Überprüfung der Zielerreichung
+			this.initialize();
+		}
+
+		initialize() {
+			switch (this.type) {
+				case 'Eliminiere den Kommandanten':
+					this.description = 'Finde und eliminiere den feindlichen Kommandanten';
+					this.checkCompletion = (player) => {
+						if (!this.target) {
+							this.target = enemies.find(e => e.isCommander);
+						}
+						return this.target && !this.target.isAlive;
+					};
+					break;
+
+				case 'Finde und steuere ein Fahrzeug':
+					this.description = 'Finde ein funktionsfähiges Fahrzeug und fahre es';
+					// Zuerst prüfen ob es bereits ein Zielfahrzeug gibt
+					if (!this.target) {
+						const availableVehicles = vehicles.filter(v => !v.isDestroyed);
+						if (availableVehicles.length > 0) {
+							this.target = availableVehicles[Math.floor(Math.random() * availableVehicles.length)];
+						}
+					}
+					this.checkCompletion = (player) => {
+						return player.vehicle && player.vehicle === this.target;
+					};
+					break;
+
+				case 'Sammle Geheimdaten':
+					this.description = 'Finde und sammle geheime Informationen';
+					// PowerUp für Geheimdaten erstellen, falls noch nicht vorhanden
+					if (!this.target) {
+						const secretData = new PowerUp(this.x, this.y, 'geheimdaten');
+						powerUps.push(secretData);
+						this.target = secretData;
+					}
+					this.checkCompletion = (player) => {
+						return !powerUps.includes(this.target); // PowerUp wurde aufgesammelt
+					};
+					break;
+
+				case 'Zerstöre das feindliche Lager':
+					this.description = 'Lokalisiere und zerstöre das feindliche Lager';
+					if (!this.target) {
+						const camp = new Structure(this.x, this.y, 'Camp');
+						structures.push(camp);
+						this.target = camp;
+					}
+					this.checkCompletion = (player) => {
+						return this.target && this.target.isDestroyed;
+					};
+					break;
+
+				case 'Rette den Verbündeten':
+					this.description = 'Finde und rette den gefangenen Verbündeten';
+					if (!this.target) {
+						const ally = new NPC(this.x, this.y, 'yellow');
+						allies.push(ally);
+						this.target = ally;
+					}
+					this.checkCompletion = (player) => {
+						return this.target && this.target.isRescued;
+					};
+					break;
+			}
+		}
+
+		update(player) {
+			if (this.active && !this.completed) {
+				if (this.checkCompletion(player)) {
+					this.complete(player);
+				}
+			}
+		}
+
+		complete(player) {
+			this.active = false;
+			this.completed = true;
+			showMessage(`Mission abgeschlossen: ${this.type}`, 3000);
+			// Belohnung vergeben
+			this.giveReward(player);
+		}
+
+		giveReward(player) {
+			// Zufällige Belohnung basierend auf Missionstyp
+			const rewards = [
+				{type: 'medipack', chance: 0.3},
+				{type: 'schutzweste', chance: 0.2},
+				{type: 'maschinengewehr', chance: 0.2},
+				{type: 'granate', chance: 0.15},
+				{type: 'pistole (silenced)', chance: 0.15}
+			];
+
+			const roll = Math.random();
+			let cumulative = 0;
+			for (const reward of rewards) {
+				cumulative += reward.chance;
+				if (roll < cumulative) {
+					const powerUp = new PowerUp(player.x + 30, player.y, reward.type);
+					powerUps.push(powerUp);
+					showMessage(`Belohnung erhalten: ${reward.type}`, 2000);
+					break;
+				}
+			}
+		}
+	}
 
 	// Missionen generieren
 	let missions = [];
@@ -896,63 +1012,80 @@
 	function generateMissions() {
 		missions = [];
 		const missionTypes = [
-			'Finde und steuere ein Fahrzeug',
 			'Eliminiere den Kommandanten',
+			'Finde und steuere ein Fahrzeug',
 			'Sammle Geheimdaten',
 			'Zerstöre das feindliche Lager',
 			'Rette den Verbündeten'
 		];
-		for (let i = 0; i < 5; i++) {
-			let x, y;
 
-			// Find a random tile to which the player can reach
+		// Erstelle 5 verschiedene Missionen an unterschiedlichen Orten
+		const usedTypes = new Set();
+		for (let i = 0; i < 5; i++) {
+			let x, y, type;
+
+			// Position finden
 			do {
 				x = Math.floor(Math.random() * MAP_WIDTH);
 				y = Math.floor(Math.random() * MAP_HEIGHT);
 			} while (
-				map[y][x] === TILE_TYPES.DEEP_WATER
-				|| map[y][x] === TILE_TYPES.SHALLOW_WATER
-				|| map[y][x] === TILE_TYPES.BUILDING
-				|| map[y][x] === TILE_TYPES.MOUNTAIN
-				|| map[y][x] === TILE_TYPES.WALL
-				|| map[y][x] === TILE_TYPES.TREE);
+				map[y][x] === TILE_TYPES.DEEP_WATER ||
+				map[y][x] === TILE_TYPES.SHALLOW_WATER ||
+				map[y][x] === TILE_TYPES.BUILDING ||
+				map[y][x] === TILE_TYPES.MOUNTAIN ||
+				map[y][x] === TILE_TYPES.WALL ||
+				map[y][x] === TILE_TYPES.TREE
+				);
 
-			const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
-			const mission = {
-				x: x * TILE_SIZE + TILE_SIZE / 2,
-				y: y * TILE_SIZE + TILE_SIZE / 2,
-				active: true,
-				type: type,
-				target: null
-			};
-			if (type === 'Eliminiere den Kommandanten') {
-				// Ensure the commander is not removed
-				const commander = new Enemy(mission.x, mission.y, true);
-				enemies.push(commander);
-				mission.target = commander;
-			} else if (type === 'Finde und steuere ein Fahrzeug') {
-				// Ensure a vehicle is available at the mission location
-				const vehicle = new Vehicle(mission.x, mission.y, 'Jeep');
-				vehicles.push(vehicle);
-				mission.target = vehicle;
-			} else if (type === 'Sammle Geheimdaten') {
-				// Place a power-up representing the secret data
-				const secretData = new PowerUp(mission.x, mission.y, 'geheimdaten');
-				powerUps.push(secretData);
-				mission.target = secretData;
-			} else if (type === 'Zerstöre das feindliche Lager') {
-				// Create a destructible enemy camp
-				const enemyCamp = new Structure(mission.x, mission.y, 'Camp');
-				structures.push(enemyCamp); // Make sure you have a structures array
-				mission.target = enemyCamp;
-			} else if (type === 'Rette den Verbündeten') {
-				// Spawn an allied NPC
-				const ally = new NPC(mission.x, mission.y, 'yellow');
-				allies.push(ally); // Make sure you have an allies array
-				mission.target = ally;
-			}
+			// Einzigartigen Missionstyp wählen
+			do {
+				type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
+			} while (usedTypes.has(type));
+			usedTypes.add(type);
+
+			const mission = new Mission(
+				type,
+				x * TILE_SIZE + TILE_SIZE / 2,
+				y * TILE_SIZE + TILE_SIZE / 2
+			);
 			missions.push(mission);
 		}
+	}
+
+	// Update der Player-Klasse - Missions-Update-Methode
+	function updatePlayerMissions(player) {
+		// Aktuelle Mission updaten
+		if (player.currentMission) {
+			player.currentMission.update(player);
+
+			// Wenn Mission abgeschlossen, nächste Mission suchen
+			if (player.currentMission.completed) {
+				player.currentMission = null;
+			}
+		}
+
+		// Neue Mission zuweisen wenn keine aktiv
+		if (!player.currentMission) {
+			const nextMission = missions.find(m => m.active && !m.completed);
+			if (nextMission) {
+				player.currentMission = nextMission;
+				showMessage(`Neue Mission: ${nextMission.description}`, 3000);
+			}
+		}
+
+		// UI aktualisieren
+		document.getElementById(`mission${player.index + 1}`).textContent =
+			player.currentMission ? player.currentMission.description : 'Keine';
+	}
+
+	// Hilfsfunktion zum Anzeigen von Nachrichten
+	function showMessage(text, duration) {
+		const messageElement = document.getElementById('message');
+		messageElement.textContent = text;
+		messageElement.style.display = 'block';
+		setTimeout(() => {
+			messageElement.style.display = 'none';
+		}, duration);
 	}
 
 	// Klassen
@@ -999,6 +1132,9 @@
 
 		update() {
 			if (!this.isAlive) return;
+
+			// Missions-Update
+			updatePlayerMissions(this);
 
 			// Spotted enemies are all enemies inside the screen bounds
 			this.spottedEnemies.clear();
