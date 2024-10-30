@@ -1329,23 +1329,150 @@
 	class Enemy extends GameObject {
 		constructor(x, y, isCommander = false) {
 			super(x, y, 30, isCommander ? 'purple' : 'red');
+			// Basis-Eigenschaften
 			this.speed = 2;
-			this.target = null;
 			this.angle = 0;
-			this.state = 'patrol'; // patrol, chase, investigate, search, flee
+			this.health = 100;
+			this.isCommander = isCommander;
+
+			// Stealth & Wahrnehmung
+			this.viewAngle = Math.PI / 3; // Engeres Sichtfeld (60 Grad)
+			this.viewDistance = SIGHT_RADIUS;
+			this.alertness = 'patrol'; // patrol, suspicious, alert, combat
+			this.alertnessLevel = 0; // Steigt bei Verdacht
+			this.lastSuspiciousPosition = null;
+			this.viewColor = 'rgba(255, 255, 0, 0.1)'; // Gelb für normal
+
+			// Patrouille & Wache
+			this.patrolType = this.getRandomPatrolType();
 			this.patrolPoints = this.generatePatrolPoints();
 			this.currentPatrolIndex = 0;
-			this.viewAngle = Math.PI / 2;
-			this.viewDistance = SIGHT_RADIUS;
+			this.guardTarget = null; // Zu bewachendes Objekt
+			this.waitTime = 0; // Für Pausen an Patrouillen-Punkten
+			this.lookAroundTimer = 0; // Für das Hin- und Herspähen
+			this.lookDirection = 1; // 1 oder -1 für Spährichtung
+
+			// Ausrüstung & Taktik
 			this.weapon = this.getRandomWeapon();
-			this.isCommander = isCommander;
-			this.isDead = false;
-			this.deathTime = 0;
-			this.path = [];
 			this.equipment = this.getRandomEquipment();
-			this.heardNoise = false;
-			this.heardNoisePosition = null;
-			this.spottedByPlayer = false; // Für die Minikarte
+			this.currentVehicle = null;
+			this.preferredRange = isCommander ? 400 : 200;
+
+			// Erweiterte Wahrnehmung
+			this.closeProximityRange = 50; // Nahbereichs-Wahrnehmung
+			this.lastHeardShot = null;
+			this.knownDeadAllies = new Set(); // Bekannte tote Verbündete
+			this.investigatedDeaths = new Set(); // Bereits untersuchte Leichen
+			this.lastNoiseCheck = Date.now();
+
+			// Fahrzeug-Wahrnehmung
+			this.vehicleAwarenessRange = 200;
+			this.lastVehicleNoise = null;
+		}
+
+		// Erweiterte Wahrnehmungsprüfung
+		checkForThreats() {
+			this.checkCloseProximity();
+			this.checkForShots();
+			this.checkForDeadAllies();
+			this.checkForSuspiciousVehicles();
+		}
+
+		// Sehr nahe Bedrohungen erkennen (auch von hinten)
+		checkCloseProximity() {
+			players.forEach(player => {
+				if (!player.isAlive) return;
+
+				const dist = Math.hypot(player.x - this.x, player.y - this.y);
+
+				// Extrem nahe Spieler werden immer bemerkt
+				if (dist < this.closeProximityRange) {
+					this.handlePlayerDetection(player, true);
+					// Sofort umdrehen
+					this.angle = Math.atan2(player.y - this.y, player.x - this.x);
+				}
+			});
+		}
+
+		// Auf Schüsse reagieren
+		checkForShots() {
+			bullets.forEach(bullet => {
+				if (bullet.owner instanceof Player) {
+					const distToShot = Math.hypot(bullet.x - this.x, bullet.y - this.y);
+					const shotNoiseRange = bullet.owner.currentVehicle ? 400 : 200;
+
+					if (distToShot < shotNoiseRange) {
+						// Gedämpfte Waffen machen weniger Lärm
+						const isSilenced = bullet.owner.inventory[bullet.owner.currentItemIndex]?.name.toLowerCase().includes('silenced');
+						if (!isSilenced || distToShot < shotNoiseRange / 3) {
+							this.lastHeardShot = {
+								x: bullet.x,
+								y: bullet.y,
+								time: Date.now()
+							};
+							this.alertness = 'suspicious';
+							this.alertnessLevel = Math.min(this.alertnessLevel + 3, 10);
+							this.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
+						}
+					}
+				}
+			});
+		}
+
+		// Tote Verbündete entdecken
+		checkForDeadAllies() {
+			enemies.forEach(enemy => {
+				if (!enemy.isAlive && !this.investigatedDeaths.has(enemy.id)) {
+					const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+
+					// Tote in Sichtweite entdecken
+					if (dist < this.viewDistance && this.isInView(enemy)) {
+						this.knownDeadAllies.add(enemy.id);
+
+						// Alarmzustand erhöhen
+						this.alertness = 'alert';
+						this.alertnessLevel = Math.min(this.alertnessLevel + 5, 10);
+						this.lastSuspiciousPosition = {x: enemy.x, y: enemy.y};
+
+						// Andere Wachen warnen
+						this.alertNearbyGuards({x: enemy.x, y: enemy.y, isDead: true});
+					}
+				}
+			});
+		}
+
+		// Verdächtige Fahrzeuggeräusche
+		checkForSuspiciousVehicles() {
+			vehicles.forEach(vehicle => {
+				if (!vehicle.isDestroyed) {
+					const dist = Math.hypot(vehicle.x - this.x, vehicle.y - this.y);
+
+					if (dist < this.vehicleAwarenessRange) {
+						// Prüfen ob Fahrzeug von einem Spieler gesteuert wird
+						const hasPlayerDriver = vehicle.passengers.some(p => p instanceof Player);
+
+						if (hasPlayerDriver) {
+							// Schnell fahrende oder laute Fahrzeuge werden eher bemerkt
+							const isNoisy = Math.abs(vehicle.speed) > 3 || vehicle.isLoud();
+							const detectionRange = isNoisy ? this.vehicleAwarenessRange : this.vehicleAwarenessRange / 2;
+
+							if (dist < detectionRange) {
+								this.lastVehicleNoise = {
+									x: vehicle.x,
+									y: vehicle.y,
+									time: Date.now()
+								};
+
+								if (this.alertness === 'patrol') {
+									this.alertness = 'suspicious';
+									this.alertnessLevel += 2;
+									this.lastSuspiciousPosition = {x: vehicle.x, y: vehicle.y};
+								}
+							}
+						}
+					}
+				}
+			});
 		}
 
 		getRandomWeapon() {
@@ -1356,19 +1483,6 @@
 		getRandomEquipment() {
 			const equipments = ['schutzweste', 'tarnanzug', ''];
 			return equipments[Math.floor(Math.random() * equipments.length)];
-		}
-
-		generatePatrolPoints() {
-			const points = [];
-			for (let i = 0; i < 3; i++) {
-				let x, y;
-				do {
-					x = this.x + (Math.random() - 0.5) * 500;
-					y = this.y + (Math.random() - 0.5) * 500;
-				} while (isColliding(x, y));
-				points.push({x, y});
-			}
-			return points;
 		}
 
 		update() {
@@ -1382,49 +1496,336 @@
 				return;
 			}
 
-			// Wahrnehmung
-			const playerDetected = players.find(
-				player => this.canSee(player) || this.canHear(player)
-			);
-			if (playerDetected) {
-				this.state = 'chase';
-				this.target = playerDetected;
+			// Bedrohungen checken
+			this.checkForThreats();
+
+			// Alertness-Level über Zeit reduzieren
+			if (this.alertnessLevel > 0) {
+				this.alertnessLevel -= 0.05; // Langsamer beruhigen
+				if (this.alertnessLevel <= 0) {
+					this.returnToPatrol();
+				}
 			}
 
-			// Reaktion auf Lärm
-			if (this.heardNoise) {
-				this.state = 'investigate';
-				this.targetPosition = this.heardNoisePosition;
-				this.heardNoise = false;
-			}
+			// Sichtfeld-Updates
+			this.updateViewColor();
+			this.checkForPlayers();
 
-			// Reaktion auf laute Geräusche
-			const loudVehicles = vehicles.filter(
-				v =>
-					!v.isDestroyed &&
-					Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
-					v.isLoud()
-			);
-			if (loudVehicles.length > 0) {
-				this.state = 'flee';
-			}
-
-			switch (this.state) {
+			// Verhalten basierend auf Alertness
+			switch (this.alertness) {
 				case 'patrol':
-					this.patrol();
+					this.updatePatrol();
 					break;
-				case 'chase':
-					this.chase();
+				case 'suspicious':
+					this.investigateSuspicion();
 					break;
-				case 'investigate':
-					this.investigate();
+				case 'alert':
+					this.searchArea();
 					break;
-				case 'search':
-					this.search();
+				case 'combat':
+					this.engageTarget();
 					break;
-				case 'flee':
-					this.flee();
+			}
+
+			// Fahrzeug-Logik
+			if (this.currentVehicle) {
+				this.updateVehicleBehavior();
+			}
+		}
+
+		updateViewColor() {
+			switch (this.alertness) {
+				case 'patrol':
+					this.viewColor = 'rgba(255, 255, 0, 0.1)'; // Gelb
 					break;
+				case 'suspicious':
+					this.viewColor = 'rgba(255, 165, 0, 0.15)'; // Orange
+					break;
+				case 'alert':
+					this.viewColor = 'rgba(255, 100, 0, 0.15)'; // Dunkelorange
+					break;
+				case 'combat':
+					this.viewColor = 'rgba(255, 0, 0, 0.2)'; // Rot
+					break;
+			}
+		}
+
+		checkForPlayers() {
+			players.forEach(player => {
+				if (!player.isAlive || player.equipment.includes('tarnanzug')) return;
+
+				const inView = this.isInView(player);
+				const canHear = this.canHear(player);
+
+				if (inView || canHear) {
+					this.handlePlayerDetection(player, inView);
+				}
+			});
+		}
+
+		// Erweiterte Untersuchungsmethode
+		investigateSuspicion() {
+			if (!this.lastSuspiciousPosition) {
+				this.returnToPatrol();
+				return;
+			}
+
+			const distToSpot = Math.hypot(
+				this.lastSuspiciousPosition.x - this.x,
+				this.lastSuspiciousPosition.y - this.y
+			);
+
+			if (distToSpot < 20) {
+				// Am Verdachtspunkt - gründlich untersuchen
+				this.waitTime = 180;
+				this.lookAround();
+
+				// Leichen markieren als untersucht
+				enemies.forEach(enemy => {
+					if (!enemy.isAlive &&
+						Math.hypot(enemy.x - this.x, enemy.y - this.y) < 50) {
+						this.investigatedDeaths.add(enemy.id);
+					}
+				});
+
+				if (this.waitTime <= 0) {
+					if (this.knownDeadAllies.size > 0) {
+						// Bei toten Verbündeten nicht sofort zur Patrouille zurück
+						this.alertness = 'alert';
+					} else {
+						this.returnToPatrol();
+					}
+				}
+			} else {
+				// Zum Verdachtspunkt bewegen
+				this.moveTowards(this.lastSuspiciousPosition.x, this.lastSuspiciousPosition.y);
+			}
+		}
+
+		searchArea() {
+			if (!this.lastSuspiciousPosition) {
+				this.returnToPatrol();
+				return;
+			}
+
+			// Zufällige Position um den letzten bekannten Punkt
+			if (!this.searchPoint || Math.hypot(this.x - this.searchPoint.x, this.y - this.searchPoint.y) < 20) {
+				const angle = Math.random() * Math.PI * 2;
+				const distance = Math.random() * 100 + 50;
+				this.searchPoint = {
+					x: this.lastSuspiciousPosition.x + Math.cos(angle) * distance,
+					y: this.lastSuspiciousPosition.y + Math.sin(angle) * distance
+				};
+			}
+
+			this.moveTowards(this.searchPoint.x, this.searchPoint.y);
+			this.lookAround();
+		}
+
+		engageTarget() {
+			const target = this.findNearestPlayer();
+			if (!target) {
+				this.alertness = 'alert';
+				return;
+			}
+
+			const distToTarget = Math.hypot(target.x - this.x, target.y - this.y);
+
+			if (distToTarget > this.preferredRange) {
+				// Zu weit weg - annähern
+				this.moveTowards(target.x, target.y);
+			} else if (distToTarget < this.preferredRange - 50) {
+				// Zu nah - zurückweichen
+				const angle = Math.atan2(this.y - target.y, this.x - target.x);
+				const retreatX = this.x + Math.cos(angle) * this.speed;
+				const retreatY = this.y + Math.sin(angle) * this.speed;
+				this.moveTowards(retreatX, retreatY);
+			}
+
+			// Zum Ziel drehen und schießen
+			this.angle = Math.atan2(target.y - this.y, target.x - this.x);
+			if (this.canUseItem) {
+				bullets.push(new Bullet(this.x, this.y, this.angle, 'red', this, {
+					damage: 15,
+					range: 300,
+					speed: 10
+				}));
+				this.canUseItem = false;
+				setTimeout(() => this.canUseItem = true, 500);
+			}
+		}
+
+		updateVehicleBehavior() {
+			if (!this.currentVehicle) return;
+
+			// Im Fahrzeug die gleiche Logik anwenden, aber mit angepassten Parametern
+			this.viewDistance *= 1.5; // Größere Sichtweite
+			this.preferredRange *= 1.5; // Größerer Kampfabstand
+
+			// Fahrzeug-spezifische Aktionen
+			if (this.currentVehicle.type === 'Panzer') {
+				this.alertness = 'aggressive'; // Panzer sind aggressiver
+			}
+		}
+
+		updatePatrol() {
+			if (this.waitTime > 0) {
+				// An Patrouillen-Punkt warten und spähen
+				this.waitTime--;
+				this.lookAround();
+			} else {
+				if (this.guardTarget) {
+					// Objekt bewachen
+					this.guardObject();
+				} else {
+					// Normal patrouillieren
+					this.followPatrolRoute();
+				}
+			}
+		}
+
+		lookAround() {
+			this.lookAroundTimer++;
+			if (this.lookAroundTimer > 60) { // Richtung alle 60 Frames ändern
+				this.lookDirection *= -1;
+				this.lookAroundTimer = 0;
+			}
+			this.angle += 0.02 * this.lookDirection; // Langsam drehen
+		}
+
+		guardObject() {
+			// Abstand zum Zielobjekt berechnen
+			const distToTarget = Math.hypot(
+				this.guardTarget.x - this.x,
+				this.guardTarget.y - this.y
+			);
+
+			if (distToTarget > 100) { // Zu weit weg
+				this.moveTowards(this.guardTarget.x, this.guardTarget.y);
+			} else {
+				// Im Wachbereich - Patrouille um Objekt
+				const angle = Date.now() * 0.001; // Langsame Kreisbewegung
+				const guardRadius = 80;
+				const targetX = this.guardTarget.x + Math.cos(angle) * guardRadius;
+				const targetY = this.guardTarget.y + Math.sin(angle) * guardRadius;
+				this.moveTowards(targetX, targetY);
+
+				// Immer zum Objekt schauen
+				this.angle = Math.atan2(
+					this.guardTarget.y - this.y,
+					this.guardTarget.x - this.x
+				);
+			}
+		}
+
+		followPatrolRoute() {
+			const point = this.patrolPoints[this.currentPatrolIndex];
+			const distToPoint = Math.hypot(point.x - this.x, point.y - this.y);
+
+			if (distToPoint < 10) {
+				// Punkt erreicht - warten und spähen
+				this.waitTime = 120; // 2 Sekunden bei 60 FPS
+				this.currentPatrolIndex = (this.currentPatrolIndex + 1) % this.patrolPoints.length;
+			} else {
+				this.moveTowards(point.x, point.y);
+			}
+		}
+
+		getRandomPatrolType() {
+			const types = ['linear', 'circular', 'random'];
+			return types[Math.floor(Math.random() * types.length)];
+		}
+
+		generatePatrolPoints() {
+			const points = [];
+			const patrolRadius = 200;
+
+			switch (this.patrolType) {
+				case 'linear':
+					// Linie mit zwei Punkten
+					points.push({x: this.x - patrolRadius, y: this.y});
+					points.push({x: this.x + patrolRadius, y: this.y});
+					break;
+
+				case 'circular':
+					// Kreis mit mehreren Punkten
+					for (let i = 0; i < 6; i++) {
+						const angle = (Math.PI * 2 * i) / 6;
+						points.push({
+							x: this.x + Math.cos(angle) * patrolRadius,
+							y: this.y + Math.sin(angle) * patrolRadius
+						});
+					}
+					break;
+
+				case 'random':
+					// Zufällige Punkte
+					for (let i = 0; i < 4; i++) {
+						points.push({
+							x: this.x + (Math.random() - 0.5) * patrolRadius * 2,
+							y: this.y + (Math.random() - 0.5) * patrolRadius * 2
+						});
+					}
+					break;
+			}
+
+			// Punkte filtern, die nicht erreichbar sind
+			return points.filter(p => !isColliding(p.x, p.y));
+		}
+
+		layMine() {
+			mines.push(new Mine(this.x, this.y));
+			this.lastMineTime = Date.now();
+		}
+
+		findNearestPlayer() {
+			return players
+				.filter(p => p.isAlive && this.canSee(p))
+				.reduce((nearest, p) => {
+					const dist = Math.hypot(p.x - this.x, p.y - this.y);
+					if (!nearest || dist < nearest.dist) {
+						return {player: p, dist};
+					}
+					return nearest;
+				}, null)?.player;
+		}
+
+		isInView(player) {
+			const dx = player.x - this.x;
+			const dy = player.y - this.y;
+			const dist = Math.hypot(dx, dy);
+
+			if (dist > this.viewDistance) return false;
+
+			const angleToPlayer = Math.atan2(dy, dx);
+			const angleDiff = Math.abs(this.normalizeAngle(angleToPlayer - this.angle));
+
+			if (angleDiff > this.viewAngle / 2) return false;
+
+			return !lineOfSightBlocked(this.x, this.y, player.x, player.y);
+		}
+
+		normalizeAngle(angle) {
+			while (angle > Math.PI) angle -= 2 * Math.PI;
+			while (angle < -Math.PI) angle += 2 * Math.PI;
+			return angle;
+		}
+
+		handlePlayerDetection(player, fullView) {
+			if (fullView) {
+				this.alertnessLevel += 2;
+				if (this.alertnessLevel >= 10) {
+					this.alertness = 'combat';
+					this.viewColor = 'rgba(255, 0, 0, 0.2)';
+					// Benachrichtige andere Wachen in der Nähe
+					this.alertNearbyGuards(player);
+				} else {
+					this.alertness = 'suspicious';
+					this.viewColor = 'rgba(255, 165, 0, 0.15)';
+				}
+			} else {
+				this.alertnessLevel += 0.5;
+				this.lastSuspiciousPosition = {x: player.x, y: player.y};
 			}
 		}
 
@@ -1458,6 +1859,25 @@
 		hearNoise(x, y) {
 			this.heardNoise = true;
 			this.heardNoisePosition = {x, y};
+		}
+
+		alertNearbyGuards(player) {
+			const alertRadius = 300;
+			enemies.forEach(enemy => {
+				if (enemy !== this &&
+					enemy.isAlive &&
+					Math.hypot(enemy.x - this.x, enemy.y - this.y) < alertRadius) {
+					enemy.alertness = 'alert';
+					enemy.alertnessLevel = 8;
+					enemy.lastSuspiciousPosition = {x: player.x, y: player.y};
+				}
+			});
+		}
+
+		returnToPatrol() {
+			this.alertness = 'patrol';
+			this.viewColor = 'rgba(255, 255, 0, 0.1)';
+			this.lastSuspiciousPosition = null;
 		}
 
 		patrol() {
@@ -1598,6 +2018,37 @@
 				ctx.fillRect(0, -5, 25, 5);
 			}
 			ctx.restore();
+
+			// Sichtfeld zeichnen
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle - this.viewAngle / 2);
+
+			ctx.beginPath();
+			ctx.moveTo(0, 0);
+			ctx.arc(0, 0, this.viewDistance, 0, this.viewAngle);
+			ctx.fillStyle = this.viewColor;
+			ctx.fill();
+
+			// Richtungslinie
+			ctx.beginPath();
+			ctx.moveTo(0, 0);
+			ctx.lineTo(30, 0);
+			ctx.strokeStyle = this.color;
+			ctx.lineWidth = 2;
+			ctx.stroke();
+
+			ctx.restore();
+
+			// Alertness-Indikator
+			if (this.alertness !== 'patrol') {
+				ctx.save();
+				ctx.fillStyle = this.alertness === 'combat' ? 'red' : 'orange';
+				ctx.beginPath();
+				ctx.arc(this.x, this.y - 40, 5, 0, Math.PI * 2);
+				ctx.fill();
+				ctx.restore();
+			}
 
 			// Health Bar zeichnen
 			ctx.save();
