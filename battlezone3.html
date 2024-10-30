@@ -1852,8 +1852,8 @@ function drawMinimap(centerX, centerY) {
   minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
 
   const scale = 0.1; // Maßstab der Minikarte
-  const mapWidth = canvas.width * scale * 8; // 8x Bildausschnitt
-  const mapHeight = canvas.height * scale * 8;
+  const mapWidth = canvas.width * scale * 32; // 32x Bildausschnitt
+  const mapHeight = canvas.height * scale * 32;
 
   const startX = centerX - mapWidth / 2;
   const startY = centerY - mapHeight / 2;
