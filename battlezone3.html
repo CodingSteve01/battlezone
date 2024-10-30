@@ -390,578 +390,277 @@
 			this.TILE_SIZE = tileSize || 1; // Default tile size
 			this.map = []; // The main map
 			this.heightMap = []; // Height map
-			this.moistureMap = []; // Moisture map
 		}
 
 		generateMap() {
-			// 1. Create base height map and moisture map
-			this.heightMap = this.generateHeightMap();
-			this.moistureMap = this.generateBaseMoistureMap();
+			// 1. Create a low-resolution height map
+			const lowResSize = 4;
+			let lowResHeightMap = this.createLowResHeightMap(lowResSize);
 
-			// 2. Initial terrain generation based on height and moisture
-			this.map = [];
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				const row = [];
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					const height = this.heightMap[y][x];
-					const moisture = this.moistureMap[y][x];
-					row.push(this.determineBaseTerrain(height, moisture));
-				}
-				this.map.push(row);
-			}
+			// 2. Smooth the low-resolution height map
+			lowResHeightMap = this.smoothMap(lowResHeightMap, 3);
 
-			// 3. Adjust moisture based on water
-			this.adjustMoistureNearWater();
+			// 3. Upscale the height map to desired size
+			this.heightMap = this.upscaleHeightMap(lowResHeightMap, this.MAP_WIDTH, this.MAP_HEIGHT);
 
-			// 4. Update map based on adjusted moisture
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (!this.isWaterTile(this.map[y][x])) {
-						this.map[y][x] = this.determineBaseTerrain(this.heightMap[y][x], this.moistureMap[y][x]);
-					}
-				}
-			}
+			// 4. Determine terrain based on height
+			this.map = this.determineTerrain(this.heightMap);
 
-			// 5. Add further features
-			this.generateWaterBodies();
-			this.generateVillages();
-			this.generateRoadNetwork();
+			// 5. Place water bodies (sea and lakes)
+			this.placeWaterBodies();
+
+			// 6. Place villages
+			const villages = this.placeVillages();
+
+			// 7. Connect villages with roads
+			this.connectVillagesWithRoads(villages);
+
+			// 8. Add vegetation
 			this.addVegetation();
-			this.addBridges();
 
 			return this.map;
 		}
 
-		generateHeightMap() {
-			const heightMap = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
-			const octaves = [
-				{frequency: 1, amplitude: 1},
-				{frequency: 2, amplitude: 0.5},
-				{frequency: 4, amplitude: 0.25},
-				{frequency: 8, amplitude: 0.125},
-			];
-
-			octaves.forEach(({frequency, amplitude}) => {
-				for (let y = 0; y < this.MAP_HEIGHT; y++) {
-					for (let x = 0; x < this.MAP_WIDTH; x++) {
-						heightMap[y][x] +=
-							this.noise2D((x * frequency) / this.MAP_WIDTH, (y * frequency) / this.MAP_HEIGHT) *
-							amplitude;
-					}
+		// 1. Create a low-resolution height map with random heights
+		createLowResHeightMap(size) {
+			const map = [];
+			for (let y = 0; y < size; y++) {
+				const row = [];
+				for (let x = 0; x < size; x++) {
+					row.push(Math.random()); // Heights between 0 and 1
 				}
-			});
-
-			return this.normalizeMap(heightMap);
+				map.push(row);
+			}
+			return map;
 		}
 
-		generateBaseMoistureMap() {
-			const moistureMap = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
-			const octaves = [
-				{frequency: 2, amplitude: 1.0},
-				{frequency: 4, amplitude: 0.5},
-				{frequency: 8, amplitude: 0.25},
-			];
-
-			octaves.forEach(({frequency, amplitude}) => {
-				for (let y = 0; y < this.MAP_HEIGHT; y++) {
-					for (let x = 0; x < this.MAP_WIDTH; x++) {
-						moistureMap[y][x] +=
-							(this.noise2D((x * frequency) / this.MAP_WIDTH, (y * frequency) / this.MAP_HEIGHT) * 0.5 +
-								0.5) *
-							amplitude;
+		// 2. Smooth the height map using averaging
+		smoothMap(map, iterations) {
+			const size = map.length;
+			for (let iter = 0; iter < iterations; iter++) {
+				const newMap = [];
+				for (let y = 0; y < size; y++) {
+					const row = [];
+					for (let x = 0; x < size; x++) {
+						let sum = 0;
+						let count = 0;
+						for (let dy = -1; dy <= 1; dy++) {
+							for (let dx = -1; dx <= 1; dx++) {
+								const ny = y + dy;
+								const nx = x + dx;
+								if (ny >= 0 && ny < size && nx >= 0 && nx < size) {
+									sum += map[ny][nx];
+									count++;
+								}
+							}
+						}
+						row.push(sum / count);
 					}
+					newMap.push(row);
 				}
-			});
-
-			return this.normalizeMap(moistureMap);
-		}
-
-		adjustMoistureNearWater() {
-			const waterTiles = [];
-			// Find all water tiles
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (this.isWaterTile(this.map[y][x])) {
-						waterTiles.push({x, y});
+				// Update map for next iteration
+				for (let y = 0; y < size; y++) {
+					for (let x = 0; x < size; x++) {
+						map[y][x] = newMap[y][x];
 					}
 				}
 			}
+			return map;
+		}
 
-			// Create a temporary moisture adjustment map
-			const moistureAdjustments = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
+		// 3. Upscale the height map using bilinear interpolation
+		upscaleHeightMap(lowResMap, targetWidth, targetHeight) {
+			const lowSize = lowResMap.length;
+			const highResMap = Array.from({length: targetHeight}, () => Array(targetWidth).fill(0));
 
-			// Add moisture near water
-			waterTiles.forEach((tile) => {
-				const WATER_INFLUENCE_RADIUS = 10;
-				for (let dy = -WATER_INFLUENCE_RADIUS; dy <= WATER_INFLUENCE_RADIUS; dy++) {
-					for (let dx = -WATER_INFLUENCE_RADIUS; dx <= WATER_INFLUENCE_RADIUS; dx++) {
-						const newX = tile.x + dx;
-						const newY = tile.y + dy;
+			for (let y = 0; y < targetHeight; y++) {
+				for (let x = 0; x < targetWidth; x++) {
+					const fx = (x / targetWidth) * (lowSize - 1);
+					const fy = (y / targetHeight) * (lowSize - 1);
 
-						if (newX >= 0 && newX < this.MAP_WIDTH && newY >= 0 && newY < this.MAP_HEIGHT) {
-							const distance = Math.hypot(dx, dy);
-							if (distance <= WATER_INFLUENCE_RADIUS) {
-								const influence = (1 - distance / WATER_INFLUENCE_RADIUS) * 0.3;
-								moistureAdjustments[newY][newX] += influence;
+					const x0 = Math.floor(fx);
+					const y0 = Math.floor(fy);
+					const x1 = Math.min(x0 + 1, lowSize - 1);
+					const y1 = Math.min(y0 + 1, lowSize - 1);
+
+					const sx = fx - x0;
+					const sy = fy - y0;
+
+					// Bilinear interpolation
+					const top = lowResMap[y0][x0] * (1 - sx) + lowResMap[y0][x1] * sx;
+					const bottom = lowResMap[y1][x0] * (1 - sx) + lowResMap[y1][x1] * sx;
+					const value = top * (1 - sy) + bottom * sy;
+
+					highResMap[y][x] = value;
+				}
+			}
+
+			// Apply additional smoothing if necessary
+			return this.smoothMap(highResMap, 2);
+		}
+
+		// 4. Determine terrain based on height
+		determineTerrain(heightMap) {
+			const map = [];
+			for (let y = 0; y < heightMap.length; y++) {
+				const row = [];
+				for (let x = 0; x < heightMap[0].length; x++) {
+					const height = heightMap[y][x];
+					if (height < 0.3) {
+						row.push(TILE_TYPES.SHALLOW_WATER);
+					} else if (height < 0.35) {
+						row.push(TILE_TYPES.BEACH);
+					} else if (height < 0.6) {
+						row.push(TILE_TYPES.GRASS);
+					} else if (height < 0.75) {
+						row.push(TILE_TYPES.FOREST);
+					} else if (height < 0.85) {
+						row.push(TILE_TYPES.MOUNTAIN);
+					} else {
+						row.push(TILE_TYPES.SNOW);
+					}
+				}
+				map.push(row);
+			}
+			return map;
+		}
+
+		// 5. Place water bodies such as seas and lakes
+		placeWaterBodies() {
+			// For simplicity, designate the edges as sea (DEEP_WATER)
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				this.map[y][0] = TILE_TYPES.DEEP_WATER;
+				this.map[y][this.MAP_WIDTH - 1] = TILE_TYPES.DEEP_WATER;
+			}
+			for (let x = 0; x < this.MAP_WIDTH; x++) {
+				this.map[0][x] = TILE_TYPES.DEEP_WATER;
+				this.map[this.MAP_HEIGHT - 1][x] = TILE_TYPES.DEEP_WATER;
+			}
+
+			// Optionally, add some lakes randomly
+			const lakeCount = Math.floor(this.MAP_WIDTH / 20);
+			for (let i = 0; i < lakeCount; i++) {
+				const lakeSize = Math.floor(Math.random() * 5) + 3;
+				const centerX = Math.floor(Math.random() * (this.MAP_WIDTH - 20)) + 10;
+				const centerY = Math.floor(Math.random() * (this.MAP_HEIGHT - 20)) + 10;
+
+				for (let y = -lakeSize; y <= lakeSize; y++) {
+					for (let x = -lakeSize; x <= lakeSize; x++) {
+						if (Math.sqrt(x * x + y * y) <= lakeSize) {
+							const newX = centerX + x;
+							const newY = centerY + y;
+							if (this.isValidTile(newX, newY) && this.map[newY][newX] !== TILE_TYPES.DEEP_WATER) {
+								this.map[newY][newX] = TILE_TYPES.SHALLOW_WATER;
 							}
 						}
 					}
 				}
-			});
-
-			// Apply the adjustments to the original moisture map
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					this.moistureMap[y][x] += moistureAdjustments[y][x];
-				}
-			}
-
-			// Normalize the moisture map again
-			this.moistureMap = this.normalizeMap(this.moistureMap);
-		}
-
-		normalizeMap(map) {
-			let min = Infinity;
-			let max = -Infinity;
-
-			// Find min and max
-			for (let y = 0; y < map.length; y++) {
-				for (let x = 0; x < map[0].length; x++) {
-					if (map[y][x] < min) min = map[y][x];
-					if (map[y][x] > max) max = map[y][x];
-				}
-			}
-
-			// Normalize each value
-			const range = max - min;
-			for (let y = 0; y < map.length; y++) {
-				for (let x = 0; x < map[0].length; x++) {
-					map[y][x] = range === 0 ? 0 : (map[y][x] - min) / range;
-				}
-			}
-
-			return map;
-		}
-
-		determineBaseTerrain(height, moisture) {
-			if (height < 0.2) return TILE_TYPES.DEEP_WATER;
-			if (height < 0.3) return TILE_TYPES.SHALLOW_WATER;
-			if (height < 0.35) return TILE_TYPES.BEACH;
-			if (height < 0.75) {
-				if (moisture < 0.3) return TILE_TYPES.GRASS;
-				if (moisture < 0.6) return TILE_TYPES.HIGH_GRASS;
-				if (moisture < 0.8) return TILE_TYPES.FOREST;
-				return TILE_TYPES.DENSE_FOREST;
-			}
-			if (height < 0.85) return TILE_TYPES.MOUNTAIN;
-			return TILE_TYPES.SNOW;
-		}
-
-		getTileHeight(tileType) {
-			switch (tileType) {
-				case TILE_TYPES.DEEP_WATER:
-					return 0;
-				case TILE_TYPES.SHALLOW_WATER:
-					return 0.2;
-				case TILE_TYPES.BEACH:
-					return 0.3;
-				case TILE_TYPES.GRASS:
-					return 0.4;
-				case TILE_TYPES.HIGH_GRASS:
-					return 0.5;
-				case TILE_TYPES.FOREST:
-					return 0.6;
-				case TILE_TYPES.DENSE_FOREST:
-					return 0.7;
-				case TILE_TYPES.MOUNTAIN:
-					return 0.8;
-				case TILE_TYPES.SNOW:
-					return 0.9;
-				default:
-					return 0.5;
 			}
 		}
 
-		isWaterTile(tileType) {
-			return tileType === TILE_TYPES.DEEP_WATER || tileType === TILE_TYPES.SHALLOW_WATER;
-		}
+		// 6. Place villages on grass tiles
+		placeVillages() {
+			const villages = [];
+			const villageCount = Math.max(1, Math.floor(this.MAP_WIDTH / 20));
 
-		isGrassTile(tileType) {
-			return tileType === TILE_TYPES.GRASS || tileType === TILE_TYPES.HIGH_GRASS;
-		}
+			for (let i = 0; i < villageCount; i++) {
+				let placed = false;
+				while (!placed) {
+					const x = Math.floor(Math.random() * this.MAP_WIDTH);
+					const y = Math.floor(Math.random() * this.MAP_HEIGHT);
 
-		isValidTile(x, y) {
-			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
-		}
-
-		generateWaterBodies() {
-			// Rivers from mountains to sea
-			const mountainTiles = MapGenerator.findTilesByType(this.map, TILE_TYPES.MOUNTAIN);
-			mountainTiles.forEach((mountain) => {
-				if (Math.random() < 0.3) {
-					this.generateRiver(mountain);
-				}
-			});
-		}
-
-		generateRiver(startTile) {
-			let current = {...startTile};
-			const river = [current];
-			const MAX_RIVER_LENGTH = this.MAP_WIDTH + this.MAP_HEIGHT;
-
-			for (let i = 0; i < MAX_RIVER_LENGTH; i++) {
-				if (this.isWaterTile(this.map[current.y][current.x])) {
-					break;
-				}
-
-				// Set river tile
-				this.map[current.y][current.x] = TILE_TYPES.SHALLOW_WATER;
-				river.push(current);
-
-				const next = this.findLowestNeighbor(current);
-				if (!next || river.some((tile) => tile.x === next.x && tile.y === next.y)) {
-					break;
-				}
-
-				current = next;
-			}
-		}
-
-		findLowestNeighbor(tile) {
-			const directions = [
-				{dx: -1, dy: -1},
-				{dx: 0, dy: -1},
-				{dx: 1, dy: -1},
-				{dx: -1, dy: 0},
-				{dx: 1, dy: 0},
-				{dx: -1, dy: 1},
-				{dx: 0, dy: 1},
-				{dx: 1, dy: 1},
-			];
-
-			let lowestNeighbor = null;
-			let lowestHeight = Infinity;
-
-			for (const dir of directions) {
-				const newX = tile.x + dir.dx;
-				const newY = tile.y + dir.dy;
-
-				if (this.isValidTile(newX, newY)) {
-					const neighborHeight = this.getTileHeight(this.map[newY][newX]);
-
-					const randomFactor = Math.random() * 0.2;
-					const diagonalPreference = Math.abs(dir.dx) + Math.abs(dir.dy) === 2 ? -0.1 : 0;
-
-					const effectiveHeight = neighborHeight + randomFactor + diagonalPreference;
-
-					if (effectiveHeight < lowestHeight) {
-						lowestHeight = effectiveHeight;
-						lowestNeighbor = {x: newX, y: newY};
-					}
-				}
-			}
-
-			return lowestNeighbor;
-		}
-
-		generateVillages() {
-			const villageLocations = this.findSuitableVillageLocations();
-
-			// Ensure at least one village
-			if (villageLocations.length === 0) {
-				for (let y = 0; y < this.MAP_HEIGHT; y++) {
-					for (let x = 0; x < this.MAP_WIDTH; x++) {
-						if (this.isGrassTile(this.map[y][x])) {
-							villageLocations.push({x, y});
-							break;
-						}
-					}
-					if (villageLocations.length > 0) break;
-				}
-			}
-
-			villageLocations.forEach((loc) => {
-				this.createVillage(loc);
-			});
-		}
-
-		findSuitableVillageLocations() {
-			const locations = [];
-			const minDistance = 20;
-
-			for (let y = 10; y < this.MAP_HEIGHT - 10; y += 10) {
-				for (let x = 10; x < this.MAP_WIDTH - 10; x += 10) {
-					if (this.isGrassTile(this.map[y][x])) {
-						let suitable = true;
-
-						for (const loc of locations) {
-							const dist = Math.hypot(x - loc.x, y - loc.y);
+					if (this.map[y][x] === TILE_TYPES.GRASS) {
+						// Ensure minimum distance from other villages
+						const minDistance = 10;
+						let tooClose = false;
+						for (const village of villages) {
+							const dist = Math.hypot(village.x - x, village.y - y);
 							if (dist < minDistance) {
-								suitable = false;
+								tooClose = true;
 								break;
 							}
 						}
 
-						let hasStrategicValue = false;
-						for (let dy = -5; dy <= 5 && !hasStrategicValue; dy++) {
-							for (let dx = -5; dx <= 5 && !hasStrategicValue; dx++) {
-								const newX = x + dx;
-								const newY = y + dy;
-								if (this.isValidTile(newX, newY)) {
-									const tile = this.map[newY][newX];
-									if (tile === TILE_TYPES.MOUNTAIN || this.isWaterTile(tile)) {
-										hasStrategicValue = true;
-									}
-								}
-							}
-						}
-
-						if (suitable && hasStrategicValue) {
-							locations.push({x, y});
+						if (!tooClose) {
+							this.map[y][x] = TILE_TYPES.VILLAGE_CENTER;
+							villages.push({x, y});
+							placed = true;
 						}
 					}
 				}
 			}
 
-			return locations.slice(0, 8);
+			// Surround village centers with buildings
+			villages.forEach(village => {
+				this.createVillageBuildings(village.x, village.y);
+			});
+
+			return villages;
 		}
 
-		createVillage(center) {
-			// Village center
-			this.map[center.y][center.x] = TILE_TYPES.VILLAGE_CENTER;
-
-			// Buildings around the center
-			const radius = 3 + Math.floor(Math.random() * 3);
-			for (let y = -radius; y <= radius; y++) {
-				for (let x = -radius; x <= radius; x++) {
+		createVillageBuildings(centerX, centerY) {
+			const buildingRadius = 2;
+			for (let y = -buildingRadius; y <= buildingRadius; y++) {
+				for (let x = -buildingRadius; x <= buildingRadius; x++) {
 					const dist = Math.sqrt(x * x + y * y);
-					if (dist <= radius && Math.random() < 0.7) {
-						const newY = center.y + y;
-						const newX = center.x + x;
-						if (this.isValidTile(newX, newY) && !this.isWaterTile(this.map[newY][newX])) {
+					if (dist <= buildingRadius) {
+						const newX = centerX + x;
+						const newY = centerY + y;
+						if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
 							this.map[newY][newX] = TILE_TYPES.BUILDING;
 						}
 					}
 				}
 			}
-
-			// Farms at the village edge
-			this.createFarms(center, radius + 2);
 		}
 
-		createFarms(center, radius) {
-			for (let y = -radius; y <= radius; y++) {
-				for (let x = -radius; x <= radius; x++) {
-					const dist = Math.sqrt(x * x + y * y);
-					const newY = center.y + y;
-					const newX = center.x + x;
-
-					if (
-						dist > radius - 2 &&
-						dist <= radius &&
-						this.isValidTile(newX, newY) &&
-						this.isGrassTile(this.map[newY][newX])
-					) {
-						if (Math.random() < 0.5) {
-							this.map[newY][newX] = TILE_TYPES.FARM;
-						}
-					}
+		// 7. Connect villages with roads using simple straight lines
+		connectVillagesWithRoads(villages) {
+			for (let i = 0; i < villages.length; i++) {
+				for (let j = i + 1; j < villages.length; j++) {
+					this.createRoad(villages[i], villages[j]);
 				}
 			}
 		}
 
-		generateRoadNetwork() {
-			// Main roads between important points
-			const hubs = this.findImportantLocations();
-			const mst = this.minimumSpanningTree(hubs);
-
-			mst.forEach((edge) => {
-				this.createRoadBetween(edge.start, edge.end);
-			});
-
-			// Secondary roads
-			hubs.forEach((hub) => {
-				if (Math.random() < 0.4) {
-					const target = this.findNearestVillage(hub);
-					if (target) {
-						this.createDirtRoad(hub, target);
-					}
-				}
-			});
-		}
-
-		findImportantLocations() {
-			const locations = [];
-
-			// Mountains
-			const mountains = MapGenerator.findTilesByType(this.map, TILE_TYPES.MOUNTAIN);
-			mountains.slice(0, 5).forEach((mountain) => {
-				locations.push({
-					x: mountain.x * this.TILE_SIZE + this.TILE_SIZE / 2,
-					y: mountain.y * this.TILE_SIZE + this.TILE_SIZE / 2,
-					type: 'mountain',
-				});
-			});
-
-			// Villages
-			const villages = MapGenerator.findTilesByType(this.map, TILE_TYPES.VILLAGE_CENTER);
-			villages.forEach((village) => {
-				locations.push({
-					x: village.x * this.TILE_SIZE + this.TILE_SIZE / 2,
-					y: village.y * this.TILE_SIZE + this.TILE_SIZE / 2,
-					type: 'village',
-				});
-			});
-
-			// Water access points
-			const waterAccess = [];
-			const waterTiles = MapGenerator.findTilesByType(this.map, TILE_TYPES.DEEP_WATER).concat(
-				MapGenerator.findTilesByType(this.map, TILE_TYPES.SHALLOW_WATER)
-			);
-
-			waterTiles.forEach((water) => {
-				const neighbors = [
-					{x: water.x + 1, y: water.y},
-					{x: water.x - 1, y: water.y},
-					{x: water.x, y: water.y + 1},
-					{x: water.x, y: water.y - 1},
-				];
-
-				neighbors.forEach((neighbor) => {
-					if (
-						this.isValidTile(neighbor.x, neighbor.y) &&
-						!this.isWaterTile(this.map[neighbor.y][neighbor.x]) &&
-						neighbor.x % 20 === 0
-					) {
-						waterAccess.push({
-							x: neighbor.x * this.TILE_SIZE + this.TILE_SIZE / 2,
-							y: neighbor.y * this.TILE_SIZE + this.TILE_SIZE / 2,
-							type: 'waterAccess',
-						});
-					}
-				});
-			});
-
-			// Add a selection of water access points
-			locations.push(...waterAccess.slice(0, 5));
-
-			return locations;
-		}
-
-		minimumSpanningTree(points) {
-			const edges = [];
-
-			// Create all possible edges with their distances
-			for (let i = 0; i < points.length; i++) {
-				for (let j = i + 1; j < points.length; j++) {
-					edges.push({
-						start: points[i],
-						end: points[j],
-						distance: Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y),
-					});
-				}
-			}
-
-			// Sort edges by distance
-			edges.sort((a, b) => a.distance - b.distance);
-
-			// Initialize Union-Find structure
-			const parent = Array(points.length).fill(0).map((_, idx) => idx);
-
-			const find = (i) => {
-				if (parent[i] !== i) {
-					parent[i] = find(parent[i]);
-				}
-				return parent[i];
-			};
-
-			const mst = [];
-			edges.forEach((edge) => {
-				const startIdx = points.indexOf(edge.start);
-				const endIdx = points.indexOf(edge.end);
-				const rootStart = find(startIdx);
-				const rootEnd = find(endIdx);
-				if (rootStart !== rootEnd) {
-					mst.push(edge);
-					parent[rootStart] = rootEnd;
-				}
-			});
-
-			return mst;
-		}
-
-		createRoadBetween(start, end) {
-			const dx = end.x - start.x;
-			const dy = end.y - start.y;
+		createRoad(villageA, villageB) {
+			let x = villageA.x;
+			let y = villageA.y;
+			const dx = villageB.x - villageA.x;
+			const dy = villageB.y - villageA.y;
 			const steps = Math.max(Math.abs(dx), Math.abs(dy));
 
-			for (let i = 0; i <= steps; i++) {
-				const x = Math.floor((start.x + (dx * i) / steps) / this.TILE_SIZE);
-				const y = Math.floor((start.y + (dy * i) / steps) / this.TILE_SIZE);
+			const stepX = dx / steps;
+			const stepY = dy / steps;
 
-				if (this.isValidTile(x, y) && !this.isWaterTile(this.map[y][x])) {
-					this.map[y][x] = TILE_TYPES.ROAD;
+			for (let i = 0; i <= steps; i++) {
+				const currentX = Math.round(x + stepX * i);
+				const currentY = Math.round(y + stepY * i);
+				if (this.isValidTile(currentX, currentY)) {
+					if (this.map[currentY][currentX] !== TILE_TYPES.DEEP_WATER &&
+						this.map[currentY][currentX] !== TILE_TYPES.SHALLOW_WATER) {
+						this.map[currentY][currentX] = TILE_TYPES.ROAD;
+					}
 				}
 			}
 		}
 
-		createDirtRoad(start, end) {
-			const dx = end.x - start.x;
-			const dy = end.y - start.y;
-			const steps = Math.max(Math.abs(dx), Math.abs(dy));
-
-			for (let i = 0; i <= steps; i++) {
-				const x = Math.floor((start.x + (dx * i) / steps) / this.TILE_SIZE);
-				const y = Math.floor((start.y + (dy * i) / steps) / this.TILE_SIZE);
-
-				if (
-					this.isValidTile(x, y) &&
-					!this.isWaterTile(this.map[y][x]) &&
-					this.map[y][x] !== TILE_TYPES.ROAD
-				) {
-					this.map[y][x] = TILE_TYPES.DIRT_ROAD;
-				}
-			}
-		}
-
-		findNearestVillage(point) {
-			const villages = MapGenerator.findTilesByType(this.map, TILE_TYPES.VILLAGE_CENTER);
-			if (villages.length === 0) return null;
-
-			let nearest = null;
-			let minDist = Infinity;
-
-			villages.forEach((village) => {
-				const dist = Math.hypot(
-					village.x - point.x / this.TILE_SIZE,
-					village.y - point.y / this.TILE_SIZE
-				);
-				if (dist < minDist) {
-					minDist = dist;
-					nearest = {
-						x: village.x * this.TILE_SIZE + this.TILE_SIZE / 2,
-						y: village.y * this.TILE_SIZE + this.TILE_SIZE / 2,
-					};
-				}
-			});
-
-			return nearest;
-		}
-
+		// 8. Add vegetation like trees and bushes
 		addVegetation() {
 			for (let y = 0; y < this.MAP_HEIGHT; y++) {
 				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (this.map[y][x] === TILE_TYPES.GRASS || this.map[y][x] === TILE_TYPES.HIGH_GRASS) {
-						if (Math.random() < 0.1) {
+					if (this.map[y][x] === TILE_TYPES.GRASS || this.map[y][x] === TILE_TYPES.FOREST) {
+						const rand = Math.random();
+						if (rand < 0.05) {
 							this.map[y][x] = TILE_TYPES.TREE;
-						} else if (Math.random() < 0.2) {
+						} else if (rand < 0.10) {
 							this.map[y][x] = TILE_TYPES.BUSH;
 						}
 					}
 				}
 			}
 
-			// Tree lines along roads
+			// Optionally, add tree lines along roads
 			this.addTreeLines();
 		}
 
@@ -969,55 +668,28 @@
 			for (let y = 0; y < this.MAP_HEIGHT; y++) {
 				for (let x = 0; x < this.MAP_WIDTH; x++) {
 					if (this.map[y][x] === TILE_TYPES.ROAD) {
-						if (y % 3 === 0) {
-							if (this.isValidTile(x - 1, y) && this.isGrassTile(this.map[y][x - 1])) {
-								this.map[y][x - 1] = TILE_TYPES.TREE;
-							}
-							if (this.isValidTile(x + 1, y) && this.isGrassTile(this.map[y][x + 1])) {
-								this.map[y][x + 1] = TILE_TYPES.TREE;
-							}
+						// Add trees on both sides of the road with some probability
+						if (this.isValidTile(x - 1, y) && this.map[y][x - 1] === TILE_TYPES.GRASS) {
+							if (Math.random() < 0.3) this.map[y][x - 1] = TILE_TYPES.TREE;
+						}
+						if (this.isValidTile(x + 1, y) && this.map[y][x + 1] === TILE_TYPES.GRASS) {
+							if (Math.random() < 0.3) this.map[y][x + 1] = TILE_TYPES.TREE;
 						}
 					}
 				}
 			}
 		}
 
-		addBridges() {
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (this.map[y][x] === TILE_TYPES.ROAD) {
-						if (this.hasWaterNeighbors(x, y)) {
-							this.map[y][x] = TILE_TYPES.BRIDGE;
-						}
-					}
-				}
-			}
+		// Utility method to check if a tile is within map bounds
+		isValidTile(x, y) {
+			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
 		}
 
-		hasWaterNeighbors(x, y) {
-			const neighbors = [
-				{dx: -1, dy: 0},
-				{dx: 1, dy: 0},
-				{dx: 0, dy: -1},
-				{dx: 0, dy: 1},
-			];
-
-			let waterCount = 0;
-			neighbors.forEach((n) => {
-				const newX = x + n.dx;
-				const newY = y + n.dy;
-				if (this.isValidTile(newX, newY) && this.isWaterTile(this.map[newY][newX])) {
-					waterCount++;
-				}
-			});
-
-			return waterCount > 0;
-		}
-
+		// Methode wird benötigt (ist bereits im Code eingebunden)
 		static findTilesByType(searchMap, tileType) {
 			const tiles = [];
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
+			for (let y = 0; y < searchMap.length; y++) {
+				for (let x = 0; x < searchMap[0].length; x++) {
 					if (searchMap[y][x] === tileType) {
 						tiles.push({x, y});
 					}
@@ -1025,8 +697,8 @@
 			}
 
 			// Optional: Sort by distance to map center
-			const centerX = this.MAP_WIDTH / 2;
-			const centerY = this.MAP_HEIGHT / 2;
+			const centerX = searchMap[0].length / 2;
+			const centerY = searchMap.length / 2;
 
 			tiles.sort((a, b) => {
 				const distA = Math.hypot(a.x - centerX, a.y - centerY);
@@ -1035,14 +707,6 @@
 			});
 
 			return tiles;
-		}
-
-		// Einfache Rauschfunktion (z.B. Wertedämpfung)
-		noise2D(x, y) {
-			// Verwende eine einfache Pseudozufallsfunktion basierend auf Koordinaten
-			const seed = 10000 * x + y;
-			let n = Math.sin(seed) * 10000;
-			return n - Math.floor(n);
 		}
 	}
 
@@ -1060,10 +724,18 @@
 		];
 		for (let i = 0; i < 5; i++) {
 			let x, y;
+
+			// Find a random tile to which the player can reach
 			do {
 				x = Math.floor(Math.random() * MAP_WIDTH);
 				y = Math.floor(Math.random() * MAP_HEIGHT);
-			} while (map[y][x] !== TILE_TYPES.VILLAGE_CENTER);
+			} while (
+				map[y][x] === TILE_TYPES.DEEP_WATER
+				|| map[y][x] === TILE_TYPES.SHALLOW_WATER
+				|| map[y][x] === TILE_TYPES.BUILDING
+				|| map[y][x] === TILE_TYPES.MOUNTAIN
+				|| map[y][x] === TILE_TYPES.TREE);
+
 			const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
 			const mission = {
 				x: x * TILE_SIZE + TILE_SIZE / 2,
