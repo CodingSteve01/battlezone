@@ -176,6 +176,7 @@
 	const MAP_WIDTH = 200; // Größerer Level
 	const MAP_HEIGHT = 200;
 	const SIGHT_RADIUS = 300;
+	const MIN_ENEMY_PLAYER_DISTANCE = 50;
 	const keys = {};
 	let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover'
 
@@ -197,7 +198,8 @@
 		FARM: 13,
 		BRIDGE: 14,
 		TREE: 15,
-		BUSH: 16
+		BUSH: 16,
+        WALL: 17
 	};
 
 	// Farben für die Tiles
@@ -212,6 +214,7 @@
 		[TILE_TYPES.MOUNTAIN]: '#808080',
 		[TILE_TYPES.SNOW]: '#fffafa',
 		[TILE_TYPES.ROAD]: '#696969',
+		[TILE_TYPES.WALL]: '#261f1f',
 		[TILE_TYPES.DIRT_ROAD]: '#8b4513',
 		[TILE_TYPES.BUILDING]: '#8b0000',
 		[TILE_TYPES.VILLAGE_CENTER]: '#cd853f',
@@ -390,6 +393,8 @@
 			this.TILE_SIZE = tileSize || 1; // Default tile size
 			this.map = []; // The main map
 			this.heightMap = []; // Height map
+			this.MAX_VILLAGE_PLACEMENT_ATTEMPTS = 1000; // Sicherheitsgrenze für Dorfplatzierung
+			this.MAX_ROAD_CREATION_ATTEMPTS = 1000; // Sicherheitsgrenze für Straßenerstellung
 		}
 
 		generateMap() {
@@ -412,7 +417,7 @@
 			// 6. Place villages
 			const villages = this.placeVillages();
 
-			// 7. Connect villages with roads
+			// 7. Connect villages with roads using A* for smooth roads with curves
 			this.connectVillagesWithRoads(villages);
 
 			// 8. Add vegetation
@@ -471,7 +476,7 @@
 		// 3. Upscale the height map using bilinear interpolation
 		upscaleHeightMap(lowResMap, targetWidth, targetHeight) {
 			const lowSize = lowResMap.length;
-			const highResMap = Array.from({length: targetHeight}, () => Array(targetWidth).fill(0));
+			const highResMap = Array.from({ length: targetHeight }, () => Array(targetWidth).fill(0));
 
 			for (let y = 0; y < targetHeight; y++) {
 				for (let x = 0; x < targetWidth; x++) {
@@ -527,7 +532,7 @@
 
 		// 5. Place water bodies such as seas and lakes
 		placeWaterBodies() {
-			// For simplicity, designate the edges as sea (DEEP_WATER)
+			// Designate the edges as sea (DEEP_WATER)
 			for (let y = 0; y < this.MAP_HEIGHT; y++) {
 				this.map[y][0] = TILE_TYPES.DEEP_WATER;
 				this.map[y][this.MAP_WIDTH - 1] = TILE_TYPES.DEEP_WATER;
@@ -562,10 +567,12 @@
 		placeVillages() {
 			const villages = [];
 			const villageCount = Math.max(1, Math.floor(this.MAP_WIDTH / 20));
+			let attempts = 0;
 
 			for (let i = 0; i < villageCount; i++) {
 				let placed = false;
-				while (!placed) {
+				while (!placed && attempts < this.MAX_VILLAGE_PLACEMENT_ATTEMPTS) {
+					attempts++;
 					const x = Math.floor(Math.random() * this.MAP_WIDTH);
 					const y = Math.floor(Math.random() * this.MAP_HEIGHT);
 
@@ -583,17 +590,18 @@
 
 						if (!tooClose) {
 							this.map[y][x] = TILE_TYPES.VILLAGE_CENTER;
-							villages.push({x, y});
+							villages.push({ x, y });
+							this.createVillageBuildings(x, y);
 							placed = true;
 						}
 					}
 				}
-			}
 
-			// Surround village centers with buildings
-			villages.forEach(village => {
-				this.createVillageBuildings(village.x, village.y);
-			});
+				if (attempts >= this.MAX_VILLAGE_PLACEMENT_ATTEMPTS && !placed) {
+					console.warn(`Max village placement attempts reached. Placed ${villages.length} villages out of ${villageCount}.`);
+					break;
+				}
+			}
 
 			return villages;
 		}
@@ -608,41 +616,206 @@
 						const newY = centerY + y;
 						if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
 							this.map[newY][newX] = TILE_TYPES.BUILDING;
+							this.createWallAroundBuilding(newX, newY);
 						}
 					}
 				}
 			}
 		}
 
-		// 7. Connect villages with roads using simple straight lines
-		connectVillagesWithRoads(villages) {
-			for (let i = 0; i < villages.length; i++) {
-				for (let j = i + 1; j < villages.length; j++) {
-					this.createRoad(villages[i], villages[j]);
+		createWallAroundBuilding(x, y) {
+			const wallRadius = 3; // Größe der Mauer
+			for (let dy = -wallRadius; dy <= wallRadius; dy++) {
+				for (let dx = -wallRadius; dx <= wallRadius; dx++) {
+					const dist = Math.sqrt(dx * dx + dy * dy);
+					if (dist <= wallRadius) {
+						const newX = x + dx;
+						const newY = y + dy;
+						if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
+							this.map[newY][newX] = TILE_TYPES.WALL;
+						}
+					}
 				}
 			}
 		}
 
-		createRoad(villageA, villageB) {
-			let x = villageA.x;
-			let y = villageA.y;
-			const dx = villageB.x - villageA.x;
-			const dy = villageB.y - villageA.y;
-			const steps = Math.max(Math.abs(dx), Math.abs(dy));
+		// 7. Connect villages with roads using A* for smooth roads with curves
+		connectVillagesWithRoads(villages) {
+			if (villages.length < 2) return; // Nothing to connect
 
-			const stepX = dx / steps;
-			const stepY = dy / steps;
+			// Create a graph connecting all villages
+			const connected = new Set();
+			connected.add(villages[0]);
 
-			for (let i = 0; i <= steps; i++) {
-				const currentX = Math.round(x + stepX * i);
-				const currentY = Math.round(y + stepY * i);
-				if (this.isValidTile(currentX, currentY)) {
-					if (this.map[currentY][currentX] !== TILE_TYPES.DEEP_WATER &&
-						this.map[currentY][currentX] !== TILE_TYPES.SHALLOW_WATER) {
-						this.map[currentY][currentX] = TILE_TYPES.ROAD;
-					}
+			let attempts = 0;
+
+			while (connected.size < villages.length && attempts < this.MAX_ROAD_CREATION_ATTEMPTS) {
+				attempts++;
+				let nearestDistance = Infinity;
+				let nearestPair = [null, null];
+
+				connected.forEach(villageA => {
+					villages.forEach(villageB => {
+						if (!connected.has(villageB)) {
+							const dist = Math.hypot(villageA.x - villageB.x, villageA.y - villageB.y);
+							if (dist < nearestDistance) {
+								nearestDistance = dist;
+								nearestPair = [villageA, villageB];
+							}
+						}
+					});
+				});
+
+				if (nearestPair[0] && nearestPair[1]) {
+					this.createRoad(nearestPair[0], nearestPair[1]);
+					connected.add(nearestPair[1]);
+				} else {
+					break;
 				}
 			}
+
+			if (attempts >= this.MAX_ROAD_CREATION_ATTEMPTS) {
+				console.warn(`Max road creation attempts reached. Connected ${connected.size} out of ${villages.length} villages.`);
+			}
+		}
+
+		// A* Pathfinding to create smooth roads with curves
+		createRoad(start, end) {
+			const path = this.aStarPathfind(start, end);
+
+			if (path.length === 0) return; // No path found
+
+			// Draw road with width 2x2 tiles
+			path.forEach(point => {
+				this.setRoadTile(point.x, point.y);
+				// Also set adjacent tiles to make the road 2x2
+				this.setRoadTile(point.x + 1, point.y);
+				this.setRoadTile(point.x, point.y + 1);
+				this.setRoadTile(point.x + 1, point.y + 1);
+			});
+		}
+
+		isWaterTile(tileType) {
+			return tileType === TILE_TYPES.DEEP_WATER || tileType === TILE_TYPES.SHALLOW_WATER;
+		}
+
+		isGrassTile(tileType) {
+			return tileType === TILE_TYPES.GRASS || tileType === TILE_TYPES.HIGH_GRASS;
+		}
+
+		isValidTile(x, y) {
+			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
+		}
+
+		// Set road tile if possible
+		setRoadTile(x, y) {
+			if (this.isValidTile(x, y) && !this.isWaterTile(this.map[y][x])) {
+				// Prefer roads over dirt roads and buildings
+				if (
+					this.map[y][x] !== TILE_TYPES.ROAD &&
+					this.map[y][x] !== TILE_TYPES.BUILDING &&
+					this.map[y][x] !== TILE_TYPES.WALL
+				) {
+					this.map[y][x] = TILE_TYPES.ROAD;
+				}
+			}
+		}
+
+		// A* Pathfinding Algorithm
+		aStarPathfind(start, end) {
+			const openSet = [];
+			const closedSet = new Set();
+			const cameFrom = new Map();
+
+			const startKey = `${start.x},${start.y}`;
+			const endKey = `${end.x},${end.y}`;
+
+			const gScore = {};
+			const fScore = {};
+
+			gScore[startKey] = 0;
+			fScore[startKey] = this.heuristic(start, end);
+
+			openSet.push({ x: start.x, y: start.y, f: fScore[startKey] });
+
+			while (openSet.length > 0) {
+				// Get the node with the lowest fScore
+				openSet.sort((a, b) => a.f - b.f);
+				const current = openSet.shift();
+				const currentKey = `${current.x},${current.y}`;
+
+				if (currentKey === endKey) {
+					return this.reconstructPath(cameFrom, currentKey);
+				}
+
+				closedSet.add(currentKey);
+
+				const neighbors = this.getNeighbors(current.x, current.y);
+				neighbors.forEach(neighbor => {
+					const neighborKey = `${neighbor.x},${neighbor.y}`;
+					if (closedSet.has(neighborKey)) return;
+
+					const tentative_gScore = gScore[currentKey] + 1; // Assuming uniform cost
+
+					if (!gScore.hasOwnProperty(neighborKey) || tentative_gScore < gScore[neighborKey]) {
+						cameFrom.set(neighborKey, currentKey);
+						gScore[neighborKey] = tentative_gScore;
+						fScore[neighborKey] = tentative_gScore + this.heuristic(neighbor, end);
+
+						if (!openSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
+							openSet.push({ x: neighbor.x, y: neighbor.y, f: fScore[neighborKey] });
+						}
+					}
+				});
+			}
+
+			// No path found
+			console.warn(`No path found between (${start.x}, ${start.y}) and (${end.x}, ${end.y}).`);
+			return [];
+		}
+
+		heuristic(a, b) {
+			// Use Manhattan distance
+			return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+		}
+
+		reconstructPath(cameFrom, currentKey) {
+			const path = [];
+			let current = currentKey;
+
+			while (cameFrom.has(current)) {
+				const [x, y] = current.split(',').map(Number);
+				path.push({ x, y });
+				current = cameFrom.get(current);
+			}
+
+			const [x, y] = current.split(',').map(Number);
+			path.push({ x, y });
+			return path.reverse();
+		}
+
+		getNeighbors(x, y) {
+			const directions = [
+				{ dx: -1, dy: 0 },
+				{ dx: 1, dy: 0 },
+				{ dx: 0, dy: -1 },
+				{ dx: 0, dy: 1 },
+				{ dx: -1, dy: -1 },
+				{ dx: 1, dy: -1 },
+				{ dx: -1, dy: 1 },
+				{ dx: 1, dy: 1 }
+			];
+
+			const neighbors = [];
+			directions.forEach(dir => {
+				const newX = x + dir.dx;
+				const newY = y + dir.dy;
+				if (this.isValidTile(newX, newY) && !this.isWaterTile(this.map[newY][newX])) {
+					neighbors.push({ x: newX, y: newY });
+				}
+			});
+
+			return neighbors;
 		}
 
 		// 8. Add vegetation like trees and bushes
@@ -669,20 +842,25 @@
 				for (let x = 0; x < this.MAP_WIDTH; x++) {
 					if (this.map[y][x] === TILE_TYPES.ROAD) {
 						// Add trees on both sides of the road with some probability
-						if (this.isValidTile(x - 1, y) && this.map[y][x - 1] === TILE_TYPES.GRASS) {
-							if (Math.random() < 0.3) this.map[y][x - 1] = TILE_TYPES.TREE;
-						}
-						if (this.isValidTile(x + 1, y) && this.map[y][x + 1] === TILE_TYPES.GRASS) {
-							if (Math.random() < 0.3) this.map[y][x + 1] = TILE_TYPES.TREE;
-						}
+						const adjacentOffsets = [
+							{ dx: -2, dy: 0 },
+							{ dx: 2, dy: 0 },
+							{ dx: 0, dy: -2 },
+							{ dx: 0, dy: 2 }
+						];
+
+						adjacentOffsets.forEach(offset => {
+							const newX = x + offset.dx;
+							const newY = y + offset.dy;
+							if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
+								if (Math.random() < 0.3) {
+									this.map[newY][newX] = TILE_TYPES.TREE;
+								}
+							}
+						});
 					}
 				}
 			}
-		}
-
-		// Utility method to check if a tile is within map bounds
-		isValidTile(x, y) {
-			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
 		}
 
 		// Methode wird benötigt (ist bereits im Code eingebunden)
@@ -691,7 +869,7 @@
 			for (let y = 0; y < searchMap.length; y++) {
 				for (let x = 0; x < searchMap[0].length; x++) {
 					if (searchMap[y][x] === tileType) {
-						tiles.push({x, y});
+						tiles.push({ x, y });
 					}
 				}
 			}
@@ -734,6 +912,7 @@
 				|| map[y][x] === TILE_TYPES.SHALLOW_WATER
 				|| map[y][x] === TILE_TYPES.BUILDING
 				|| map[y][x] === TILE_TYPES.MOUNTAIN
+				|| map[y][x] === TILE_TYPES.WALL
 				|| map[y][x] === TILE_TYPES.TREE);
 
 			const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
@@ -1351,13 +1530,13 @@
 			const dx = x - this.x;
 			const dy = y - this.y;
 			const dist = Math.hypot(dx, dy);
-			if (dist > 0) {
+			if (dist > MIN_ENEMY_PLAYER_DISTANCE) { // Nur bewegen, wenn außerhalb des Mindestabstands
 				const dirX = dx / dist;
 				const dirY = dy / dist;
 				const newX = this.x + dirX * this.speed;
 				const newY = this.y + dirY * this.speed;
 
-				if (!isColliding(newX, newY)) {
+				if (!isColliding(newX, newY, this)) {
 					this.x = newX;
 					this.y = newY;
 				}
@@ -1918,10 +2097,10 @@
 		)
 			return true;
 		const tile = map[tileY][tileX];
-		if (tile === TILE_TYPES.MOUNTAIN) {
+		if (tile === TILE_TYPES.MOUNTAIN || tile === TILE_TYPES.WALL) {
 			return true;
 		}
-		if (tile === TILE_TYPES.WATER) {
+		if (tile === TILE_TYPES.DEEP_WATER || tile === TILE_TYPES.SHALLOW_WATER) {
 			if (object instanceof Vehicle) {
 				return true; // Vehicles cannot move over water
 			} else if (object instanceof Player) {
@@ -1929,6 +2108,48 @@
 			} else {
 				return true;
 			}
+		}
+
+		if (object) {
+			// Kollision mit anderen Spielern
+			for (let player of players) {
+				if (player !== object) { // Objekt selbst ausschließen
+					const distance = Math.hypot(x - player.x, y - player.y);
+					if (distance < (object.size + player.size) / 2) {
+						return true;
+					}
+				}
+			}
+
+			// Kollision mit anderen Gegnern
+			for (let enemy of enemies) {
+				if (enemy !== object) { // Objekt selbst ausschließen
+					const distance = Math.hypot(x - enemy.x, y - enemy.y);
+					if (distance < (object.size + enemy.size) / 2) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	// Kollisionsauflösung
+	function resolveCollision(entityA, entityB) {
+		const dx = entityB.x - entityA.x;
+		const dy = entityB.y - entityA.y;
+		const distance = Math.hypot(dx, dy);
+		const overlap = (entityA.size / 2 + entityB.size / 2) - distance;
+
+		if (overlap > 0) {
+			const offsetX = (dx / distance) * (overlap / 2);
+			const offsetY = (dy / distance) * (overlap / 2);
+
+			entityA.x -= offsetX;
+			entityA.y -= offsetY;
+			entityB.x += offsetX;
+			entityB.y += offsetY;
 		}
 	}
 
@@ -1958,7 +2179,7 @@
 		)
 			return true;
 		const tile = map[tileY][tileX];
-		return tile === TILE_TYPES.BUILDING || tile === TILE_TYPES.FOREST || tile === TILE_TYPES.MOUNTAIN;
+		return tile === TILE_TYPES.BUILDING || tile === TILE_TYPES.FOREST || tile === TILE_TYPES.MOUNTAIN || tile === TILE_TYPES.WALL;
 	}
 
 	function drawMissionArrow(player, mission) {
@@ -2180,6 +2401,27 @@
 
 		// Enemy respawning
 		spawnEnemiesAroundPlayers();
+
+		// Kollisionen zwischen Spielern und Gegnern auflösen
+		players.forEach(player => {
+			enemies.forEach(enemy => {
+				if (player.isAlive && enemy.isAlive) {
+					const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+					if (distance < (player.size / 2 + enemy.size / 2)) {
+						// Spieler nimmt Schaden
+						player.health -= 0.5; // Langsame Abnahme für realistischere Erfahrung
+
+						// Kollision auflösen
+						resolveCollision(player, enemy);
+
+						if (player.health <= 0) {
+							player.isAlive = false;
+							checkGameOver();
+						}
+					}
+				}
+			});
+		});
 
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
