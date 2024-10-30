@@ -1334,6 +1334,7 @@
 			this.angle = 0;
 			this.health = 100;
 			this.isCommander = isCommander;
+			this.canUseItem = true; // Wichtig für Schussrate-Kontrolle
 
 			// Stealth & Wahrnehmung
 			this.viewAngle = Math.PI / 3; // Engeres Sichtfeld (60 Grad)
@@ -1342,6 +1343,12 @@
 			this.alertnessLevel = 0; // Steigt bei Verdacht
 			this.lastSuspiciousPosition = null;
 			this.viewColor = 'rgba(255, 255, 0, 0.1)'; // Gelb für normal
+			this.currentTarget = null; // Speichert das aktuelle Ziel für den Kampf
+
+			// Combat-spezifische Eigenschaften
+			this.fireRate = isCommander ? 800 : 1000; // Millisekunden zwischen Schüssen
+			this.lastShotTime = 0;
+			this.accuracy = isCommander ? 0.9 : 0.7; // Genauigkeit der Schüsse
 
 			// Patrouille & Wache
 			this.patrolType = this.getRandomPatrolType();
@@ -1500,8 +1507,8 @@
 			this.checkForThreats();
 
 			// Alertness-Level über Zeit reduzieren
-			if (this.alertnessLevel > 0) {
-				this.alertnessLevel -= 0.05; // Langsamer beruhigen
+			if (this.alertnessLevel > 0 && this.alertness !== 'combat') {
+				this.alertnessLevel -= 0.02; // Langsamer beruhigen
 				if (this.alertnessLevel <= 0) {
 					this.returnToPatrol();
 				}
@@ -1623,35 +1630,59 @@
 		}
 
 		engageTarget() {
-			const target = this.findNearestPlayer();
-			if (!target) {
-				this.alertness = 'alert';
-				return;
+			if (!this.currentTarget || !this.currentTarget.isAlive) {
+				this.currentTarget = this.findNearestPlayer();
+				if (!this.currentTarget) {
+					this.alertness = 'alert';
+					return;
+				}
 			}
 
-			const distToTarget = Math.hypot(target.x - this.x, target.y - this.y);
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-			if (distToTarget > this.preferredRange) {
+			// Positionierung relativ zum Ziel
+			if (distToTarget > this.preferredRange + 50) {
 				// Zu weit weg - annähern
-				this.moveTowards(target.x, target.y);
+				this.moveTowards(this.currentTarget.x, this.currentTarget.y);
 			} else if (distToTarget < this.preferredRange - 50) {
 				// Zu nah - zurückweichen
-				const angle = Math.atan2(this.y - target.y, this.x - target.x);
+				const angle = Math.atan2(this.y - this.currentTarget.y, this.x - this.currentTarget.x);
 				const retreatX = this.x + Math.cos(angle) * this.speed;
 				const retreatY = this.y + Math.sin(angle) * this.speed;
 				this.moveTowards(retreatX, retreatY);
 			}
 
-			// Zum Ziel drehen und schießen
-			this.angle = Math.atan2(target.y - this.y, target.x - this.x);
-			if (this.canUseItem) {
-				bullets.push(new Bullet(this.x, this.y, this.angle, 'red', this, {
-					damage: 15,
-					range: 300,
-					speed: 10
-				}));
-				this.canUseItem = false;
-				setTimeout(() => this.canUseItem = true, 500);
+			// Zum Ziel drehen
+			this.angle = Math.atan2(
+				this.currentTarget.y - this.y,
+				this.currentTarget.x - this.x
+			);
+
+			// Schießen wenn möglich
+			const currentTime = Date.now();
+			if (currentTime - this.lastShotTime >= this.fireRate) {
+				// Schussgenauigkeit simulieren
+				const accuracy = Math.random() <= this.accuracy;
+				const spread = accuracy ? 0.1 : 0.3; // Weniger Streuung bei genauem Schuss
+				const randomSpread = (Math.random() - 0.5) * spread;
+
+				bullets.push(new Bullet(
+					this.x,
+					this.y,
+					this.angle + randomSpread,
+					'red',
+					this,
+					{
+						damage: this.isCommander ? 20 : 15,
+						range: 400,
+						speed: 10
+					}
+				));
+
+				this.lastShotTime = currentTime;
 			}
 		}
 
@@ -1813,18 +1844,20 @@
 
 		handlePlayerDetection(player, fullView) {
 			if (fullView) {
-				this.alertnessLevel += 2;
-				if (this.alertnessLevel >= 10) {
+				this.alertnessLevel = Math.min(this.alertnessLevel + 3, 10);
+				this.currentTarget = player;
+
+				if (this.alertnessLevel >= 8) {
 					this.alertness = 'combat';
 					this.viewColor = 'rgba(255, 0, 0, 0.2)';
-					// Benachrichtige andere Wachen in der Nähe
 					this.alertNearbyGuards(player);
 				} else {
 					this.alertness = 'suspicious';
 					this.viewColor = 'rgba(255, 165, 0, 0.15)';
 				}
+				this.lastSuspiciousPosition = {x: player.x, y: player.y};
 			} else {
-				this.alertnessLevel += 0.5;
+				this.alertnessLevel = Math.min(this.alertnessLevel + 1, 10);
 				this.lastSuspiciousPosition = {x: player.x, y: player.y};
 			}
 		}
