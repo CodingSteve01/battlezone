@@ -199,7 +199,7 @@
 		BRIDGE: 14,
 		TREE: 15,
 		BUSH: 16,
-        WALL: 17
+		WALL: 17
 	};
 
 	// Farben für die Tiles
@@ -476,7 +476,7 @@
 		// 3. Upscale the height map using bilinear interpolation
 		upscaleHeightMap(lowResMap, targetWidth, targetHeight) {
 			const lowSize = lowResMap.length;
-			const highResMap = Array.from({ length: targetHeight }, () => Array(targetWidth).fill(0));
+			const highResMap = Array.from({length: targetHeight}, () => Array(targetWidth).fill(0));
 
 			for (let y = 0; y < targetHeight; y++) {
 				for (let x = 0; x < targetWidth; x++) {
@@ -590,7 +590,7 @@
 
 						if (!tooClose) {
 							this.map[y][x] = TILE_TYPES.VILLAGE_CENTER;
-							villages.push({ x, y });
+							villages.push({x, y});
 							this.createVillageBuildings(x, y);
 							placed = true;
 						}
@@ -736,7 +736,7 @@
 			gScore[startKey] = 0;
 			fScore[startKey] = this.heuristic(start, end);
 
-			openSet.push({ x: start.x, y: start.y, f: fScore[startKey] });
+			openSet.push({x: start.x, y: start.y, f: fScore[startKey]});
 
 			while (openSet.length > 0) {
 				// Get the node with the lowest fScore
@@ -763,7 +763,7 @@
 						fScore[neighborKey] = tentative_gScore + this.heuristic(neighbor, end);
 
 						if (!openSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
-							openSet.push({ x: neighbor.x, y: neighbor.y, f: fScore[neighborKey] });
+							openSet.push({x: neighbor.x, y: neighbor.y, f: fScore[neighborKey]});
 						}
 					}
 				});
@@ -785,25 +785,25 @@
 
 			while (cameFrom.has(current)) {
 				const [x, y] = current.split(',').map(Number);
-				path.push({ x, y });
+				path.push({x, y});
 				current = cameFrom.get(current);
 			}
 
 			const [x, y] = current.split(',').map(Number);
-			path.push({ x, y });
+			path.push({x, y});
 			return path.reverse();
 		}
 
 		getNeighbors(x, y) {
 			const directions = [
-				{ dx: -1, dy: 0 },
-				{ dx: 1, dy: 0 },
-				{ dx: 0, dy: -1 },
-				{ dx: 0, dy: 1 },
-				{ dx: -1, dy: -1 },
-				{ dx: 1, dy: -1 },
-				{ dx: -1, dy: 1 },
-				{ dx: 1, dy: 1 }
+				{dx: -1, dy: 0},
+				{dx: 1, dy: 0},
+				{dx: 0, dy: -1},
+				{dx: 0, dy: 1},
+				{dx: -1, dy: -1},
+				{dx: 1, dy: -1},
+				{dx: -1, dy: 1},
+				{dx: 1, dy: 1}
 			];
 
 			const neighbors = [];
@@ -811,7 +811,7 @@
 				const newX = x + dir.dx;
 				const newY = y + dir.dy;
 				if (this.isValidTile(newX, newY) && !this.isWaterTile(this.map[newY][newX])) {
-					neighbors.push({ x: newX, y: newY });
+					neighbors.push({x: newX, y: newY});
 				}
 			});
 
@@ -843,10 +843,10 @@
 					if (this.map[y][x] === TILE_TYPES.ROAD) {
 						// Add trees on both sides of the road with some probability
 						const adjacentOffsets = [
-							{ dx: -2, dy: 0 },
-							{ dx: 2, dy: 0 },
-							{ dx: 0, dy: -2 },
-							{ dx: 0, dy: 2 }
+							{dx: -2, dy: 0},
+							{dx: 2, dy: 0},
+							{dx: 0, dy: -2},
+							{dx: 0, dy: 2}
 						];
 
 						adjacentOffsets.forEach(offset => {
@@ -869,7 +869,7 @@
 			for (let y = 0; y < searchMap.length; y++) {
 				for (let x = 0; x < searchMap[0].length; x++) {
 					if (searchMap[y][x] === tileType) {
-						tiles.push({ x, y });
+						tiles.push({x, y});
 					}
 				}
 			}
@@ -1007,26 +1007,11 @@
 					top: this.y - canvas.height / 2,
 					bottom: this.y + canvas.height / 2
 				};
-				if (
-					enemy.x > screenBounds.left &&
-					enemy.x < screenBounds.right &&
-					enemy.y > screenBounds.top &&
-					enemy.y < screenBounds.bottom
-				) {
+				if (enemy.x > screenBounds.left && enemy.x < screenBounds.right &&
+					enemy.y > screenBounds.top && enemy.y < screenBounds.bottom) {
 					this.spottedEnemies.add(enemy);
 				}
 			});
-
-
-			// If the player is in a vehicle, skip movement controls
-			if (this.vehicle) {
-				// Allow rotation controls for the gunner role
-				if (this.vehicle.roleAssignment[this.index] === 'gunner') {
-					if (keys[this.controls.left]) this.angle -= 0.05;
-					if (keys[this.controls.right]) this.angle += 0.05;
-				}
-				return;
-			}
 
 			let dx = 0;
 			let dy = 0;
@@ -1161,22 +1146,50 @@
 			// Entering/Exiting Vehicles
 			if (keys[this.controls.action]) {
 				if (this.vehicle) {
-					this.vehicle.removePassenger(this);
-					this.vehicle = null;
+					// Aussteigen
+					const exitOffsets = [
+						{angle: this.vehicle.angle + Math.PI / 2, offset: 30}, // Rechtsseite
+						{angle: this.vehicle.angle - Math.PI / 2, offset: 30}, // Linke Seite
+						{angle: this.vehicle.angle, offset: 30}, // Vorderseite
+						{angle: this.vehicle.angle + Math.PI, offset: 30}  // Rückseite
+					];
+					let exited = false;
+
+					for (let {angle, offset} of exitOffsets) {
+						const exitX = this.vehicle.x + Math.cos(angle) * offset;
+						const exitY = this.vehicle.y + Math.sin(angle) * offset;
+
+						if (!isColliding(exitX, exitY)) {
+							this.x = exitX;
+							this.y = exitY;
+							this.vehicle.removePassenger(this);
+							this.vehicle = null;
+							exited = true;
+							break;
+						}
+					}
+
+					if (!exited) {
+						// Optional: Zeige eine Nachricht an, dass der Ausstiegsbereich blockiert ist
+						showMessage('Ausstiegsposition blockiert!', 2000);
+					}
 				} else {
-					const nearbyVehicle = vehicles.find(
-						v =>
-							Math.hypot(this.x - v.x, this.y - v.y) < v.size / 2 + this.size / 2 &&
-							!v.isDestroyed
+					// Einsteigen
+					const nearbyVehicle = vehicles.find(v =>
+						Math.hypot(this.x - v.x, this.y - v.y) < v.size / 2 + this.size / 2 &&
+						!v.isDestroyed
 					);
 					if (nearbyVehicle) {
 						nearbyVehicle.addPassenger(this);
-						this.vehicle = nearbyVehicle;
-						// Set player's angle to the vehicle's angle
-						this.angle = nearbyVehicle.angle;
 					}
 				}
 				keys[this.controls.action] = false;
+			}
+
+			// Rollenwechsel im Fahrzeug
+			if (keys[this.controls.switchRole] && this.vehicle) {
+				this.vehicle.switchRole(this);
+				keys[this.controls.switchRole] = false;
 			}
 
 			// Ducken (Stealth)
@@ -1782,7 +1795,7 @@
 				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
 					vehicle.condition -= 100;
 					if (vehicle.condition <= 0) {
-						vehicle.isDestroyed = true;
+						vehicle.destroy();
 					}
 				}
 			});
@@ -1820,7 +1833,7 @@
 				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 20) {
 					vehicle.condition -= 100;
 					if (vehicle.condition <= 0) {
-						vehicle.isDestroyed = true;
+						vehicle.destroy();
 					}
 					mines.splice(mines.indexOf(this), 1);
 				}
@@ -1848,8 +1861,8 @@
 			this.maxSpeed = 5;
 			this.angle = 0;
 			this.passengers = [];
-			this.condition = 100; // Zustand des Fahrzeugs
-			this.roleAssignment = {}; // Spielerrollen
+			this.condition = 100;
+			this.roleAssignment = {};
 			this.isClosed = type === 'Panzer';
 			this.isDestroyed = false;
 		}
@@ -1857,25 +1870,42 @@
 		addPassenger(player) {
 			if (this.passengers.length < 2 && !this.isDestroyed) {
 				this.passengers.push(player);
-				if (this.passengers.length === 1) {
-					this.roleAssignment[player.index] = 'driver';
-				} else {
-					this.roleAssignment[player.index] = 'gunner';
-				}
+				// Erste Person ist immer Fahrer, zweite Person Schütze
+				this.roleAssignment[player.index] = this.passengers.length === 1 ? 'driver' : 'gunner';
+				player.vehicle = this; // Wichtig: Setze die Fahrzeugreferenz
 			}
 		}
 
 		removePassenger(player) {
-			this.passengers = this.passengers.filter(p => p !== player);
-			delete this.roleAssignment[player.index];
+			const index = this.passengers.indexOf(player);
+			if (index !== -1) {
+				this.passengers.splice(index, 1);
+				delete this.roleAssignment[player.index];
+				player.vehicle = null; // Wichtig: Entferne die Fahrzeugreferenz
+
+				// Wenn der Fahrer aussteigt und es noch einen Schützen gibt, wird dieser zum Fahrer
+				if (this.passengers.length === 1 && this.roleAssignment[this.passengers[0].index] === 'gunner') {
+					this.roleAssignment[this.passengers[0].index] = 'driver';
+				}
+			}
 		}
+
+		destroy() {
+            this.isDestroyed = true;
+			for (let i = this.passengers.length - 1; i >= 0; i--) {
+				this.removePassenger(this.passengers[i]);
+            }
+        }
 
 		switchRole(player) {
 			if (this.passengers.length === 2) {
 				const otherPlayer = this.passengers.find(p => p !== player);
-				const tempRole = this.roleAssignment[player.index];
-				this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
-				this.roleAssignment[otherPlayer.index] = tempRole;
+				if (otherPlayer) {
+					// Tausche die Rollen
+					const tempRole = this.roleAssignment[player.index];
+					this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
+					this.roleAssignment[otherPlayer.index] = tempRole;
+				}
 			}
 		}
 
@@ -1925,15 +1955,22 @@
 				if (keys[driver.controls.left]) this.angle -= 0.05;
 				if (keys[driver.controls.right]) this.angle += 0.05;
 			}
-			const newX = this.x + Math.cos(this.angle) * this.speed;
-			const newY = this.y + Math.sin(this.angle) * this.speed;
-			if (!isColliding(newX, newY, this)) {
-				this.x = newX;
-				this.y = newY;
-			} else {
-				this.speed = 0;
+
+			// Bewegung anwenden
+			if (Math.abs(this.speed) > 0.1) {
+				const newX = this.x + Math.cos(this.angle) * this.speed;
+				const newY = this.y + Math.sin(this.angle) * this.speed;
+				if (!isColliding(newX, newY, this)) {
+					this.x = newX;
+					this.y = newY;
+				} else {
+					this.speed = 0;
+				}
 			}
-			this.speed *= 0.9; // Reibung
+
+			// Reibung
+			this.speed *= 0.95;
+
 			// Aktualisiere Passagierpositionen
 			this.passengers.forEach(p => {
 				p.x = this.x;
@@ -2023,7 +2060,7 @@
 				// Inventar voll
 				return;
 			}
-			if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole_mit_schalldaempfer'].includes(this.type)) {
+			if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole (silenced)'].includes(this.type)) {
 				player.inventory.push({
 					name: this.type.charAt(0).toUpperCase() + this.type.slice(1),
 					type: 'Waffe',
@@ -2039,6 +2076,9 @@
 				if (!player.equipment.includes(this.type)) {
 					player.equipment.push(this.type);
 				}
+			} else if (this.type === 'medipack') {
+				// Medi-Pack: Gesundheit wiederherstellen
+				player.health = Math.min(player.health + 50, 100); // Stelle sicher, dass Gesundheit 100 nicht überschreitet
 			}
 		}
 
@@ -2053,7 +2093,7 @@
 					ctx.fillStyle = 'black';
 					ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
 					break;
-				case 'pistole_mit_schalldaempfer':
+				case 'pistole (silenced)':
 					ctx.fillStyle = 'black';
 					ctx.fillRect(this.x - 5, this.y - 5, 15, 10);
 					break;
@@ -2074,6 +2114,15 @@
 				case 'mine':
 					ctx.fillStyle = 'darkred';
 					ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+					break;
+				case 'medipack':
+					ctx.fillStyle = 'red';
+					ctx.beginPath();
+					ctx.moveTo(this.x, this.y - 10);
+					ctx.lineTo(this.x - 10, this.y + 10);
+					ctx.lineTo(this.x + 10, this.y + 10);
+					ctx.closePath();
+					ctx.fill();
 					break;
 				default:
 					ctx.fillStyle = this.color;
@@ -2111,9 +2160,10 @@
 		}
 
 		if (object) {
-			// Kollision mit anderen Spielern
-			for (let player of players) {
+			// Kollision mit anderen Spielern (außer fahrzeug mit fahrern)
+			for (let player of players.filter(e => e.isAlive)) {
 				if (player !== object) { // Objekt selbst ausschließen
+					if (player.vehicle === object) continue; // Fahrzeug mit Fahrern überspringen
 					const distance = Math.hypot(x - player.x, y - player.y);
 					if (distance < (object.size + player.size) / 2) {
 						return true;
@@ -2121,8 +2171,13 @@
 				}
 			}
 
+			// Wenn das object ein fahrzeug ist, dann ist hier schluss, weil gegner überfahren werden können
+			if (object instanceof Vehicle) {
+				return false;
+			}
+
 			// Kollision mit anderen Gegnern
-			for (let enemy of enemies) {
+			for (let enemy of enemies.filter(e => e.isAlive)) {
 				if (enemy !== object) { // Objekt selbst ausschließen
 					const distance = Math.hypot(x - enemy.x, y - enemy.y);
 					if (distance < (object.size + enemy.size) / 2) {
@@ -2378,11 +2433,12 @@
 			'pistole',
 			'schrotflinte',
 			'maschinengewehr',
-			'pistole_mit_schalldaempfer',
+			'pistole (silenced)',
 			'schutzweste',
 			'tarnanzug',
 			'granate',
-			'mine'
+			'mine',
+            'medipack'
 		];
 		for (let i = 0; i < 60; i++) {
 			let x, y;
