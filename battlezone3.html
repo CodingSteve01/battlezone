@@ -185,6 +185,30 @@ const SIGHT_RADIUS = 300;
 const keys = {};
 let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover'
 
+// Zusätzliche Tile-Typen
+const TILE_TYPES = {
+  GRASS: 0,
+  FOREST: 1,
+  WATER: 2,
+  ROAD: 3,
+  BUILDING: 4,
+  SAND: 5,
+  MOUNTAIN: 6,
+  VILLAGE: 7,
+};
+
+// Farben für die Tiles
+const TILE_COLORS = {
+  [TILE_TYPES.GRASS]: '#7cfc00',
+  [TILE_TYPES.FOREST]: '#228b22',
+  [TILE_TYPES.WATER]: '#1e90ff',
+  [TILE_TYPES.ROAD]: '#999',
+  [TILE_TYPES.BUILDING]: '#555',
+  [TILE_TYPES.SAND]: '#edc9af',
+  [TILE_TYPES.MOUNTAIN]: '#a9a9a9',
+  [TILE_TYPES.VILLAGE]: '#8b4513',
+};
+
 // Event Listener für Tasten
 document.addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
@@ -295,7 +319,7 @@ function resetGame() {
   gameState = 'playing';
 }
 
-// Spiel über
+// Spiel vorbei
 function gameOver() {
   gameState = 'gameover';
   document.getElementById('ui').style.display = 'none';
@@ -307,30 +331,96 @@ function gameOver() {
 let map = [];
 function generateMap() {
   map = [];
+  // Verwende Perlin Noise für natürlichere Landschaften
+  const noise = generatePerlinNoise(MAP_WIDTH, MAP_HEIGHT);
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const row = [];
     for (let x = 0; x < MAP_WIDTH; x++) {
-      const rand = Math.random();
-      if (rand < 0.05) {
-        row.push(1); // Hindernis (Gebäude)
-      } else if (rand < 0.1) {
-        row.push(2); // Wald
-      } else if (rand < 0.12) {
-        row.push(3); // Wasser
-      } else if (rand < 0.2) {
-        row.push(4); // Straße
+      const value = noise[y * MAP_WIDTH + x];
+      if (value < 0.3) {
+        row.push(TILE_TYPES.WATER);
+      } else if (value < 0.35) {
+        row.push(TILE_TYPES.SAND);
+      } else if (value < 0.5) {
+        row.push(TILE_TYPES.GRASS);
+      } else if (value < 0.6) {
+        row.push(TILE_TYPES.FOREST);
+      } else if (value < 0.7) {
+        row.push(TILE_TYPES.MOUNTAIN);
       } else {
-        row.push(0); // Boden
+        row.push(TILE_TYPES.GRASS);
       }
     }
     map.push(row);
+  }
+  // Platziere Dörfer
+  generateVillages();
+  // Generiere Straßen
+  generateRoads();
+}
+
+// Perlin Noise Generator
+function generatePerlinNoise(width, height) {
+  const noise = [];
+  const octaveCount = 4;
+  const amplitude = 1;
+  const persistence = 0.5;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let total = 0;
+      let frequency = 1;
+      let amplitude = 1;
+      let maxValue = 0;
+      for (let i = 0; i < octaveCount; i++) {
+        total += noise2D(x * frequency, y * frequency) * amplitude;
+        maxValue += amplitude;
+        amplitude *= persistence;
+        frequency *= 2;
+      }
+      noise[y * width + x] = total / maxValue;
+    }
+  }
+  return noise;
+}
+
+// Simplex Noise Function (Placeholder)
+function noise2D(x, y) {
+  // Verwende eine einfache Funktion für Demo-Zwecke
+  return Math.abs(Math.sin(x * 0.1) + Math.cos(y * 0.1));
+}
+
+// Dörfer generieren
+function generateVillages() {
+  const numberOfVillages = 5;
+  for (let i = 0; i < numberOfVillages; i++) {
+    let x, y;
+    do {
+      x = Math.floor(Math.random() * MAP_WIDTH);
+      y = Math.floor(Math.random() * MAP_HEIGHT);
+    } while (map[y][x] !== TILE_TYPES.GRASS);
+    createVillage(x, y);
+  }
+}
+
+// Dorf erstellen
+function createVillage(centerX, centerY) {
+  const villageSize = 5;
+  for (let y = -villageSize; y <= villageSize; y++) {
+    for (let x = -villageSize; x <= villageSize; x++) {
+      const mapX = centerX + x;
+      const mapY = centerY + y;
+      if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT) {
+        map[mapY][mapX] = TILE_TYPES.VILLAGE;
+      }
+    }
   }
 }
 
 // Straßen generieren
 function generateRoads() {
-  const roadWidth = 2; // 2 Tiles breit
-  const numberOfRoads = 5;
+  const roadWidth = 2;
+  const numberOfRoads = 10;
   for (let i = 0; i < numberOfRoads; i++) {
     const horizontal = Math.random() < 0.5;
     const start = Math.floor(Math.random() * (horizontal ? MAP_HEIGHT : MAP_WIDTH));
@@ -339,7 +429,9 @@ function generateRoads() {
         const x = horizontal ? j : start + w;
         const y = horizontal ? start + w : j;
         if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-          map[y][x] = 4; // Straße
+          if (map[y][x] !== TILE_TYPES.WATER && map[y][x] !== TILE_TYPES.MOUNTAIN) {
+            map[y][x] = TILE_TYPES.ROAD;
+          }
         }
       }
     }
@@ -362,7 +454,7 @@ function generateMissions() {
     do {
       x = Math.floor(Math.random() * MAP_WIDTH);
       y = Math.floor(Math.random() * MAP_HEIGHT);
-    } while (map[y][x] !== 1); // Missionen an Gebäuden platzieren
+    } while (map[y][x] !== TILE_TYPES.VILLAGE); // Missionen in Dörfern platzieren
     const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
     missions.push({
       x: x * TILE_SIZE + TILE_SIZE / 2,
@@ -1354,7 +1446,11 @@ function isColliding(x, y) {
     tileY >= MAP_HEIGHT
   )
     return true;
-  return map[tileY][tileX] === 1 || map[tileY][tileX] === 3;
+  const tile = map[tileY][tileX];
+  return (
+    tile === TILE_TYPES.WATER ||
+    tile === TILE_TYPES.MOUNTAIN
+  );
 }
 
 function lineOfSightBlocked(x1, y1, x2, y2) {
@@ -1401,7 +1497,6 @@ let powerUps = [];
 // Initialisierung des Spiels
 function initGame() {
   generateMap();
-  generateRoads();
   generateMissions();
   spawnEnemies();
   spawnVehicles();
@@ -1566,43 +1661,18 @@ function update() {
   ctx.save();
   ctx.translate(-cameraX, -cameraY);
 
-  // Karte zeichnen
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      if (map[y][x] === 1) {
-        ctx.fillStyle = '#555';
-        ctx.fillRect(
-          x * TILE_SIZE,
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE
-        );
-      } else if (map[y][x] === 2) {
-        ctx.fillStyle = '#2f4f2f';
-        ctx.fillRect(
-          x * TILE_SIZE,
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE
-        );
-      } else if (map[y][x] === 3) {
-        ctx.fillStyle = '#1e90ff';
-        ctx.fillRect(
-          x * TILE_SIZE,
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE
-        );
-      } else if (map[y][x] === 4) {
-        ctx.fillStyle = '#999';
-        ctx.fillRect(
-          x * TILE_SIZE,
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE
-        );
-      } else {
-        ctx.fillStyle = '#777';
+  // Sichtbare Kachelbereiche berechnen
+  const visibleTilesX = Math.ceil(canvas.width / TILE_SIZE) + 2;
+  const visibleTilesY = Math.ceil(canvas.height / TILE_SIZE) + 2;
+  const startTileX = Math.floor(cameraX / TILE_SIZE);
+  const startTileY = Math.floor(cameraY / TILE_SIZE);
+
+  // Karte zeichnen (nur sichtbare Bereiche)
+  for (let y = startTileY; y < startTileY + visibleTilesY; y++) {
+    for (let x = startTileX; x < startTileX + visibleTilesX; x++) {
+      if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+        const tileType = map[y][x];
+        ctx.fillStyle = TILE_COLORS[tileType] || '#777';
         ctx.fillRect(
           x * TILE_SIZE,
           y * TILE_SIZE,
@@ -1642,14 +1712,9 @@ function update() {
     vehicle.draw();
   });
 
-  // Feinde im Umkreis aktualisieren und zeichnen
-  const activeEnemies = enemies.filter(enemy => {
-    return players.some(
-      player => Math.hypot(player.x - enemy.x, player.y - enemy.y) < 500
-    );
-  });
-
-  activeEnemies.forEach(enemy => {
+  // Feinde aktualisieren und zeichnen, wenn sie im Sichtbereich sind
+  enemies.forEach(enemy => {
+    if (isInViewport(enemy.x, enemy.y, cameraX, cameraY)) {
     enemy.update();
     enemy.draw();
 
@@ -1667,12 +1732,15 @@ function update() {
         }
       }
     });
+    }
   });
 
   // Kugeln aktualisieren und zeichnen
   bullets.forEach((bullet, index) => {
     bullet.update();
-    bullet.draw();
+    if (isInViewport(bullet.x, bullet.y, cameraX, cameraY)) {
+        bullet.draw();
+    }
 
     // Kollision mit Feinden
     if (bullet.owner instanceof Player) {
@@ -1714,25 +1782,43 @@ function update() {
   // Granaten aktualisieren und zeichnen
   grenades.forEach(grenade => {
     grenade.update();
-    grenade.draw();
+    if (isInViewport(grenade.x, grenade.y, cameraX, cameraY)) {
+      grenade.draw();
+    }
   });
 
   // Minen aktualisieren und zeichnen
   mines.forEach(mine => {
     mine.update();
-    mine.draw();
+    if (isInViewport(mine.x, mine.y, cameraX, cameraY)) {
+      mine.draw();
+    }
   });
 
   // Power-Ups zeichnen
-  powerUps.forEach(pu => pu.draw());
+  powerUps.forEach(pu => {
+    if (isInViewport(pu.x, pu.y, cameraX, cameraY)) {
+      pu.draw();
+    }
+  });
 
   ctx.restore();
 
   // Minikarte zeichnen
-  drawMinimap();
+  drawMinimap(centerX, centerY);
 
   // Fortsetzen der Update-Schleife
   requestAnimationFrame(update);
+}
+
+// Funktion, um zu überprüfen, ob ein Objekt im Sichtbereich ist
+function isInViewport(x, y, cameraX, cameraY) {
+  return (
+    x >= cameraX &&
+    x <= cameraX + canvas.width &&
+    y >= cameraY &&
+    y <= cameraY + canvas.height
+  );
 }
 
 // Überprüfen, ob das Spiel vorbei ist
@@ -1743,31 +1829,40 @@ function checkGameOver() {
 }
 
 // Minikarte
-function drawMinimap() {
+function drawMinimap(centerX, centerY) {
   minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
-  const scaleX = minimap.width / (MAP_WIDTH * TILE_SIZE);
-  const scaleY = minimap.height / (MAP_HEIGHT * TILE_SIZE);
 
-  // Karte auf der Minikarte zeichnen (optional, kann für Performance entfernt werden)
+  const scale = 0.1; // Maßstab der Minikarte
+  const mapWidth = canvas.width * scale * 8; // 8x Bildausschnitt
+  const mapHeight = canvas.height * scale * 8;
+
+  const startX = centerX - mapWidth / 2;
+  const startY = centerY - mapHeight / 2;
+
+  const scaleX = minimap.width / mapWidth;
+  const scaleY = minimap.height / mapHeight;
+
+  // Zeichne den sichtbaren Bereich der Karte auf der Minikarte
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
-      if (map[y][x] === 1) {
-        minimapCtx.fillStyle = '#555';
-      } else if (map[y][x] === 2) {
-        minimapCtx.fillStyle = '#2f4f2f';
-      } else if (map[y][x] === 3) {
-        minimapCtx.fillStyle = '#1e90ff';
-      } else if (map[y][x] === 4) {
-        minimapCtx.fillStyle = '#999';
-      } else {
-        minimapCtx.fillStyle = '#777';
-      }
+      const tileX = x * TILE_SIZE;
+      const tileY = y * TILE_SIZE;
+
+      if (
+        tileX >= startX &&
+        tileX <= startX + mapWidth &&
+        tileY >= startY &&
+        tileY <= startY + mapHeight
+      ) {
+        const tileType = map[y][x];
+        minimapCtx.fillStyle = TILE_COLORS[tileType] || '#777';
       minimapCtx.fillRect(
-        x * TILE_SIZE * scaleX,
-        y * TILE_SIZE * scaleY,
+          (tileX - startX) * scaleX,
+          (tileY - startY) * scaleY,
         TILE_SIZE * scaleX,
         TILE_SIZE * scaleY
       );
+      }
     }
   }
 
@@ -1775,32 +1870,30 @@ function drawMinimap() {
   players.forEach(player => {
     minimapCtx.fillStyle = player.color;
     minimapCtx.fillRect(
-      player.x * scaleX - 2,
-      player.y * scaleY - 2,
+      (player.x - startX) * scaleX - 2,
+      (player.y - startY) * scaleY - 2,
       4,
       4
     );
   });
 
-  // Feinde im Umkreis zeichnen
+  // Feinde zeichnen
   enemies.forEach(enemy => {
-    if (players.some(player => Math.hypot(player.x - enemy.x, player.y - enemy.y) < 500)) {
     minimapCtx.fillStyle = 'red';
     minimapCtx.fillRect(
-      enemy.x * scaleX - 2,
-      enemy.y * scaleY - 2,
+      (enemy.x - startX) * scaleX - 2,
+      (enemy.y - startY) * scaleY - 2,
       4,
       4
     );
-    }
   });
 
   // Fahrzeuge zeichnen
   vehicles.forEach(vehicle => {
     minimapCtx.fillStyle = 'gray';
     minimapCtx.fillRect(
-      vehicle.x * scaleX - 3,
-      vehicle.y * scaleY - 3,
+      (vehicle.x - startX) * scaleX - 3,
+      (vehicle.y - startY) * scaleY - 3,
       6,
       6
     );
@@ -1811,13 +1904,22 @@ function drawMinimap() {
     if (mission.active) {
       minimapCtx.fillStyle = 'gold';
       minimapCtx.fillRect(
-        mission.x * scaleX - 3,
-        mission.y * scaleY - 3,
+        (mission.x - startX) * scaleX - 3,
+        (mission.y - startY) * scaleY - 3,
         6,
         6
       );
     }
   });
+
+  // Rahmen für den sichtbaren Bereich zeichnen
+  minimapCtx.strokeStyle = 'white';
+  minimapCtx.strokeRect(
+    (centerX - canvas.width / 2 - startX) * scaleX,
+    (centerY - canvas.height / 2 - startY) * scaleY,
+    canvas.width * scaleX,
+    canvas.height * scaleY
+  );
 }
 
 // Game Over Funktion
