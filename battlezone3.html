@@ -1895,7 +1895,7 @@
 		addPassenger(player) {
 			if (this.passengers.length < 2 && !this.isDestroyed) {
 				this.passengers.push(player);
-				// Erste Person ist immer Fahrer, zweite Person Schütze
+				// Erste Person ist standardmäßig Fahrer
 				this.roleAssignment[player.index] = this.passengers.length === 1 ? 'driver' : 'gunner';
 				player.vehicle = this; // Wichtig: Setze die Fahrzeugreferenz
 			}
@@ -1923,10 +1923,20 @@
 		}
 
 		switchRole(player) {
-			if (this.passengers.length === 2) {
+			// Wenn nur ein Spieler im Fahrzeug ist, wechsle zwischen Fahrer und Schütze
+			if (this.passengers.length === 1) {
+				const currentRole = this.roleAssignment[player.index];
+				this.roleAssignment[player.index] = currentRole === 'driver' ? 'gunner' : 'driver';
+
+				// Fahrzeug anhalten wenn niemand fährt
+				if (this.roleAssignment[player.index] === 'gunner') {
+					this.speed = 0;
+				}
+			}
+			// Bei zwei Spielern wie bisher die Rollen tauschen
+			else if (this.passengers.length === 2) {
 				const otherPlayer = this.passengers.find(p => p !== player);
 				if (otherPlayer) {
-					// Tausche die Rollen
 					const tempRole = this.roleAssignment[player.index];
 					this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
 					this.roleAssignment[otherPlayer.index] = tempRole;
@@ -1972,13 +1982,16 @@
 				}
 			});
 
-			// Fahrzeugbewegung
+			// Fahrzeugbewegung - nur wenn ein Fahrer da ist
 			const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
 			if (driver) {
 				if (keys[driver.controls.up]) this.speed = this.maxSpeed;
 				if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
 				if (keys[driver.controls.left]) this.angle -= 0.05;
 				if (keys[driver.controls.right]) this.angle += 0.05;
+			} else {
+				// Fahrzeug langsam zum Stillstand bringen wenn kein Fahrer
+				this.speed *= 0.9;
 			}
 
 			// Bewegung anwenden
@@ -2002,14 +2015,17 @@
 				p.y = this.y;
 			});
 
-			// Schütze kann schießen
+			// Schießen erlauben wenn jemand Schütze ist
 			const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
 			if (gunner && gunner.controls && keys[gunner.controls.useItem] && gunner.canUseItem) {
-				bullets.push(new Bullet(this.x, this.y, gunner.angle, 'black', gunner, {damage: 25, range: 300}));
+				bullets.push(new Bullet(this.x, this.y, gunner.angle, gunner.color, gunner, {
+					damage: this.type === 'Panzer' ? 50 : 25,
+					range: this.type === 'Panzer' ? 500 : 300
+				}));
 				gunner.canUseItem = false;
 				setTimeout(() => {
 					gunner.canUseItem = true;
-				}, 300);
+				}, this.type === 'Panzer' ? 500 : 300);
 			}
 
 			// Kollision mit Feinden
