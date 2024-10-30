@@ -128,11 +128,11 @@
   <h3>Steuerung Einzelspieler:</h3>
   <p>Bewegung: W, A, S, D</p>
   <p>Gegenstand verwenden: F</p>
+  <p>Ziel wechseln/Rollenwechsel im Fahrzeug: R</p>
   <p>Gegenstand wechseln: 1-4</p>
   <p>Gegenstand ablegen: G</p>
   <p>Ducken (Stealth): C</p>
   <p>Ein-/Aussteigen: E</p>
-  <p>Rollenwechsel im Fahrzeug: R</p>
   <button id="backToMenu">Zurück</button>
 </div>
 
@@ -279,7 +279,8 @@ class Player extends GameObject {
     this.isCrouching = false;
     this.currentMission = null;
     this.equipment = [];
-    this.autoAimTarget = null;
+    this.autoAimTargets = [];
+    this.currentTargetIndex = 0;
   }
 
   update() {
@@ -309,24 +310,31 @@ class Player extends GameObject {
       this.angle = Math.atan2(dy, dx);
     }
 
-    // Auto-Aim
-    const closestEnemy = enemies.reduce((closest, enemy) => {
+    // Auto-Aim Targets innerhalb der Waffenreichweite
+    const currentWeapon = this.inventory[this.currentItemIndex];
+    const weaponRange = currentWeapon ? currentWeapon.range : 100;
+    this.autoAimTargets = enemies.filter(enemy => {
       const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
-      if (dist < 300 && (!closest || dist < closest.dist)) {
-        return { enemy, dist };
-      } else {
-        return closest;
-      }
-    }, null);
+      return dist < weaponRange && enemy.isAlive;
+    });
 
-    if (closestEnemy) {
-      this.autoAimTarget = closestEnemy.enemy;
-      this.angle = Math.atan2(
-        closestEnemy.enemy.y - this.y,
-        closestEnemy.enemy.x - this.x
-      );
-    } else {
-      this.autoAimTarget = null;
+    if (keys[this.controls.switchRole]) {
+        // Rollenwechsel im Fahrzeug
+        if (this.vehicle) {
+            this.vehicle.switchRole(this);
+            keys[this.controls.switchRole] = false;
+        }
+
+        // Ziel wechseln
+        else {
+            this.currentTargetIndex = (this.currentTargetIndex + 1) % this.autoAimTargets.length;
+            keys[this.controls.switchRole] = false;
+        }
+    }
+
+    const currentTarget = this.autoAimTargets[this.currentTargetIndex];
+    if (currentTarget) {
+      this.angle = Math.atan2(currentTarget.y - this.y, currentTarget.x - this.x);
     }
 
     // Gegenstände wechseln
@@ -343,18 +351,21 @@ class Player extends GameObject {
           // Schießen oder Nahkampf
           if (currentItem.name === 'Nahkampf') {
             if (
-              this.autoAimTarget &&
-              Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50
+              currentTarget &&
+              Math.hypot(this.x - currentTarget.x, this.y - currentTarget.y) < 50
             ) {
-              this.autoAimTarget.health = 0;
-              this.autoAimTarget.isAlive = false;
-              enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
+              currentTarget.health -= currentItem.damage;
+              if (currentTarget.health <= 0) {
+                currentTarget.isAlive = false;
+              }
             }
           } else {
             bullets.push(
-              new Bullet(this.x, this.y, this.angle, this.color, this)
+              new Bullet(this.x, this.y, this.angle, this.color, this, currentItem)
             );
           }
+          // Lärm erzeugen
+          this.makeNoise(currentItem.noise);
         } else if (currentItem.type === 'Granate') {
           grenades.push(new Grenade(this.x, this.y, this.angle, this));
           this.inventory.splice(this.currentItemIndex, 1);
@@ -365,7 +376,7 @@ class Player extends GameObject {
         this.canUseItem = false;
         setTimeout(() => {
           this.canUseItem = true;
-        }, 300);
+        }, currentItem.fireRate || 500);
       }
     }
 
@@ -398,15 +409,7 @@ class Player extends GameObject {
       keys[this.controls.action] = false;
     }
 
-    // Rollenwechsel im Fahrzeug
-    if (keys[this.controls.switchRole]) {
-      if (this.vehicle) {
-        this.vehicle.switchRole(this);
-      }
-      keys[this.controls.switchRole] = false;
-    }
-
-    // Stealth (Ducken)
+    // Ducken (Stealth)
     if (keys[this.controls.crouch]) {
       this.isCrouching = true;
       this.speed = 1.5;
@@ -469,6 +472,15 @@ class Player extends GameObject {
       this.currentMission ? this.currentMission.type : 'Keine';
   }
 
+  makeNoise(noiseLevel) {
+    enemies.forEach(enemy => {
+      const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+      if (dist < noiseLevel) {
+        enemy.hearNoise(this.x, this.y);
+      }
+    });
+  }
+
   draw() {
     if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
 
@@ -493,7 +505,7 @@ class Player extends GameObject {
     ctx.fillStyle = 'black';
     const currentItem = this.inventory[this.currentItemIndex];
     if (currentItem) {
-      if (currentItem.name === 'Pistole') {
+      if (currentItem.name === 'Pistole' || currentItem.name === 'Pistole mit Schalldämpfer') {
         ctx.fillRect(0, -5, 15, 5);
       } else if (currentItem.name === 'Maschinengewehr') {
         ctx.fillRect(0, -5, 20, 5);
@@ -504,6 +516,15 @@ class Player extends GameObject {
       }
     }
     ctx.restore();
+
+    // Fadenkreuz auf aktuellem Ziel
+    const currentTarget = this.autoAimTargets[this.currentTargetIndex];
+    if (currentTarget) {
+      ctx.strokeStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(currentTarget.x, currentTarget.y, currentTarget.size / 2 + 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 }
 
@@ -516,12 +537,13 @@ class Enemy extends GameObject {
     this.state = 'patrol'; // patrol, chase, search, flee
     this.patrolPoints = this.generatePatrolPoints();
     this.currentPatrolIndex = 0;
-    this.viewAngle = Math.PI / 4;
+    this.viewAngle = Math.PI / 2;
     this.viewDistance = SIGHT_RADIUS;
     this.weapon = 'Maschinengewehr';
     this.isCommander = isCommander;
     this.isDead = false;
     this.deathTime = 0;
+    this.path = [];
   }
 
   generatePatrolPoints() {
@@ -557,6 +579,13 @@ class Enemy extends GameObject {
       this.target = playerDetected;
     }
 
+    // Reaktion auf Lärm
+    if (this.heardNoise) {
+        this.state = 'investigate';
+        this.targetPosition = this.heardNoisePosition;
+        this.heardNoise = false;
+    }
+
     // Reaktion auf laute Geräusche
     const loudVehicles = vehicles.filter(
       v =>
@@ -581,6 +610,9 @@ class Enemy extends GameObject {
       case 'flee':
         this.flee();
         break;
+      case 'investigate':
+        this.investigate();
+        break;
     }
   }
 
@@ -591,9 +623,15 @@ class Enemy extends GameObject {
     const dist = Math.hypot(dx, dy);
     if (dist > this.viewDistance) return false;
     const angleToPlayer = Math.atan2(dy, dx);
-    const angleDifference = Math.abs(this.angle - angleToPlayer);
-    if (angleDifference > this.viewAngle) return false;
+    let angleDifference = angleToPlayer - this.angle;
+    angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+    if (Math.abs(angleDifference) > this.viewAngle / 2) return false;
     return !lineOfSightBlocked(this.x, this.y, player.x, player.y);
+  }
+
+  hearNoise(x, y) {
+    this.heardNoise = true;
+    this.heardNoisePosition = { x, y };
   }
 
   canHear(player) {
@@ -626,11 +664,23 @@ class Enemy extends GameObject {
         Math.random() < 0.05
       ) {
         bullets.push(
-          new Bullet(this.x, this.y, this.angle, 'red', this)
+          new Bullet(this.x, this.y, this.angle, 'red', this, { damage: 20 })
         );
       }
     } else {
       this.state = 'search';
+    }
+  }
+
+  investigate() {
+    if (this.targetPosition) {
+        this.moveTowards(this.targetPosition.x, this.targetPosition.y);
+        if (Math.hypot(this.x - this.targetPosition.x, this.y - this.targetPosition.y) < 10) {
+        this.state = 'patrol';
+        this.targetPosition = null;
+        }
+    } else {
+        this.state = 'patrol';
     }
   }
 
@@ -719,19 +769,23 @@ class Enemy extends GameObject {
 }
 
 class Bullet extends GameObject {
-  constructor(x, y, angle, color, owner) {
+  constructor(x, y, angle, color, owner, weapon) {
     super(x, y, 5, color);
-    this.speed = 10;
+    this.speed = weapon.speed || 10;
     this.owner = owner;
+    this.damage = weapon.damage || 20;
     this.vx = Math.cos(angle) * this.speed;
     this.vy = Math.sin(angle) * this.speed;
+    this.range = weapon.range || 500;
+    this.distanceTraveled = 0;
   }
 
   update() {
     const newX = this.x + this.vx;
     const newY = this.y + this.vy;
+    this.distanceTraveled += Math.hypot(this.vx, this.vy);
 
-    if (!isColliding(newX, newY)) {
+    if (!isColliding(newX, newY) && this.distanceTraveled < this.range) {
       this.x = newX;
       this.y = newY;
     } else {
