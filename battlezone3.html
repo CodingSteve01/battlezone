@@ -23,13 +23,22 @@
     z-index: 10;
     display: flex;
     justify-content: space-between;
-    padding: 10px;
+    padding: 5px;
+    font-size: 14px;
   }
-  #player1UI, #player2UI {
+  .playerUI {
     background: rgba(0,0,0,0.5);
-    padding: 10px;
+    padding: 5px;
     border-radius: 5px;
-    width: 45%;
+    width: 48%;
+    display: flex;
+    align-items: center;
+  }
+  .playerColor {
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    border-radius: 50%;
   }
   #message {
     position: absolute;
@@ -50,7 +59,30 @@
     background: rgba(0,0,0,0.5);
     z-index: 10;
   }
-  #controls {
+  #menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #222;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+  }
+  #menu h1 {
+    font-size: 48px;
+    margin-bottom: 20px;
+  }
+  #menu button {
+    padding: 10px 20px;
+    margin: 10px;
+    font-size: 24px;
+  }
+  #controlsInfo {
     position: absolute;
     bottom: 10px;
     left: 10px;
@@ -64,64 +96,59 @@
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
-<div id="ui">
-  <div id="player1UI">
-    <h2>Spieler 1</h2>
-    <p>Gesundheit: <span id="health1">100</span></p>
-    <p>Munition: <span id="ammo1">50</span></p>
-    <p>Waffen: <span id="weapons1">Pistole</span></p>
-    <p>Ausrüstung: <span id="equipment1">Keine</span></p>
-    <p>Fahrzeug: <span id="vehicle1">Keines</span></p>
-    <p>Mission: <span id="mission1">Keine</span></p>
+<div id="ui" style="display: none;">
+  <div id="player1UI" class="playerUI">
+    <div class="playerColor" id="player1Color"></div>
+    <div>
+      <p>Gesundheit: <span id="health1">100</span></p>
+      <p>Munition: <span id="ammo1">50</span></p>
+      <p>Waffe: <span id="weapon1">Pistole</span></p>
+      <p>Ausrüstung: <span id="equipment1">Keine</span></p>
+      <p>Mission: <span id="mission1">Keine</span></p>
+    </div>
   </div>
-  <div id="player2UI">
-    <h2>Spieler 2</h2>
-    <p>Gesundheit: <span id="health2">100</span></p>
-    <p>Munition: <span id="ammo2">50</span></p>
-    <p>Waffen: <span id="weapons2">Pistole</span></p>
-    <p>Ausrüstung: <span id="equipment2">Keine</span></p>
-    <p>Fahrzeug: <span id="vehicle2">Keines</span></p>
-    <p>Mission: <span id="mission2">Keine</span></p>
+  <div id="player2UI" class="playerUI" style="display: none;">
+    <div class="playerColor" id="player2Color"></div>
+    <div>
+      <p>Gesundheit: <span id="health2">100</span></p>
+      <p>Munition: <span id="ammo2">50</span></p>
+      <p>Waffe: <span id="weapon2">Pistole</span></p>
+      <p>Ausrüstung: <span id="equipment2">Keine</span></p>
+      <p>Mission: <span id="mission2">Keine</span></p>
+    </div>
   </div>
 </div>
 <div id="message"></div>
-<canvas id="minimap"></canvas>
-<div id="controls">
-  <h3>Steuerung Spieler 1:</h3>
-  <p>Pfeiltasten: Bewegung</p>
-  <p>Leertaste: Schießen</p>
-  <p>Enter: Ein-/Aussteigen</p>
-  <p>Shift: Waffen wechseln</p>
-  <p>Alt: Ducken</p>
-  <p>M: Nahkampf</p>
-  <p>Strg: Rollenwechsel im Fahrzeug</p>
-  <h3>Steuerung Spieler 2:</h3>
-  <p>WASD: Bewegung</p>
-  <p>Q: Schießen</p>
-  <p>E: Ein-/Aussteigen</p>
-  <p>Tab: Waffen wechseln</p>
-  <p>Z: Ducken</p>
-  <p>X: Nahkampf</p>
-  <p>F: Rollenwechsel im Fahrzeug</p>
+<canvas id="minimap" style="display: none;"></canvas>
+<div id="menu">
+  <h1>Top-Down Stealth Shooter</h1>
+  <button id="startSingle">Einzelspieler</button>
+  <button id="startMulti">Mehrspieler</button>
+  <button id="showControls">Steuerung</button>
+</div>
+<div id="controlsInfo" style="display: none;">
+  <h3>Steuerung Einzelspieler:</h3>
+  <p>Bewegung: WASD</p>
+  <p>Schießen: Leertaste</p>
+  <p>Waffen wechseln: 1-5</p>
+  <p>Ausrüstung verwenden: E</p>
+  <p>Granate werfen: G</p>
+  <p>Mine legen: M</p>
+  <p>Ducken (Stealth): C</p>
+  <p>Ein-/Aussteigen: F</p>
+  <p>Rollenwechsel im Fahrzeug: R</p>
+  <button id="backToMenu">Zurück</button>
 </div>
 
 <script>
-// Spielvariablen
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-const minimap = document.getElementById('minimap');
-const minimapCtx = minimap.getContext('2d');
-minimap.width = 200;
-minimap.height = 200;
-
+// Globale Variablen
+let canvas, ctx, minimap, minimapCtx;
+let gameStarted = false;
+let singlePlayer = true;
 const TILE_SIZE = 50;
 const MAP_WIDTH = 100;
 const MAP_HEIGHT = 100;
 const SIGHT_RADIUS = 300;
-
 const keys = {};
 
 document.addEventListener('keydown', (e) => {
@@ -131,32 +158,71 @@ document.addEventListener('keyup', (e) => {
   keys[e.key.toLowerCase()] = false;
 });
 
+// Hauptmenü-Buttons
+document.getElementById('startSingle').addEventListener('click', () => {
+  singlePlayer = true;
+  startGame();
+});
+document.getElementById('startMulti').addEventListener('click', () => {
+  singlePlayer = false;
+  startGame();
+});
+document.getElementById('showControls').addEventListener('click', () => {
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('controlsInfo').style.display = 'block';
+});
+document.getElementById('backToMenu').addEventListener('click', () => {
+  document.getElementById('controlsInfo').style.display = 'none';
+  document.getElementById('menu').style.display = 'flex';
+});
+
+// Spiel starten
+function startGame() {
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('ui').style.display = 'flex';
+  document.getElementById('minimap').style.display = 'block';
+
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  minimap = document.getElementById('minimap');
+  minimapCtx = minimap.getContext('2d');
+  minimap.width = 200;
+  minimap.height = 200;
+
+  initGame();
+}
+
 // Kachelbasierte Karte erstellen
 const map = [];
-for (let y = 0; y < MAP_HEIGHT; y++) {
-  const row = [];
-  for (let x = 0; x < MAP_WIDTH; x++) {
-    const rand = Math.random();
-    if (rand < 0.05) {
-      row.push(1); // Hindernis (Gebäude)
-    } else if (rand < 0.1) {
-      row.push(2); // Wald
-    } else if (rand < 0.12) {
-      row.push(3); // Wasser
-    } else if (rand < 0.15) {
-      row.push(4); // Straße
-    } else {
-      row.push(0); // Boden
+function generateMap() {
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      const rand = Math.random();
+      if (rand < 0.05) {
+        row.push(1); // Hindernis (Gebäude)
+      } else if (rand < 0.1) {
+        row.push(2); // Wald
+      } else if (rand < 0.12) {
+        row.push(3); // Wasser
+      } else if (rand < 0.15) {
+        row.push(4); // Straße
+      } else {
+        row.push(0); // Boden
+      }
     }
+    map.push(row);
   }
-  map.push(row);
 }
 
 // Missionen generieren
 const missions = [];
 function generateMissions() {
   const missionTypes = [
-    'Finde ein Fahrzeug',
+    'Finde und steuere ein Fahrzeug',
     'Eliminiere den Kommandanten',
     'Sammle Geheimdaten',
     'Zerstöre das feindliche Lager',
@@ -173,7 +239,8 @@ function generateMissions() {
       x: x * TILE_SIZE + TILE_SIZE / 2,
       y: y * TILE_SIZE + TILE_SIZE / 2,
       active: true,
-      type: type
+      type: type,
+      target: null
     });
   }
 }
@@ -206,7 +273,7 @@ class Player extends GameObject {
     this.controls = controls;
     this.speed = 3;
     this.ammo = 50;
-    this.weapons = ['Pistole'];
+    this.weapons = ['Pistole', 'Nahkampf'];
     this.currentWeaponIndex = 0;
     this.vehicle = null;
     this.canShoot = true;
@@ -216,6 +283,8 @@ class Player extends GameObject {
     this.currentMission = null;
     this.equipment = [];
     this.autoAimTarget = null;
+    this.grenades = 3;
+    this.mines = 2;
   }
 
   update() {
@@ -244,10 +313,10 @@ class Player extends GameObject {
       this.angle = Math.atan2(dy, dx);
     }
 
-    // Auto-Aim für Nahkampf
+    // Auto-Aim
     const closestEnemy = enemies.reduce((closest, enemy) => {
       const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
-      if (dist < 100 && (!closest || dist < closest.dist)) {
+      if (dist < 300 && (!closest || dist < closest.dist)) {
         return { enemy, dist };
       } else {
         return closest;
@@ -265,22 +334,47 @@ class Player extends GameObject {
     }
 
     // Waffen wechseln
-    if (keys[this.controls.switchWeapon]) {
-      this.currentWeaponIndex =
-        (this.currentWeaponIndex + 1) % this.weapons.length;
-      keys[this.controls.switchWeapon] = false;
-    }
+    if (keys['1']) this.currentWeaponIndex = 0;
+    if (keys['2']) this.currentWeaponIndex = 1;
+    if (keys['3']) this.currentWeaponIndex = 2;
+    if (keys['4']) this.currentWeaponIndex = 3;
+    if (keys['5']) this.currentWeaponIndex = 4;
 
     // Schießen
-    if (keys[this.controls.shoot] && this.canShoot && this.ammo > 0) {
-      bullets.push(
-        new Bullet(this.x, this.y, this.angle, this.color, this)
-      );
-      this.ammo--;
+    if (keys[this.controls.shoot] && this.canShoot) {
+      if (this.weapons[this.currentWeaponIndex] === 'Nahkampf') {
+        if (
+          this.autoAimTarget &&
+          Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50
+        ) {
+          this.autoAimTarget.health = 0;
+          this.autoAimTarget.isAlive = false;
+          enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
+        }
+      } else if (this.ammo > 0) {
+        bullets.push(
+          new Bullet(this.x, this.y, this.angle, this.color, this)
+        );
+        this.ammo--;
+      }
       this.canShoot = false;
       setTimeout(() => {
         this.canShoot = true;
       }, 300);
+    }
+
+    // Granate werfen
+    if (keys[this.controls.grenade] && this.grenades > 0) {
+      grenades.push(new Grenade(this.x, this.y, this.angle, this));
+      this.grenades--;
+      keys[this.controls.grenade] = false;
+    }
+
+    // Mine legen
+    if (keys[this.controls.mine] && this.mines > 0) {
+      mines.push(new Mine(this.x, this.y));
+      this.mines--;
+      keys[this.controls.mine] = false;
     }
 
     // Ein-/Aussteigen
@@ -292,7 +386,9 @@ class Player extends GameObject {
           'Keines';
       } else {
         const nearbyVehicle = vehicles.find(
-          v => Math.hypot(this.x - v.x, this.y - v.y) < 50
+          v =>
+            Math.hypot(this.x - v.x, this.y - v.y) < 50 &&
+            !v.isDestroyed
         );
         if (nearbyVehicle) {
           nearbyVehicle.addPassenger(this);
@@ -321,16 +417,6 @@ class Player extends GameObject {
       this.speed = 3;
     }
 
-    // Nahkampf
-    if (keys[this.controls.melee]) {
-      if (this.autoAimTarget && Math.hypot(this.x - this.autoAimTarget.x, this.y - this.autoAimTarget.y) < 50) {
-        this.autoAimTarget.health = 0;
-        this.autoAimTarget.isAlive = false;
-        enemies.splice(enemies.indexOf(this.autoAimTarget), 1);
-      }
-      keys[this.controls.melee] = false;
-    }
-
     // Pickup von Power-Ups
     powerUps.forEach((pu, index) => {
       if (
@@ -349,14 +435,32 @@ class Player extends GameObject {
         document.getElementById(
           `mission${this.index + 1}`
         ).textContent = this.currentMission.type;
+        // Missionsziel bestimmen
+        if (this.currentMission.type === 'Eliminiere den Kommandanten') {
+          const commander = enemies[Math.floor(Math.random() * enemies.length)];
+          this.currentMission.target = commander;
+        } else if (this.currentMission.type === 'Finde und steuere ein Fahrzeug') {
+          const vehicle = vehicles.find(v => !v.isDestroyed);
+          this.currentMission.target = vehicle;
+        }
+        // Weitere Missionsziele können entsprechend hinzugefügt werden
       }
     } else {
       // Pfeil zum Missionsziel
       drawMissionArrow(this, this.currentMission);
 
       if (
-        Math.hypot(this.x - this.currentMission.x, this.y - this.currentMission.y) <
-        50
+        this.currentMission.type === 'Eliminiere den Kommandanten' &&
+        !this.currentMission.target.isAlive
+      ) {
+        this.currentMission.active = false;
+        this.currentMission = null;
+        document.getElementById(
+          `mission${this.index + 1}`
+        ).textContent = 'Erledigt!';
+      } else if (
+        this.currentMission.type === 'Finde und steuere ein Fahrzeug' &&
+        this.vehicle === this.currentMission.target
       ) {
         this.currentMission.active = false;
         this.currentMission = null;
@@ -368,6 +472,8 @@ class Player extends GameObject {
   }
 
   draw() {
+    if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
@@ -387,23 +493,34 @@ class Player extends GameObject {
 
     // Waffe
     ctx.fillStyle = 'black';
-    ctx.fillRect(0, -5, 20, 10);
+    if (this.weapons[this.currentWeaponIndex] === 'Pistole') {
+      ctx.fillRect(0, -5, 15, 5);
+    } else if (this.weapons[this.currentWeaponIndex] === 'Maschinengewehr') {
+      ctx.fillRect(0, -5, 20, 5);
+    } else if (this.weapons[this.currentWeaponIndex] === 'Schrotflinte') {
+      ctx.fillRect(0, -5, 25, 5);
+    } else if (this.weapons[this.currentWeaponIndex] === 'Nahkampf') {
+      ctx.fillRect(0, -5, 10, 5);
+    }
     ctx.restore();
   }
 }
 
 class Enemy extends GameObject {
-  constructor(x, y) {
-    super(x, y, 30, 'red');
+  constructor(x, y, isCommander = false) {
+    super(x, y, 30, isCommander ? 'purple' : 'red');
     this.speed = 2;
     this.target = null;
     this.angle = 0;
-    this.state = 'patrol'; // patrol, chase, search
+    this.state = 'patrol'; // patrol, chase, search, flee
     this.patrolPoints = this.generatePatrolPoints();
     this.currentPatrolIndex = 0;
     this.viewAngle = Math.PI / 4;
     this.viewDistance = SIGHT_RADIUS;
     this.weapon = 'Maschinengewehr';
+    this.isCommander = isCommander;
+    this.isDead = false;
+    this.deathTime = 0;
   }
 
   generatePatrolPoints() {
@@ -420,7 +537,15 @@ class Enemy extends GameObject {
   }
 
   update() {
-    if (!this.isAlive) return;
+    if (!this.isAlive) {
+      if (!this.isDead) {
+        this.isDead = true;
+        this.deathTime = Date.now();
+      } else if (Date.now() - this.deathTime > 5000) {
+        enemies.splice(enemies.indexOf(this), 1);
+      }
+      return;
+    }
 
     // Wahrnehmung
     const playerDetected = players.find(
@@ -429,6 +554,17 @@ class Enemy extends GameObject {
     if (playerDetected) {
       this.state = 'chase';
       this.target = playerDetected;
+    }
+
+    // Reaktion auf laute Geräusche
+    const loudVehicles = vehicles.filter(
+      v =>
+        !v.isDestroyed &&
+        Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
+        v.isLoud()
+    );
+    if (loudVehicles.length > 0) {
+      this.state = 'flee';
     }
 
     switch (this.state) {
@@ -440,6 +576,9 @@ class Enemy extends GameObject {
         break;
       case 'search':
         this.search();
+        break;
+      case 'flee':
+        this.flee();
         break;
     }
   }
@@ -503,6 +642,32 @@ class Enemy extends GameObject {
     }
   }
 
+  flee() {
+    // Bewegung weg von lauten Fahrzeugen
+    const loudVehicle = vehicles.find(
+      v =>
+        !v.isDestroyed &&
+        Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
+        v.isLoud()
+    );
+    if (loudVehicle) {
+      const dx = this.x - loudVehicle.x;
+      const dy = this.y - loudVehicle.y;
+      const dist = Math.hypot(dx, dy);
+      const dirX = dx / dist;
+      const dirY = dy / dist;
+      const newX = this.x + dirX * this.speed;
+      const newY = this.y + dirY * this.speed;
+      if (!isColliding(newX, newY)) {
+        this.x = newX;
+        this.y = newY;
+      }
+      this.angle = Math.atan2(dirY, dirX);
+    } else {
+      this.state = 'patrol';
+    }
+  }
+
   moveTowards(x, y) {
     const dx = x - this.x;
     const dy = y - this.y;
@@ -523,6 +688,16 @@ class Enemy extends GameObject {
   }
 
   draw() {
+    if (!this.isAlive) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.PI / 2); // Umfallen
+      ctx.fillStyle = this.color;
+      ctx.fillRect(-15, -15, 30, 30);
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
@@ -575,6 +750,98 @@ class Bullet extends GameObject {
   }
 }
 
+class Grenade extends GameObject {
+  constructor(x, y, angle, owner) {
+    super(x, y, 10, 'orange');
+    this.speed = 5;
+    this.vx = Math.cos(angle) * this.speed;
+    this.vy = Math.sin(angle) * this.speed;
+    this.timer = 100;
+    this.owner = owner;
+  }
+
+  update() {
+    this.timer--;
+    const newX = this.x + this.vx;
+    const newY = this.y + this.vy;
+
+    if (!isColliding(newX, newY)) {
+      this.x = newX;
+      this.y = newY;
+    } else {
+      this.vx = 0;
+      this.vy = 0;
+    }
+
+    if (this.timer <= 0) {
+      this.explode();
+      grenades.splice(grenades.indexOf(this), 1);
+    }
+  }
+
+  explode() {
+    // Explosionseffekt
+    enemies.forEach(enemy => {
+      if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 100) {
+        enemy.health = 0;
+        enemy.isAlive = false;
+      }
+    });
+    // Fahrzeuge beschädigen
+    vehicles.forEach(vehicle => {
+      if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
+        vehicle.condition -= 50;
+        if (vehicle.condition <= 0) {
+          vehicle.isDestroyed = true;
+        }
+      }
+    });
+  }
+
+  draw() {
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+class Mine extends GameObject {
+  constructor(x, y) {
+    super(x, y, 15, 'brown');
+  }
+
+  update() {
+    // Warten auf Feinde oder Fahrzeuge
+    enemies.forEach(enemy => {
+      if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 20) {
+        enemy.health = 0;
+        enemy.isAlive = false;
+        mines.splice(mines.indexOf(this), 1);
+      }
+    });
+    vehicles.forEach(vehicle => {
+      if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 20) {
+        vehicle.condition -= 100;
+        if (vehicle.condition <= 0) {
+          vehicle.isDestroyed = true;
+        }
+        mines.splice(mines.indexOf(this), 1);
+      }
+    });
+  }
+
+  draw() {
+    ctx.fillStyle = this.color;
+    ctx.fillRect(
+      this.x - this.size / 2,
+      this.y - this.size / 2,
+      this.size,
+      this.size
+    );
+  }
+}
+
 class Vehicle extends GameObject {
   constructor(x, y, type) {
     super(x, y, 50, 'gray');
@@ -586,10 +853,11 @@ class Vehicle extends GameObject {
     this.condition = 100; // Zustand des Fahrzeugs
     this.roleAssignment = {}; // Spielerrollen
     this.isClosed = type === 'Panzer';
+    this.isDestroyed = false;
   }
 
   addPassenger(player) {
-    if (this.passengers.length < 2) {
+    if (this.passengers.length < 2 && !this.isDestroyed) {
       this.passengers.push(player);
       if (this.passengers.length === 1) {
         this.roleAssignment[player.index] = 'driver';
@@ -613,7 +881,43 @@ class Vehicle extends GameObject {
     }
   }
 
+  isLoud() {
+    return this.type === 'Panzer' || this.type === 'LKW';
+  }
+
   update() {
+    if (this.isDestroyed) return;
+
+    // Kollision mit Spielern
+    players.forEach(player => {
+      if (
+        Math.hypot(this.x - player.x, this.y - player.y) <
+        (this.size + player.size) / 2
+      ) {
+        // Kollision verhindern
+        const angle = Math.atan2(player.y - this.y, player.x - this.x);
+        player.x = this.x + Math.cos(angle) * (this.size + player.size) / 2;
+        player.y = this.y + Math.sin(angle) * (this.size + player.size) / 2;
+      }
+    });
+
+    // Kollision mit anderen Fahrzeugen
+    vehicles.forEach(vehicle => {
+      if (vehicle !== this && !vehicle.isDestroyed) {
+        if (
+          Math.hypot(this.x - vehicle.x, this.y - vehicle.y) <
+          (this.size + vehicle.size) / 2
+        ) {
+          // Kollision verhindern
+          const angle = Math.atan2(vehicle.y - this.y, vehicle.x - this.x);
+          this.x -= Math.cos(angle) * 2;
+          this.y -= Math.sin(angle) * 2;
+          vehicle.x += Math.cos(angle) * 2;
+          vehicle.y += Math.sin(angle) * 2;
+        }
+      }
+    });
+
     // Fahrzeugbewegung
     const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
     if (driver) {
@@ -658,13 +962,22 @@ class Vehicle extends GameObject {
         enemy.health -= 50;
         if (enemy.health <= 0) {
           enemy.isAlive = false;
-          enemies.splice(enemies.indexOf(enemy), 1);
         }
       }
     });
   }
 
   draw() {
+    if (this.isDestroyed) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(Math.PI / 2); // Umkippen
+      ctx.fillStyle = 'black';
+      ctx.fillRect(-25, -15, 50, 30);
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
@@ -685,8 +998,8 @@ class Vehicle extends GameObject {
       // Kanone
       ctx.fillRect(15, -5, 30, 10);
     } else {
-      // Andere Fahrzeuge
-      ctx.fillRect(-25, -15, 50, 30);
+      // LKW
+      ctx.fillRect(-30, -15, 60, 30);
     }
     ctx.restore();
   }
@@ -719,12 +1032,20 @@ class PowerUp extends GameObject {
           player.equipment.push(this.type);
         }
         break;
+      case 'granaten':
+        player.grenades += 2;
+        break;
+      case 'minen':
+        player.mines += 2;
+        break;
     }
     // UI aktualisieren
-    document.getElementById(`weapons${player.index + 1}`).textContent =
-      player.weapons.join(', ');
+    document.getElementById(`weapon${player.index + 1}`).textContent =
+      player.weapons[player.currentWeaponIndex];
     document.getElementById(`equipment${player.index + 1}`).textContent =
-      player.equipment.join(', ');
+      player.equipment.join(', ') || 'Keine';
+    document.getElementById(`ammo${player.index + 1}`).textContent =
+      player.ammo;
   }
 
   draw() {
@@ -762,8 +1083,9 @@ function lineOfSightBlocked(x1, y1, x2, y2) {
 }
 
 function drawMissionArrow(player, mission) {
-  const dx = mission.x - player.x;
-  const dy = mission.y - player.y;
+  const target = mission.target || { x: mission.x, y: mission.y };
+  const dx = target.x - player.x;
+  const dy = target.y - player.y;
   const angle = Math.atan2(dy, dx);
   const arrowX = canvas.width / 2 + Math.cos(angle) * 100;
   const arrowY = canvas.height / 2 + Math.sin(angle) * 100;
@@ -781,49 +1103,74 @@ function drawMissionArrow(player, mission) {
 }
 
 // Spielobjekte
-const players = [
-  new Player(
-    100,
-    100,
-    'blue',
-    {
-      up: 'arrowup',
-      down: 'arrowdown',
-      left: 'arrowleft',
-      right: 'arrowright',
-      shoot: ' ',
-      action: 'enter',
-      switchWeapon: 'shift',
-      crouch: 'alt',
-      melee: 'm',
-      switchRole: 'control'
-    },
-    0
-  ),
-  new Player(
-    200,
-    100,
-    'green',
-    {
-      up: 'w',
-      down: 's',
-      left: 'a',
-      right: 'd',
-      shoot: 'q',
-      action: 'e',
-      switchWeapon: 'tab',
-      crouch: 'z',
-      melee: 'x',
-      switchRole: 'f'
-    },
-    1
-  ),
-];
+let players = [];
+let enemies = [];
+let bullets = [];
+let grenades = [];
+let mines = [];
+let vehicles = [];
+let powerUps = [];
 
-const enemies = [];
-const bullets = [];
-const vehicles = [];
-const powerUps = [];
+function initGame() {
+  generateMap();
+  generateMissions();
+  spawnEnemies();
+  spawnVehicles();
+  spawnPowerUps();
+
+  players = [
+    new Player(
+      100,
+      100,
+      'blue',
+      {
+        up: singlePlayer ? 'w' : 'arrowup',
+        down: singlePlayer ? 's' : 'arrowdown',
+        left: singlePlayer ? 'a' : 'arrowleft',
+        right: singlePlayer ? 'd' : 'arrowright',
+        shoot: ' ',
+        action: 'f',
+        switchRole: 'r',
+        crouch: 'c',
+        grenade: 'g',
+        mine: 'm'
+      },
+      0
+    )
+  ];
+
+  if (!singlePlayer) {
+    document.getElementById('player2UI').style.display = 'flex';
+    players.push(
+      new Player(
+        200,
+        100,
+        'green',
+        {
+          up: 'i',
+          down: 'k',
+          left: 'j',
+          right: 'l',
+          shoot: 'n',
+          action: 'h',
+          switchRole: 'y',
+          crouch: 'u',
+          grenade: 'b',
+          mine: 'v'
+        },
+        1
+      )
+    );
+  }
+
+  // Spielerfarben im HUD anzeigen
+  players.forEach((player, index) => {
+    document.getElementById(`player${index + 1}Color`).style.backgroundColor =
+      player.color;
+  });
+
+  update();
+}
 
 // Gegner spawnen
 function spawnEnemies() {
@@ -835,6 +1182,13 @@ function spawnEnemies() {
     } while (isColliding(x, y) || isInPlayerSight(x, y));
     enemies.push(new Enemy(x, y));
   }
+  // Kommandant hinzufügen
+  let x, y;
+  do {
+    x = Math.random() * MAP_WIDTH * TILE_SIZE;
+    y = Math.random() * MAP_HEIGHT * TILE_SIZE;
+  } while (isColliding(x, y) || isInPlayerSight(x, y));
+  enemies.push(new Enemy(x, y, true));
 }
 
 function isInPlayerSight(x, y) {
@@ -866,7 +1220,9 @@ function spawnPowerUps() {
     'maschinengewehr',
     'sniper',
     'schutzweste',
-    'tarnanzug'
+    'tarnanzug',
+    'granaten',
+    'minen'
   ];
   for (let i = 0; i < 40; i++) {
     let x, y;
@@ -884,8 +1240,10 @@ function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Kamera-Offset (zentriert auf Spieler)
-  const centerX = (players[0].x + players[1].x) / 2;
-  const centerY = (players[0].y + players[1].y) / 2;
+  const centerX =
+    players.reduce((sum, player) => sum + player.x, 0) / players.length;
+  const centerY =
+    players.reduce((sum, player) => sum + player.y, 0) / players.length;
   const cameraX = centerX - canvas.width / 2;
   const cameraY = centerY - canvas.height / 2;
   ctx.save();
@@ -957,10 +1315,8 @@ function update() {
       player.health;
     document.getElementById(`ammo${index + 1}`).textContent =
       player.ammo;
-    document.getElementById(`weapons${index + 1}`).textContent =
-      player.weapons.join(', ');
-    document.getElementById(`vehicle${index + 1}`).textContent =
-      player.vehicle ? player.vehicle.type : 'Keines';
+    document.getElementById(`weapon${index + 1}`).textContent =
+      player.weapons[player.currentWeaponIndex];
     document.getElementById(`equipment${index + 1}`).textContent =
       player.equipment.join(', ') || 'Keine';
     document.getElementById(`mission${index + 1}`).textContent =
@@ -1014,7 +1370,6 @@ function update() {
           bullets.splice(bullets.indexOf(bullet), 1);
           if (enemy.health <= 0) {
             enemy.isAlive = false;
-            enemies.splice(enemies.indexOf(enemy), 1);
           }
         }
       });
@@ -1040,6 +1395,18 @@ function update() {
         }
       });
     }
+  });
+
+  // Granaten aktualisieren und zeichnen
+  grenades.forEach(grenade => {
+    grenade.update();
+    grenade.draw();
+  });
+
+  // Minen aktualisieren und zeichnen
+  mines.forEach(mine => {
+    mine.update();
+    mine.draw();
   });
 
   // Power-Ups zeichnen
@@ -1105,13 +1472,6 @@ function drawMinimap() {
     }
   });
 }
-
-// Starten des Spiels
-generateMissions();
-spawnEnemies();
-spawnVehicles();
-spawnPowerUps();
-update();
 </script>
 </body>
 </html>
