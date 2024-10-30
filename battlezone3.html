@@ -1,1957 +1,2820 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Top-Down Stealth Shooter</title>
-<style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    background: #333;
-    font-family: Arial, sans-serif;
-  }
-  canvas {
-    display: block;
-    background: #222;
-  }
-  #ui {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    color: white;
-    z-index: 10;
-    display: flex;
-    justify-content: space-between;
-    padding: 5px;
-    font-size: 14px;
-  }
-  .playerUI {
-    background: rgba(0,0,0,0.5);
-    padding: 5px;
-    border-radius: 5px;
-    width: 48%;
-    display: flex;
-    align-items: center;
-  }
-  .playerColor {
-    width: 20px;
-    height: 20px;
-    margin-right: 5px;
-    border-radius: 50%;
-  }
-  #message {
-    position: absolute;
-    bottom: 50%;
-    left: 50%;
-    transform: translate(-50%, 50%);
-    font-size: 24px;
-    color: white;
-    z-index: 10;
-    display: none;
-  }
-  #minimap {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    width: 200px;
-    height: 200px;
-    background: rgba(0,0,0,0.5);
-    z-index: 10;
-  }
-  #menu, #gameOverMenu, #pauseMenu {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(34, 34, 34, 0.95);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 20;
-  }
-  #menu h1, #gameOverMenu h1, #pauseMenu h1 {
-    font-size: 48px;
-    margin-bottom: 20px;
-  }
-  #menu button, #gameOverMenu button, #pauseMenu button {
-    padding: 10px 20px;
-    margin: 10px;
-    font-size: 24px;
-    cursor: pointer;
-  }
-  #controlsInfo {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    width: 300px;
-    background: rgba(0,0,0,0.7);
-    color: white;
-    padding: 10px;
-    z-index: 10;
-    border-radius: 5px;
-  }
-  /* Stil für die Gegner-Healthbars */
-  .healthbar {
-    position: absolute;
-    width: 50px;
-    height: 5px;
-    background: red;
-    border: 1px solid #000;
-    border-radius: 2px;
-    transform: translate(-25px, -35px);
-    pointer-events: none;
-  }
-  .healthbar-inner {
-    width: 100%;
-    height: 100%;
-    background: lime;
-    border-radius: 2px;
-  }
-</style>
+    <meta charset="UTF-8">
+    <title>Top-Down Stealth Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #333;
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+            background: #222;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            color: white;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            padding: 5px;
+            font-size: 14px;
+        }
+
+        .playerUI {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+            border-radius: 5px;
+            width: 48%;
+            display: flex;
+            align-items: center;
+        }
+
+        .playerColor {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            border-radius: 50%;
+        }
+
+        #message {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform: translate(-50%, 50%);
+            font-size: 24px;
+            color: white;
+            z-index: 10;
+            display: none;
+        }
+
+        #minimap {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            width: 200px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        #menu, #gameOverMenu, #pauseMenu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(34, 34, 34, 0.95);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        #menu h1, #gameOverMenu h1, #pauseMenu h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        #menu button, #gameOverMenu button, #pauseMenu button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        #controlsInfo {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            z-index: 10;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
 <canvas id="gameCanvas"></canvas>
 <div id="ui" style="display: none;">
-  <div id="player1UI" class="playerUI">
-    <div class="playerColor" id="player1Color"></div>
-    <div>
-      <p>Gesundheit: <span id="health1">100</span></p>
-      <p>Aktuelles Item: <span id="weapon1">Keine</span></p>
-      <p>Ausrüstung: <span id="equipment1">Keine</span></p>
-      <p>Mission: <span id="mission1">Keine</span></p>
+    <div id="player1UI" class="playerUI">
+        <div class="playerColor" id="player1Color"></div>
+        <div>
+            <p>Gesundheit: <span id="health1">100</span></p>
+            <p>Aktuelles Item: <span id="weapon1">Keine</span></p>
+            <p>Ausrüstung: <span id="equipment1">Keine</span></p>
+            <p>Mission: <span id="mission1">Keine</span></p>
+        </div>
     </div>
-  </div>
-  <div id="player2UI" class="playerUI" style="display: none;">
-    <div class="playerColor" id="player2Color"></div>
-    <div>
-      <p>Gesundheit: <span id="health2">100</span></p>
-      <p>Aktuelles Item: <span id="weapon2">Keine</span></p>
-      <p>Ausrüstung: <span id="equipment2">Keine</span></p>
-      <p>Mission: <span id="mission2">Keine</span></p>
+    <div id="player2UI" class="playerUI" style="display: none;">
+        <div class="playerColor" id="player2Color"></div>
+        <div>
+            <p>Gesundheit: <span id="health2">100</span></p>
+            <p>Aktuelles Item: <span id="weapon2">Keine</span></p>
+            <p>Ausrüstung: <span id="equipment2">Keine</span></p>
+            <p>Mission: <span id="mission2">Keine</span></p>
+        </div>
     </div>
-  </div>
 </div>
 <div id="message"></div>
 <canvas id="minimap" style="display: none;"></canvas>
 
 <!-- Hauptmenü -->
 <div id="menu">
-  <h1>Top-Down Stealth Shooter</h1>
-  <button id="startSingle">Einzelspieler</button>
-  <button id="startMulti">Mehrspieler</button>
-  <button id="showControls">Steuerung</button>
+    <h1>Top-Down Stealth Shooter</h1>
+    <button id="startSingle">Einzelspieler</button>
+    <button id="startMulti">Mehrspieler</button>
+    <button id="showControls">Steuerung</button>
 </div>
 
 <!-- Steuerungsinfo -->
 <div id="controlsInfo" style="display: none;">
-  <h3>Steuerung Einzelspieler:</h3>
-  <p>Bewegung: W, A, S, D</p>
-  <p>Gegenstand verwenden: F</p>
-  <p>Ziel wechseln/Rollenwechsel im Fahrzeug: R</p>
-  <p>Gegenstand wechseln: 1-4</p>
-  <p>Gegenstand ablegen: G</p>
-  <p>Ducken (Stealth): C</p>
-  <p>Ein-/Aussteigen: E</p>
-  <button id="backToMenu">Zurück</button>
+    <h3>Steuerung Einzelspieler:</h3>
+    <p>Bewegung: W, A, S, D</p>
+    <p>Gegenstand verwenden: F</p>
+    <p>Ziel wechseln/Rollenwechsel im Fahrzeug: R</p>
+    <p>Gegenstand wechseln: 1-4</p>
+    <p>Gegenstand ablegen: G</p>
+    <p>Ducken (Stealth): C</p>
+    <p>Ein-/Aussteigen: E</p>
+    <button id="backToMenu">Zurück</button>
 </div>
 
 <!-- Game Over Menü -->
 <div id="gameOverMenu" style="display: none;">
-  <h1>Game Over</h1>
-  <button id="restartGame">Neustart</button>
-  <button id="quitGame">Beenden</button>
+    <h1>Game Over</h1>
+    <button id="restartGame">Neustart</button>
+    <button id="quitGame">Beenden</button>
 </div>
 
 <!-- Pause Menü -->
 <div id="pauseMenu" style="display: none;">
-  <h1>Pause</h1>
-  <button id="resumeGame">Fortsetzen</button>
-  <button id="quitPause">Beenden</button>
+    <h1>Pause</h1>
+    <button id="resumeGame">Fortsetzen</button>
+    <button id="quitPause">Beenden</button>
 </div>
 
 <script>
-// Globale Variablen
-let canvas, ctx, minimap, minimapCtx;
-let gameStarted = false;
-let singlePlayer = true;
-const TILE_SIZE = 50;
-const MAP_WIDTH = 200; // Größerer Level
-const MAP_HEIGHT = 200;
-const SIGHT_RADIUS = 300;
-const keys = {};
-let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover'
-
-// Zusätzliche Tile-Typen
-const TILE_TYPES = {
-  GRASS: 0,
-  FOREST: 1,
-  WATER: 2,
-  ROAD: 3,
-  BUILDING: 4,
-  SAND: 5,
-  MOUNTAIN: 6,
-  VILLAGE: 7,
-};
-
-// Farben für die Tiles
-const TILE_COLORS = {
-  [TILE_TYPES.GRASS]: '#7cfc00',
-  [TILE_TYPES.FOREST]: '#228b22',
-  [TILE_TYPES.WATER]: '#1e90ff',
-  [TILE_TYPES.ROAD]: '#999',
-  [TILE_TYPES.BUILDING]: '#555',
-  [TILE_TYPES.SAND]: '#edc9af',
-  [TILE_TYPES.MOUNTAIN]: '#a9a9a9',
-  [TILE_TYPES.VILLAGE]: '#8b4513',
-};
-
-// Event Listener für Tasten
-document.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
-
-  // Pause/Resume mit der Esc-Taste
-  if (e.key === 'Escape') {
-    if (gameState === 'playing') {
-      pauseGame();
-    } else if (gameState === 'paused') {
-      resumeGame();
-    }
-  }
-});
-document.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
-});
-
-// Hauptmenü-Buttons
-document.getElementById('startSingle').addEventListener('click', () => {
-  singlePlayer = true;
-  gameState = 'playing'; // Setze gameState vor initGame
-  startGame();
-});
-document.getElementById('startMulti').addEventListener('click', () => {
-  singlePlayer = false;
-  gameState = 'playing'; // Setze gameState vor initGame
-  startGame();
-});
-document.getElementById('showControls').addEventListener('click', () => {
-  document.getElementById('menu').style.display = 'none';
-  document.getElementById('controlsInfo').style.display = 'block';
-});
-document.getElementById('backToMenu').addEventListener('click', () => {
-  document.getElementById('controlsInfo').style.display = 'none';
-  document.getElementById('menu').style.display = 'flex';
-});
-
-// Game Over Menü-Buttons
-document.getElementById('restartGame').addEventListener('click', () => {
-  resetGame();
-  startGame();
-});
-document.getElementById('quitGame').addEventListener('click', () => {
-  window.location.reload();
-});
-
-// Pause Menü-Buttons
-document.getElementById('resumeGame').addEventListener('click', () => {
-  resumeGame();
-});
-document.getElementById('quitPause').addEventListener('click', () => {
-  window.location.reload();
-});
-
-// Spiel starten
-function startGame() {
-  document.getElementById('menu').style.display = 'none';
-  document.getElementById('controlsInfo').style.display = 'none';
-  document.getElementById('gameOverMenu').style.display = 'none';
-  document.getElementById('pauseMenu').style.display = 'none';
-  document.getElementById('ui').style.display = 'flex';
-  document.getElementById('minimap').style.display = 'block';
-  document.getElementById('message').style.display = 'none';
-
-  canvas = document.getElementById('gameCanvas');
-  ctx = canvas.getContext('2d');
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  minimap = document.getElementById('minimap');
-  minimapCtx = minimap.getContext('2d');
-  minimap.width = 200;
-  minimap.height = 200;
-
-  initGame();
-  // Starte die Update-Schleife
-  requestAnimationFrame(update);
-}
-
-// Spiel pausieren
-function pauseGame() {
-  gameState = 'paused';
-  document.getElementById('pauseMenu').style.display = 'flex';
-}
-
-// Spiel fortsetzen
-function resumeGame() {
-  gameState = 'playing';
-  document.getElementById('pauseMenu').style.display = 'none';
-  requestAnimationFrame(update); // Starte die Update-Schleife erneut
-}
-
-// Spiel zurücksetzen
-function resetGame() {
-  // Zurücksetzen aller Spielvariablen
-  map = [];
-  missions = [];
-  players = [];
-  enemies = [];
-  bullets = [];
-  grenades = [];
-  mines = [];
-  vehicles = [];
-  powerUps = [];
-  document.getElementById('ui').style.display = 'flex';
-  document.getElementById('minimap').style.display = 'block';
-  document.getElementById('message').style.display = 'none';
-  gameState = 'playing';
-}
-
-// Spiel vorbei
-function gameOver() {
-  gameState = 'gameover';
-  document.getElementById('ui').style.display = 'none';
-  document.getElementById('minimap').style.display = 'none';
-  document.getElementById('gameOverMenu').style.display = 'flex';
-}
-
-// Kachelbasierte Karte erstellen
-let map = [];
-function generateMap() {
-  map = [];
-  // Verwende Perlin Noise für natürlichere Landschaften
-  const noise = generatePerlinNoise(MAP_WIDTH, MAP_HEIGHT);
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    const row = [];
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      const value = noise[y * MAP_WIDTH + x];
-      if (value < 0.3) {
-        row.push(TILE_TYPES.WATER);
-      } else if (value < 0.35) {
-        row.push(TILE_TYPES.SAND);
-      } else if (value < 0.5) {
-        row.push(TILE_TYPES.GRASS);
-      } else if (value < 0.6) {
-        row.push(TILE_TYPES.FOREST);
-      } else if (value < 0.7) {
-        row.push(TILE_TYPES.MOUNTAIN);
-      } else {
-        row.push(TILE_TYPES.GRASS);
-      }
-    }
-    map.push(row);
-  }
-  // Platziere Dörfer
-  generateVillages();
-  // Generiere Straßen
-  generateRoads();
-}
-
-// Perlin Noise Generator
-function generatePerlinNoise(width, height) {
-  const noise = [];
-  const octaveCount = 4;
-  const amplitude = 1;
-  const persistence = 0.5;
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      let total = 0;
-      let frequency = 1;
-      let amplitude = 1;
-      let maxValue = 0;
-      for (let i = 0; i < octaveCount; i++) {
-        total += noise2D(x * frequency, y * frequency) * amplitude;
-        maxValue += amplitude;
-        amplitude *= persistence;
-        frequency *= 2;
-      }
-      noise[y * width + x] = total / maxValue;
-    }
-  }
-  return noise;
-}
-
-// Simplex Noise Function (Placeholder)
-function noise2D(x, y) {
-  // Verwende eine einfache Funktion für Demo-Zwecke
-  return Math.abs(Math.sin(x * 0.1) + Math.cos(y * 0.1));
-}
-
-// Dörfer generieren
-function generateVillages() {
-  const numberOfVillages = 5;
-  for (let i = 0; i < numberOfVillages; i++) {
-    let x, y;
-    do {
-      x = Math.floor(Math.random() * MAP_WIDTH);
-      y = Math.floor(Math.random() * MAP_HEIGHT);
-    } while (map[y][x] !== TILE_TYPES.GRASS);
-    createVillage(x, y);
-  }
-}
-
-// Dorf erstellen
-function createVillage(centerX, centerY) {
-  const villageSize = 5;
-  for (let y = -villageSize; y <= villageSize; y++) {
-    for (let x = -villageSize; x <= villageSize; x++) {
-      const mapX = centerX + x;
-      const mapY = centerY + y;
-      if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT) {
-        map[mapY][mapX] = TILE_TYPES.VILLAGE;
-      }
-    }
-  }
-}
-
-// Straßen generieren
-function generateRoads() {
-  const roadWidth = 2;
-  const numberOfRoads = 10;
-  for (let i = 0; i < numberOfRoads; i++) {
-    const horizontal = Math.random() < 0.5;
-    const start = Math.floor(Math.random() * (horizontal ? MAP_HEIGHT : MAP_WIDTH));
-    for (let j = 0; j < (horizontal ? MAP_WIDTH : MAP_HEIGHT); j++) {
-      for (let w = -roadWidth; w <= roadWidth; w++) {
-        const x = horizontal ? j : start + w;
-        const y = horizontal ? start + w : j;
-        if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-          if (map[y][x] !== TILE_TYPES.WATER && map[y][x] !== TILE_TYPES.MOUNTAIN) {
-            map[y][x] = TILE_TYPES.ROAD;
-          }
-        }
-      }
-    }
-  }
-}
-
-// Missionen generieren
-let missions = [];
-function generateMissions() {
-  missions = [];
-  const missionTypes = [
-    'Finde und steuere ein Fahrzeug',
-    'Eliminiere den Kommandanten',
-    'Sammle Geheimdaten',
-    'Zerstöre das feindliche Lager',
-    'Rette den Verbündeten'
-  ];
-  for (let i = 0; i < 5; i++) {
-    let x, y;
-    do {
-      x = Math.floor(Math.random() * MAP_WIDTH);
-      y = Math.floor(Math.random() * MAP_HEIGHT);
-    } while (map[y][x] !== TILE_TYPES.VILLAGE); // Missionen in Dörfern platzieren
-    const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
-    missions.push({
-      x: x * TILE_SIZE + TILE_SIZE / 2,
-      y: y * TILE_SIZE + TILE_SIZE / 2,
-      active: true,
-      type: type,
-      target: null
-    });
-  }
-}
-
-// Klassen
-class GameObject {
-  constructor(x, y, size, color) {
-    this.x = x;
-    this.y = y;
-    this.size = size;
-    this.color = color;
-    this.health = 100;
-    this.isAlive = true;
-  }
-
-  draw() {
-    ctx.fillStyle = this.color;
-    ctx.fillRect(
-      this.x - this.size / 2,
-      this.y - this.size / 2,
-      this.size,
-      this.size
-    );
-  }
-}
-
-class Player extends GameObject {
-  constructor(x, y, color, controls, index) {
-    super(x, y, 30, color);
-    this.controls = controls;
-    this.speed = 3;
-    this.inventory = []; // Begrenztes Inventar
-    this.maxInventorySize = 4;
-    this.currentItemIndex = 0;
-    this.vehicle = null;
-    this.canUseItem = true;
-    this.angle = 0;
-    this.index = index;
-    this.isCrouching = false;
-    this.currentMission = null;
-    this.equipment = [];
-    this.autoAimTargets = [];
-    this.currentTargetIndex = 0;
-    this.spottedEnemies = new Set(); // Für die Minikarte
-  }
-
-  update() {
-    if (!this.isAlive) return;
-    let dx = 0;
-    let dy = 0;
-
-    // Bewegung
-    if (keys[this.controls.up]) dy -= 1;
-    if (keys[this.controls.down]) dy += 1;
-    if (keys[this.controls.left]) dx -= 1;
-    if (keys[this.controls.right]) dx += 1;
-
-    if (dx !== 0 || dy !== 0) {
-      const length = Math.hypot(dx, dy);
-      dx /= length;
-      dy /= length;
-
-      const newX = this.x + dx * this.speed;
-      const newY = this.y + dy * this.speed;
-
-      if (!isColliding(newX, newY)) {
-        this.x = newX;
-        this.y = newY;
-      }
-
-      this.angle = Math.atan2(dy, dx);
-    }
-
-    // Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
-    const currentWeapon = this.inventory[this.currentItemIndex];
-    const weaponRange = currentWeapon ? currentWeapon.range : 100;
-    const screenBounds = {
-      left: this.x - canvas.width / 2,
-      right: this.x + canvas.width / 2,
-      top: this.y - canvas.height / 2,
-      bottom: this.y + canvas.height / 2
-    };
-    this.autoAimTargets = enemies.filter(enemy => {
-      const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
-      const canSeeEnemy = this.canSee(enemy);
-      if (canSeeEnemy) {
-        this.spottedEnemies.add(enemy); // Feind zur Liste hinzufügen
-      }
-      return (
-        dist < weaponRange &&
-        enemy.isAlive &&
-        canSeeEnemy &&
-        enemy.x > screenBounds.left &&
-        enemy.x < screenBounds.right &&
-        enemy.y > screenBounds.top &&
-        enemy.y < screenBounds.bottom
-      );
-    });
-
-    if (keys[this.controls.switchRole]) {
-        // Rollenwechsel im Fahrzeug
-        if (this.vehicle) {
-            this.vehicle.switchRole(this);
-            keys[this.controls.switchRole] = false;
-        }
-
-        // Ziel wechseln
-        else {
-            if (this.autoAimTargets.length > 0) {
-                this.currentTargetIndex = (this.currentTargetIndex + 1) % this.autoAimTargets.length;
-            }
-            keys[this.controls.switchRole] = false;
-        }
-    }
-
-    const currentTarget = this.autoAimTargets[this.currentTargetIndex];
-    if (currentTarget) {
-      this.angle = Math.atan2(currentTarget.y - this.y, currentTarget.x - this.x);
-    }
-
-    // Gegenstände wechseln
-    if (keys[this.controls.item1]) this.currentItemIndex = 0;
-    if (keys[this.controls.item2]) this.currentItemIndex = 1;
-    if (keys[this.controls.item3]) this.currentItemIndex = 2;
-    if (keys[this.controls.item4]) this.currentItemIndex = 3;
-
-    // Gegenstand verwenden
-    if (keys[this.controls.useItem] && this.canUseItem) {
-      const currentItem = this.inventory[this.currentItemIndex];
-      if (currentItem) {
-        if (currentItem.type === 'Waffe') {
-          // Schießen
-            bullets.push(
-              new Bullet(this.x, this.y, this.angle, this.color, this, currentItem)
-            );
-          // Lärm erzeugen
-          this.makeNoise(currentItem.noise);
-        } else if (currentItem.type === 'Granate') {
-          grenades.push(new Grenade(this.x, this.y, this.angle, this));
-          this.inventory.splice(this.currentItemIndex, 1);
-        } else if (currentItem.type === 'Mine') {
-          mines.push(new Mine(this.x, this.y));
-          this.inventory.splice(this.currentItemIndex, 1);
-        }
-        this.canUseItem = false;
-        setTimeout(() => {
-          this.canUseItem = true;
-        }, currentItem.fireRate || 500);
-      }
-    }
-
-    // Nahkampf (immer verfügbar)
-    if (keys[this.controls.melee] && this.canUseItem) {
-      const meleeRange = 50;
-      enemies.forEach(enemy => {
-        if (
-          enemy.isAlive &&
-          Math.hypot(this.x - enemy.x, this.y - enemy.y) < meleeRange
-        ) {
-          enemy.health -= 100; // One-hit kill in melee
-          if (enemy.health <= 0) {
-            enemy.isAlive = false;
-          }
-        }
-      });
-      this.canUseItem = false;
-      setTimeout(() => {
-        this.canUseItem = true;
-      }, 500);
-    }
-
-    // Gegenstand ablegen
-    if (keys[this.controls.dropItem]) {
-      const droppedItem = this.inventory.splice(this.currentItemIndex, 1)[0];
-      if (droppedItem) {
-        powerUps.push(new PowerUp(this.x, this.y, droppedItem.name));
-        // UI aktualisieren
-        keys[this.controls.dropItem] = false;
-      }
-    }
-
-    // Ein-/Aussteigen
-    if (keys[this.controls.action]) {
-      if (this.vehicle) {
-        this.vehicle.removePassenger(this);
-        this.vehicle = null;
-      } else {
-        const nearbyVehicle = vehicles.find(
-          v =>
-            Math.hypot(this.x - v.x, this.y - v.y) < 50 &&
-            !v.isDestroyed
-        );
-        if (nearbyVehicle) {
-          nearbyVehicle.addPassenger(this);
-          this.vehicle = nearbyVehicle;
-        }
-      }
-      keys[this.controls.action] = false;
-    }
-
-    // Ducken (Stealth)
-    if (keys[this.controls.crouch]) {
-      this.isCrouching = true;
-      this.speed = 1.5;
-    } else {
-      this.isCrouching = false;
-      this.speed = 3;
-    }
-
-    // Pickup von Power-Ups
-    powerUps.forEach((pu, index) => {
-      if (
-        Math.hypot(this.x - pu.x, this.y - pu.y) <
-        (this.size + pu.size) / 2
-      ) {
-        pu.applyEffect(this);
-        powerUps.splice(index, 1);
-      }
-    });
-
-    // Missionen
-    if (!this.currentMission) {
-      this.currentMission = missions.find(m => m.active);
-      if (this.currentMission) {
-        // Missionsziel bestimmen
-        if (this.currentMission.type === 'Eliminiere den Kommandanten') {
-          const commander = enemies.find(e => e.isCommander);
-          this.currentMission.target = commander;
-        } else if (this.currentMission.type === 'Finde und steuere ein Fahrzeug') {
-          const vehicle = vehicles.find(v => !v.isDestroyed);
-          this.currentMission.target = vehicle;
-        }
-        // Weitere Missionsziele können entsprechend hinzugefügt werden
-      }
-    } else {
-      // Pfeil zum Missionsziel
-      drawMissionArrow(this, this.currentMission);
-
-      if (
-        this.currentMission.type === 'Eliminiere den Kommandanten' &&
-        (!this.currentMission.target || !this.currentMission.target.isAlive)
-      ) {
-        this.currentMission.active = false;
-        this.currentMission = null;
-      } else if (
-        this.currentMission.type === 'Finde und steuere ein Fahrzeug' &&
-        this.vehicle === this.currentMission.target
-      ) {
-        this.currentMission.active = false;
-        this.currentMission = null;
-      }
-    }
-
-    // HUD aktualisieren
-    const currentItem = this.inventory[this.currentItemIndex];
-    document.getElementById(`weapon${this.index + 1}`).textContent =
-      currentItem ? currentItem.name : 'Keine';
-    document.getElementById(`equipment${this.index + 1}`).textContent =
-      this.equipment.join(', ') || 'Keine';
-    document.getElementById(`mission${this.index + 1}`).textContent =
-      this.currentMission ? this.currentMission.type : 'Keine';
-  }
-
-  makeNoise(noiseLevel) {
-    enemies.forEach(enemy => {
-      const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
-      if (dist < noiseLevel) {
-        enemy.hearNoise(this.x, this.y);
-      }
-    });
-  }
-
-  canSee(enemy) {
-    const dx = enemy.x - this.x;
-    const dy = enemy.y - this.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > SIGHT_RADIUS) return false;
-    return !lineOfSightBlocked(this.x, this.y, enemy.x, enemy.y);
-  }
-
-  draw() {
-    if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-    // Körper
-    ctx.fillStyle = this.color;
-    ctx.fillRect(-15, -15, 30, 30);
-
-    // Ausrüstung anzeigen
-    if (this.equipment.includes('schutzweste')) {
-      ctx.fillStyle = 'gray';
-      ctx.fillRect(-10, -10, 20, 20);
-    }
-    if (this.equipment.includes('tarnanzug')) {
-      ctx.strokeStyle = 'green';
-      ctx.strokeRect(-15, -15, 30, 30);
-    }
-
-    // Waffe
-    ctx.fillStyle = 'black';
-    const currentItem = this.inventory[this.currentItemIndex];
-    if (currentItem) {
-      if (currentItem.name === 'Pistole' || currentItem.name === 'Pistole mit Schalldämpfer') {
-        ctx.fillRect(0, -5, 15, 5);
-      } else if (currentItem.name === 'Maschinengewehr') {
-        ctx.fillRect(0, -5, 20, 5);
-      } else if (currentItem.name === 'Schrotflinte') {
-        ctx.fillRect(0, -5, 25, 5);
-      }
-    }
-    ctx.restore();
-
-    // Health Bar zeichnen
-    ctx.save();
-    ctx.fillStyle = 'black';
-    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-    ctx.fillStyle = 'lime';
-    const healthPercentage = Math.max(this.health / 100, 0);
-    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
-    ctx.restore();
-
-    // Fadenkreuz auf aktuellem Ziel
-    const currentTarget = this.autoAimTargets[this.currentTargetIndex];
-    if (currentTarget) {
-      ctx.strokeStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(currentTarget.x, currentTarget.y, currentTarget.size / 2 + 5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-}
-
-class Enemy extends GameObject {
-  constructor(x, y, isCommander = false) {
-    super(x, y, 30, isCommander ? 'purple' : 'red');
-    this.speed = 2;
-    this.target = null;
-    this.angle = 0;
-    this.state = 'patrol'; // patrol, chase, investigate, search, flee
-    this.patrolPoints = this.generatePatrolPoints();
-    this.currentPatrolIndex = 0;
-    this.viewAngle = Math.PI / 2;
-    this.viewDistance = SIGHT_RADIUS;
-    this.weapon = this.getRandomWeapon();
-    this.isCommander = isCommander;
-    this.isDead = false;
-    this.deathTime = 0;
-    this.path = [];
-    this.equipment = this.getRandomEquipment();
-    this.heardNoise = false;
-    this.heardNoisePosition = null;
-    this.spottedByPlayer = false; // Für die Minikarte
-  }
-
-  getRandomWeapon() {
-    const weapons = ['Pistole', 'Maschinengewehr', 'Schrotflinte'];
-    return weapons[Math.floor(Math.random() * weapons.length)];
-  }
-
-  getRandomEquipment() {
-    const equipments = ['schutzweste', 'tarnanzug', ''];
-    return equipments[Math.floor(Math.random() * equipments.length)];
-  }
-
-  generatePatrolPoints() {
-    const points = [];
-    for (let i = 0; i < 3; i++) {
-      let x, y;
-      do {
-        x = this.x + (Math.random() - 0.5) * 500;
-        y = this.y + (Math.random() - 0.5) * 500;
-      } while (isColliding(x, y));
-      points.push({ x, y });
-    }
-    return points;
-  }
-
-  update() {
-    if (!this.isAlive) {
-      if (!this.isDead) {
-        this.isDead = true;
-        this.deathTime = Date.now();
-      } else if (Date.now() - this.deathTime > 5000) {
-        enemies.splice(enemies.indexOf(this), 1);
-      }
-      return;
-    }
-
-    // Wahrnehmung
-    const playerDetected = players.find(
-      player => this.canSee(player) || this.canHear(player)
-    );
-    if (playerDetected) {
-      this.state = 'chase';
-      this.target = playerDetected;
-    }
-
-    // Reaktion auf Lärm
-    if (this.heardNoise) {
-        this.state = 'investigate';
-        this.targetPosition = this.heardNoisePosition;
-        this.heardNoise = false;
-    }
-
-    // Reaktion auf laute Geräusche
-    const loudVehicles = vehicles.filter(
-      v =>
-        !v.isDestroyed &&
-        Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
-        v.isLoud()
-    );
-    if (loudVehicles.length > 0) {
-      this.state = 'flee';
-    }
-
-    switch (this.state) {
-      case 'patrol':
-        this.patrol();
-        break;
-      case 'chase':
-        this.chase();
-        break;
-      case 'investigate':
-        this.investigate();
-        break;
-      case 'search':
-        this.search();
-        break;
-      case 'flee':
-        this.flee();
-        break;
-    }
-  }
-
-  canSee(player) {
-    if (!player.isAlive || player.equipment.includes('tarnanzug')) return false;
-    const dx = player.x - this.x;
-    const dy = player.y - this.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > this.viewDistance) return false;
-    const angleToPlayer = Math.atan2(dy, dx);
-    let angleDifference = angleToPlayer - this.angle;
-    angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
-    if (Math.abs(angleDifference) > this.viewAngle / 2) return false;
-    return !lineOfSightBlocked(this.x, this.y, player.x, player.y);
-  }
-
-  canHear(player) {
-    if (!player.isAlive) return false;
-    const dist = Math.hypot(player.x - this.x, player.y - this.y);
-    if (player.isCrouching) {
-      return dist < 100; // Geringere Hörweite bei geducktem Spieler
-    } else if (player.speed > 3) {
-      return dist < 500; // Größere Hörweite bei rennendem Spieler
-    } else {
-      return dist < 300;
-    }
-  }
-
-  hearNoise(x, y) {
-    this.heardNoise = true;
-    this.heardNoisePosition = { x, y };
-  }
-
-  patrol() {
-    const point = this.patrolPoints[this.currentPatrolIndex];
-    this.moveTowards(point.x, point.y);
-    if (Math.hypot(this.x - point.x, this.y - point.y) < 10) {
-      this.currentPatrolIndex =
-        (this.currentPatrolIndex + 1) % this.patrolPoints.length;
-    }
-  }
-
-  chase() {
-    if (this.target && this.target.isAlive) {
-      this.moveTowards(this.target.x, this.target.y);
-      // Schießen
-      if (
-        Math.hypot(this.x - this.target.x, this.y - this.target.y) < 300 &&
-        Math.random() < 0.02 // Erhöhte Schussrate
-      ) {
-        bullets.push(
-          new Bullet(this.x, this.y, this.angle, 'red', this, { damage: 15, range: 300 })
-        );
-      }
-    } else {
-      this.state = 'search';
-    }
-  }
-
-  investigate() {
-    if (this.targetPosition) {
-        this.moveTowards(this.targetPosition.x, this.targetPosition.y);
-        if (Math.hypot(this.x - this.targetPosition.x, this.y - this.targetPosition.y) < 10) {
-        this.state = 'patrol';
-        this.targetPosition = null;
-        }
-    } else {
-        this.state = 'patrol';
-    }
-  }
-
-  search() {
-    this.angle += (Math.random() - 0.5) * 0.1;
-    const dx = Math.cos(this.angle);
-    const dy = Math.sin(this.angle);
-    const newX = this.x + dx * this.speed;
-    const newY = this.y + dy * this.speed;
-    if (!isColliding(newX, newY)) {
-      this.x = newX;
-      this.y = newY;
-    }
-    if (Math.random() < 0.01) {
-      this.state = 'patrol';
-    }
-  }
-
-  flee() {
-    // Bewegung weg von lauten Fahrzeugen
-    const loudVehicle = vehicles.find(
-      v =>
-        !v.isDestroyed &&
-        Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
-        v.isLoud()
-    );
-    if (loudVehicle) {
-      const dx = this.x - loudVehicle.x;
-      const dy = this.y - loudVehicle.y;
-      const dist = Math.hypot(dx, dy);
-      const dirX = dx / dist;
-      const dirY = dy / dist;
-      const newX = this.x + dirX * this.speed;
-      const newY = this.y + dirY * this.speed;
-
-      if (!isColliding(newX, newY)) {
-        this.x = newX;
-        this.y = newY;
-      }
-
-      this.angle = Math.atan2(dirY, dirX);
-    } else {
-      this.state = 'patrol';
-    }
-  }
-
-  moveTowards(x, y) {
-    const dx = x - this.x;
-    const dy = y - this.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 0) {
-      const dirX = dx / dist;
-      const dirY = dy / dist;
-      const newX = this.x + dirX * this.speed;
-      const newY = this.y + dirY * this.speed;
-
-      if (!isColliding(newX, newY)) {
-        this.x = newX;
-        this.y = newY;
-      }
-
-      this.angle = Math.atan2(dy, dx);
-    }
-  }
-
-  draw() {
-    if (!this.isAlive) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(Math.PI / 2); // Umfallen
-      ctx.fillStyle = this.color;
-      ctx.fillRect(-15, -15, 30, 30);
-      ctx.restore();
-      return;
-    }
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-    // Körper
-    ctx.fillStyle = this.color;
-    ctx.fillRect(-15, -15, 30, 30);
-
-    // Ausrüstung anzeigen
-    if (this.equipment.includes('schutzweste')) {
-      ctx.fillStyle = 'gray';
-      ctx.fillRect(-10, -10, 20, 20);
-    }
-    if (this.equipment.includes('tarnanzug')) {
-      ctx.strokeStyle = 'green';
-      ctx.strokeRect(-15, -15, 30, 30);
-    }
-
-    // Waffe anzeigen
-    ctx.fillStyle = 'black';
-    if (this.weapon === 'Pistole') {
-      ctx.fillRect(0, -5, 15, 5);
-    } else if (this.weapon === 'Maschinengewehr') {
-      ctx.fillRect(0, -5, 20, 5);
-    } else if (this.weapon === 'Schrotflinte') {
-      ctx.fillRect(0, -5, 25, 5);
-    }
-    ctx.restore();
-
-    // Health Bar zeichnen
-    ctx.save();
-    ctx.fillStyle = 'black';
-    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-    ctx.fillStyle = 'lime';
-    const healthPercentage = Math.max(this.health / 100, 0);
-    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
-    ctx.restore();
-  }
-}
-
-class Bullet extends GameObject {
-  constructor(x, y, angle, color, owner, weapon) {
-    super(x, y, 5, color);
-    this.speed = weapon.speed || 10;
-    this.owner = owner;
-    this.damage = weapon.damage || 20;
-    this.vx = Math.cos(angle) * this.speed;
-    this.vy = Math.sin(angle) * this.speed;
-    this.range = weapon.range || 500;
-    this.distanceTraveled = 0;
-  }
-
-  update() {
-    if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
-
-    const newX = this.x + this.vx;
-    const newY = this.y + this.vy;
-    this.distanceTraveled += Math.hypot(this.vx, this.vy);
-
-    if (!isColliding(newX, newY) && this.distanceTraveled < this.range) {
-      this.x = newX;
-      this.y = newY;
-    } else {
-      bullets.splice(bullets.indexOf(this), 1);
-    }
-
-    // Grenzen prüfen
-    if (
-      this.x < 0 ||
-      this.x > MAP_WIDTH * TILE_SIZE ||
-      this.y < 0 ||
-      this.y > MAP_HEIGHT * TILE_SIZE
-    ) {
-      bullets.splice(bullets.indexOf(this), 1);
-    }
-  }
-
-  draw() {
-    if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
-
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-class Grenade extends GameObject {
-  constructor(x, y, angle, owner) {
-    super(x, y, 10, 'orange');
-    this.speed = 5;
-    this.vx = Math.cos(angle) * this.speed;
-    this.vy = Math.sin(angle) * this.speed;
-    this.timer = 100;
-    this.owner = owner;
-  }
-
-  update() {
-    if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
-
-    this.timer--;
-    const newX = this.x + this.vx;
-    const newY = this.y + this.vy;
-
-    if (!isColliding(newX, newY)) {
-      this.x = newX;
-      this.y = newY;
-    } else {
-      this.vx = 0;
-      this.vy = 0;
-    }
-
-    if (this.timer <= 0) {
-      this.explode();
-      grenades.splice(grenades.indexOf(this), 1);
-    }
-  }
-
-  explode() {
-    // Explosionseffekt
-    enemies.forEach(enemy => {
-      if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 100) {
-        enemy.health -= 100; // Angepasster Schaden
-        if (enemy.health <= 0) {
-        enemy.isAlive = false;
-      }
-      }
-    });
-    // Fahrzeuge beschädigen
-    vehicles.forEach(vehicle => {
-      if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
-        vehicle.condition -= 100;
-        if (vehicle.condition <= 0) {
-          vehicle.isDestroyed = true;
-        }
-      }
-    });
-  }
-
-  draw() {
-    if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
-
-    ctx.fillStyle = this.color;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-}
-
-class Mine extends GameObject {
-  constructor(x, y) {
-    super(x, y, 15, 'brown');
-  }
-
-  update() {
-    if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
-
-    // Warten auf Feinde oder Fahrzeuge
-    enemies.forEach(enemy => {
-      if (enemy.isAlive && Math.hypot(this.x - enemy.x, this.y - enemy.y) < 20) {
-        enemy.health -= 100; // Sofort töten
-        if (enemy.health <= 0) {
-            enemy.isAlive = false;
-        }
-        mines.splice(mines.indexOf(this), 1);
-      }
-    });
-    vehicles.forEach(vehicle => {
-      if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 20) {
-        vehicle.condition -= 100;
-        if (vehicle.condition <= 0) {
-          vehicle.isDestroyed = true;
-        }
-        mines.splice(mines.indexOf(this), 1);
-      }
-    });
-  }
-
-  draw() {
-    if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
-
-    ctx.fillStyle = this.color;
-    ctx.fillRect(
-      this.x - this.size / 2,
-      this.y - this.size / 2,
-      this.size,
-      this.size
-    );
-  }
-}
-
-class Vehicle extends GameObject {
-  constructor(x, y, type) {
-    super(x, y, type === 'Jeep' ? 120 : 200, 'gray');
-    this.type = type;
-    this.speed = 0;
-    this.maxSpeed = 5;
-    this.angle = 0;
-    this.passengers = [];
-    this.condition = 100; // Zustand des Fahrzeugs
-    this.roleAssignment = {}; // Spielerrollen
-    this.isClosed = type === 'Panzer';
-    this.isDestroyed = false;
-  }
-
-  addPassenger(player) {
-    if (this.passengers.length < 2 && !this.isDestroyed) {
-      this.passengers.push(player);
-      if (this.passengers.length === 1) {
-        this.roleAssignment[player.index] = 'driver';
-      } else {
-        this.roleAssignment[player.index] = 'gunner';
-      }
-    }
-  }
-
-  removePassenger(player) {
-    this.passengers = this.passengers.filter(p => p !== player);
-    delete this.roleAssignment[player.index];
-  }
-
-  switchRole(player) {
-    if (this.passengers.length === 2) {
-      const otherPlayer = this.passengers.find(p => p !== player);
-      const tempRole = this.roleAssignment[player.index];
-      this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
-      this.roleAssignment[otherPlayer.index] = tempRole;
-    }
-  }
-
-  isLoud() {
-    return this.type === 'Panzer' || this.type === 'LKW';
-  }
-
-  update() {
-    if (this.isDestroyed) return;
-
-    // Kollision mit Spielern
-    players.forEach(player => {
-      if (
-        Math.hypot(this.x - player.x, this.y - player.y) <
-        (this.size + player.size) / 2
-      ) {
-        // Kollision verhindern
-        const angle = Math.atan2(player.y - this.y, player.x - this.x);
-        player.x = this.x + Math.cos(angle) * (this.size + player.size) / 2;
-        player.y = this.y + Math.sin(angle) * (this.size + player.size) / 2;
-      }
-    });
-
-    // Kollision mit anderen Fahrzeugen
-    vehicles.forEach(vehicle => {
-      if (vehicle !== this && !vehicle.isDestroyed) {
-        if (
-          Math.hypot(this.x - vehicle.x, this.y - vehicle.y) <
-          (this.size + vehicle.size) / 2
-        ) {
-          // Kollision verhindern
-          const angle = Math.atan2(vehicle.y - this.y, vehicle.x - this.x);
-          this.x -= Math.cos(angle) * 2;
-          this.y -= Math.sin(angle) * 2;
-          vehicle.x += Math.cos(angle) * 2;
-          vehicle.y += Math.sin(angle) * 2;
-        }
-      }
-    });
-
-    // Fahrzeugbewegung
-    const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
-    if (driver) {
-        if (keys[driver.controls.up]) this.speed = this.maxSpeed;
-        if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
-        if (keys[driver.controls.left]) this.angle -= 0.05;
-        if (keys[driver.controls.right]) this.angle += 0.05;
-    }
-    const newX = this.x + Math.cos(this.angle) * this.speed;
-    const newY = this.y + Math.sin(this.angle) * this.speed;
-    if (!isColliding(newX, newY)) {
-      this.x = newX;
-      this.y = newY;
-    } else {
-      this.speed = 0;
-    }
-    this.speed *= 0.9; // Reibung
-    // Aktualisiere Passagierpositionen
-    this.passengers.forEach(p => {
-      p.x = this.x;
-      p.y = this.y;
-    });
-
-    // Schütze kann schießen
-    const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
-    if (gunner && gunner.controls && keys[gunner.controls.useItem] && gunner.canUseItem) {
-      bullets.push(new Bullet(this.x, this.y, gunner.angle, 'black', gunner, { damage: 25, range: 300 }));
-      gunner.canUseItem = false;
-      setTimeout(() => {
-        gunner.canUseItem = true;
-      }, 300);
-    }
-
-    // Kollision mit Feinden
-    enemies.forEach(enemy => {
-      if (
-        enemy.isAlive &&
-        Math.hypot(this.x - enemy.x, this.y - enemy.y) <
-        (this.size + enemy.size) / 2
-      ) {
-        enemy.health -= 50;
-        if (enemy.health <= 0) {
-          enemy.isAlive = false;
-        }
-      }
-    });
-  }
-
-  draw() {
-    if (this.isDestroyed) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(Math.PI / 2); // Umkippen
-      ctx.fillStyle = 'black';
-      ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
-      ctx.restore();
-      return;
-    }
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.angle);
-    // Fahrzeugkörper
-    ctx.fillStyle = this.color;
-    if (this.type === 'Jeep') {
-      ctx.fillRect(-60, -30, 120, 60);
-      // Spieler sichtbar
-      this.passengers.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-20, -20, 40, 40);
-      });
-    } else if (this.type === 'Panzer') {
-      ctx.fillRect(-100, -50, 200, 100);
-      // Turm
-      ctx.fillStyle = 'darkgray';
-      ctx.fillRect(-30, -30, 60, 60);
-      // Kanone
-      ctx.fillRect(30, -10, 60, 20);
-    } else {
-      // LKW
-      ctx.fillRect(-80, -40, 160, 80);
-    }
-    ctx.restore();
-  }
-}
-
-class PowerUp extends GameObject {
-  constructor(x, y, type) {
-    super(x, y, 20, 'yellow');
-    this.type = type;
-  }
-
-  applyEffect(player) {
-    if (player.inventory.length >= player.maxInventorySize) {
-      // Inventar voll
-      return;
-    }
-    if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole_mit_schalldaempfer'].includes(this.type)) {
-      player.inventory.push({ name: this.type.charAt(0).toUpperCase() + this.type.slice(1), type: 'Waffe', damage: 100, range: 300, noise: 200 });
-    } else if (this.type === 'granate') {
-      player.inventory.push({ name: 'Granate', type: 'Granate' });
-    } else if (this.type === 'mine') {
-      player.inventory.push({ name: 'Mine', type: 'Mine' });
-    } else if (this.type === 'schutzweste' || this.type === 'tarnanzug') {
-      if (!player.equipment.includes(this.type)) {
-        player.equipment.push(this.type);
-      }
-    }
-  }
-
-  draw() {
-    // Icon basierend auf dem Typ zeichnen
-    switch (this.type) {
-      case 'pistole':
-        ctx.fillStyle = 'black';
-        ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
-        break;
-      case 'pistole_mit_schalldaempfer':
-        ctx.fillStyle = 'black';
-        ctx.fillRect(this.x - 5, this.y - 5, 15, 10);
-        break;
-      case 'maschinengewehr':
-        ctx.fillStyle = 'green';
-        ctx.fillRect(this.x - 7, this.y - 3, 14, 6);
-        break;
-      case 'schrotflinte':
-        ctx.fillStyle = 'brown';
-        ctx.fillRect(this.x - 10, this.y - 3, 20, 6);
-        break;
-      case 'granate':
-        ctx.fillStyle = 'olive';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      case 'mine':
-        ctx.fillStyle = 'darkred';
-        ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
-        break;
-      default:
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-    }
-  }
-}
-
-// Hilfsfunktionen
-function isColliding(x, y) {
-  const tileX = Math.floor(x / TILE_SIZE);
-  const tileY = Math.floor(y / TILE_SIZE);
-  if (
-    tileX < 0 ||
-    tileX >= MAP_WIDTH ||
-    tileY < 0 ||
-    tileY >= MAP_HEIGHT
-  )
-    return true;
-  const tile = map[tileY][tileX];
-  return (
-    tile === TILE_TYPES.WATER ||
-    tile === TILE_TYPES.MOUNTAIN
-  );
-}
-
-function lineOfSightBlocked(x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const steps = Math.max(Math.abs(dx), Math.abs(dy)) / TILE_SIZE;
-  for (let i = 0; i < steps; i++) {
-    const x = x1 + (dx * i) / steps;
-    const y = y1 + (dy * i) / steps;
-    if (isColliding(x, y)) return true;
-  }
-  return false;
-}
-
-function drawMissionArrow(player, mission) {
-  const target = mission.target || { x: mission.x, y: mission.y };
-  const dx = target.x - player.x;
-  const dy = target.y - player.y;
-  const angle = Math.atan2(dy, dx);
-  const arrowX = canvas.width / 2 + Math.cos(angle) * 100;
-  const arrowY = canvas.height / 2 + Math.sin(angle) * 100;
-
-  ctx.save();
-  ctx.translate(player.x - canvas.width / 2, player.y - canvas.height / 2);
-  ctx.fillStyle = 'gold';
-  ctx.beginPath();
-  ctx.moveTo(arrowX, arrowY);
-  ctx.lineTo(arrowX - 10, arrowY - 5);
-  ctx.lineTo(arrowX - 10, arrowY + 5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-// Spielobjekte
-let players = [];
-let enemies = [];
-let bullets = [];
-let grenades = [];
-let mines = [];
-let vehicles = [];
-let powerUps = [];
-
-// Initialisierung des Spiels
-function initGame() {
-  generateMap();
-  generateMissions();
-  spawnEnemies();
-  spawnVehicles();
-  spawnPowerUps();
-
-  // Spieler an sicheren Positionen spawnen
-  players = [];
-  for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
-    let x, y;
-    do {
-      x = Math.random() * MAP_WIDTH * TILE_SIZE;
-      y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-    } while (isColliding(x, y) || isEnemyNearby(x, y));
-    players.push(
-    new Player(
-        x,
-        y,
-        i === 0 ? 'blue' : 'green',
-        i === 0
-          ? {
-        up: 'w',
-        down: 's',
-        left: 'a',
-        right: 'd',
-        useItem: 'f',
-        action: 'e',
-        switchRole: 'r',
-        crouch: 'c',
-        item1: '1',
-        item2: '2',
-        item3: '3',
-        item4: '4',
-        dropItem: 'g',
-              melee: 'v'
-            }
-          : {
-          up: 'i',
-          down: 'k',
-          left: 'j',
-          right: 'l',
-          useItem: 'o',
-          action: 'u',
-          switchRole: 'p',
-          crouch: ';',
-          item1: '7',
-          item2: '8',
-          item3: '9',
-          item4: '0',
-          dropItem: 'h',
-              melee: 'm'
-        },
-        i
-      )
-    );
-  }
-
-  // Standardausrüstung für Spieler
-  players.forEach(player => {
-    player.inventory.push({ name: 'Pistole', type: 'Waffe', damage: 100, range: 300, noise: 200 });
-  });
-
-  // Spielerfarben im HUD anzeigen
-  players.forEach((player, index) => {
-    document.getElementById(`player${index + 1}Color`).style.backgroundColor =
-      player.color;
-    if (index === 1) {
-      document.getElementById('player2UI').style.display = 'flex';
-    }
-  });
-
-  // Starte das Update nur, wenn das Spiel läuft
-  if (gameState === 'playing') {
-    requestAnimationFrame(update);
-  }
-}
-
-// Funktion, um Feinde in der Nähe zu überprüfen
-function isEnemyNearby(x, y) {
-  return enemies.some(
-    enemy => Math.hypot(enemy.x - x, enemy.y - y) < 200
-  );
-}
-
-// Gegner spawnen
-function spawnEnemies() {
-  enemies = [];
-  for (let i = 0; i < 50; i++) {
-    let x, y;
-    do {
-      x = Math.random() * MAP_WIDTH * TILE_SIZE;
-      y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-    } while (isColliding(x, y) || isInPlayerSight(x, y));
-    enemies.push(new Enemy(x, y));
-  }
-  // Kommandant hinzufügen
-  let x, y;
-  do {
-    x = Math.random() * MAP_WIDTH * TILE_SIZE;
-    y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-  } while (isColliding(x, y) || isInPlayerSight(x, y));
-  enemies.push(new Enemy(x, y, true));
-}
-
-function isInPlayerSight(x, y) {
-  return players.some(
-    player => Math.hypot(player.x - x, player.y - y) < SIGHT_RADIUS
-  );
-}
-
-// Fahrzeuge platzieren
-function spawnVehicles() {
-  vehicles = [];
-  const vehicleTypes = ['Jeep', 'Panzer', 'LKW'];
-  for (let i = 0; i < 15; i++) {
-    let x, y;
-    do {
-      x = Math.random() * MAP_WIDTH * TILE_SIZE;
-      y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-    } while (isColliding(x, y));
-    const type = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
-    vehicles.push(new Vehicle(x, y, type));
-  }
-}
-
-// Power-Ups platzieren
-function spawnPowerUps() {
-  powerUps = [];
-  const types = [
-    'pistole',
-    'schrotflinte',
-    'maschinengewehr',
-    'pistole_mit_schalldaempfer',
-    'schutzweste',
-    'tarnanzug',
-    'granate',
-    'mine'
-  ];
-  for (let i = 0; i < 60; i++) {
-    let x, y;
-    do {
-      x = Math.random() * MAP_WIDTH * TILE_SIZE;
-      y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-    } while (isColliding(x, y));
-    const type = types[Math.floor(Math.random() * types.length)];
-    powerUps.push(new PowerUp(x, y, type));
-  }
-}
-
-// Hauptupdate-Funktion
-function update() {
-  if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Kamera-Offset (zentriert auf Spieler)
-  const centerX =
-    players.reduce((sum, player) => sum + player.x, 0) / players.length;
-  const centerY =
-    players.reduce((sum, player) => sum + player.y, 0) / players.length;
-  const cameraX = centerX - canvas.width / 2;
-  const cameraY = centerY - canvas.height / 2;
-  ctx.save();
-  ctx.translate(-cameraX, -cameraY);
-
-  // Sichtbare Kachelbereiche berechnen
-  const visibleTilesX = Math.ceil(canvas.width / TILE_SIZE) + 2;
-  const visibleTilesY = Math.ceil(canvas.height / TILE_SIZE) + 2;
-  const startTileX = Math.floor(cameraX / TILE_SIZE);
-  const startTileY = Math.floor(cameraY / TILE_SIZE);
-
-  // Karte zeichnen (nur sichtbare Bereiche)
-  for (let y = startTileY; y < startTileY + visibleTilesY; y++) {
-    for (let x = startTileX; x < startTileX + visibleTilesX; x++) {
-      if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-        const tileType = map[y][x];
-                ctx.fillStyle = TILE_COLORS[tileType] || '#777';
-        ctx.fillRect(
-          x * TILE_SIZE,
-          y * TILE_SIZE,
-          TILE_SIZE,
-          TILE_SIZE
-        );
-      }
-    }
-  }
-
-  // Missionen zeichnen
-  missions.forEach(mission => {
-    if (mission.active) {
-      ctx.fillStyle = 'gold';
-      ctx.beginPath();
-      ctx.arc(mission.x, mission.y, 15, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  });
-
-  // Spieler aktualisieren und zeichnen
-  players.forEach((player, index) => {
-    player.update();
-    player.draw();
-    // UI aktualisieren
-    document.getElementById(`health${index + 1}`).textContent =
-      player.health;
-    if (player.health <= 0 && player.isAlive) {
-      player.isAlive = false;
-      checkGameOver();
-    }
-  });
-
-  // Fahrzeuge aktualisieren und zeichnen
-  vehicles.forEach(vehicle => {
-    vehicle.update();
-    vehicle.draw();
-  });
-
-  // Feinde aktualisieren und zeichnen, wenn sie im Sichtbereich sind
-  enemies.forEach(enemy => {
-    if (isInViewport(enemy.x, enemy.y, cameraX, cameraY)) {
-    enemy.update();
-    enemy.draw();
-
-    // Kollision mit Spielern
-    players.forEach(player => {
-      if (
-        player.isAlive &&
-        Math.hypot(player.x - enemy.x, player.y - enemy.y) <
-          (player.size + enemy.size) / 2
-      ) {
-        player.health -= 0.5; // Langsame Abnahme für realistischere Erfahrung
-        if (player.health <= 0) {
-          player.isAlive = false;
-          checkGameOver();
-        }
-      }
-    });
-    }
-  });
-
-  // Kugeln aktualisieren und zeichnen
-  bullets.forEach((bullet, index) => {
-    bullet.update();
-    if (isInViewport(bullet.x, bullet.y, cameraX, cameraY)) {
-        bullet.draw();
-    }
-
-    // Kollision mit Feinden
-    if (bullet.owner instanceof Player) {
-      enemies.forEach(enemy => {
-        if (
-          enemy.isAlive &&
-          Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) <
-          (bullet.size + enemy.size) / 2
-        ) {
-          enemy.health -= bullet.damage;
-          bullets.splice(index, 1);
-          if (enemy.health <= 0) {
-            enemy.isAlive = false;
-          }
-        }
-      });
-    } else if (bullet.owner instanceof Enemy) {
-      players.forEach(player => {
-        if (
-          player.isAlive &&
-          Math.hypot(bullet.x - player.x, bullet.y - player.y) <
-            (bullet.size + player.size) / 2
-        ) {
-          if (player.vehicle && player.vehicle.isClosed) {
-            // Spieler ist in einem geschlossenen Fahrzeug und sicher
-          } else {
-            player.health -= bullet.damage;
-            bullets.splice(index, 1);
-            if (player.health <= 0) {
-              player.isAlive = false;
-              checkGameOver();
-            }
-          }
-        }
-      });
-    }
-  });
-
-  // Granaten aktualisieren und zeichnen
-  grenades.forEach(grenade => {
-    grenade.update();
-    if (isInViewport(grenade.x, grenade.y, cameraX, cameraY)) {
-      grenade.draw();
-    }
-  });
-
-  // Minen aktualisieren und zeichnen
-  mines.forEach(mine => {
-    mine.update();
-    if (isInViewport(mine.x, mine.y, cameraX, cameraY)) {
-      mine.draw();
-    }
-  });
-
-  // Power-Ups zeichnen
-  powerUps.forEach(pu => {
-    if (isInViewport(pu.x, pu.y, cameraX, cameraY)) {
-      pu.draw();
-    }
-  });
-
-  ctx.restore();
-
-  // Minikarte zeichnen
-  drawMinimap(centerX, centerY);
-
-  // Fortsetzen der Update-Schleife
-  requestAnimationFrame(update);
-}
-
-// Funktion, um zu überprüfen, ob ein Objekt im Sichtbereich ist
-function isInViewport(x, y, cameraX, cameraY) {
-  return (
-    x >= cameraX &&
-    x <= cameraX + canvas.width &&
-    y >= cameraY &&
-    y <= cameraY + canvas.height
-  );
-}
-
-// Überprüfen, ob das Spiel vorbei ist
-function checkGameOver() {
-  if (players.every(player => !player.isAlive)) {
-    gameOver();
-  }
-}
-
-// Minikarte
-function drawMinimap(centerX, centerY) {
-  minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
-
-  const scale = 0.1; // Maßstab der Minikarte
-  const mapWidth = canvas.width * scale * 32; // 32x Bildausschnitt
-  const mapHeight = canvas.height * scale * 32;
-
-  const startX = centerX - mapWidth / 2;
-  const startY = centerY - mapHeight / 2;
-
-  const scaleX = minimap.width / mapWidth;
-  const scaleY = minimap.height / mapHeight;
-
-  // Zeichne den sichtbaren Bereich der Karte auf der Minikarte
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      const tileX = x * TILE_SIZE;
-      const tileY = y * TILE_SIZE;
-
-      if (
-        tileX >= startX &&
-        tileX <= startX + mapWidth &&
-        tileY >= startY &&
-        tileY <= startY + mapHeight
-      ) {
-        const tileType = map[y][x];
-        minimapCtx.fillStyle = TILE_COLORS[tileType] || '#777';
-      minimapCtx.fillRect(
-          (tileX - startX) * scaleX,
-          (tileY - startY) * scaleY,
-        TILE_SIZE * scaleX,
-        TILE_SIZE * scaleY
-      );
-      }
-    }
-  }
-
-  // Spieler zeichnen
-  players.forEach(player => {
-    minimapCtx.fillStyle = player.color;
-    minimapCtx.fillRect(
-      (player.x - startX) * scaleX - 2,
-      (player.y - startY) * scaleY - 2,
-      4,
-      4
-    );
-  });
-
-  // Spotted Feinde zeichnen
-  players.forEach(player => {
-    player.spottedEnemies.forEach(enemy => {
-      if (enemy.isAlive) {
-    minimapCtx.fillStyle = 'red';
-    minimapCtx.fillRect(
-      (enemy.x - startX) * scaleX - 2,
-      (enemy.y - startY) * scaleY - 2,
-      4,
-      4
-    );
-      }
-    });
-  });
-
-  // Fahrzeuge zeichnen
-  vehicles.forEach(vehicle => {
-    minimapCtx.fillStyle = 'gray';
-    minimapCtx.fillRect(
-      (vehicle.x - startX) * scaleX - 3,
-      (vehicle.y - startY) * scaleY - 3,
-      6,
-      6
-    );
-  });
-
-  // Missionen zeichnen
-  missions.forEach(mission => {
-    if (mission.active) {
-      minimapCtx.fillStyle = 'gold';
-      minimapCtx.fillRect(
-        (mission.x - startX) * scaleX - 3,
-        (mission.y - startY) * scaleY - 3,
-        6,
-        6
-      );
-    }
-  });
-
-  // Rahmen für den sichtbaren Bereich zeichnen
-  minimapCtx.strokeStyle = 'white';
-  minimapCtx.strokeRect(
-    (centerX - canvas.width / 2 - startX) * scaleX,
-    (centerY - canvas.height / 2 - startY) * scaleY,
-    canvas.width * scaleX,
-    canvas.height * scaleY
-  );
-}
-
-// Game Over Funktion
-function gameOver() {
-  gameState = 'gameover';
-  document.getElementById('ui').style.display = 'none';
-  document.getElementById('minimap').style.display = 'none';
-  document.getElementById('gameOverMenu').style.display = 'flex';
-}
+	// Globale Variablen
+	let canvas, ctx, minimap, minimapCtx;
+	let gameStarted = false;
+	let gameStartTime = Date.now();
+	let singlePlayer = true;
+	const TILE_SIZE = 50;
+	const MAP_WIDTH = 200; // Größerer Level
+	const MAP_HEIGHT = 200;
+	const SIGHT_RADIUS = 300;
+	const keys = {};
+	let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameover'
+
+	// Erweiterte Tile-Typen
+	const TILE_TYPES = {
+		DEEP_WATER: 0,
+		SHALLOW_WATER: 1,
+		BEACH: 2,
+		GRASS: 3,
+		HIGH_GRASS: 4,
+		FOREST: 5,
+		DENSE_FOREST: 6,
+		MOUNTAIN: 7,
+		SNOW: 8,
+		ROAD: 9,
+		DIRT_ROAD: 10,
+		BUILDING: 11,
+		VILLAGE_CENTER: 12,
+		FARM: 13,
+		BRIDGE: 14,
+		TREE: 15,
+		BUSH: 16
+	};
+
+	// Farben für die Tiles
+	const TILE_COLORS = {
+		[TILE_TYPES.DEEP_WATER]: '#0077be',
+		[TILE_TYPES.SHALLOW_WATER]: '#3399ff',
+		[TILE_TYPES.BEACH]: '#f5deb3',
+		[TILE_TYPES.GRASS]: '#90ee90',
+		[TILE_TYPES.HIGH_GRASS]: '#32cd32',
+		[TILE_TYPES.FOREST]: '#228b22',
+		[TILE_TYPES.DENSE_FOREST]: '#006400',
+		[TILE_TYPES.MOUNTAIN]: '#808080',
+		[TILE_TYPES.SNOW]: '#fffafa',
+		[TILE_TYPES.ROAD]: '#696969',
+		[TILE_TYPES.DIRT_ROAD]: '#8b4513',
+		[TILE_TYPES.BUILDING]: '#8b0000',
+		[TILE_TYPES.VILLAGE_CENTER]: '#cd853f',
+		[TILE_TYPES.FARM]: '#deb887',
+		[TILE_TYPES.BRIDGE]: '#a0522d',
+		[TILE_TYPES.TREE]: '#355e3b',
+		[TILE_TYPES.BUSH]: '#556b2f'
+	};
+
+	// Event Listener für Tasten
+	document.addEventListener('keydown', (e) => {
+		keys[e.key.toLowerCase()] = true;
+
+		// Pause/Resume mit der Esc-Taste
+		if (e.key === 'Escape') {
+			if (gameState === 'playing') {
+				pauseGame();
+			} else if (gameState === 'paused') {
+				resumeGame();
+			}
+		}
+	});
+	document.addEventListener('keyup', (e) => {
+		keys[e.key.toLowerCase()] = false;
+	});
+
+	// Hauptmenü-Buttons
+	document.getElementById('startSingle').addEventListener('click', () => {
+		singlePlayer = true;
+		gameState = 'playing'; // Setze gameState vor initGame
+		startGame();
+	});
+	document.getElementById('startMulti').addEventListener('click', () => {
+		singlePlayer = false;
+		gameState = 'playing'; // Setze gameState vor initGame
+		startGame();
+	});
+	document.getElementById('showControls').addEventListener('click', () => {
+		document.getElementById('menu').style.display = 'none';
+		document.getElementById('controlsInfo').style.display = 'block';
+	});
+	document.getElementById('backToMenu').addEventListener('click', () => {
+		document.getElementById('controlsInfo').style.display = 'none';
+		document.getElementById('menu').style.display = 'flex';
+	});
+
+	// Game Over Menü-Buttons
+	document.getElementById('restartGame').addEventListener('click', () => {
+		resetGame();
+		startGame();
+	});
+	document.getElementById('quitGame').addEventListener('click', () => {
+		window.location.reload();
+	});
+
+	// Pause Menü-Buttons
+	document.getElementById('resumeGame').addEventListener('click', () => {
+		resumeGame();
+	});
+	document.getElementById('quitPause').addEventListener('click', () => {
+		window.location.reload();
+	});
+
+	// Spiel starten
+	function startGame() {
+		document.getElementById('menu').style.display = 'none';
+		document.getElementById('controlsInfo').style.display = 'none';
+		document.getElementById('gameOverMenu').style.display = 'none';
+		document.getElementById('pauseMenu').style.display = 'none';
+		document.getElementById('ui').style.display = 'flex';
+		document.getElementById('minimap').style.display = 'block';
+		document.getElementById('message').style.display = 'none';
+
+		canvas = document.getElementById('gameCanvas');
+		ctx = canvas.getContext('2d');
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+
+		minimap = document.getElementById('minimap');
+		minimapCtx = minimap.getContext('2d');
+		minimap.width = 200;
+		minimap.height = 200;
+
+		initGame();
+
+		gameStartTime = Date.now();
+
+		// Starte die Update-Schleife
+		requestAnimationFrame(update);
+	}
+
+	// Spiel pausieren
+	function pauseGame() {
+		gameState = 'paused';
+		document.getElementById('pauseMenu').style.display = 'flex';
+	}
+
+	// Spiel fortsetzen
+	function resumeGame() {
+		gameState = 'playing';
+		document.getElementById('pauseMenu').style.display = 'none';
+		requestAnimationFrame(update); // Starte die Update-Schleife erneut
+	}
+
+	// Spiel zurücksetzen
+	function resetGame() {
+		// Zurücksetzen aller Spielvariablen
+		map = [];
+		missions = [];
+		players = [];
+		enemies = [];
+		bullets = [];
+		grenades = [];
+		mines = [];
+		vehicles = [];
+		powerUps = [];
+		document.getElementById('ui').style.display = 'flex';
+		document.getElementById('minimap').style.display = 'block';
+		document.getElementById('message').style.display = 'none';
+		gameState = 'playing';
+	}
+
+	// Spiel vorbei
+	function gameOver() {
+		// Setze Spielstatus
+		gameState = 'gameover';
+
+		// UI-Elemente aktualisieren
+		document.getElementById('ui').style.display = 'none';
+		document.getElementById('minimap').style.display = 'none';
+		document.getElementById('gameOverMenu').style.display = 'flex';
+
+		// Optional: Spielstatistiken anzeigen
+		const statistics = calculateGameStatistics();
+		displayGameStatistics(statistics);
+	}
+
+
+	// Hilfsfunktionen für Spielstatistiken
+	function calculateGameStatistics() {
+		return {
+			survivedTime: Date.now() - gameStartTime,
+			eliminatedEnemies: enemies.filter(e => !e.isAlive).length,
+			completedMissions: missions.filter(m => !m.active).length,
+			// Weitere Statistiken können hier hinzugefügt werden
+		};
+	}
+
+	function displayGameStatistics(stats) {
+		const minutes = Math.floor(stats.survivedTime / 60000);
+		const seconds = Math.floor((stats.survivedTime % 60000) / 1000);
+
+		const statisticsHTML = `
+            <div id="gameStats">
+                <p>Überlebenszeit: ${minutes}m ${seconds}s</p>
+                <p>Besiegte Gegner: ${stats.eliminatedEnemies}</p>
+                <p>Abgeschlossene Missionen: ${stats.completedMissions}</p>
+            </div>
+        `;
+
+		const gameOverMenu = document.getElementById('gameOverMenu');
+		const existingStats = document.getElementById('gameStats');
+		if (existingStats) {
+			existingStats.remove();
+		}
+		gameOverMenu.insertAdjacentHTML('afterbegin', statisticsHTML);
+	}
+
+	// Kachelbasierte Karte erstellen
+	let map = [];
+
+	class MapGenerator {
+		constructor(width, height, tileSize) {
+			this.MAP_WIDTH = width || 100; // Default width
+			this.MAP_HEIGHT = height || 100; // Default height
+			this.TILE_SIZE = tileSize || 1; // Default tile size
+			this.map = []; // The main map
+			this.heightMap = []; // Height map
+			this.moistureMap = []; // Moisture map
+		}
+
+		generateMap() {
+			// 1. Create base height map and moisture map
+			this.heightMap = this.generateHeightMap();
+			this.moistureMap = this.generateBaseMoistureMap();
+
+			// 2. Initial terrain generation based on height and moisture
+			this.map = [];
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				const row = [];
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					const height = this.heightMap[y][x];
+					const moisture = this.moistureMap[y][x];
+					row.push(this.determineBaseTerrain(height, moisture));
+				}
+				this.map.push(row);
+			}
+
+			// 3. Adjust moisture based on water
+			this.adjustMoistureNearWater();
+
+			// 4. Update map based on adjusted moisture
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (!this.isWaterTile(this.map[y][x])) {
+						this.map[y][x] = this.determineBaseTerrain(this.heightMap[y][x], this.moistureMap[y][x]);
+					}
+				}
+			}
+
+			// 5. Add further features
+			this.generateWaterBodies();
+			this.generateVillages();
+			this.generateRoadNetwork();
+			this.addVegetation();
+			this.addBridges();
+
+			return this.map;
+		}
+
+		generateHeightMap() {
+			const heightMap = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
+			const octaves = [
+				{frequency: 1, amplitude: 1},
+				{frequency: 2, amplitude: 0.5},
+				{frequency: 4, amplitude: 0.25},
+				{frequency: 8, amplitude: 0.125},
+			];
+
+			octaves.forEach(({frequency, amplitude}) => {
+				for (let y = 0; y < this.MAP_HEIGHT; y++) {
+					for (let x = 0; x < this.MAP_WIDTH; x++) {
+						heightMap[y][x] +=
+							this.noise2D((x * frequency) / this.MAP_WIDTH, (y * frequency) / this.MAP_HEIGHT) *
+							amplitude;
+					}
+				}
+			});
+
+			return this.normalizeMap(heightMap);
+		}
+
+		generateBaseMoistureMap() {
+			const moistureMap = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
+			const octaves = [
+				{frequency: 2, amplitude: 1.0},
+				{frequency: 4, amplitude: 0.5},
+				{frequency: 8, amplitude: 0.25},
+			];
+
+			octaves.forEach(({frequency, amplitude}) => {
+				for (let y = 0; y < this.MAP_HEIGHT; y++) {
+					for (let x = 0; x < this.MAP_WIDTH; x++) {
+						moistureMap[y][x] +=
+							(this.noise2D((x * frequency) / this.MAP_WIDTH, (y * frequency) / this.MAP_HEIGHT) * 0.5 +
+								0.5) *
+							amplitude;
+					}
+				}
+			});
+
+			return this.normalizeMap(moistureMap);
+		}
+
+		adjustMoistureNearWater() {
+			const waterTiles = [];
+			// Find all water tiles
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (this.isWaterTile(this.map[y][x])) {
+						waterTiles.push({x, y});
+					}
+				}
+			}
+
+			// Create a temporary moisture adjustment map
+			const moistureAdjustments = Array.from({length: this.MAP_HEIGHT}, () => Array(this.MAP_WIDTH).fill(0));
+
+			// Add moisture near water
+			waterTiles.forEach((tile) => {
+				const WATER_INFLUENCE_RADIUS = 10;
+				for (let dy = -WATER_INFLUENCE_RADIUS; dy <= WATER_INFLUENCE_RADIUS; dy++) {
+					for (let dx = -WATER_INFLUENCE_RADIUS; dx <= WATER_INFLUENCE_RADIUS; dx++) {
+						const newX = tile.x + dx;
+						const newY = tile.y + dy;
+
+						if (newX >= 0 && newX < this.MAP_WIDTH && newY >= 0 && newY < this.MAP_HEIGHT) {
+							const distance = Math.hypot(dx, dy);
+							if (distance <= WATER_INFLUENCE_RADIUS) {
+								const influence = (1 - distance / WATER_INFLUENCE_RADIUS) * 0.3;
+								moistureAdjustments[newY][newX] += influence;
+							}
+						}
+					}
+				}
+			});
+
+			// Apply the adjustments to the original moisture map
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					this.moistureMap[y][x] += moistureAdjustments[y][x];
+				}
+			}
+
+			// Normalize the moisture map again
+			this.moistureMap = this.normalizeMap(this.moistureMap);
+		}
+
+		normalizeMap(map) {
+			let min = Infinity;
+			let max = -Infinity;
+
+			// Find min and max
+			for (let y = 0; y < map.length; y++) {
+				for (let x = 0; x < map[0].length; x++) {
+					if (map[y][x] < min) min = map[y][x];
+					if (map[y][x] > max) max = map[y][x];
+				}
+			}
+
+			// Normalize each value
+			const range = max - min;
+			for (let y = 0; y < map.length; y++) {
+				for (let x = 0; x < map[0].length; x++) {
+					map[y][x] = range === 0 ? 0 : (map[y][x] - min) / range;
+				}
+			}
+
+			return map;
+		}
+
+		determineBaseTerrain(height, moisture) {
+			if (height < 0.2) return TILE_TYPES.DEEP_WATER;
+			if (height < 0.3) return TILE_TYPES.SHALLOW_WATER;
+			if (height < 0.35) return TILE_TYPES.BEACH;
+			if (height < 0.75) {
+				if (moisture < 0.3) return TILE_TYPES.GRASS;
+				if (moisture < 0.6) return TILE_TYPES.HIGH_GRASS;
+				if (moisture < 0.8) return TILE_TYPES.FOREST;
+				return TILE_TYPES.DENSE_FOREST;
+			}
+			if (height < 0.85) return TILE_TYPES.MOUNTAIN;
+			return TILE_TYPES.SNOW;
+		}
+
+		getTileHeight(tileType) {
+			switch (tileType) {
+				case TILE_TYPES.DEEP_WATER:
+					return 0;
+				case TILE_TYPES.SHALLOW_WATER:
+					return 0.2;
+				case TILE_TYPES.BEACH:
+					return 0.3;
+				case TILE_TYPES.GRASS:
+					return 0.4;
+				case TILE_TYPES.HIGH_GRASS:
+					return 0.5;
+				case TILE_TYPES.FOREST:
+					return 0.6;
+				case TILE_TYPES.DENSE_FOREST:
+					return 0.7;
+				case TILE_TYPES.MOUNTAIN:
+					return 0.8;
+				case TILE_TYPES.SNOW:
+					return 0.9;
+				default:
+					return 0.5;
+			}
+		}
+
+		isWaterTile(tileType) {
+			return tileType === TILE_TYPES.DEEP_WATER || tileType === TILE_TYPES.SHALLOW_WATER;
+		}
+
+		isGrassTile(tileType) {
+			return tileType === TILE_TYPES.GRASS || tileType === TILE_TYPES.HIGH_GRASS;
+		}
+
+		isValidTile(x, y) {
+			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
+		}
+
+		generateWaterBodies() {
+			// Rivers from mountains to sea
+			const mountainTiles = MapGenerator.findTilesByType(this.map, TILE_TYPES.MOUNTAIN);
+			mountainTiles.forEach((mountain) => {
+				if (Math.random() < 0.3) {
+					this.generateRiver(mountain);
+				}
+			});
+		}
+
+		generateRiver(startTile) {
+			let current = {...startTile};
+			const river = [current];
+			const MAX_RIVER_LENGTH = this.MAP_WIDTH + this.MAP_HEIGHT;
+
+			for (let i = 0; i < MAX_RIVER_LENGTH; i++) {
+				if (this.isWaterTile(this.map[current.y][current.x])) {
+					break;
+				}
+
+				// Set river tile
+				this.map[current.y][current.x] = TILE_TYPES.SHALLOW_WATER;
+				river.push(current);
+
+				const next = this.findLowestNeighbor(current);
+				if (!next || river.some((tile) => tile.x === next.x && tile.y === next.y)) {
+					break;
+				}
+
+				current = next;
+			}
+		}
+
+		findLowestNeighbor(tile) {
+			const directions = [
+				{dx: -1, dy: -1},
+				{dx: 0, dy: -1},
+				{dx: 1, dy: -1},
+				{dx: -1, dy: 0},
+				{dx: 1, dy: 0},
+				{dx: -1, dy: 1},
+				{dx: 0, dy: 1},
+				{dx: 1, dy: 1},
+			];
+
+			let lowestNeighbor = null;
+			let lowestHeight = Infinity;
+
+			for (const dir of directions) {
+				const newX = tile.x + dir.dx;
+				const newY = tile.y + dir.dy;
+
+				if (this.isValidTile(newX, newY)) {
+					const neighborHeight = this.getTileHeight(this.map[newY][newX]);
+
+					const randomFactor = Math.random() * 0.2;
+					const diagonalPreference = Math.abs(dir.dx) + Math.abs(dir.dy) === 2 ? -0.1 : 0;
+
+					const effectiveHeight = neighborHeight + randomFactor + diagonalPreference;
+
+					if (effectiveHeight < lowestHeight) {
+						lowestHeight = effectiveHeight;
+						lowestNeighbor = {x: newX, y: newY};
+					}
+				}
+			}
+
+			return lowestNeighbor;
+		}
+
+		generateVillages() {
+			const villageLocations = this.findSuitableVillageLocations();
+
+			// Ensure at least one village
+			if (villageLocations.length === 0) {
+				for (let y = 0; y < this.MAP_HEIGHT; y++) {
+					for (let x = 0; x < this.MAP_WIDTH; x++) {
+						if (this.isGrassTile(this.map[y][x])) {
+							villageLocations.push({x, y});
+							break;
+						}
+					}
+					if (villageLocations.length > 0) break;
+				}
+			}
+
+			villageLocations.forEach((loc) => {
+				this.createVillage(loc);
+			});
+		}
+
+		findSuitableVillageLocations() {
+			const locations = [];
+			const minDistance = 20;
+
+			for (let y = 10; y < this.MAP_HEIGHT - 10; y += 10) {
+				for (let x = 10; x < this.MAP_WIDTH - 10; x += 10) {
+					if (this.isGrassTile(this.map[y][x])) {
+						let suitable = true;
+
+						for (const loc of locations) {
+							const dist = Math.hypot(x - loc.x, y - loc.y);
+							if (dist < minDistance) {
+								suitable = false;
+								break;
+							}
+						}
+
+						let hasStrategicValue = false;
+						for (let dy = -5; dy <= 5 && !hasStrategicValue; dy++) {
+							for (let dx = -5; dx <= 5 && !hasStrategicValue; dx++) {
+								const newX = x + dx;
+								const newY = y + dy;
+								if (this.isValidTile(newX, newY)) {
+									const tile = this.map[newY][newX];
+									if (tile === TILE_TYPES.MOUNTAIN || this.isWaterTile(tile)) {
+										hasStrategicValue = true;
+									}
+								}
+							}
+						}
+
+						if (suitable && hasStrategicValue) {
+							locations.push({x, y});
+						}
+					}
+				}
+			}
+
+			return locations.slice(0, 8);
+		}
+
+		createVillage(center) {
+			// Village center
+			this.map[center.y][center.x] = TILE_TYPES.VILLAGE_CENTER;
+
+			// Buildings around the center
+			const radius = 3 + Math.floor(Math.random() * 3);
+			for (let y = -radius; y <= radius; y++) {
+				for (let x = -radius; x <= radius; x++) {
+					const dist = Math.sqrt(x * x + y * y);
+					if (dist <= radius && Math.random() < 0.7) {
+						const newY = center.y + y;
+						const newX = center.x + x;
+						if (this.isValidTile(newX, newY) && !this.isWaterTile(this.map[newY][newX])) {
+							this.map[newY][newX] = TILE_TYPES.BUILDING;
+						}
+					}
+				}
+			}
+
+			// Farms at the village edge
+			this.createFarms(center, radius + 2);
+		}
+
+		createFarms(center, radius) {
+			for (let y = -radius; y <= radius; y++) {
+				for (let x = -radius; x <= radius; x++) {
+					const dist = Math.sqrt(x * x + y * y);
+					const newY = center.y + y;
+					const newX = center.x + x;
+
+					if (
+						dist > radius - 2 &&
+						dist <= radius &&
+						this.isValidTile(newX, newY) &&
+						this.isGrassTile(this.map[newY][newX])
+					) {
+						if (Math.random() < 0.5) {
+							this.map[newY][newX] = TILE_TYPES.FARM;
+						}
+					}
+				}
+			}
+		}
+
+		generateRoadNetwork() {
+			// Main roads between important points
+			const hubs = this.findImportantLocations();
+			const mst = this.minimumSpanningTree(hubs);
+
+			mst.forEach((edge) => {
+				this.createRoadBetween(edge.start, edge.end);
+			});
+
+			// Secondary roads
+			hubs.forEach((hub) => {
+				if (Math.random() < 0.4) {
+					const target = this.findNearestVillage(hub);
+					if (target) {
+						this.createDirtRoad(hub, target);
+					}
+				}
+			});
+		}
+
+		findImportantLocations() {
+			const locations = [];
+
+			// Mountains
+			const mountains = MapGenerator.findTilesByType(this.map, TILE_TYPES.MOUNTAIN);
+			mountains.slice(0, 5).forEach((mountain) => {
+				locations.push({
+					x: mountain.x * this.TILE_SIZE + this.TILE_SIZE / 2,
+					y: mountain.y * this.TILE_SIZE + this.TILE_SIZE / 2,
+					type: 'mountain',
+				});
+			});
+
+			// Villages
+			const villages = MapGenerator.findTilesByType(this.map, TILE_TYPES.VILLAGE_CENTER);
+			villages.forEach((village) => {
+				locations.push({
+					x: village.x * this.TILE_SIZE + this.TILE_SIZE / 2,
+					y: village.y * this.TILE_SIZE + this.TILE_SIZE / 2,
+					type: 'village',
+				});
+			});
+
+			// Water access points
+			const waterAccess = [];
+			const waterTiles = MapGenerator.findTilesByType(this.map, TILE_TYPES.DEEP_WATER).concat(
+				MapGenerator.findTilesByType(this.map, TILE_TYPES.SHALLOW_WATER)
+			);
+
+			waterTiles.forEach((water) => {
+				const neighbors = [
+					{x: water.x + 1, y: water.y},
+					{x: water.x - 1, y: water.y},
+					{x: water.x, y: water.y + 1},
+					{x: water.x, y: water.y - 1},
+				];
+
+				neighbors.forEach((neighbor) => {
+					if (
+						this.isValidTile(neighbor.x, neighbor.y) &&
+						!this.isWaterTile(this.map[neighbor.y][neighbor.x]) &&
+						neighbor.x % 20 === 0
+					) {
+						waterAccess.push({
+							x: neighbor.x * this.TILE_SIZE + this.TILE_SIZE / 2,
+							y: neighbor.y * this.TILE_SIZE + this.TILE_SIZE / 2,
+							type: 'waterAccess',
+						});
+					}
+				});
+			});
+
+			// Add a selection of water access points
+			locations.push(...waterAccess.slice(0, 5));
+
+			return locations;
+		}
+
+		minimumSpanningTree(points) {
+			const edges = [];
+
+			// Create all possible edges with their distances
+			for (let i = 0; i < points.length; i++) {
+				for (let j = i + 1; j < points.length; j++) {
+					edges.push({
+						start: points[i],
+						end: points[j],
+						distance: Math.hypot(points[i].x - points[j].x, points[i].y - points[j].y),
+					});
+				}
+			}
+
+			// Sort edges by distance
+			edges.sort((a, b) => a.distance - b.distance);
+
+			// Initialize Union-Find structure
+			const parent = Array(points.length).fill(0).map((_, idx) => idx);
+
+			const find = (i) => {
+				if (parent[i] !== i) {
+					parent[i] = find(parent[i]);
+				}
+				return parent[i];
+			};
+
+			const mst = [];
+			edges.forEach((edge) => {
+				const startIdx = points.indexOf(edge.start);
+				const endIdx = points.indexOf(edge.end);
+				const rootStart = find(startIdx);
+				const rootEnd = find(endIdx);
+				if (rootStart !== rootEnd) {
+					mst.push(edge);
+					parent[rootStart] = rootEnd;
+				}
+			});
+
+			return mst;
+		}
+
+		createRoadBetween(start, end) {
+			const dx = end.x - start.x;
+			const dy = end.y - start.y;
+			const steps = Math.max(Math.abs(dx), Math.abs(dy));
+
+			for (let i = 0; i <= steps; i++) {
+				const x = Math.floor((start.x + (dx * i) / steps) / this.TILE_SIZE);
+				const y = Math.floor((start.y + (dy * i) / steps) / this.TILE_SIZE);
+
+				if (this.isValidTile(x, y) && !this.isWaterTile(this.map[y][x])) {
+					this.map[y][x] = TILE_TYPES.ROAD;
+				}
+			}
+		}
+
+		createDirtRoad(start, end) {
+			const dx = end.x - start.x;
+			const dy = end.y - start.y;
+			const steps = Math.max(Math.abs(dx), Math.abs(dy));
+
+			for (let i = 0; i <= steps; i++) {
+				const x = Math.floor((start.x + (dx * i) / steps) / this.TILE_SIZE);
+				const y = Math.floor((start.y + (dy * i) / steps) / this.TILE_SIZE);
+
+				if (
+					this.isValidTile(x, y) &&
+					!this.isWaterTile(this.map[y][x]) &&
+					this.map[y][x] !== TILE_TYPES.ROAD
+				) {
+					this.map[y][x] = TILE_TYPES.DIRT_ROAD;
+				}
+			}
+		}
+
+		findNearestVillage(point) {
+			const villages = MapGenerator.findTilesByType(this.map, TILE_TYPES.VILLAGE_CENTER);
+			if (villages.length === 0) return null;
+
+			let nearest = null;
+			let minDist = Infinity;
+
+			villages.forEach((village) => {
+				const dist = Math.hypot(
+					village.x - point.x / this.TILE_SIZE,
+					village.y - point.y / this.TILE_SIZE
+				);
+				if (dist < minDist) {
+					minDist = dist;
+					nearest = {
+						x: village.x * this.TILE_SIZE + this.TILE_SIZE / 2,
+						y: village.y * this.TILE_SIZE + this.TILE_SIZE / 2,
+					};
+				}
+			});
+
+			return nearest;
+		}
+
+		addVegetation() {
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (this.map[y][x] === TILE_TYPES.GRASS || this.map[y][x] === TILE_TYPES.HIGH_GRASS) {
+						if (Math.random() < 0.1) {
+							this.map[y][x] = TILE_TYPES.TREE;
+						} else if (Math.random() < 0.2) {
+							this.map[y][x] = TILE_TYPES.BUSH;
+						}
+					}
+				}
+			}
+
+			// Tree lines along roads
+			this.addTreeLines();
+		}
+
+		addTreeLines() {
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (this.map[y][x] === TILE_TYPES.ROAD) {
+						if (y % 3 === 0) {
+							if (this.isValidTile(x - 1, y) && this.isGrassTile(this.map[y][x - 1])) {
+								this.map[y][x - 1] = TILE_TYPES.TREE;
+							}
+							if (this.isValidTile(x + 1, y) && this.isGrassTile(this.map[y][x + 1])) {
+								this.map[y][x + 1] = TILE_TYPES.TREE;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		addBridges() {
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (this.map[y][x] === TILE_TYPES.ROAD) {
+						if (this.hasWaterNeighbors(x, y)) {
+							this.map[y][x] = TILE_TYPES.BRIDGE;
+						}
+					}
+				}
+			}
+		}
+
+		hasWaterNeighbors(x, y) {
+			const neighbors = [
+				{dx: -1, dy: 0},
+				{dx: 1, dy: 0},
+				{dx: 0, dy: -1},
+				{dx: 0, dy: 1},
+			];
+
+			let waterCount = 0;
+			neighbors.forEach((n) => {
+				const newX = x + n.dx;
+				const newY = y + n.dy;
+				if (this.isValidTile(newX, newY) && this.isWaterTile(this.map[newY][newX])) {
+					waterCount++;
+				}
+			});
+
+			return waterCount > 0;
+		}
+
+		static findTilesByType(searchMap, tileType) {
+			const tiles = [];
+			for (let y = 0; y < this.MAP_HEIGHT; y++) {
+				for (let x = 0; x < this.MAP_WIDTH; x++) {
+					if (searchMap[y][x] === tileType) {
+						tiles.push({x, y});
+					}
+				}
+			}
+
+			// Optional: Sort by distance to map center
+			const centerX = this.MAP_WIDTH / 2;
+			const centerY = this.MAP_HEIGHT / 2;
+
+			tiles.sort((a, b) => {
+				const distA = Math.hypot(a.x - centerX, a.y - centerY);
+				const distB = Math.hypot(b.x - centerX, b.y - centerY);
+				return distA - distB;
+			});
+
+			return tiles;
+		}
+
+		// Einfache Rauschfunktion (z.B. Wertedämpfung)
+		noise2D(x, y) {
+			// Verwende eine einfache Pseudozufallsfunktion basierend auf Koordinaten
+			const seed = 10000 * x + y;
+			let n = Math.sin(seed) * 10000;
+			return n - Math.floor(n);
+		}
+	}
+
+	// Missionen generieren
+	let missions = [];
+
+	function generateMissions() {
+		missions = [];
+		const missionTypes = [
+			'Finde und steuere ein Fahrzeug',
+			'Eliminiere den Kommandanten',
+			'Sammle Geheimdaten',
+			'Zerstöre das feindliche Lager',
+			'Rette den Verbündeten'
+		];
+		for (let i = 0; i < 5; i++) {
+			let x, y;
+			do {
+				x = Math.floor(Math.random() * MAP_WIDTH);
+				y = Math.floor(Math.random() * MAP_HEIGHT);
+			} while (map[y][x] !== TILE_TYPES.VILLAGE_CENTER);
+			const type = missionTypes[Math.floor(Math.random() * missionTypes.length)];
+			const mission = {
+				x: x * TILE_SIZE + TILE_SIZE / 2,
+				y: y * TILE_SIZE + TILE_SIZE / 2,
+				active: true,
+				type: type,
+				target: null
+			};
+			if (type === 'Eliminiere den Kommandanten') {
+				// Ensure the commander is not removed
+				const commander = new Enemy(mission.x, mission.y, true);
+				enemies.push(commander);
+				mission.target = commander;
+			} else if (type === 'Finde und steuere ein Fahrzeug') {
+				// Ensure a vehicle is available at the mission location
+				const vehicle = new Vehicle(mission.x, mission.y, 'Jeep');
+				vehicles.push(vehicle);
+				mission.target = vehicle;
+			} else if (type === 'Sammle Geheimdaten') {
+				// Place a power-up representing the secret data
+				const secretData = new PowerUp(mission.x, mission.y, 'geheimdaten');
+				powerUps.push(secretData);
+				mission.target = secretData;
+			} else if (type === 'Zerstöre das feindliche Lager') {
+				// Create a destructible enemy camp
+				const enemyCamp = new Structure(mission.x, mission.y, 'Camp');
+				structures.push(enemyCamp); // Make sure you have a structures array
+				mission.target = enemyCamp;
+			} else if (type === 'Rette den Verbündeten') {
+				// Spawn an allied NPC
+				const ally = new NPC(mission.x, mission.y, 'yellow');
+				allies.push(ally); // Make sure you have an allies array
+				mission.target = ally;
+			}
+			missions.push(mission);
+		}
+	}
+
+	// Klassen
+	class GameObject {
+		constructor(x, y, size, color) {
+			this.x = x;
+			this.y = y;
+			this.size = size;
+			this.color = color;
+			this.health = 100;
+			this.isAlive = true;
+		}
+
+		draw() {
+			ctx.fillStyle = this.color;
+			ctx.fillRect(
+				this.x - this.size / 2,
+				this.y - this.size / 2,
+				this.size,
+				this.size
+			);
+		}
+	}
+
+	class Player extends GameObject {
+		constructor(x, y, color, controls, index) {
+			super(x, y, 30, color);
+			this.controls = controls;
+			this.speed = 3;
+			this.inventory = []; // Begrenztes Inventar
+			this.maxInventorySize = 4;
+			this.currentItemIndex = 0;
+			this.vehicle = null;
+			this.canUseItem = true;
+			this.angle = 0;
+			this.index = index;
+			this.isCrouching = false;
+			this.currentMission = null;
+			this.equipment = [];
+			this.autoAimTargets = [];
+			this.currentTargetIndex = 0;
+			this.spottedEnemies = new Set(); // Für die Minikarte
+		}
+
+		update() {
+			if (!this.isAlive) return;
+
+			// Spotted enemies are all enemies inside the screen bounds
+			this.spottedEnemies.clear();
+			enemies.forEach(enemy => {
+				const screenBounds = {
+					left: this.x - canvas.width / 2,
+					right: this.x + canvas.width / 2,
+					top: this.y - canvas.height / 2,
+					bottom: this.y + canvas.height / 2
+				};
+				if (
+					enemy.x > screenBounds.left &&
+					enemy.x < screenBounds.right &&
+					enemy.y > screenBounds.top &&
+					enemy.y < screenBounds.bottom
+				) {
+					this.spottedEnemies.add(enemy);
+				}
+			});
+
+
+			// If the player is in a vehicle, skip movement controls
+			if (this.vehicle) {
+				// Allow rotation controls for the gunner role
+				if (this.vehicle.roleAssignment[this.index] === 'gunner') {
+					if (keys[this.controls.left]) this.angle -= 0.05;
+					if (keys[this.controls.right]) this.angle += 0.05;
+				}
+				return;
+			}
+
+			let dx = 0;
+			let dy = 0;
+
+			// Movement
+			if (keys[this.controls.up]) dy -= 1;
+			if (keys[this.controls.down]) dy += 1;
+			if (keys[this.controls.left]) dx -= 1;
+			if (keys[this.controls.right]) dx += 1;
+
+			if (dx !== 0 || dy !== 0) {
+				const length = Math.hypot(dx, dy);
+				dx /= length;
+				dy /= length;
+
+				const newX = this.x + dx * this.speed;
+				const newY = this.y + dy * this.speed;
+
+				if (!isColliding(newX, newY, this)) {
+					this.x = newX;
+					this.y = newY;
+				}
+
+				this.angle = Math.atan2(dy, dx);
+			}
+
+			// Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
+			const currentWeapon = this.inventory[this.currentItemIndex];
+			const weaponRange = currentWeapon ? currentWeapon.range : 100;
+			const screenBounds = {
+				left: this.x - canvas.width / 2,
+				right: this.x + canvas.width / 2,
+				top: this.y - canvas.height / 2,
+				bottom: this.y + canvas.height / 2
+			};
+			this.autoAimTargets = enemies.filter(enemy => {
+				const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+				const canSeeEnemy = this.canSee(enemy);
+				return (
+					dist < weaponRange &&
+					enemy.isAlive &&
+					canSeeEnemy &&
+					enemy.x > screenBounds.left &&
+					enemy.x < screenBounds.right &&
+					enemy.y > screenBounds.top &&
+					enemy.y < screenBounds.bottom
+				);
+			});
+
+			if (keys[this.controls.switchRole]) {
+				// Rollenwechsel im Fahrzeug
+				if (this.vehicle) {
+					this.vehicle.switchRole(this);
+					keys[this.controls.switchRole] = false;
+				}
+
+				// Ziel wechseln
+				else {
+					if (this.autoAimTargets.length > 0) {
+						this.currentTargetIndex = (this.currentTargetIndex + 1) % this.autoAimTargets.length;
+					}
+					keys[this.controls.switchRole] = false;
+				}
+			}
+
+			const currentTarget = this.autoAimTargets[this.currentTargetIndex];
+			if (currentTarget) {
+				this.angle = Math.atan2(currentTarget.y - this.y, currentTarget.x - this.x);
+			}
+
+			// Gegenstände wechseln
+			if (keys[this.controls.item1]) this.currentItemIndex = 0;
+			if (keys[this.controls.item2]) this.currentItemIndex = 1;
+			if (keys[this.controls.item3]) this.currentItemIndex = 2;
+			if (keys[this.controls.item4]) this.currentItemIndex = 3;
+
+			// Gegenstand verwenden
+			if (keys[this.controls.useItem] && this.canUseItem) {
+				const currentItem = this.inventory[this.currentItemIndex];
+				if (currentItem) {
+					if (currentItem.type === 'Waffe') {
+						// Schießen
+						bullets.push(
+							new Bullet(this.x, this.y, this.angle, this.color, this, currentItem)
+						);
+						// Lärm erzeugen
+						this.makeNoise(currentItem.noise);
+					} else if (currentItem.type === 'Granate') {
+						grenades.push(new Grenade(this.x, this.y, this.angle, this));
+						this.inventory.splice(this.currentItemIndex, 1);
+					} else if (currentItem.type === 'Mine') {
+						mines.push(new Mine(this.x, this.y));
+						this.inventory.splice(this.currentItemIndex, 1);
+					}
+					this.canUseItem = false;
+					setTimeout(() => {
+						this.canUseItem = true;
+					}, currentItem.fireRate || 500);
+				}
+			}
+
+			// Nahkampf (immer verfügbar)
+			if (keys[this.controls.melee] && this.canUseItem) {
+				const meleeRange = 50;
+				enemies.forEach(enemy => {
+					if (
+						enemy.isAlive &&
+						Math.hypot(this.x - enemy.x, this.y - enemy.y) < meleeRange
+					) {
+						enemy.health -= 100; // One-hit kill in melee
+						if (enemy.health <= 0) {
+							enemy.isAlive = false;
+						}
+					}
+				});
+				this.canUseItem = false;
+				setTimeout(() => {
+					this.canUseItem = true;
+				}, 500);
+			}
+
+			// Gegenstand ablegen
+			if (keys[this.controls.dropItem]) {
+				const droppedItem = this.inventory.splice(this.currentItemIndex, 1)[0];
+				if (droppedItem) {
+					powerUps.push(new PowerUp(this.x, this.y, droppedItem.name));
+					// UI aktualisieren
+					keys[this.controls.dropItem] = false;
+				}
+			}
+
+			// Entering/Exiting Vehicles
+			if (keys[this.controls.action]) {
+				if (this.vehicle) {
+					this.vehicle.removePassenger(this);
+					this.vehicle = null;
+				} else {
+					const nearbyVehicle = vehicles.find(
+						v =>
+							Math.hypot(this.x - v.x, this.y - v.y) < v.size / 2 + this.size / 2 &&
+							!v.isDestroyed
+					);
+					if (nearbyVehicle) {
+						nearbyVehicle.addPassenger(this);
+						this.vehicle = nearbyVehicle;
+						// Set player's angle to the vehicle's angle
+						this.angle = nearbyVehicle.angle;
+					}
+				}
+				keys[this.controls.action] = false;
+			}
+
+			// Ducken (Stealth)
+			if (keys[this.controls.crouch]) {
+				this.isCrouching = true;
+				this.speed = 1.5;
+			} else {
+				this.isCrouching = false;
+				this.speed = 3;
+			}
+
+			// Pickup von Power-Ups
+			powerUps.forEach((pu, index) => {
+				if (
+					Math.hypot(this.x - pu.x, this.y - pu.y) <
+					(this.size + pu.size) / 2
+				) {
+					pu.applyEffect(this);
+					powerUps.splice(index, 1);
+				}
+			});
+
+			// Missionen
+			if (!this.currentMission) {
+				this.currentMission = missions.find(m => m.active);
+				if (this.currentMission) {
+					// Missionsziel bestimmen
+					if (this.currentMission.type === 'Eliminiere den Kommandanten') {
+						this.currentMission.target = enemies.find(e => e.isCommander);
+					} else if (this.currentMission.type === 'Finde und steuere ein Fahrzeug') {
+						this.currentMission.target = vehicles.find(v => !v.isDestroyed);
+					}
+					// Weitere Missionsziele können entsprechend hinzugefügt werden
+				}
+			} else {
+				// Pfeil zum Missionsziel
+				drawMissionArrow(this, this.currentMission);
+
+				if (
+					this.currentMission.type === 'Eliminiere den Kommandanten' &&
+					(!this.currentMission.target || !this.currentMission.target.isAlive)
+				) {
+					this.currentMission.active = false;
+					this.currentMission = null;
+				} else if (
+					this.currentMission.type === 'Finde und steuere ein Fahrzeug' &&
+					this.vehicle === this.currentMission.target
+				) {
+					this.currentMission.active = false;
+					this.currentMission = null;
+				}
+			}
+
+			// HUD aktualisieren
+			const currentItem = this.inventory[this.currentItemIndex];
+			document.getElementById(`weapon${this.index + 1}`).textContent =
+				currentItem ? currentItem.name : 'Keine';
+			document.getElementById(`equipment${this.index + 1}`).textContent =
+				this.equipment.join(', ') || 'Keine';
+			document.getElementById(`mission${this.index + 1}`).textContent =
+				this.currentMission ? this.currentMission.type : 'Keine';
+		}
+
+		makeNoise(noiseLevel) {
+			enemies.forEach(enemy => {
+				const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+				if (dist < noiseLevel) {
+					enemy.hearNoise(this.x, this.y);
+				}
+			});
+		}
+
+		canSee(enemy) {
+			const dx = enemy.x - this.x;
+			const dy = enemy.y - this.y;
+			const dist = Math.hypot(dx, dy);
+			if (dist > SIGHT_RADIUS) return false;
+			return !lineOfSightBlocked(this.x, this.y, enemy.x, enemy.y);
+		}
+
+		draw() {
+			if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
+
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
+			// Körper
+			ctx.fillStyle = this.color;
+			ctx.fillRect(-15, -15, 30, 30);
+
+			// Ausrüstung anzeigen
+			if (this.equipment.includes('schutzweste')) {
+				ctx.fillStyle = 'gray';
+				ctx.fillRect(-10, -10, 20, 20);
+			}
+			if (this.equipment.includes('tarnanzug')) {
+				ctx.strokeStyle = 'green';
+				ctx.strokeRect(-15, -15, 30, 30);
+			}
+
+			// Waffe
+			ctx.fillStyle = 'black';
+			const currentItem = this.inventory[this.currentItemIndex];
+			if (currentItem) {
+				if (currentItem.name === 'Pistole' || currentItem.name === 'Pistole mit Schalldämpfer') {
+					ctx.fillRect(0, -5, 15, 5);
+				} else if (currentItem.name === 'Maschinengewehr') {
+					ctx.fillRect(0, -5, 20, 5);
+				} else if (currentItem.name === 'Schrotflinte') {
+					ctx.fillRect(0, -5, 25, 5);
+				}
+			}
+			ctx.restore();
+
+			// Health Bar zeichnen
+			ctx.save();
+			ctx.fillStyle = 'black';
+			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+			ctx.fillStyle = 'lime';
+			const healthPercentage = Math.max(this.health / 100, 0);
+			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+			ctx.restore();
+
+			// Fadenkreuz auf aktuellem Ziel
+			const currentTarget = this.autoAimTargets[this.currentTargetIndex];
+			if (currentTarget) {
+				ctx.strokeStyle = this.color;
+				ctx.beginPath();
+				ctx.arc(currentTarget.x, currentTarget.y, currentTarget.size / 2 + 5, 0, Math.PI * 2);
+				ctx.stroke();
+			}
+		}
+	}
+
+	class Enemy extends GameObject {
+		constructor(x, y, isCommander = false) {
+			super(x, y, 30, isCommander ? 'purple' : 'red');
+			this.speed = 2;
+			this.target = null;
+			this.angle = 0;
+			this.state = 'patrol'; // patrol, chase, investigate, search, flee
+			this.patrolPoints = this.generatePatrolPoints();
+			this.currentPatrolIndex = 0;
+			this.viewAngle = Math.PI / 2;
+			this.viewDistance = SIGHT_RADIUS;
+			this.weapon = this.getRandomWeapon();
+			this.isCommander = isCommander;
+			this.isDead = false;
+			this.deathTime = 0;
+			this.path = [];
+			this.equipment = this.getRandomEquipment();
+			this.heardNoise = false;
+			this.heardNoisePosition = null;
+			this.spottedByPlayer = false; // Für die Minikarte
+		}
+
+		getRandomWeapon() {
+			const weapons = ['Pistole', 'Maschinengewehr', 'Schrotflinte'];
+			return weapons[Math.floor(Math.random() * weapons.length)];
+		}
+
+		getRandomEquipment() {
+			const equipments = ['schutzweste', 'tarnanzug', ''];
+			return equipments[Math.floor(Math.random() * equipments.length)];
+		}
+
+		generatePatrolPoints() {
+			const points = [];
+			for (let i = 0; i < 3; i++) {
+				let x, y;
+				do {
+					x = this.x + (Math.random() - 0.5) * 500;
+					y = this.y + (Math.random() - 0.5) * 500;
+				} while (isColliding(x, y));
+				points.push({x, y});
+			}
+			return points;
+		}
+
+		update() {
+			if (!this.isAlive) {
+				if (!this.isDead) {
+					this.isDead = true;
+					this.deathTime = Date.now();
+				} else if (Date.now() - this.deathTime > 5000) {
+					enemies.splice(enemies.indexOf(this), 1);
+				}
+				return;
+			}
+
+			// Wahrnehmung
+			const playerDetected = players.find(
+				player => this.canSee(player) || this.canHear(player)
+			);
+			if (playerDetected) {
+				this.state = 'chase';
+				this.target = playerDetected;
+			}
+
+			// Reaktion auf Lärm
+			if (this.heardNoise) {
+				this.state = 'investigate';
+				this.targetPosition = this.heardNoisePosition;
+				this.heardNoise = false;
+			}
+
+			// Reaktion auf laute Geräusche
+			const loudVehicles = vehicles.filter(
+				v =>
+					!v.isDestroyed &&
+					Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
+					v.isLoud()
+			);
+			if (loudVehicles.length > 0) {
+				this.state = 'flee';
+			}
+
+			switch (this.state) {
+				case 'patrol':
+					this.patrol();
+					break;
+				case 'chase':
+					this.chase();
+					break;
+				case 'investigate':
+					this.investigate();
+					break;
+				case 'search':
+					this.search();
+					break;
+				case 'flee':
+					this.flee();
+					break;
+			}
+		}
+
+		canSee(player) {
+			if (!player.isAlive || player.equipment.includes('tarnanzug')) return false;
+			const dx = player.x - this.x;
+			const dy = player.y - this.y;
+			const dist = Math.hypot(dx, dy);
+			if (dist > this.viewDistance) return false;
+			const angleToPlayer = Math.atan2(dy, dx);
+			let angleDifference = angleToPlayer - this.angle;
+			angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+			if (Math.abs(angleDifference) > this.viewAngle / 2) return false;
+			// Check for obstacles between enemy and player
+			if (lineOfSightBlocked(this.x, this.y, player.x, player.y)) return false;
+			return true;
+		}
+
+		canHear(player) {
+			if (!player.isAlive) return false;
+			const dist = Math.hypot(player.x - this.x, player.y - this.y);
+			if (player.isCrouching) {
+				return dist < 100; // Geringere Hörweite bei geducktem Spieler
+			} else if (player.speed > 3) {
+				return dist < 500; // Größere Hörweite bei rennendem Spieler
+			} else {
+				return dist < 300;
+			}
+		}
+
+		hearNoise(x, y) {
+			this.heardNoise = true;
+			this.heardNoisePosition = {x, y};
+		}
+
+		patrol() {
+			const point = this.patrolPoints[this.currentPatrolIndex];
+			this.moveTowards(point.x, point.y);
+			if (Math.hypot(this.x - point.x, this.y - point.y) < 10) {
+				this.currentPatrolIndex =
+					(this.currentPatrolIndex + 1) % this.patrolPoints.length;
+			}
+		}
+
+		chase() {
+			if (this.target && this.target.isAlive) {
+				this.moveTowards(this.target.x, this.target.y);
+				// Schießen
+				if (
+					Math.hypot(this.x - this.target.x, this.y - this.target.y) < 300 &&
+					Math.random() < 0.02 // Erhöhte Schussrate
+				) {
+					bullets.push(
+						new Bullet(this.x, this.y, this.angle, 'red', this, {damage: 15, range: 300})
+					);
+				}
+			} else {
+				this.state = 'search';
+			}
+		}
+
+		investigate() {
+			if (this.targetPosition) {
+				this.moveTowards(this.targetPosition.x, this.targetPosition.y);
+				if (Math.hypot(this.x - this.targetPosition.x, this.y - this.targetPosition.y) < 10) {
+					this.state = 'patrol';
+					this.targetPosition = null;
+				}
+			} else {
+				this.state = 'patrol';
+			}
+		}
+
+		search() {
+			this.angle += (Math.random() - 0.5) * 0.1;
+			const dx = Math.cos(this.angle);
+			const dy = Math.sin(this.angle);
+			const newX = this.x + dx * this.speed;
+			const newY = this.y + dy * this.speed;
+			if (!isColliding(newX, newY)) {
+				this.x = newX;
+				this.y = newY;
+			}
+			if (Math.random() < 0.01) {
+				this.state = 'patrol';
+			}
+		}
+
+		flee() {
+			// Bewegung weg von lauten Fahrzeugen
+			const loudVehicle = vehicles.find(
+				v =>
+					!v.isDestroyed &&
+					Math.hypot(this.x - v.x, this.y - v.y) < 500 &&
+					v.isLoud()
+			);
+			if (loudVehicle) {
+				const dx = this.x - loudVehicle.x;
+				const dy = this.y - loudVehicle.y;
+				const dist = Math.hypot(dx, dy);
+				const dirX = dx / dist;
+				const dirY = dy / dist;
+				const newX = this.x + dirX * this.speed;
+				const newY = this.y + dirY * this.speed;
+
+				if (!isColliding(newX, newY)) {
+					this.x = newX;
+					this.y = newY;
+				}
+
+				this.angle = Math.atan2(dirY, dirX);
+			} else {
+				this.state = 'patrol';
+			}
+		}
+
+		moveTowards(x, y) {
+			const dx = x - this.x;
+			const dy = y - this.y;
+			const dist = Math.hypot(dx, dy);
+			if (dist > 0) {
+				const dirX = dx / dist;
+				const dirY = dy / dist;
+				const newX = this.x + dirX * this.speed;
+				const newY = this.y + dirY * this.speed;
+
+				if (!isColliding(newX, newY)) {
+					this.x = newX;
+					this.y = newY;
+				}
+
+				this.angle = Math.atan2(dy, dx);
+			}
+		}
+
+		draw() {
+			if (!this.isAlive) {
+				ctx.save();
+				ctx.translate(this.x, this.y);
+				ctx.rotate(Math.PI / 2); // Umfallen
+				ctx.fillStyle = this.color;
+				ctx.fillRect(-15, -15, 30, 30);
+				ctx.restore();
+				return;
+			}
+
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
+			// Körper
+			ctx.fillStyle = this.color;
+			ctx.fillRect(-15, -15, 30, 30);
+
+			// Ausrüstung anzeigen
+			if (this.equipment.includes('schutzweste')) {
+				ctx.fillStyle = 'gray';
+				ctx.fillRect(-10, -10, 20, 20);
+			}
+			if (this.equipment.includes('tarnanzug')) {
+				ctx.strokeStyle = 'green';
+				ctx.strokeRect(-15, -15, 30, 30);
+			}
+
+			// Waffe anzeigen
+			ctx.fillStyle = 'black';
+			if (this.weapon === 'Pistole') {
+				ctx.fillRect(0, -5, 15, 5);
+			} else if (this.weapon === 'Maschinengewehr') {
+				ctx.fillRect(0, -5, 20, 5);
+			} else if (this.weapon === 'Schrotflinte') {
+				ctx.fillRect(0, -5, 25, 5);
+			}
+			ctx.restore();
+
+			// Health Bar zeichnen
+			ctx.save();
+			ctx.fillStyle = 'black';
+			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+			ctx.fillStyle = 'lime';
+			const healthPercentage = Math.max(this.health / 100, 0);
+			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+			ctx.restore();
+		}
+	}
+
+	class NPC extends GameObject {
+		constructor(x, y, color) {
+			super(x, y, 30, color);
+			this.isRescued = false;
+		}
+
+		update() {
+			if (this.isRescued) {
+				// Follow the player
+				const player = players[0]; // Assuming single player
+				const dx = player.x - this.x;
+				const dy = player.y - this.y;
+				const dist = Math.hypot(dx, dy);
+				if (dist > 50) {
+					this.x += (dx / dist) * 2;
+					this.y += (dy / dist) * 2;
+				}
+			} else {
+				// Wait for the player to rescue
+				if (Math.hypot(this.x - players[0].x, this.y - players[0].y) < 50) {
+					this.isRescued = true;
+					const mission = missions.find(m => m.target === this);
+					if (mission) {
+						mission.active = false;
+						players[0].currentMission = null;
+					}
+				}
+			}
+		}
+
+		draw() {
+			ctx.fillStyle = this.color;
+			ctx.fillRect(
+				this.x - this.size / 2,
+				this.y - this.size / 2,
+				this.size,
+				this.size
+			);
+		}
+	}
+
+	class Structure extends GameObject {
+		constructor(x, y, type) {
+			super(x, y, 50, 'darkred');
+			this.type = type;
+			this.health = 200;
+			this.isDestructible = true;
+		}
+
+		update() {
+			// Check for damage from bullets or explosives
+			bullets.forEach((bullet, index) => {
+				if (
+					Math.hypot(bullet.x - this.x, bullet.y - this.y) <
+					(bullet.size + this.size) / 2
+				) {
+					this.health -= bullet.damage;
+					bullets.splice(index, 1);
+					if (this.health <= 0) {
+						this.destroy();
+					}
+				}
+			});
+			// Handle explosives similarly
+		}
+
+		destroy() {
+			this.isDestroyed = true;
+			const mission = missions.find(m => m.target === this);
+			if (mission) {
+				mission.active = false;
+			}
+			// Remove from structures array
+			structures.splice(structures.indexOf(this), 1);
+		}
+
+		draw() {
+			if (!this.isDestroyed) {
+				ctx.fillStyle = this.color;
+				ctx.fillRect(
+					this.x - this.size / 2,
+					this.y - this.size / 2,
+					this.size,
+					this.size
+				);
+				// Health bar
+				ctx.fillStyle = 'black';
+				ctx.fillRect(this.x - 25, this.y - 35, 50, 5);
+				ctx.fillStyle = 'lime';
+				ctx.fillRect(this.x - 25, this.y - 35, (this.health / 200) * 50, 5);
+			}
+		}
+	}
+
+	class Bullet extends GameObject {
+		constructor(x, y, angle, color, owner, weapon) {
+			super(x, y, 5, color);
+			this.speed = weapon.speed || 10;
+			this.owner = owner;
+			this.damage = weapon.damage || 20;
+			this.vx = Math.cos(angle) * this.speed;
+			this.vy = Math.sin(angle) * this.speed;
+			this.range = weapon.range || 500;
+			this.distanceTraveled = 0;
+		}
+
+		update() {
+			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+
+			const newX = this.x + this.vx;
+			const newY = this.y + this.vy;
+			this.distanceTraveled += Math.hypot(this.vx, this.vy);
+
+			if (!isColliding(newX, newY) && this.distanceTraveled < this.range) {
+				this.x = newX;
+				this.y = newY;
+			} else {
+				bullets.splice(bullets.indexOf(this), 1);
+			}
+
+			// Grenzen prüfen
+			if (
+				this.x < 0 ||
+				this.x > MAP_WIDTH * TILE_SIZE ||
+				this.y < 0 ||
+				this.y > MAP_HEIGHT * TILE_SIZE
+			) {
+				bullets.splice(bullets.indexOf(this), 1);
+			}
+		}
+
+		draw() {
+			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
+
+			ctx.fillStyle = this.color;
+			ctx.beginPath();
+			ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+			ctx.fill();
+		}
+	}
+
+	class Grenade extends GameObject {
+		constructor(x, y, angle, owner) {
+			super(x, y, 10, 'orange');
+			this.speed = 5;
+			this.vx = Math.cos(angle) * this.speed;
+			this.vy = Math.sin(angle) * this.speed;
+			this.timer = 100;
+			this.owner = owner;
+		}
+
+		update() {
+			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+
+			this.timer--;
+			const newX = this.x + this.vx;
+			const newY = this.y + this.vy;
+
+			if (!isColliding(newX, newY)) {
+				this.x = newX;
+				this.y = newY;
+			} else {
+				this.vx = 0;
+				this.vy = 0;
+			}
+
+			if (this.timer <= 0) {
+				this.explode();
+				grenades.splice(grenades.indexOf(this), 1);
+			}
+		}
+
+		explode() {
+			// Explosionseffekt
+			enemies.forEach(enemy => {
+				if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 100) {
+					enemy.health -= 100; // Angepasster Schaden
+					if (enemy.health <= 0) {
+						enemy.isAlive = false;
+					}
+				}
+			});
+			// Fahrzeuge beschädigen
+			vehicles.forEach(vehicle => {
+				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
+					vehicle.condition -= 100;
+					if (vehicle.condition <= 0) {
+						vehicle.isDestroyed = true;
+					}
+				}
+			});
+		}
+
+		draw() {
+			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
+
+			ctx.fillStyle = this.color;
+			ctx.beginPath();
+			ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+			ctx.fill();
+		}
+	}
+
+	class Mine extends GameObject {
+		constructor(x, y) {
+			super(x, y, 15, 'brown');
+		}
+
+		update() {
+			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+
+			// Warten auf Feinde oder Fahrzeuge
+			enemies.forEach(enemy => {
+				if (enemy.isAlive && Math.hypot(this.x - enemy.x, this.y - enemy.y) < 20) {
+					enemy.health -= 100; // Sofort töten
+					if (enemy.health <= 0) {
+						enemy.isAlive = false;
+					}
+					mines.splice(mines.indexOf(this), 1);
+				}
+			});
+			vehicles.forEach(vehicle => {
+				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 20) {
+					vehicle.condition -= 100;
+					if (vehicle.condition <= 0) {
+						vehicle.isDestroyed = true;
+					}
+					mines.splice(mines.indexOf(this), 1);
+				}
+			});
+		}
+
+		draw() {
+			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
+
+			ctx.fillStyle = this.color;
+			ctx.fillRect(
+				this.x - this.size / 2,
+				this.y - this.size / 2,
+				this.size,
+				this.size
+			);
+		}
+	}
+
+	class Vehicle extends GameObject {
+		constructor(x, y, type) {
+			super(x, y, type === 'Jeep' ? 120 : 200, 'gray');
+			this.type = type;
+			this.speed = 0;
+			this.maxSpeed = 5;
+			this.angle = 0;
+			this.passengers = [];
+			this.condition = 100; // Zustand des Fahrzeugs
+			this.roleAssignment = {}; // Spielerrollen
+			this.isClosed = type === 'Panzer';
+			this.isDestroyed = false;
+		}
+
+		addPassenger(player) {
+			if (this.passengers.length < 2 && !this.isDestroyed) {
+				this.passengers.push(player);
+				if (this.passengers.length === 1) {
+					this.roleAssignment[player.index] = 'driver';
+				} else {
+					this.roleAssignment[player.index] = 'gunner';
+				}
+			}
+		}
+
+		removePassenger(player) {
+			this.passengers = this.passengers.filter(p => p !== player);
+			delete this.roleAssignment[player.index];
+		}
+
+		switchRole(player) {
+			if (this.passengers.length === 2) {
+				const otherPlayer = this.passengers.find(p => p !== player);
+				const tempRole = this.roleAssignment[player.index];
+				this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
+				this.roleAssignment[otherPlayer.index] = tempRole;
+			}
+		}
+
+		isLoud() {
+			return this.type === 'Panzer' || this.type === 'LKW';
+		}
+
+		update() {
+			if (this.isDestroyed) return;
+
+			// Collision with players
+			players.forEach(player => {
+				if (
+					player.vehicle !== this && // Player is not already in this vehicle
+					Math.hypot(this.x - player.x, this.y - player.y) <
+					(this.size / 2 + player.size / 2) - 10
+				) {
+					// Prevent collision
+					const angle = Math.atan2(player.y - this.y, player.x - this.x);
+					player.x = this.x + Math.cos(angle) * ((this.size / 2 + player.size / 2) - 10);
+					player.y = this.y + Math.sin(angle) * ((this.size / 2 + player.size / 2) - 10);
+				}
+			});
+
+			// Kollision mit anderen Fahrzeugen
+			vehicles.forEach(vehicle => {
+				if (vehicle !== this && !vehicle.isDestroyed) {
+					if (
+						Math.hypot(this.x - vehicle.x, this.y - vehicle.y) <
+						(this.size + vehicle.size) / 2
+					) {
+						// Kollision verhindern
+						const angle = Math.atan2(vehicle.y - this.y, vehicle.x - this.x);
+						this.x -= Math.cos(angle) * 2;
+						this.y -= Math.sin(angle) * 2;
+						vehicle.x += Math.cos(angle) * 2;
+						vehicle.y += Math.sin(angle) * 2;
+					}
+				}
+			});
+
+			// Fahrzeugbewegung
+			const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
+			if (driver) {
+				if (keys[driver.controls.up]) this.speed = this.maxSpeed;
+				if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
+				if (keys[driver.controls.left]) this.angle -= 0.05;
+				if (keys[driver.controls.right]) this.angle += 0.05;
+			}
+			const newX = this.x + Math.cos(this.angle) * this.speed;
+			const newY = this.y + Math.sin(this.angle) * this.speed;
+			if (!isColliding(newX, newY, this)) {
+				this.x = newX;
+				this.y = newY;
+			} else {
+				this.speed = 0;
+			}
+			this.speed *= 0.9; // Reibung
+			// Aktualisiere Passagierpositionen
+			this.passengers.forEach(p => {
+				p.x = this.x;
+				p.y = this.y;
+			});
+
+			// Schütze kann schießen
+			const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
+			if (gunner && gunner.controls && keys[gunner.controls.useItem] && gunner.canUseItem) {
+				bullets.push(new Bullet(this.x, this.y, gunner.angle, 'black', gunner, {damage: 25, range: 300}));
+				gunner.canUseItem = false;
+				setTimeout(() => {
+					gunner.canUseItem = true;
+				}, 300);
+			}
+
+			// Kollision mit Feinden
+			enemies.forEach(enemy => {
+				if (
+					enemy.isAlive &&
+					Math.hypot(this.x - enemy.x, this.y - enemy.y) <
+					(this.size + enemy.size) / 2
+				) {
+					enemy.health -= 50;
+					if (enemy.health <= 0) {
+						enemy.isAlive = false;
+					}
+				}
+			});
+		}
+
+		draw() {
+			if (this.isDestroyed) {
+				ctx.save();
+				ctx.translate(this.x, this.y);
+				ctx.rotate(Math.PI / 2); // Umkippen
+				ctx.fillStyle = 'black';
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+				ctx.restore();
+				return;
+			}
+
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
+			// Fahrzeugkörper
+			ctx.fillStyle = this.color;
+			if (this.type === 'Jeep') {
+				ctx.fillRect(-60, -30, 120, 60);
+				// Spieler sichtbar
+				this.passengers.forEach(p => {
+					ctx.fillStyle = p.color;
+					ctx.fillRect(-20, -20, 40, 40);
+				});
+			} else if (this.type === 'Panzer') {
+				ctx.fillRect(-100, -50, 200, 100);
+				// Turm
+				ctx.fillStyle = 'darkgray';
+				ctx.fillRect(-30, -30, 60, 60);
+				// Kanone
+				ctx.fillRect(30, -10, 60, 20);
+			} else {
+				// LKW
+				ctx.fillRect(-80, -40, 160, 80);
+			}
+			ctx.restore();
+		}
+	}
+
+	class PowerUp extends GameObject {
+		constructor(x, y, type) {
+			super(x, y, 20, 'yellow');
+			this.type = type;
+		}
+
+		applyEffect(player) {
+			if (this.type === 'geheimdaten') {
+				// Complete the mission
+				const mission = missions.find(m => m.type === 'Sammle Geheimdaten' && m.active);
+				if (mission) {
+					mission.active = false;
+					player.currentMission = null;
+				}
+				return;
+			}
+			if (player.inventory.length >= player.maxInventorySize) {
+				// Inventar voll
+				return;
+			}
+			if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole_mit_schalldaempfer'].includes(this.type)) {
+				player.inventory.push({
+					name: this.type.charAt(0).toUpperCase() + this.type.slice(1),
+					type: 'Waffe',
+					damage: 100,
+					range: 300,
+					noise: 200
+				});
+			} else if (this.type === 'granate') {
+				player.inventory.push({name: 'Granate', type: 'Granate'});
+			} else if (this.type === 'mine') {
+				player.inventory.push({name: 'Mine', type: 'Mine'});
+			} else if (this.type === 'schutzweste' || this.type === 'tarnanzug') {
+				if (!player.equipment.includes(this.type)) {
+					player.equipment.push(this.type);
+				}
+			}
+		}
+
+		draw() {
+			// Icon basierend auf dem Typ zeichnen
+			switch (this.type) {
+				case 'geheimdaten':
+					ctx.fillStyle = 'blue';
+					ctx.fillRect(this.x - 10, this.y - 10, 20, 20);
+					break;
+				case 'pistole':
+					ctx.fillStyle = 'black';
+					ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+					break;
+				case 'pistole_mit_schalldaempfer':
+					ctx.fillStyle = 'black';
+					ctx.fillRect(this.x - 5, this.y - 5, 15, 10);
+					break;
+				case 'maschinengewehr':
+					ctx.fillStyle = 'green';
+					ctx.fillRect(this.x - 7, this.y - 3, 14, 6);
+					break;
+				case 'schrotflinte':
+					ctx.fillStyle = 'brown';
+					ctx.fillRect(this.x - 10, this.y - 3, 20, 6);
+					break;
+				case 'granate':
+					ctx.fillStyle = 'olive';
+					ctx.beginPath();
+					ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+					ctx.fill();
+					break;
+				case 'mine':
+					ctx.fillStyle = 'darkred';
+					ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+					break;
+				default:
+					ctx.fillStyle = this.color;
+					ctx.beginPath();
+					ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+					ctx.fill();
+					break;
+			}
+		}
+	}
+
+	// Hilfsfunktionen
+	function isColliding(x, y, object) {
+		const tileX = Math.floor(x / TILE_SIZE);
+		const tileY = Math.floor(y / TILE_SIZE);
+		if (
+			tileX < 0 ||
+			tileX >= MAP_WIDTH ||
+			tileY < 0 ||
+			tileY >= MAP_HEIGHT
+		)
+			return true;
+		const tile = map[tileY][tileX];
+		if (tile === TILE_TYPES.MOUNTAIN) {
+			return true;
+		}
+		if (tile === TILE_TYPES.WATER) {
+			if (object instanceof Vehicle) {
+				return true; // Vehicles cannot move over water
+			} else if (object instanceof Player) {
+				return false; // Players can swim
+			} else {
+				return true;
+			}
+		}
+	}
+
+	function lineOfSightBlocked(x1, y1, x2, y2) {
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		const distance = Math.hypot(dx, dy);
+		const steps = Math.ceil(distance / TILE_SIZE);
+		const incrementX = dx / steps;
+		const incrementY = dy / steps;
+		for (let i = 0; i < steps; i++) {
+			const x = x1 + incrementX * i;
+			const y = y1 + incrementY * i;
+			if (isObstacleAt(x, y)) return true;
+		}
+		return false;
+	}
+
+	function isObstacleAt(x, y) {
+		const tileX = Math.floor(x / TILE_SIZE);
+		const tileY = Math.floor(y / TILE_SIZE);
+		if (
+			tileX < 0 ||
+			tileX >= MAP_WIDTH ||
+			tileY < 0 ||
+			tileY >= MAP_HEIGHT
+		)
+			return true;
+		const tile = map[tileY][tileX];
+		return tile === TILE_TYPES.BUILDING || tile === TILE_TYPES.FOREST || tile === TILE_TYPES.MOUNTAIN;
+	}
+
+	function drawMissionArrow(player, mission) {
+		const target = mission.target || {x: mission.x, y: mission.y};
+		const dx = target.x - player.x;
+		const dy = target.y - player.y;
+		const angle = Math.atan2(dy, dx);
+
+		ctx.save();
+		// Translate to the center of the screen
+		ctx.translate(canvas.width / 2, canvas.height / 2);
+		ctx.rotate(angle);
+
+		ctx.fillStyle = 'gold';
+		ctx.beginPath();
+		ctx.moveTo(0, -100); // Arrow tip
+		ctx.lineTo(-10, -80); // Left wing
+		ctx.lineTo(10, -80);  // Right wing
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+	}
+
+	// Spielobjekte
+	let players = [];
+	let enemies = [];
+	let bullets = [];
+	let grenades = [];
+	let mines = [];
+	let vehicles = [];
+	let powerUps = [];
+	let structures = [];
+	let allies = [];
+
+	// Initialisierung des Spiels
+	function initGame() {
+		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
+		map = mapGenerator.generateMap();
+		generateMissions();
+		spawnEnemies();
+		spawnVehicles();
+		spawnPowerUps();
+
+		// Spawn players at safe positions near each other
+		players = [];
+		let spawnX, spawnY;
+		do {
+			spawnX = Math.random() * MAP_WIDTH * TILE_SIZE;
+			spawnY = Math.random() * MAP_HEIGHT * TILE_SIZE;
+		} while (isColliding(spawnX, spawnY) || isEnemyNearby(spawnX, spawnY));
+
+		for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
+			let x, y;
+			do {
+				x = spawnX + (Math.random() - 0.5) * 100; // Spawn near the first player
+				y = spawnY + (Math.random() - 0.5) * 100;
+			} while (isColliding(x, y));
+			players.push(
+				new Player(
+					x,
+					y,
+					i === 0 ? 'blue' : 'green',
+					i === 0
+						? {
+							up: 'w',
+							down: 's',
+							left: 'a',
+							right: 'd',
+							useItem: 'f',
+							action: 'e',
+							switchRole: 'r',
+							crouch: 'c',
+							item1: '1',
+							item2: '2',
+							item3: '3',
+							item4: '4',
+							dropItem: 'g',
+							melee: 'v'
+						}
+						: {
+							up: 'i',
+							down: 'k',
+							left: 'j',
+							right: 'l',
+							useItem: 'o',
+							action: 'u',
+							switchRole: 'p',
+							crouch: ';',
+							item1: '7',
+							item2: '8',
+							item3: '9',
+							item4: '0',
+							dropItem: 'h',
+							melee: 'm'
+						},
+					i
+				)
+			);
+		}
+
+		// Standardausrüstung für Spieler
+		players.forEach(player => {
+			player.inventory.push({name: 'Pistole', type: 'Waffe', damage: 100, range: 300, noise: 200});
+		});
+
+		// Spielerfarben im HUD anzeigen
+		players.forEach((player, index) => {
+			document.getElementById(`player${index + 1}Color`).style.backgroundColor =
+				player.color;
+			if (index === 1) {
+				document.getElementById('player2UI').style.display = 'flex';
+			}
+		});
+
+		// Starte das Update nur, wenn das Spiel läuft
+		if (gameState === 'playing') {
+			requestAnimationFrame(update);
+		}
+	}
+
+	// Funktion, um Feinde in der Nähe zu überprüfen
+	function isEnemyNearby(x, y) {
+		return enemies.some(
+			enemy => Math.hypot(enemy.x - x, enemy.y - y) < 200
+		);
+	}
+
+	// Gegner spawnen
+	function spawnEnemies() {
+		enemies = [];
+		for (let i = 0; i < 50; i++) {
+			let x, y;
+			do {
+				x = Math.random() * MAP_WIDTH * TILE_SIZE;
+				y = Math.random() * MAP_HEIGHT * TILE_SIZE;
+			} while (isColliding(x, y) || isInPlayerSight(x, y));
+			enemies.push(new Enemy(x, y));
+		}
+		// Kommandant hinzufügen
+		let x, y;
+		do {
+			x = Math.random() * MAP_WIDTH * TILE_SIZE;
+			y = Math.random() * MAP_HEIGHT * TILE_SIZE;
+		} while (isColliding(x, y) || isInPlayerSight(x, y));
+		enemies.push(new Enemy(x, y, true));
+	}
+
+	function isInPlayerSight(x, y) {
+		return players.some(player => {
+			const dx = x - player.x;
+			const dy = y - player.y;
+			const dist = Math.hypot(dx, dy);
+			if (dist > SIGHT_RADIUS) return false;
+			return !lineOfSightBlocked(player.x, player.y, x, y);
+		});
+	}
+
+	// Fahrzeuge platzieren
+	function spawnVehicles() {
+		vehicles = [];
+
+		// Fahrzeuge auf Straßen und in Dörfern platzieren
+		const roadTiles = MapGenerator.findTilesByType(map, TILE_TYPES.ROAD);
+		const villageTiles = MapGenerator.findTilesByType(map, TILE_TYPES.VILLAGE_CENTER);
+
+		// Militärfahrzeuge hauptsächlich auf Straßen
+		roadTiles.forEach(tile => {
+			if (Math.random() < 0.05) { // 5% Chance pro Straßenkachel
+				const type = Math.random() < 0.7 ? 'Jeep' : 'Panzer';
+				vehicles.push(new Vehicle(
+					tile.x * TILE_SIZE + TILE_SIZE / 2,
+					tile.y * TILE_SIZE + TILE_SIZE / 2,
+					type
+				));
+			}
+		});
+
+		// Zivile Fahrzeuge in und um Dörfer
+		villageTiles.forEach(tile => {
+			if (Math.random() < 0.8) { // 80% Chance pro Dorf
+				const type = 'LKW';
+				const offset = (Math.random() - 0.5) * TILE_SIZE * 3;
+				vehicles.push(new Vehicle(
+					tile.x * TILE_SIZE + offset,
+					tile.y * TILE_SIZE + offset,
+					type
+				));
+			}
+		});
+	}
+
+	// Power-Ups platzieren
+	function spawnPowerUps() {
+		powerUps = [];
+		const types = [
+			'pistole',
+			'schrotflinte',
+			'maschinengewehr',
+			'pistole_mit_schalldaempfer',
+			'schutzweste',
+			'tarnanzug',
+			'granate',
+			'mine'
+		];
+		for (let i = 0; i < 60; i++) {
+			let x, y;
+			do {
+				x = Math.random() * MAP_WIDTH * TILE_SIZE;
+				y = Math.random() * MAP_HEIGHT * TILE_SIZE;
+			} while (isColliding(x, y));
+			const type = types[Math.floor(Math.random() * types.length)];
+			powerUps.push(new PowerUp(x, y, type));
+		}
+	}
+
+	// Hauptupdate-Funktion
+	function update() {
+		if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+
+		// Enemy respawning
+		spawnEnemiesAroundPlayers();
+
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+		// Kamera-Offset (zentriert auf Spieler)
+		const centerX =
+			players.reduce((sum, player) => sum + player.x, 0) / players.length;
+		const centerY =
+			players.reduce((sum, player) => sum + player.y, 0) / players.length;
+		const cameraX = centerX - canvas.width / 2;
+		const cameraY = centerY - canvas.height / 2;
+		ctx.save();
+		ctx.translate(-cameraX, -cameraY);
+
+		// Sichtbare Kachelbereiche berechnen
+		const visibleTilesX = Math.ceil(canvas.width / TILE_SIZE) + 2;
+		const visibleTilesY = Math.ceil(canvas.height / TILE_SIZE) + 2;
+		const startTileX = Math.floor(cameraX / TILE_SIZE);
+		const startTileY = Math.floor(cameraY / TILE_SIZE);
+
+		// Karte zeichnen (nur sichtbare Bereiche)
+		for (let y = startTileY; y < startTileY + visibleTilesY; y++) {
+			for (let x = startTileX; x < startTileX + visibleTilesX; x++) {
+				if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+					const tileType = map[y][x];
+					ctx.fillStyle = TILE_COLORS[tileType] || '#777';
+					ctx.fillRect(
+						x * TILE_SIZE,
+						y * TILE_SIZE,
+						TILE_SIZE,
+						TILE_SIZE
+					);
+				}
+			}
+		}
+
+		// Missionen zeichnen
+		missions.forEach(mission => {
+			if (mission.active) {
+				ctx.fillStyle = 'gold';
+				ctx.beginPath();
+				ctx.arc(mission.x, mission.y, 15, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		});
+
+		// Spieler aktualisieren und zeichnen
+		players.forEach((player, index) => {
+			player.update();
+			player.draw();
+			// UI aktualisieren
+			document.getElementById(`health${index + 1}`).textContent =
+				player.health;
+			if (player.health <= 0 && player.isAlive) {
+				player.isAlive = false;
+				checkGameOver();
+			}
+		});
+
+		// Fahrzeuge aktualisieren und zeichnen
+		vehicles.forEach(vehicle => {
+			vehicle.update();
+			vehicle.draw();
+		});
+
+		// Feinde aktualisieren und zeichnen, wenn sie im Sichtbereich sind
+		enemies.forEach(enemy => {
+			if (isInViewport(enemy.x, enemy.y, cameraX, cameraY)) {
+				enemy.update();
+				enemy.draw();
+
+				// Kollision mit Spielern
+				players.forEach(player => {
+					if (
+						player.isAlive &&
+						Math.hypot(player.x - enemy.x, player.y - enemy.y) <
+						(player.size + enemy.size) / 2
+					) {
+						player.health -= 0.5; // Langsame Abnahme für realistischere Erfahrung
+						if (player.health <= 0) {
+							player.isAlive = false;
+							checkGameOver();
+						}
+					}
+				});
+			}
+		});
+
+		// Kugeln aktualisieren und zeichnen
+		bullets.forEach((bullet, index) => {
+			bullet.update();
+			if (isInViewport(bullet.x, bullet.y, cameraX, cameraY)) {
+				bullet.draw();
+			}
+
+			// Kollision mit Feinden
+			if (bullet.owner instanceof Player) {
+				enemies.forEach(enemy => {
+					if (
+						enemy.isAlive &&
+						Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) <
+						(bullet.size + enemy.size) / 2
+					) {
+						enemy.health -= bullet.damage;
+						bullets.splice(index, 1);
+						if (enemy.health <= 0) {
+							enemy.isAlive = false;
+						}
+					}
+				});
+			} else if (bullet.owner instanceof Enemy) {
+				players.forEach(player => {
+					if (
+						player.isAlive &&
+						Math.hypot(bullet.x - player.x, bullet.y - player.y) <
+						(bullet.size + player.size) / 2
+					) {
+						if (player.vehicle && player.vehicle.isClosed) {
+							// Spieler ist in einem geschlossenen Fahrzeug und sicher
+						} else {
+							player.health -= bullet.damage;
+							bullets.splice(index, 1);
+							if (player.health <= 0) {
+								player.isAlive = false;
+								checkGameOver();
+							}
+						}
+					}
+				});
+			}
+		});
+
+		// Granaten aktualisieren und zeichnen
+		grenades.forEach(grenade => {
+			grenade.update();
+			if (isInViewport(grenade.x, grenade.y, cameraX, cameraY)) {
+				grenade.draw();
+			}
+		});
+
+		// Minen aktualisieren und zeichnen
+		mines.forEach(mine => {
+			mine.update();
+			if (isInViewport(mine.x, mine.y, cameraX, cameraY)) {
+				mine.draw();
+			}
+		});
+
+		// Power-Ups zeichnen
+		powerUps.forEach(pu => {
+			if (isInViewport(pu.x, pu.y, cameraX, cameraY)) {
+				pu.draw();
+			}
+		});
+
+		ctx.restore();
+
+		// Minikarte zeichnen
+		drawMinimap(centerX, centerY);
+
+		// Fortsetzen der Update-Schleife
+		requestAnimationFrame(update);
+	}
+
+	function spawnEnemiesAroundPlayers() {
+		players.forEach(player => {
+			const numberOfEnemies = 10 - countEnemiesNearPlayer(player);
+			for (let i = 0; i < numberOfEnemies; i++) {
+				let x, y;
+				let attempts = 0;
+				do {
+					const angle = Math.random() * Math.PI * 2;
+					const distance = SIGHT_RADIUS + 200 + Math.random() * 500; // Spawn outside the sight radius
+					x = player.x + Math.cos(angle) * distance;
+					y = player.y + Math.sin(angle) * distance;
+					attempts++;
+				} while (
+					(isColliding(x, y) || isInPlayerSight(x, y)) &&
+					attempts < 10
+					);
+				if (attempts < 10) {
+					enemies.push(new Enemy(x, y));
+				}
+			}
+		});
+	}
+
+	function countEnemiesNearPlayer(player) {
+		return enemies.filter(enemy => {
+			const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+			return dist < SIGHT_RADIUS + 600; // Count enemies within a certain radius
+		}).length;
+	}
+
+	// Funktion, um zu überprüfen, ob ein Objekt im Sichtbereich ist
+	function isInViewport(x, y, cameraX, cameraY) {
+		return (
+			x >= cameraX &&
+			x <= cameraX + canvas.width &&
+			y >= cameraY &&
+			y <= cameraY + canvas.height
+		);
+	}
+
+	// Überprüfen, ob das Spiel vorbei ist
+	function checkGameOver() {
+		if (players.every(player => !player.isAlive)) {
+			gameOver();
+		}
+	}
+
+	// Minikarte
+	function drawMinimap(centerX, centerY) {
+		minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+
+		const scale = 0.1; // Maßstab der Minikarte
+		const mapWidth = canvas.width * scale * 32; // 32x Bildausschnitt
+		const mapHeight = canvas.height * scale * 32;
+
+		const startX = centerX - mapWidth / 2;
+		const startY = centerY - mapHeight / 2;
+
+		const scaleX = minimap.width / mapWidth;
+		const scaleY = minimap.height / mapHeight;
+
+		// Zeichne den sichtbaren Bereich der Karte auf der Minikarte
+		for (let y = 0; y < MAP_HEIGHT; y++) {
+			for (let x = 0; x < MAP_WIDTH; x++) {
+				const tileX = x * TILE_SIZE;
+				const tileY = y * TILE_SIZE;
+
+				if (
+					tileX >= startX &&
+					tileX <= startX + mapWidth &&
+					tileY >= startY &&
+					tileY <= startY + mapHeight
+				) {
+					const tileType = map[y][x];
+					minimapCtx.fillStyle = TILE_COLORS[tileType] || '#777';
+					minimapCtx.fillRect(
+						(tileX - startX) * scaleX,
+						(tileY - startY) * scaleY,
+						TILE_SIZE * scaleX,
+						TILE_SIZE * scaleY
+					);
+				}
+			}
+		}
+
+		// Spieler zeichnen
+		players.forEach(player => {
+			minimapCtx.fillStyle = player.color;
+			minimapCtx.fillRect(
+				(player.x - startX) * scaleX - 2,
+				(player.y - startY) * scaleY - 2,
+				4,
+				4
+			);
+		});
+
+		// Spotted Feinde zeichnen
+		players.forEach(player => {
+			player.spottedEnemies.forEach(enemy => {
+				if (enemy.isAlive) {
+					minimapCtx.fillStyle = 'red';
+					minimapCtx.fillRect(
+						(enemy.x - startX) * scaleX - 2,
+						(enemy.y - startY) * scaleY - 2,
+						4,
+						4
+					);
+				}
+			});
+		});
+
+		// Fahrzeuge zeichnen
+		vehicles.forEach(vehicle => {
+			minimapCtx.fillStyle = 'gray';
+			minimapCtx.fillRect(
+				(vehicle.x - startX) * scaleX - 3,
+				(vehicle.y - startY) * scaleY - 3,
+				6,
+				6
+			);
+		});
+
+		// Missionen zeichnen
+		missions.forEach(mission => {
+			if (mission.active) {
+				minimapCtx.fillStyle = 'gold';
+				minimapCtx.fillRect(
+					(mission.x - startX) * scaleX - 3,
+					(mission.y - startY) * scaleY - 3,
+					6,
+					6
+				);
+			}
+		});
+
+		// Rahmen für den sichtbaren Bereich zeichnen
+		minimapCtx.strokeStyle = 'white';
+		minimapCtx.strokeRect(
+			(centerX - canvas.width / 2 - startX) * scaleX,
+			(centerY - canvas.height / 2 - startY) * scaleY,
+			canvas.width * scaleX,
+			canvas.height * scaleY
+		);
+	}
 </script>
 </body>
 </html>
