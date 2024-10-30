@@ -171,7 +171,8 @@
 	let canvas, ctx, minimap, minimapCtx;
 	let gameStarted = false;
 	let gameStartTime = Date.now();
-	let lastMinimapUpdate = Date.now();;
+	let lastMinimapUpdate = Date.now();
+	;
 	let singlePlayer = true;
 	const TILE_SIZE = 50;
 	const MAP_WIDTH = 200; // Größerer Level
@@ -1713,40 +1714,63 @@
 			this.vy = Math.sin(angle) * this.speed;
 			this.range = weapon.range || 500;
 			this.distanceTraveled = 0;
+			this.initialX = x;  // Startposition für Range-Berechnung
+			this.initialY = y;
 		}
 
 		update() {
 			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
 
+			// Neue Position berechnen
 			const newX = this.x + this.vx;
 			const newY = this.y + this.vy;
-			this.distanceTraveled += Math.hypot(this.vx, this.vy);
 
-			if (!isColliding(newX, newY) && this.distanceTraveled < this.range) {
-				this.x = newX;
-				this.y = newY;
-			} else {
-				bullets.splice(bullets.indexOf(this), 1);
+			// Distanz zur Startposition berechnen
+			this.distanceTraveled = Math.hypot(newX - this.initialX, newY - this.initialY);
+
+			// Prüfen ob die Kugel ihre maximale Reichweite erreicht hat
+			if (this.distanceTraveled >= this.range) {
+				const index = bullets.indexOf(this);
+				if (index !== -1) bullets.splice(index, 1);
+				return;
 			}
 
-			// Grenzen prüfen
-			if (
-				this.x < 0 ||
-				this.x > MAP_WIDTH * TILE_SIZE ||
-				this.y < 0 ||
-				this.y > MAP_HEIGHT * TILE_SIZE
-			) {
-				bullets.splice(bullets.indexOf(this), 1);
+			// Kollision mit Terrain prüfen
+			if (isColliding(newX, newY)) {
+				const index = bullets.indexOf(this);
+				if (index !== -1) bullets.splice(index, 1);
+				return;
+			}
+
+			// Position aktualisieren
+			this.x = newX;
+			this.y = newY;
+
+			// Kartenrand prüfen
+			if (this.x < 0 || this.x > MAP_WIDTH * TILE_SIZE ||
+				this.y < 0 || this.y > MAP_HEIGHT * TILE_SIZE) {
+				const index = bullets.indexOf(this);
+				if (index !== -1) bullets.splice(index, 1);
+				return;
 			}
 		}
 
 		draw() {
 			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
 
+			ctx.save();
 			ctx.fillStyle = this.color;
 			ctx.beginPath();
 			ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
 			ctx.fill();
+
+			// Optional: Bewegungsunschärfe für besseren visuellen Effekt
+			ctx.globalAlpha = 0.3;
+			ctx.beginPath();
+			ctx.moveTo(this.x, this.y);
+			ctx.lineTo(this.x - this.vx, this.y - this.vy);
+			ctx.stroke();
+			ctx.restore();
 		}
 	}
 
@@ -1892,11 +1916,11 @@
 		}
 
 		destroy() {
-            this.isDestroyed = true;
+			this.isDestroyed = true;
 			for (let i = this.passengers.length - 1; i >= 0; i--) {
 				this.removePassenger(this.passengers[i]);
-            }
-        }
+			}
+		}
 
 		switchRole(player) {
 			if (this.passengers.length === 2) {
@@ -2139,17 +2163,16 @@
 	function isColliding(x, y, object) {
 		const tileX = Math.floor(x / TILE_SIZE);
 		const tileY = Math.floor(y / TILE_SIZE);
-		if (
-			tileX < 0 ||
-			tileX >= MAP_WIDTH ||
-			tileY < 0 ||
-			tileY >= MAP_HEIGHT
-		)
-			return true;
+
+		// Kartenrand- und Terrain-Kollisionen
+		if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
+
 		const tile = map[tileY][tileX];
 		if (tile === TILE_TYPES.MOUNTAIN || tile === TILE_TYPES.WALL) {
 			return true;
 		}
+
+		// Wasser-Kollisionen
 		if (tile === TILE_TYPES.DEEP_WATER || tile === TILE_TYPES.SHALLOW_WATER) {
 			if (object instanceof Vehicle) {
 				return true; // Vehicles cannot move over water
@@ -2161,7 +2184,7 @@
 		}
 
 		if (object) {
-			// Kollision mit anderen Spielern (außer fahrzeug mit fahrern)
+			// Kollision mit anderen Spielern (außer Fahrzeug mit Fahrern)
 			for (let player of players.filter(e => e.isAlive)) {
 				if (player !== object) { // Objekt selbst ausschließen
 					if (player.vehicle === object) continue; // Fahrzeug mit Fahrern überspringen
@@ -2172,14 +2195,14 @@
 				}
 			}
 
-			// Wenn das object ein fahrzeug ist, dann ist hier schluss, weil gegner überfahren werden können
+			// Wenn das Objekt ein Fahrzeug ist, keine weiteren Kollisionen prüfen
 			if (object instanceof Vehicle) {
 				return false;
 			}
 
-			// Kollision mit anderen Gegnern
+			// Kollision nur mit lebenden Gegnern prüfen
 			for (let enemy of enemies.filter(e => e.isAlive)) {
-				if (enemy !== object) { // Objekt selbst ausschließen
+				if (enemy !== object) {
 					const distance = Math.hypot(x - enemy.x, y - enemy.y);
 					if (distance < (object.size + enemy.size) / 2) {
 						return true;
@@ -2189,33 +2212,6 @@
 		}
 
 		return false;
-	}
-
-	// Kollisionsauflösung
-	function resolveCollision(entityA, entityB) {
-		// Wenn einer der Entities tot ist, keine Kollision auflösen
-		if (!entityA.isAlive || !entityB.isAlive) return;
-
-		const dx = entityB.x - entityA.x;
-		const dy = entityB.y - entityA.y;
-		const distance = Math.hypot(dx, dy);
-		const minDistance = (entityA.size + entityB.size) / 2;
-
-		if (distance < minDistance) {
-			const overlap = minDistance - distance;
-			const moveX = (dx / distance) * overlap * 0.5;
-			const moveY = (dy / distance) * overlap * 0.5;
-
-			// Bewegung nur anwenden, wenn keine anderen Kollisionen entstehen
-			if (!isColliding(entityA.x - moveX, entityA.y - moveY, entityA)) {
-				entityA.x -= moveX;
-				entityA.y -= moveY;
-			}
-			if (!isColliding(entityB.x + moveX, entityB.y + moveY, entityB)) {
-				entityB.x += moveX;
-				entityB.y += moveY;
-			}
-		}
 	}
 
 	function lineOfSightBlocked(x1, y1, x2, y2) {
@@ -2448,7 +2444,7 @@
 			'tarnanzug',
 			'granate',
 			'mine',
-            'medipack'
+			'medipack'
 		];
 		for (let i = 0; i < 60; i++) {
 			let x, y;
@@ -2551,33 +2547,18 @@
 		});
 
 		// 3. Dynamische Objekte (Fahrzeuge, Spieler, Gegner)
-		// Fahrzeuge aktualisieren und zeichnen
-		vehicles.forEach(vehicle => {
-			vehicle.update();
-			vehicle.draw();
-		});
 
 		// Feinde aktualisieren und zeichnen, wenn sie im Sichtbereich sind
 		enemies.forEach(enemy => {
 			if (isInViewport(enemy.x, enemy.y, viewport)) {
 				enemy.update();
 				enemy.draw();
-
-				// Kollision mit Spielern
-				players.forEach(player => {
-					if (
-						player.isAlive &&
-						Math.hypot(player.x - enemy.x, player.y - enemy.y) <
-						(player.size + enemy.size) / 2
-					) {
-						player.health -= 0.5; // Langsame Abnahme für realistischere Erfahrung
-						if (player.health <= 0) {
-							player.isAlive = false;
-							checkGameOver();
-						}
-					}
-				});
 			}
+		});
+		// Fahrzeuge aktualisieren und zeichnen
+		vehicles.forEach(vehicle => {
+			vehicle.update();
+			vehicle.draw();
 		});
 
 		// Player gesondert aktualisieren und rendern
@@ -2586,7 +2567,7 @@
 			player.draw();
 			// UI aktualisieren
 			document.getElementById(`health${index + 1}`).textContent =
-				player.health;
+				Math.round(player.health); // Runden für bessere Anzeige
 			if (player.health <= 0 && player.isAlive) {
 				player.isAlive = false;
 				checkGameOver();
@@ -2597,47 +2578,52 @@
 	// Optimierte Effekt-Rendering-Funktion
 	function renderEffects(viewport) {
 		// Projektile (Bullets)
-		bullets.forEach((bullet, index) => {
+		for (let i = bullets.length - 1; i >= 0; i--) {
+			const bullet = bullets[i];
+
+			// Immer updaten, auch wenn nicht im Viewport
+			bullet.update();
+
+			// Aber nur zeichnen wenn im Viewport
 			if (isInViewport(bullet.x, bullet.y, viewport)) {
 				bullet.draw();
 			}
 
-			// Kollision mit Feinden
+			// Kollisionsprüfungen
 			if (bullet.owner instanceof Player) {
-				enemies.forEach(enemy => {
-					if (
-						enemy.isAlive &&
-						Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) <
-						(bullet.size + enemy.size) / 2
-					) {
+				// Kollision mit Gegnern
+				for (const enemy of enemies) {
+					if (enemy.isAlive &&
+						Math.hypot(bullet.x - enemy.x, bullet.y - enemy.y) < (bullet.size + enemy.size) / 2) {
 						enemy.health -= bullet.damage;
-						bullets.splice(index, 1);
+						bullets.splice(i, 1);
 						if (enemy.health <= 0) {
 							enemy.isAlive = false;
 						}
+						break; // Bullet kann nur einen Gegner treffen
 					}
-				});
+				}
 			} else if (bullet.owner instanceof Enemy) {
-				players.forEach(player => {
-					if (
-						player.isAlive &&
-						Math.hypot(bullet.x - player.x, bullet.y - player.y) <
-						(bullet.size + player.size) / 2
-					) {
+				// Kollision mit Spielern
+				for (const player of players) {
+					if (player.isAlive &&
+						Math.hypot(bullet.x - player.x, bullet.y - player.y) < (bullet.size + player.size) / 2) {
 						if (player.vehicle && player.vehicle.isClosed) {
 							// Spieler ist in einem geschlossenen Fahrzeug und sicher
+							bullets.splice(i, 1);
 						} else {
 							player.health -= bullet.damage;
-							bullets.splice(index, 1);
+							bullets.splice(i, 1);
 							if (player.health <= 0) {
 								player.isAlive = false;
 								checkGameOver();
 							}
 						}
+						break; // Bullet kann nur einen Spieler treffen
 					}
-				});
+				}
 			}
-		});
+		}
 
 		// Explosionen und andere temporäre Effekte
 		grenades.forEach(grenade => {
