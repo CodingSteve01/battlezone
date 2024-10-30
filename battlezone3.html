@@ -171,6 +171,7 @@
 	let canvas, ctx, minimap, minimapCtx;
 	let gameStarted = false;
 	let gameStartTime = Date.now();
+	let lastMinimapUpdate = Date.now();;
 	let singlePlayer = true;
 	const TILE_SIZE = 50;
 	const MAP_WIDTH = 200; // Größerer Level
@@ -2192,19 +2193,28 @@
 
 	// Kollisionsauflösung
 	function resolveCollision(entityA, entityB) {
+		// Wenn einer der Entities tot ist, keine Kollision auflösen
+		if (!entityA.isAlive || !entityB.isAlive) return;
+
 		const dx = entityB.x - entityA.x;
 		const dy = entityB.y - entityA.y;
 		const distance = Math.hypot(dx, dy);
-		const overlap = (entityA.size / 2 + entityB.size / 2) - distance;
+		const minDistance = (entityA.size + entityB.size) / 2;
 
-		if (overlap > 0) {
-			const offsetX = (dx / distance) * (overlap / 2);
-			const offsetY = (dy / distance) * (overlap / 2);
+		if (distance < minDistance) {
+			const overlap = minDistance - distance;
+			const moveX = (dx / distance) * overlap * 0.5;
+			const moveY = (dy / distance) * overlap * 0.5;
 
-			entityA.x -= offsetX;
-			entityA.y -= offsetY;
-			entityB.x += offsetX;
-			entityB.y += offsetY;
+			// Bewegung nur anwenden, wenn keine anderen Kollisionen entstehen
+			if (!isColliding(entityA.x - moveX, entityA.y - moveY, entityA)) {
+				entityA.x -= moveX;
+				entityA.y -= moveY;
+			}
+			if (!isColliding(entityB.x + moveX, entityB.y + moveY, entityB)) {
+				entityB.x += moveX;
+				entityB.y += moveY;
+			}
 		}
 	}
 
@@ -2458,64 +2468,74 @@
 		// Enemy respawning
 		spawnEnemiesAroundPlayers();
 
-		// Kollisionen zwischen Spielern und Gegnern auflösen
-		players.forEach(player => {
-			enemies.forEach(enemy => {
-				if (player.isAlive && enemy.isAlive) {
-					const distance = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-					if (distance < (player.size / 2 + enemy.size / 2)) {
-						// Spieler nimmt Schaden
-						player.health -= 0.5; // Langsame Abnahme für realistischere Erfahrung
+		// Optimiertes Rendering
+		renderGame();
+	}
 
-						// Kollision auflösen
-						resolveCollision(player, enemy);
-
-						if (player.health <= 0) {
-							player.isAlive = false;
-							checkGameOver();
-						}
-					}
-				}
-			});
-		});
-
+	// 2. Neue optimierte Render-Funktion
+	function renderGame() {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-		// Kamera-Offset (zentriert auf Spieler)
-		const centerX =
-			players.reduce((sum, player) => sum + player.x, 0) / players.length;
-		const centerY =
-			players.reduce((sum, player) => sum + player.y, 0) / players.length;
+		// Kamera-Offset berechnen
+		const centerX = players.reduce((sum, player) => sum + player.x, 0) / players.length;
+		const centerY = players.reduce((sum, player) => sum + player.y, 0) / players.length;
 		const cameraX = centerX - canvas.width / 2;
 		const cameraY = centerY - canvas.height / 2;
+
+		// Viewport-Grenzen berechnen
+		const viewport = {
+			left: cameraX - TILE_SIZE,
+			right: cameraX + canvas.width + TILE_SIZE,
+			top: cameraY - TILE_SIZE,
+			bottom: cameraY + canvas.height + TILE_SIZE
+		};
+
 		ctx.save();
 		ctx.translate(-cameraX, -cameraY);
 
-		// Sichtbare Kachelbereiche berechnen
-		const visibleTilesX = Math.ceil(canvas.width / TILE_SIZE) + 2;
-		const visibleTilesY = Math.ceil(canvas.height / TILE_SIZE) + 2;
-		const startTileX = Math.floor(cameraX / TILE_SIZE);
-		const startTileY = Math.floor(cameraY / TILE_SIZE);
+		// 1. Terrain Layer
+		renderTerrain(viewport);
 
-		// Karte zeichnen (nur sichtbare Bereiche)
-		for (let y = startTileY; y < startTileY + visibleTilesY; y++) {
-			for (let x = startTileX; x < startTileX + visibleTilesX; x++) {
-				if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-					const tileType = map[y][x];
+		// 2. Objekte Layer
+		renderObjects(viewport);
+
+		// 3. Effekte Layer
+		renderEffects(viewport);
+
+		ctx.restore();
+
+		// 4. UI Layer (nicht transformiert)
+		renderUI();
+
+		// Fortsetzen der Update-Schleife
+		requestAnimationFrame(update);
+	}
+
+	// Optimierte Terrain-Rendering-Funktion
+	function renderTerrain(viewport) {
+		const startTileX = Math.max(0, Math.floor(viewport.left / TILE_SIZE));
+		const endTileX = Math.min(MAP_WIDTH, Math.ceil(viewport.right / TILE_SIZE));
+		const startTileY = Math.max(0, Math.floor(viewport.top / TILE_SIZE));
+		const endTileY = Math.min(MAP_HEIGHT, Math.ceil(viewport.bottom / TILE_SIZE));
+
+		// Vorberechnung der Tile-Positionen für bessere Performance
+		for (let y = startTileY; y < endTileY; y++) {
+			const tileY = y * TILE_SIZE;
+			for (let x = startTileX; x < endTileX; x++) {
+				const tileType = map[y][x];
+				if (tileType !== undefined) {
 					ctx.fillStyle = TILE_COLORS[tileType] || '#777';
-					ctx.fillRect(
-						x * TILE_SIZE,
-						y * TILE_SIZE,
-						TILE_SIZE,
-						TILE_SIZE
-					);
+					ctx.fillRect(x * TILE_SIZE, tileY, TILE_SIZE, TILE_SIZE);
 				}
 			}
 		}
+	}
 
-		// Missionen zeichnen
+	// Optimierte Objekt-Rendering-Funktion
+	function renderObjects(viewport) {
+		// 1. Statische Objekte (Missionen, Power-Ups)
 		missions.forEach(mission => {
-			if (mission.active) {
+			if (mission.active && isInViewport(mission.x, mission.y, viewport)) {
 				ctx.fillStyle = 'gold';
 				ctx.beginPath();
 				ctx.arc(mission.x, mission.y, 15, 0, Math.PI * 2);
@@ -2523,19 +2543,14 @@
 			}
 		});
 
-		// Spieler aktualisieren und zeichnen
-		players.forEach((player, index) => {
-			player.update();
-			player.draw();
-			// UI aktualisieren
-			document.getElementById(`health${index + 1}`).textContent =
-				player.health;
-			if (player.health <= 0 && player.isAlive) {
-				player.isAlive = false;
-				checkGameOver();
+		// 2. Power-Ups mit Sichtbarkeitscheck
+		powerUps.forEach(pu => {
+			if (isInViewport(pu.x, pu.y, viewport)) {
+				pu.draw();
 			}
 		});
 
+		// 3. Dynamische Objekte (Fahrzeuge, Spieler, Gegner)
 		// Fahrzeuge aktualisieren und zeichnen
 		vehicles.forEach(vehicle => {
 			vehicle.update();
@@ -2544,7 +2559,7 @@
 
 		// Feinde aktualisieren und zeichnen, wenn sie im Sichtbereich sind
 		enemies.forEach(enemy => {
-			if (isInViewport(enemy.x, enemy.y, cameraX, cameraY)) {
+			if (isInViewport(enemy.x, enemy.y, viewport)) {
 				enemy.update();
 				enemy.draw();
 
@@ -2565,10 +2580,25 @@
 			}
 		});
 
-		// Kugeln aktualisieren und zeichnen
+		// Player gesondert aktualisieren und rendern
+		players.forEach((player, index) => {
+			player.update();
+			player.draw();
+			// UI aktualisieren
+			document.getElementById(`health${index + 1}`).textContent =
+				player.health;
+			if (player.health <= 0 && player.isAlive) {
+				player.isAlive = false;
+				checkGameOver();
+			}
+		});
+	}
+
+	// Optimierte Effekt-Rendering-Funktion
+	function renderEffects(viewport) {
+		// Projektile (Bullets)
 		bullets.forEach((bullet, index) => {
-			bullet.update();
-			if (isInViewport(bullet.x, bullet.y, cameraX, cameraY)) {
+			if (isInViewport(bullet.x, bullet.y, viewport)) {
 				bullet.draw();
 			}
 
@@ -2609,10 +2639,10 @@
 			}
 		});
 
-		// Granaten aktualisieren und zeichnen
+		// Explosionen und andere temporäre Effekte
 		grenades.forEach(grenade => {
 			grenade.update();
-			if (isInViewport(grenade.x, grenade.y, cameraX, cameraY)) {
+			if (isInViewport(grenade.x, grenade.y, viewport)) {
 				grenade.draw();
 			}
 		});
@@ -2620,64 +2650,28 @@
 		// Minen aktualisieren und zeichnen
 		mines.forEach(mine => {
 			mine.update();
-			if (isInViewport(mine.x, mine.y, cameraX, cameraY)) {
+			if (isInViewport(mine.x, mine.y, viewport)) {
 				mine.draw();
 			}
 		});
-
-		// Power-Ups zeichnen
-		powerUps.forEach(pu => {
-			if (isInViewport(pu.x, pu.y, cameraX, cameraY)) {
-				pu.draw();
-			}
-		});
-
-		ctx.restore();
-
-		// Minikarte zeichnen
-		drawMinimap(centerX, centerY);
-
-		// Fortsetzen der Update-Schleife
-		requestAnimationFrame(update);
 	}
 
-	function spawnEnemiesAroundPlayers() {
-		players.forEach(player => {
-			const numberOfEnemies = 10 - countEnemiesNearPlayer(player);
-			for (let i = 0; i < numberOfEnemies; i++) {
-				let x, y;
-				let attempts = 0;
-				do {
-					const angle = Math.random() * Math.PI * 2;
-					const distance = SIGHT_RADIUS + 200 + Math.random() * 500; // Spawn outside the sight radius
-					x = player.x + Math.cos(angle) * distance;
-					y = player.y + Math.sin(angle) * distance;
-					attempts++;
-				} while (
-					(isColliding(x, y) || isInPlayerSight(x, y)) &&
-					attempts < 10
-					);
-				if (attempts < 10) {
-					enemies.push(new Enemy(x, y));
-				}
-			}
-		});
+	// Optimierte UI-Rendering-Funktion
+	function renderUI() {
+		// Minikarte separat aktualisieren für bessere Performance
+		if (Date.now() - lastMinimapUpdate > 100) { // Nur alle 100ms aktualisieren
+			drawMinimap(players[0].x, players[0].y);
+			lastMinimapUpdate = Date.now();
+		}
 	}
 
-	function countEnemiesNearPlayer(player) {
-		return enemies.filter(enemy => {
-			const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-			return dist < SIGHT_RADIUS + 600; // Count enemies within a certain radius
-		}).length;
-	}
-
-	// Funktion, um zu überprüfen, ob ein Objekt im Sichtbereich ist
-	function isInViewport(x, y, cameraX, cameraY) {
+	// Optimierte Viewport-Prüfung
+	function isInViewport(x, y, viewport) {
 		return (
-			x >= cameraX &&
-			x <= cameraX + canvas.width &&
-			y >= cameraY &&
-			y <= cameraY + canvas.height
+			x >= viewport.left &&
+			x <= viewport.right &&
+			y >= viewport.top &&
+			y <= viewport.bottom
 		);
 	}
 
@@ -2784,6 +2778,36 @@
 			canvas.width * scaleX,
 			canvas.height * scaleY
 		);
+	}
+
+	function spawnEnemiesAroundPlayers() {
+		players.forEach(player => {
+			const numberOfEnemies = 10 - countEnemiesNearPlayer(player);
+			for (let i = 0; i < numberOfEnemies; i++) {
+				let x, y;
+				let attempts = 0;
+				do {
+					const angle = Math.random() * Math.PI * 2;
+					const distance = SIGHT_RADIUS + 200 + Math.random() * 500; // Spawn outside the sight radius
+					x = player.x + Math.cos(angle) * distance;
+					y = player.y + Math.sin(angle) * distance;
+					attempts++;
+				} while (
+					(isColliding(x, y) || isInPlayerSight(x, y)) &&
+					attempts < 10
+					);
+				if (attempts < 10) {
+					enemies.push(new Enemy(x, y));
+				}
+			}
+		});
+	}
+
+	function countEnemiesNearPlayer(player) {
+		return enemies.filter(enemy => {
+			const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+			return dist < SIGHT_RADIUS + 600; // Count enemies within a certain radius
+		}).length;
 	}
 </script>
 </body>
