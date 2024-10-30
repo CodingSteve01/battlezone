@@ -505,6 +505,7 @@ class Player extends GameObject {
     this.equipment = [];
     this.autoAimTargets = [];
     this.currentTargetIndex = 0;
+    this.spottedEnemies = new Set(); // Für die Minikarte
   }
 
   update() {
@@ -545,9 +546,14 @@ class Player extends GameObject {
     };
     this.autoAimTargets = enemies.filter(enemy => {
       const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+      const canSeeEnemy = this.canSee(enemy);
+      if (canSeeEnemy) {
+        this.spottedEnemies.add(enemy); // Feind zur Liste hinzufügen
+      }
       return (
         dist < weaponRange &&
         enemy.isAlive &&
+        canSeeEnemy &&
         enemy.x > screenBounds.left &&
         enemy.x < screenBounds.right &&
         enemy.y > screenBounds.top &&
@@ -615,7 +621,7 @@ class Player extends GameObject {
           enemy.isAlive &&
           Math.hypot(this.x - enemy.x, this.y - enemy.y) < meleeRange
         ) {
-          enemy.health -= 50;
+          enemy.health -= 100; // One-hit kill in melee
           if (enemy.health <= 0) {
             enemy.isAlive = false;
           }
@@ -728,6 +734,14 @@ class Player extends GameObject {
     });
   }
 
+  canSee(enemy) {
+    const dx = enemy.x - this.x;
+    const dy = enemy.y - this.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > SIGHT_RADIUS) return false;
+    return !lineOfSightBlocked(this.x, this.y, enemy.x, enemy.y);
+  }
+
   draw() {
     if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
 
@@ -801,6 +815,7 @@ class Enemy extends GameObject {
     this.equipment = this.getRandomEquipment();
     this.heardNoise = false;
     this.heardNoisePosition = null;
+    this.spottedByPlayer = false; // Für die Minikarte
   }
 
   getRandomWeapon() {
@@ -931,7 +946,7 @@ class Enemy extends GameObject {
         Math.random() < 0.02 // Erhöhte Schussrate
       ) {
         bullets.push(
-          new Bullet(this.x, this.y, this.angle, 'red', this, { damage: 20, range: 300 })
+          new Bullet(this.x, this.y, this.angle, 'red', this, { damage: 15, range: 300 })
         );
       }
     } else {
@@ -1145,7 +1160,7 @@ class Grenade extends GameObject {
     // Explosionseffekt
     enemies.forEach(enemy => {
       if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 100) {
-        enemy.health -= 50; // Angepasster Schaden
+        enemy.health -= 100; // Angepasster Schaden
         if (enemy.health <= 0) {
         enemy.isAlive = false;
       }
@@ -1154,7 +1169,7 @@ class Grenade extends GameObject {
     // Fahrzeuge beschädigen
     vehicles.forEach(vehicle => {
       if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
-        vehicle.condition -= 50;
+        vehicle.condition -= 100;
         if (vehicle.condition <= 0) {
           vehicle.isDestroyed = true;
         }
@@ -1387,8 +1402,8 @@ class PowerUp extends GameObject {
       // Inventar voll
       return;
     }
-    if (['pistole', 'schrotflinte', 'maschinengewehr', 'nahkampf'].includes(this.type)) {
-      player.inventory.push({ name: this.type.charAt(0).toUpperCase() + this.type.slice(1), type: 'Waffe', damage: 25, range: 300, noise: 200 });
+    if (['pistole', 'schrotflinte', 'maschinengewehr', 'pistole_mit_schalldaempfer'].includes(this.type)) {
+      player.inventory.push({ name: this.type.charAt(0).toUpperCase() + this.type.slice(1), type: 'Waffe', damage: 100, range: 300, noise: 200 });
     } else if (this.type === 'granate') {
       player.inventory.push({ name: 'Granate', type: 'Granate' });
     } else if (this.type === 'mine') {
@@ -1406,6 +1421,10 @@ class PowerUp extends GameObject {
       case 'pistole':
         ctx.fillStyle = 'black';
         ctx.fillRect(this.x - 5, this.y - 5, 10, 10);
+        break;
+      case 'pistole_mit_schalldaempfer':
+        ctx.fillStyle = 'black';
+        ctx.fillRect(this.x - 5, this.y - 5, 15, 10);
         break;
       case 'maschinengewehr':
         ctx.fillStyle = 'green';
@@ -1555,7 +1574,7 @@ function initGame() {
 
   // Standardausrüstung für Spieler
   players.forEach(player => {
-    player.inventory.push({ name: 'Pistole', type: 'Waffe', damage: 25, range: 300, noise: 200 });
+    player.inventory.push({ name: 'Pistole', type: 'Waffe', damage: 100, range: 300, noise: 200 });
   });
 
   // Spielerfarben im HUD anzeigen
@@ -1672,7 +1691,7 @@ function update() {
     for (let x = startTileX; x < startTileX + visibleTilesX; x++) {
       if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
         const tileType = map[y][x];
-        ctx.fillStyle = TILE_COLORS[tileType] || '#777';
+                ctx.fillStyle = TILE_COLORS[tileType] || '#777';
         ctx.fillRect(
           x * TILE_SIZE,
           y * TILE_SIZE,
@@ -1877,8 +1896,10 @@ function drawMinimap(centerX, centerY) {
     );
   });
 
-  // Feinde zeichnen
-  enemies.forEach(enemy => {
+  // Spotted Feinde zeichnen
+  players.forEach(player => {
+    player.spottedEnemies.forEach(enemy => {
+      if (enemy.isAlive) {
     minimapCtx.fillStyle = 'red';
     minimapCtx.fillRect(
       (enemy.x - startX) * scaleX - 2,
@@ -1886,6 +1907,8 @@ function drawMinimap(centerX, centerY) {
       4,
       4
     );
+      }
+    });
   });
 
   // Fahrzeuge zeichnen
