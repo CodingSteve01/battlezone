@@ -2163,13 +2163,7 @@
 			ctx.restore();
 
 			// Health Bar zeichnen
-			ctx.save();
-			ctx.fillStyle = 'black';
-			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-			ctx.fillStyle = 'lime';
-			const healthPercentage = Math.max(this.health / 100, 0);
-			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
-			ctx.restore();
+			this.drawHealthBar();
 
 			// Fadenkreuz auf aktuellem Ziel
 			const currentTarget = this.autoAimTargets[this.currentTargetIndex];
@@ -2211,6 +2205,28 @@
 		        ctx.fillStyle = colors[1];
 		        ctx.fillRect(x + w * 0.4, y + h * 0.5, w * 0.3, h * 0.3);
 		    }
+		}
+		
+		drawHealthBar() {
+		    ctx.save();
+		    ctx.fillStyle = 'black';
+		    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+		    
+		    // Farbe basierend auf Gesundheit
+		    if (this.health > 60) ctx.fillStyle = 'lime';
+		    else if (this.health > 30) ctx.fillStyle = 'yellow';
+		    else ctx.fillStyle = 'red';
+		    
+		    const healthPercentage = Math.max(this.health / 100, 0);
+		    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+		    
+		    // Optionale Statuseffekte
+		    if (this.isRetreating) {
+		        ctx.fillStyle = 'white';
+		        ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
+		    }
+		    
+		    ctx.restore();
 		}
 	}
 
@@ -3112,6 +3128,10 @@
 		}
 
 		followPatrolRoute() {
+			if (this.patrolPoints.length === 0) {
+				this.generatePatrolPoints();
+			}
+
 			const point = this.patrolPoints[this.currentPatrolIndex];
 			const distToPoint = Math.hypot(point.x - this.x, point.y - this.y);
 
@@ -4787,10 +4807,6 @@
 		map = mapGenerator.generateMap();
 		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
 
-		generateMissions();
-		enemySpawner.spawnEnemies();
-		spawnVehicles();
-
 		// Spawn players at safe positions near each other
 		players = [];
 		let spawnX, spawnY;
@@ -4852,6 +4868,10 @@
 		players.forEach(player => {
 			player.addWeapon(WEAPONS.PISTOL);
 		});
+
+		generateMissions();
+		enemySpawner.spawnEnemies();
+		spawnVehicles();
 
 		// Spielerfarben im HUD anzeigen
 		players.forEach((player, index) => {
