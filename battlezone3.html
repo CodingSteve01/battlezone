@@ -45,6 +45,23 @@
             border-radius: 50%;
         }
 
+        .inventory-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .slot {
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+        }
+
+        .slot.selected {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+        }
+
         #message {
             position: absolute;
             bottom: 50%;
@@ -114,6 +131,7 @@
         <div>
             <p>Gesundheit: <span id="health1">100</span></p>
             <p>Aktuelles Item: <span id="weapon1">Keine</span></p>
+            <p>Inventory: <span id="inventory1">Keine</span></p>
             <p>Ausrüstung: <span id="equipment1">Keine</span></p>
             <p>Mission: <span id="mission1">Keine</span></p>
         </div>
@@ -123,6 +141,7 @@
         <div>
             <p>Gesundheit: <span id="health2">100</span></p>
             <p>Aktuelles Item: <span id="weapon2">Keine</span></p>
+            <p>Inventory: <span id="inventory2">Keine</span></p>
             <p>Ausrüstung: <span id="equipment2">Keine</span></p>
             <p>Mission: <span id="mission2">Keine</span></p>
         </div>
@@ -627,21 +646,59 @@
 			return villages;
 		}
 
-		createVillageBuildings(centerX, centerY) {
-			const buildingRadius = 2;
-			for (let y = -buildingRadius; y <= buildingRadius; y++) {
-				for (let x = -buildingRadius; x <= buildingRadius; x++) {
-					const dist = Math.sqrt(x * x + y * y);
-					if (dist <= buildingRadius) {
-						const newX = centerX + x;
-						const newY = centerY + y;
-						if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
-							this.map[newY][newX] = TILE_TYPES.BUILDING;
-							this.createWallAroundBuilding(newX, newY);
-						}
+		generateVillageMaze(centerX, centerY, size = 20) {
+			// Simple Recursive Backtracker Maze Generation
+			const maze = Array.from({length: size}, () => Array(size).fill(1)); // 1 = Wall, 0 = Path
+			const stack = [];
+			const startX = Math.floor(Math.random() * size);
+			const startY = Math.floor(Math.random() * size);
+			maze[startY][startX] = 0;
+			stack.push({x: startX, y: startY});
+
+			const directions = [
+				{dx: 0, dy: -2},
+				{dx: 2, dy: 0},
+				{dx: 0, dy: 2},
+				{dx: -2, dy: 0}
+			];
+
+			while (stack.length > 0) {
+				const current = stack[stack.length - 1];
+				const neighbors = [];
+
+				directions.forEach(dir => {
+					const nx = current.x + dir.dx;
+					const ny = current.y + dir.dy;
+					if (nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] === 1) {
+						neighbors.push({x: nx, y: ny, dx: dir.dx, dy: dir.dy});
+					}
+				});
+
+				if (neighbors.length > 0) {
+					const randIndex = Math.floor(Math.random() * neighbors.length);
+					const neighbor = neighbors[randIndex];
+					maze[neighbor.y][neighbor.x] = 0;
+					maze[current.y + neighbor.dy / 2][current.x + neighbor.dx / 2] = 0;
+					stack.push({x: neighbor.x, y: neighbor.y});
+				} else {
+					stack.pop();
+				}
+			}
+
+			// Übertragen des Mazes auf die Karte
+			for (let y = 0; y < size; y++) {
+				for (let x = 0; x < size; x++) {
+					const mapX = centerX + x;
+					const mapY = centerY + y;
+					if (mapY >= 0 && mapY < this.MAP_HEIGHT && mapX >= 0 && mapX < this.MAP_WIDTH) {
+						this.map[mapY][mapX] = maze[y][x] === 1 ? TILE_TYPES.WALL : TILE_TYPES.GRASS;
 					}
 				}
 			}
+		}
+
+		createVillageBuildings(centerX, centerY) {
+			this.generateVillageMaze(centerX, centerY, 20);
 		}
 
 		createWallAroundBuilding(x, y) {
@@ -906,6 +963,102 @@
 			});
 
 			return tiles;
+		}
+	}
+
+	class EnemySpawner {
+		constructor() {
+			this.lastSpanwTime = Date.now();
+			this.spawnInterval = 30000; // Alle 30 Sekunden
+		}
+
+		update() {
+			const currentTime = Date.now();
+			if (currentTime - this.lastSpanwTime > this.spawnInterval) {
+				this.spawnEnemiesAroundPlayers();
+				this.lastSpanwTime = currentTime;
+			}
+		}
+
+		// Für das initiale Spawnen von Feinden
+		spawnEnemies() {
+			enemies = [];
+
+			const numberOfGroups = 10 + Math.floor(Math.random() * 15); // Zufällige Anzahl von Gruppen
+
+			for (let i = 0; i < numberOfGroups; i++) {
+				let x, y;
+				do {
+					x = Math.random() * MAP_WIDTH * TILE_SIZE;
+					y = Math.random() * MAP_HEIGHT * TILE_SIZE;
+				} while (isColliding(x, y) || isInPlayerSight(x, y));
+
+				// Spawn als Gruppe
+				const groupSize = 2 + Math.floor(Math.random() * 4); // Zufällige Gruppengröße
+				const groupFormation = Math.random() < 0.5 ? 'line' : 'circle'; // Zufällige Formation
+				this.spawnEnemyGroup(x, y, groupSize, groupFormation);
+			}
+
+			console.log('Enemies spawned:', enemies.length);
+		}
+
+		spawnEnemyGroup(centerX, centerY, groupSize = 5, formation = 'circle') {
+			const group = [];
+			const radius = 50; // Abstand der Gegner innerhalb der Gruppe
+
+			const commanderId = Math.floor(Math.random() * groupSize);
+			for (let i = 0; i < groupSize; i++) {
+				let angle = 0;
+				let offsetX = 0;
+				let offsetY = 0;
+
+				if (formation === 'circle') {
+					angle = (Math.PI * 2 / groupSize) * i;
+					offsetX = Math.cos(angle) * radius;
+					offsetY = Math.sin(angle) * radius;
+				} else if (formation === 'line') {
+					offsetX = (i - Math.floor(groupSize / 2)) * (TILE_SIZE / 2);
+					offsetY = 0;
+				}
+
+				const x = centerX + offsetX;
+				const y = centerY + offsetY;
+
+				if (!isColliding(x, y) && !isInPlayerSight(x, y)) {
+					const enemy = new Enemy(x, y, i === commanderId);
+					group.push(enemy);
+					enemies.push(enemy);
+				}
+			}
+
+			return group;
+		}
+
+		spawnEnemiesAroundPlayers() {
+			const maxEnemies = 150; // Maximale Anzahl von Gegnern auf der Map
+			if (enemies.length >= maxEnemies) return;
+
+			const spawnGroups = 2; // Anzahl der Gruppen pro Spawn-Zyklus
+
+			for (let i = 0; i < spawnGroups; i++) {
+				const player = players[Math.floor(Math.random() * players.length)];
+				let x, y;
+				let attempts = 0;
+
+				do {
+					const angle = Math.random() * Math.PI * 2;
+					const distance = MIN_SPAWN_DISTANCE + Math.random() * 300;
+					x = player.x + Math.cos(angle) * distance;
+					y = player.y + Math.sin(angle) * distance;
+					attempts++;
+				} while ((isColliding(x, y) || isInPlayerSight(x, y)) && attempts < 10);
+
+				if (attempts < 10) {
+					const groupSize = 2 + Math.floor(Math.random() * 4);
+					const groupFormation = Math.random() < 0.5 ? 'line' : 'circle';
+					this.spawnEnemyGroup(x, y, groupSize, groupFormation);
+				}
+			}
 		}
 	}
 
@@ -1342,14 +1495,109 @@
 		}
 	}
 
+	class Inventory {
+		constructor(maxSize = 10) {
+			this.items = new Map();
+			this.maxSize = maxSize;
+			this.selectedSlot = 0;
+
+			// Separate Zähler für Spezialitems
+			this.grenades = 0;
+			this.mines = 0;
+			this.maxGrenades = 3;
+			this.maxMines = 3;
+		}
+
+		addItem(item) {
+			if (this.items.size >= this.maxSize) return false;
+
+			if (item instanceof Weapon) {
+				// Prüfen ob Waffe bereits vorhanden
+				if ([...this.items.values()].some(i => i.name === item.name)) {
+					return false;
+				}
+				this.items.set(this.items.size, item);
+				return true;
+			}
+
+			// Spezialitems
+			if (item === 'grenade' && this.grenades < this.maxGrenades) {
+				this.grenades++;
+				this.addItem(WEAPONS.GRENADE);
+				return true;
+			}
+			if (item === 'mine' && this.mines < this.maxMines) {
+				this.mines++;
+				this.addItem(WEAPONS.MINE);
+				return true;
+			}
+
+			return false;
+		}
+
+		getSelectedItem() {
+			return this.items.get(this.selectedSlot);
+		}
+
+		selectSlot(slot) {
+			if (slot >= 0 && slot < this.maxSize) {
+				this.selectedSlot = slot;
+				return true;
+			}
+			return false;
+		}
+
+		removeItem(item) {
+			console.log(`Removing item: ${item.name} from inventory`);
+			if (!item) return false;
+			for (let i = 0; i < this.items.size; i++) {
+				if (this.items.get(i).name === item.name) {
+					this.items.delete(i);
+					return true;
+				}
+			}
+			return false;
+		}
+
+		removeCurrentItem() {
+			const item = this.items.get(this.selectedSlot);
+			if (item) {
+				this.items.delete(this.selectedSlot);
+				// Reorganisiere verbleibende Items
+				const newItems = new Map();
+				let index = 0;
+				this.items.forEach(value => {
+					newItems.set(index++, value);
+				});
+				this.items = newItems;
+				return item;
+			}
+			return null;
+		}
+
+		useGrenade() {
+			if (this.grenades > 0) {
+				this.grenades--;
+				return true;
+			}
+			return false;
+		}
+
+		useMine() {
+			if (this.mines > 0) {
+				this.mines--;
+				return true;
+			}
+			return false;
+		}
+	}
+
 	class Player extends GameObject {
 		constructor(x, y, color, controls, index) {
 			super(x, y, 30, color);
+			this.inventory = new Inventory(4);
 			this.controls = controls;
 			this.speed = 3;
-			this.inventory = new Map(); // Begrenztes Inventar
-			this.maxInventorySize = 4;
-			this.currentItemIndex = 0;
 			this.vehicle = null;
 			this.canUseItem = true;
 			this.angle = 0;
@@ -1357,8 +1605,6 @@
 			this.isCrouching = false;
 			this.currentMission = null;
 			this.equipment = new Set();
-			this.grenades = 0;
-			this.mines = 0;
 			this.autoAimTargets = [];
 			this.currentTargetIndex = 0;
 			this.spottedEnemies = new Set(); // Für die Minikarte
@@ -1368,28 +1614,19 @@
 		}
 
 		addWeapon(weapon) {
-			if (this.inventory.size < this.maxInventorySize) {
-				// Prüfen ob Waffe bereits vorhanden
-				if ([...this.inventory.values()].some(w => w.name === weapon.name)) {
-					return false;
-				}
-				this.inventory.set(this.inventory.size, weapon);
-				return true;
-			}
-			return false;
+			return this.inventory.addItem(new Weapon(weapon));
 		}
 
 		useWeapon() {
-			const currentWeapon = this.inventory.get(this.currentItemIndex);
-			if (currentWeapon && currentWeapon.fire()) {
-				bullets.push(new Bullet(this.x, this.y, this.angle, this.color, this, currentWeapon));
-				return true;
+			const currentWeapon = this.inventory.getSelectedItem();
+			if (currentWeapon && currentWeapon.fire(this)) {
+				return currentWeapon;
 			}
-			return false;
+			return null;
 		}
 
 		addAmmo(weaponName, amount) {
-			for (const weapon of this.inventory.values()) {
+			for (const weapon of this.inventory.items.values()) {
 				if (weapon.name === weaponName) {
 					weapon.addAmmo(amount);
 					return true;
@@ -1399,9 +1636,8 @@
 		}
 
 		dropWeapon() {
-			const weapon = this.inventory.get(this.currentItemIndex);
+			const weapon = this.inventory.removeCurrentItem();
 			if (weapon) {
-				this.inventory.delete(this.currentItemIndex);
 				powerUps.push(new PowerUp(this.x, this.y, 'weapon', weapon));
 				return true;
 			}
@@ -1410,6 +1646,15 @@
 
 		update() {
 			if (!this.isAlive) return;
+
+			// Waffen-Updates
+			const currentWeapon = this.inventory.getSelectedItem();
+			if (currentWeapon instanceof Weapon) {
+				// Automatisches Nachladen wenn Magazin leer
+				if (currentWeapon.currentMagazine === 0 && !currentWeapon.isReloading) {
+					currentWeapon.reload();
+				}
+			}
 
 			// Missions-Update
 			updatePlayerMissions(this);
@@ -1455,7 +1700,6 @@
 			}
 
 			// Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
-			const currentWeapon = this.inventory.get(this.currentItemIndex);
 			const weaponRange = currentWeapon ? currentWeapon.range : 100;
 			const screenBounds = {
 				left: this.x - canvas.width / 2,
@@ -1499,22 +1743,16 @@
 			}
 
 			// Gegenstände wechseln
-			if (keys[this.controls.item1]) this.currentItemIndex = 0;
-			if (keys[this.controls.item2]) this.currentItemIndex = 1;
-			if (keys[this.controls.item3]) this.currentItemIndex = 2;
-			if (keys[this.controls.item4]) this.currentItemIndex = 3;
+			if (keys[this.controls.item1]) this.inventory.selectSlot(0);
+			if (keys[this.controls.item2]) this.inventory.selectSlot(1);
+			if (keys[this.controls.item3]) this.inventory.selectSlot(2);
+			if (keys[this.controls.item4]) this.inventory.selectSlot(3);
 
 			// Gegenstand verwenden
 			if (keys[this.controls.useItem] && this.canUseItem) {
-				if (this.useWeapon()) {
-					const currentWeapon = this.inventory.get(this.currentItemIndex);
+				const currentWeapon = this.useWeapon();
+				if (currentWeapon) {
 					this.makeNoise(currentWeapon.noise);
-				} else if (this.grenades > 0) {
-					grenades.push(new Grenade(this.x, this.y, this.angle, this));
-					this.grenades--;
-				} else if (this.mines > 0) {
-					mines.push(new Mine(this.x, this.y));
-					this.mines--;
 				}
 				this.canUseItem = false;
 				setTimeout(() => {
@@ -1648,13 +1886,43 @@
 			}
 
 			// HUD aktualisieren
-			const currentItem = this.inventory.get(this.currentItemIndex);
+			this.updateUI();
+		}
+
+		updateUI() {
+			const currentWeapon = this.inventory.getSelectedItem();
+			let weaponText = 'Keine Waffe';
+			let ammoText = '';
+
+			if (currentWeapon instanceof Weapon) {
+				weaponText = currentWeapon.name;
+				ammoText = `${currentWeapon.currentMagazine}/${currentWeapon.magazineSize} (${currentWeapon.totalAmmo})`;
+				if (currentWeapon.isReloading) {
+					ammoText += ' Nachladen...';
+				}
+				if (currentWeapon.name === WEAPONS.GRENADE.name) {
+					ammoText = `${this.inventory.grenades}/${this.inventory.maxGrenades}`;
+				} else if (currentWeapon.name === WEAPONS.MINE.name) {
+					ammoText = `${this.inventory.mines}/${this.inventory.maxMines}`;
+				}
+			}
+
 			document.getElementById(`weapon${this.index + 1}`).textContent =
-				currentItem ? `${currentItem.name} (${currentItem.currentAmmo}/${currentItem.maxAmmo})` : 'Keine';
-			document.getElementById(`equipment${this.index + 1}`).textContent =
-				[...this.equipment].join(', ') || 'Keine';
-			document.getElementById(`mission${this.index + 1}`).textContent =
-				this.currentMission ? this.currentMission.type : 'Keine';
+				`${weaponText} ${ammoText}`;
+
+			// Inventar-Übersicht
+			const inventoryDiv = document.getElementById(`inventory${this.index + 1}`);
+			let inventoryHTML = '<div class="inventory-slots">';
+
+			// Waffen
+			this.inventory.items.forEach((item, slot) => {
+				inventoryHTML += `
+                <div class="slot ${slot === this.inventory.selectedSlot ? 'selected' : ''}">
+                    ${item.name} (${item.getAmmoStatus(this)})
+                </div>`;
+			});
+
+			inventoryDiv.innerHTML = inventoryHTML;
 		}
 
 		makeNoise(noiseLevel) {
@@ -1696,7 +1964,7 @@
 
 			// Waffe
 			ctx.fillStyle = 'black';
-			const currentItem = this.inventory.get(this.currentItemIndex);
+			const currentItem = this.inventory.getSelectedItem();
 			if (currentItem) {
 				if (currentItem.name === 'Pistole' || currentItem.name === 'Pistole mit Schalldämpfer') {
 					ctx.fillRect(0, -5, 15, 5);
@@ -1808,7 +2076,7 @@
 			bullets.forEach(bullet => {
 				if (bullet.owner instanceof Player) {
 					const distToShot = Math.hypot(bullet.x - this.x, bullet.y - this.y);
-					let shotNoiseRange = 600; // Basis-Reichweite
+					let shotNoiseRange = bullet.weapon.noise;
 
 					// Erhöhte Reichweite für Fahrzeug-Waffen
 					if (bullet.owner.currentVehicle) {
@@ -1820,34 +2088,30 @@
 					}
 
 					if (distToShot < shotNoiseRange) {
-						// Gedämpfte Waffen machen weniger Lärm
-						const isSilenced = bullet.owner.inventory.get(bullet.owner.currentItemIndex)?.name.toLowerCase().includes('silenced');
-						if (!isSilenced || distToShot < shotNoiseRange / 3) {
-							// Verzögerung für die Reaktion einbauen
-							setTimeout(() => {
-								this.lastHeardShot = {
-									x: bullet.x,
-									y: bullet.y,
-									time: Date.now()
-								};
+						// Verzögerung für die Reaktion einbauen
+						setTimeout(() => {
+							this.lastHeardShot = {
+								x: bullet.x,
+								y: bullet.y,
+								time: Date.now()
+							};
 
-								// Nach verfügbarem Fahrzeug suchen
-								if (!this.currentVehicle) {
-									const nearbyVehicle = this.findNearbyVehicle();
-									if (nearbyVehicle) {
-										this.enterVehicle(nearbyVehicle);
-									}
+							// Nach verfügbarem Fahrzeug suchen
+							if (!this.currentVehicle) {
+								const nearbyVehicle = this.findNearbyVehicle();
+								if (nearbyVehicle) {
+									this.enterVehicle(nearbyVehicle);
 								}
+							}
 
-								this.alertness = 'alert'; // Direkt auf alert setzen
-								this.alertnessLevel = Math.min(this.alertnessLevel + 5, 10);
-								this.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
+							this.alertness = 'alert'; // Direkt auf alert setzen
+							this.alertnessLevel = Math.min(this.alertnessLevel + 5, 10);
+							this.lastSuspiciousPosition = {x: bullet.x, y: bullet.y};
 
-								// Andere Gegner alarmieren
-								this.alertAllNearbyEnemies(bullet, shotNoiseRange);
+							// Andere Gegner alarmieren
+							this.alertAllNearbyEnemies(bullet, shotNoiseRange);
 
-							}, 250); // 250ms Verzögerung für die Reaktion
-						}
+						}, 250); // 250ms Verzögerung für die Reaktion
 					}
 				}
 			});
@@ -1915,7 +2179,7 @@
 		}
 
 		getRandomEquipment() {
-            const equipment = new Set();
+			const equipment = new Set();
 			const equipments = ['schutzweste', 'tarnanzug', ''];
 			const selected = equipments[Math.floor(Math.random() * equipments.length)];
 			if (selected) equipment.add(selected);
@@ -2108,7 +2372,8 @@
 					{
 						damage: this.isCommander ? 20 : 15,
 						range: 400,
-						speed: 10
+						speed: 10,
+						noise: 600
 					}
 				));
 
@@ -2407,7 +2672,7 @@
 					Math.random() < 0.02 // Erhöhte Schussrate
 				) {
 					bullets.push(
-						new Bullet(this.x, this.y, this.angle, 'red', this, {damage: 15, range: 300})
+						new Bullet(this.x, this.y, this.angle, 'red', this, {damage: 15, range: 300, noise: 400})
 					);
 				}
 			} else {
@@ -2667,6 +2932,7 @@
 	class Bullet extends GameObject {
 		constructor(x, y, angle, color, owner, weapon) {
 			super(x, y, 5, color);
+			this.weapon = weapon;
 			this.speed = weapon.speed || 10;
 			this.owner = owner;
 			this.damage = weapon.damage || 20;
@@ -2969,7 +3235,7 @@
 
 			// Fahrzeugbewegung - nur wenn ein Fahrer da ist
 			const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
-			if (driver && driver.controls) {
+			if (driver && driver.controls && players.some(p => p.vehicle === this)) {
 				if (keys[driver.controls.up]) this.speed = this.maxSpeed;
 				if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
 				if (keys[driver.controls.left]) this.angle -= 0.05;
@@ -3016,7 +3282,8 @@
 					bullets.push(new Bullet(bulletX, bulletY, this.angle + this.turretAngle, gunner.color, gunner, {
 						damage: this.type === 'Panzer' ? 50 : 25,
 						range: this.type === 'Panzer' ? 500 : 300,
-						speed: this.type === 'Panzer' ? 15 : 10
+						speed: this.type === 'Panzer' ? 15 : 10,
+						noise: this.type === 'Panzer' ? 1000 : 800
 					}));
 					gunner.canUseItem = false;
 					setTimeout(() => {
@@ -3109,26 +3376,100 @@
 			this.range = config.range;
 			this.noise = config.noise;
 			this.fireRate = config.fireRate;
-			this.maxAmmo = config.maxAmmo;
-			this.currentAmmo = config.maxAmmo;
+			this.magazineSize = config.magazineSize;    // Größe des Magazines
+			this.currentMagazine = config.magazineSize; // Aktuelle Kugeln im Magazin
+			this.totalAmmo = config.magazineSize;       // Gesamte Munition
+			this.reloadTime = config.reloadTime;        // Zeit zum Nachladen in ms
+			this.isReloading = false;
 			this.type = config.type || 'primary';
 			this.isRare = config.isRare || false;
+			this.lastReloadTime = 0;
+			this.customBehavior = config.customBehavior
+				? {
+					...config.customBehavior,
+					canFire: config.customBehavior.canFire || (() => true),
+					isEmpty: config.customBehavior.isEmpty || (() => this.currentMagazine <= 0),
+					fire: config.customBehavior.fire || (() => {
+					}),
+					getAmmoStatus: config.customBehavior.getAmmoStatus || (() => `${this.currentMagazine}/${this.totalAmmo}`)
+				}
+				: null;
+			this.removeOnEmpty = config.removeOnEmpty || false;
 		}
 
-		canFire() {
-			return this.currentAmmo > 0;
+		getAmmoStatus(player) {
+			if (this.customBehavior?.getAmmoStatus) {
+				return this.customBehavior.getAmmoStatus(player);
+			}
+			return `${this.currentMagazine}/${this.totalAmmo}`;
 		}
 
-		fire() {
-			if (this.canFire()) {
-				this.currentAmmo--;
+		canFire(player) {
+			if (this.customBehavior?.canFire) {
+				return this.customBehavior.canFire(player);
+			}
+
+			return !this.isEmpty(player) && !this.isReloading;
+		}
+
+		isEmpty(player) {
+			if (this.customBehavior?.isEmpty) {
+				return this.customBehavior.isEmpty(player);
+			}
+			return this.currentMagazine === 0;
+		}
+
+		fire(player) {
+			if (this.customBehavior?.fire) {
+				if (!this.customBehavior.canFire || this.customBehavior.canFire(player)) {
+					this.customBehavior.fire(player);
+					if (this.removeOnEmpty && this.isEmpty(player) && this.totalAmmo <= 0) {
+						player.inventory.removeItem(this);
+					}
+					return true;
+				}
+
+				if (this.removeOnEmpty && this.isEmpty(player) && this.totalAmmo <= 0) {
+					player.inventory.removeItem(this);
+				}
+				return false;
+			}
+
+			if (this.canFire(player)) {
+				this.currentMagazine--;
+				bullets.push(new Bullet(player.x, player.y, player.angle, player.color, player, this));
+				if (this.removeOnEmpty && this.isEmpty(player) && this.totalAmmo <= 0) {
+					player.inventory.removeItem(this);
+				}
 				return true;
+			}
+
+			if (this.removeOnEmpty && this.isEmpty(player) && this.totalAmmo <= 0) {
+				player.inventory.removeItem(this);
 			}
 			return false;
 		}
 
+		reload() {
+			if (this.isReloading || this.currentMagazine === this.magazineSize) return false;
+			if (this.totalAmmo <= 0) return false;
+
+			this.isReloading = true;
+			this.lastReloadTime = Date.now();
+
+			setTimeout(() => {
+				const neededBullets = this.magazineSize - this.currentMagazine;
+				const availableBullets = Math.min(neededBullets, this.totalAmmo);
+				this.currentMagazine += availableBullets;
+				this.totalAmmo -= availableBullets;
+				this.isReloading = false;
+			}, this.reloadTime);
+
+			return true;
+		}
+
 		addAmmo(amount) {
-			this.currentAmmo = Math.min(this.currentAmmo + amount, this.maxAmmo);
+			this.totalAmmo += amount;
 		}
 	}
 
@@ -3137,20 +3478,22 @@
 		PISTOL: new Weapon({
 			name: 'Pistole',
 			damage: 25,
-			range: 400,  // Erhöht von 200
+			range: 400,
 			noise: 150,
 			fireRate: 500,
-			maxAmmo: 12,
+			magazineSize: 12,
+			reloadTime: 2000,
 			type: 'secondary'
 		}),
 
 		SILENCED_PISTOL: new Weapon({
 			name: 'Schallgedämpfte Pistole',
 			damage: 20,
-			range: 350,  // Erhöht von 150
+			range: 350,
 			noise: 50,
 			fireRate: 500,
-			maxAmmo: 12,
+			magazineSize: 12,
+			reloadTime: 2000,
 			type: 'secondary',
 			isRare: true
 		}),
@@ -3158,21 +3501,65 @@
 		ASSAULT_RIFLE: new Weapon({
 			name: 'Sturmgewehr',
 			damage: 30,
-			range: 600,  // Erhöht von 300
+			range: 600,
 			noise: 200,
 			fireRate: 150,
-			maxAmmo: 30,
+			magazineSize: 30,
+			reloadTime: 3000,
 			isRare: true
 		}),
 
 		SHOTGUN: new Weapon({
 			name: 'Schrotflinte',
 			damage: 80,
-			range: 200,  // Erhöht von 100
+			range: 200,
 			noise: 250,
 			fireRate: 800,
-			maxAmmo: 6,
+			magazineSize: 6,
+			reloadTime: 3000,
 			isRare: true
+		}),
+
+		GRENADE: new Weapon({
+			name: 'Granate',
+			damage: 200,
+			range: 100,
+			noise: 800,
+			fireRate: 1000,
+			magazineSize: 0,
+			reloadTime: 3000,
+			isRare: true,
+			customBehavior: {
+				canFire: player => player.inventory.grenades > 0,
+				isEmpty: player => player.inventory.grenades <= 0,
+				fire: player => {
+					grenades.push(new Grenade(player.x, player.y, player.angle, player));
+					player.inventory.grenades = Math.max(0, player.inventory.grenades - 1);
+				},
+				getAmmoStatus: player => player.inventory.grenades
+			},
+			removeOnEmpty: true
+		}),
+
+		MINE: new Weapon({
+			name: 'Mine',
+			damage: 800,
+			range: 1200,
+			noise: 1000,
+			fireRate: 1000,
+			magazineSize: 0,
+			reloadTime: 3000,
+			isRare: true,
+			customBehavior: {
+				canFire: player => player.inventory.mines > 0,
+				isEmpty: player => player.inventory.mines <= 0,
+				fire: player => {
+					mines.push(new Mine(player.x, player.y));
+					player.inventory.mines = Math.max(0, player.inventory.mines - 1);
+				},
+				getAmmoStatus: player => player.inventory.mines
+			},
+			removeOnEmpty: true
 		})
 	};
 
@@ -3188,8 +3575,8 @@
 					medipack: 0.5,  // Pro Bildschirmausschnitt
 					ammo: 0.5,      // Pro Bildschirmausschnitt
 					weapon: 0.1,    // Sehr selten
-					granate: 0.2,
-					mine: 0.2,
+					granate: 2.2,
+					mine: 2.2,
 					schutzweste: 0.15,
 					tarnanzug: 0.15
 				},
@@ -3281,12 +3668,14 @@
 		applyEffect(player) {
 			switch (this.type) {
 				case 'weapon':
+					console.log(`Player ${player.index} picked up ${this.weapon?.name}`);
 					if (this.weapon && player.addWeapon(this.weapon)) {
 						this.collected = true;
 					}
 					break;
 				case 'ammo':
-					for (let weapon of player.inventory.values()) {
+					for (let weapon of player.inventory.items.values()) {
+						console.log(`Player ${player.index} picked up ammo for ${weapon.name}`);
 						if (player.addAmmo(weapon.name, weapon.maxAmmo / 2)) {
 							this.collected = true;
 							break;
@@ -3295,16 +3684,19 @@
 					break;
 				case 'medipack':
 					if (player.health < 100) {
+						console.log(`Player ${player.index} picked up a medipack`);
 						player.health = Math.min(player.health + 50, 100);
 						this.collected = true;
 					}
 					break;
 				case 'granate':
-					player.grenades++;
+					console.log(`Player ${player.index} picked up a grenade`);
+					player.inventory.addItem('grenade');
 					this.collected = true;
 					break;
 				case 'mine':
-					player.mines++;
+					console.log(`Player ${player.index} picked up a mine`);
+					player.inventory.addItem('mine');
 					this.collected = true;
 					break;
 				case 'schutzweste':
@@ -3482,16 +3874,19 @@
 	let mines = [];
 	let vehicles = [];
 	let powerUps = [];
-	const powerUpManager = new PowerUpManager();
 	let structures = [];
 	let allies = [];
+
+	// Spielmanager
+	const powerUpManager = new PowerUpManager();
+	const enemySpawner = new EnemySpawner();
 
 	// Initialisierung des Spiels
 	function initGame() {
 		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
 		map = mapGenerator.generateMap();
 		generateMissions();
-		spawnEnemies();
+		enemySpawner.spawnEnemies();
 		spawnVehicles();
 		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
 
@@ -3579,26 +3974,6 @@
 		);
 	}
 
-	// Gegner spawnen
-	function spawnEnemies() {
-		enemies = [];
-		for (let i = 0; i < 50; i++) {
-			let x, y;
-			do {
-				x = Math.random() * MAP_WIDTH * TILE_SIZE;
-				y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-			} while (isColliding(x, y) || isInPlayerSight(x, y));
-			enemies.push(new Enemy(x, y));
-		}
-		// Kommandant hinzufügen
-		let x, y;
-		do {
-			x = Math.random() * MAP_WIDTH * TILE_SIZE;
-			y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-		} while (isColliding(x, y) || isInPlayerSight(x, y));
-		enemies.push(new Enemy(x, y, true));
-	}
-
 	function isInPlayerSight(x, y) {
 		return players.some(player => {
 			const dx = x - player.x;
@@ -3655,10 +4030,10 @@
 	function update() {
 		if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
 
-        powerUpManager.update()
+		powerUpManager.update()
 
 		// Enemy respawning
-		spawnEnemiesAroundPlayers();
+		enemySpawner.update();
 
 		// Optimiertes Rendering
 		renderGame();
@@ -3961,47 +4336,6 @@
 			canvas.width * scaleX,
 			canvas.height * scaleY
 		);
-	}
-
-	function spawnEnemiesAroundPlayers() {
-		const currentTime = Date.now();
-		if (currentTime - lastEnemySpawnTime < ENEMY_SPAWN_INTERVAL) return;
-
-		const maxEnemies = 30; // Maximale Anzahl von Gegnern auf der Map
-		if (enemies.length >= maxEnemies) return;
-
-		lastEnemySpawnTime = currentTime;
-
-		// 3-5 neue Gegner pro Spawn-Zyklus
-		const spawnCount = 3 + Math.floor(Math.random() * 3);
-
-		for (let i = 0; i < spawnCount; i++) {
-			let x, y;
-			let attempts = 0;
-			const player = players[0]; // Hauptspieler als Referenz
-
-			do {
-				const angle = Math.random() * Math.PI * 2;
-				const distance = MIN_SPAWN_DISTANCE + Math.random() * 300;
-				x = player.x + Math.cos(angle) * distance;
-				y = player.y + Math.sin(angle) * distance;
-				attempts++;
-			} while (
-				(isColliding(x, y) || isInPlayerSight(x, y)) &&
-				attempts < 10
-				);
-
-			if (attempts < 10) {
-				enemies.push(new Enemy(x, y));
-			}
-		}
-	}
-
-	function countEnemiesNearPlayer(player) {
-		return enemies.filter(enemy => {
-			const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-			return dist < SIGHT_RADIUS + 600; // Count enemies within a certain radius
-		}).length;
 	}
 </script>
 </body>
