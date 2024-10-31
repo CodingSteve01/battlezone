@@ -3073,8 +3073,8 @@
 			}
 
 			// Abbremsung durch Reibung
-			this.vx *= 0.5;
-			this.vy *= 0.5;
+			this.vx *= 0.75;
+			this.vy *= 0.75;
 		}
 
 		explode() {
@@ -3651,7 +3651,8 @@
 		}
 
 		addAmmo(amount) {
-			this.totalAmmo += amount;
+			console.log(`Adding ${amount} bullets to ${this.name}`);
+			this.totalAmmo = Math.ceil((this.totalAmmo || 0) + (amount || 0));
 		}
 	}
 
