@@ -1001,7 +1001,7 @@
 	    constructor() {
 	        this.lastSpawnTime = Date.now();
 	        this.spawnInterval = 1000; // Jede Sekunde prüfen
-	        this.maxEnemies = 30; // Maximale Anzahl lebender Gegner
+	        this.maxEnemies = 10; // Maximale Anzahl lebender Gegner
 	        this.spawnRadius = {
 	            min: MIN_SPAWN_DISTANCE + 200,
 	            max: MIN_SPAWN_DISTANCE + 800
@@ -3023,7 +3023,13 @@
 				this.generatePatrolPoints();
 			}
 
-			const point = this.patrolPoints[this.currentPatrolIndex];
+			let point = this.patrolPoints[this.currentPatrolIndex];
+			if (!point) {
+				point = {
+					x: this.x + (25 + (100 * Math.random()) * (Math.random() > 0.5 ? -1 : 1)),
+					y: this.y + (25 + (100 * Math.random()) * (Math.random() > 0.5 ? -1 : 1)),
+				};
+			}
 			const distToPoint = Math.hypot(point.x - this.x, point.y - this.y);
 
 			if (distToPoint < 10) {
@@ -3646,19 +3652,16 @@
 	class Grenade extends GameObject {
 		constructor(x, y, angle, owner) {
 			super(x, y, 10, 'orange');
-			this.speed = 15;             // Höhere Anfangsgeschwindigkeit
-			this.gravity = 0.5;          // Gravitationseffekt
-			this.bounceEnergy = 0.6;     // Energie die beim Aufprall bleibt
+			this.speed = 15;              // Anfangsgeschwindigkeit
 			this.vx = Math.cos(angle) * this.speed;
 			this.vy = Math.sin(angle) * this.speed;
-			this.timer = 120;            // 2 Sekunden bei 60 FPS
 			this.owner = owner;
+			this.targetDistance = 150;    // Zielreichweite der Granate in Pixeln
+			this.travelledDistance = 0;   // Zurückgelegte Strecke
 			this.hasExploded = false;
-			this.explosionRadius = 150;   // Größerer Explosionsradius
-			this.maxDamage = 150;        // Maximaler Schaden im Zentrum
-			// Explosionsanimation
-			this.explosionFrames = 0;
-			this.maxExplosionFrames = 15;
+			this.explosionRadius = 150;   // Explosionsradius
+			this.maxDamage = 150;         // Maximaler Schaden im Zentrum
+			this.timer = 120;             // 2 Sekunden bei 60 FPS
 		}
 
 		update() {
@@ -3679,26 +3682,21 @@
 			}
 
 			// Physikalische Bewegung
-			this.vy += this.gravity;
 			const newX = this.x + this.vx;
 			const newY = this.y + this.vy;
 
 			// Kollisionsprüfung
-			if (isColliding(newX, this.y)) {
+			if (isColliding(newX, newY)) {
 				this.vx *= -this.bounceEnergy;
-			} else {
-				this.x = newX;
-			}
-
-			if (isColliding(this.x, newY)) {
 				this.vy *= -this.bounceEnergy;
 			} else {
+				this.x = newX;
 				this.y = newY;
 			}
 
 			// Abbremsung durch Reibung
-			this.vx *= 0.75;
-			this.vy *= 0.75;
+			this.vx *= 0.95;
+			this.vy *= 0.95;
 		}
 
 		explode() {
@@ -4387,7 +4385,7 @@
 					medipack: 0.5,  // Pro Bildschirmausschnitt
 					ammo: 0.5,      // Pro Bildschirmausschnitt
 					weapon: 0.1,    // Sehr selten
-					granate: 0.2,
+					grenate: 0.2,
 					mine: 0.2,
 					schutzweste: 0.15,
 					tarnanzug: 0.15
@@ -4711,12 +4709,26 @@
 			spawnY = Math.random() * MAP_HEIGHT * TILE_SIZE;
 		} while (isColliding(spawnX, spawnY) || isEnemyNearby(spawnX, spawnY));
 
+		const spawnDistance = 50; // Mindestabstand zwischen den Spielern
+		let playerPositions = []; // Um gespeicherte Positionen der Spieler zu verwalten
+
 		for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
 			let x, y;
 			do {
-				x = spawnX + (Math.random() - 0.5) * 100; // Spawn near the first player
+				x = spawnX + (Math.random() - 0.5) * 100; // Spawn in der Nähe des ersten Spielers
 				y = spawnY + (Math.random() - 0.5) * 100;
+
+				// Überprüfe, ob der neue Spieler zu nahe an anderen Spielern spawnt
+				const isTooClose = playerPositions.some(([px, py]) => {
+					const distance = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+					return distance < spawnDistance;
+				});
+				if (isTooClose) continue;
 			} while (isColliding(x, y));
+
+			// Speichere die Position des aktuellen Spielers
+			playerPositions.push([x, y]);
+
 			players.push(
 				new Player(
 					x,
