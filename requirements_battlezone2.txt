@@ -142,3 +142,18 @@
 - Erweiterte Fahrzeugdetails
 - Squad-basiertes KI-System
 - Detailliertes Notifikationssystem
+
+
+
+--------------------------------------------
+
+
+Mit einem Tarnanzug sollte man zum einen anders aussehen und zum anderen müsste man nur auf Wiesen nicht so leicht zu erkennen sein, wenn man natürlich direct vor der Nase eines Gegner rumläuft sieht der einen natürlich. Und sobald ich schieße oder krach mache ist meine Tarnung natürlich sofort weg und die Gegner sollte mich sehen so wie sonst.
+
+Die Gegner reagieren unangemessen auf Beschuss und laufen auch sonst zu wenig rum. Eigentlich sollten sie sich verteilen, patroulieren, dynamisch Gegenstände bewachen. Momentan kann ich zum Beispiel selenruhig aus dem Hinterhalt auf eine Gegner schießen, ohne dass er wegläuft oder irgendwie reagiert. Er ist nur alamiert. Die Kollegen um ihn herum machen weiter als ob nichts wäre. Das sollte nicht so sein, die Stimmung muss sich im Umkreis übertragen. Es sollte ggf. so ein Globales System geben, wo bestimmte Koordinaten, Geräusche usw. von allen AIs abgerfen warden können und wo die AIs sich auch austauschen (immer nur in einem umkreis von ca. 8 Bildschirmgrößen.
+
+Die generierte Map ist total langweilig und lieblos. Ein Dorf ist doch nicht einfach ein Maze, da hätte ich gerne einfach Häuser und Straßen und Wege. Man muss in die Häuser gehen können.
+
+Außerdem muss die Tile-Map angepasst werden sodass wir einen Array on Tiles haben. Außerdem sollten unterschiedliche Bäume und Steine als Obstacles auf den Tiles registriert werden können, Sträucher und Gräser sollten ebenfalls als Sprites auf tiles registriert werden, sodass die map mal nach etwas aussieht. Die Spieler, Fahrzeuge und Gegner sollten eher so pseudo 2d sein. Also Gegenstände, Bäume usw. in der Seitenansicht und mit einer vernünftigen Tiefensortierung. Dazu muss rendering und updating voneinander getrennt werden. Ggf. muss man auch die Tiles einfach kleiner machen und dafür dann im verhältnis mehr Tiles haben, damit das gut aussieht. Ein Rastermuster muss der Spieler nicht erkennen können, mir geht es mehr um den Spaß.
+
+Das sind jetzt mehrere Themen, bitte gibt mir die benötigten Änderungen pro Thema, damit ich das umsetzen kann.
