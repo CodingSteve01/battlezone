@@ -1923,6 +1923,14 @@
 			});
 
 			inventoryDiv.innerHTML = inventoryHTML;
+
+			// Ausrüstung
+			const equipmentDiv = document.getElementById(`equipment${this.index + 1}`);
+			let equipmentHTML = '<div class="equipment-slots">';
+			this.equipment.forEach(item => {
+				equipmentHTML += `<div class="slot">${item}</div>`;
+			});
+			equipmentDiv.innerHTML = equipmentHTML;
 		}
 
 		makeNoise(noiseLevel) {
@@ -3859,7 +3867,7 @@
 				case 'ammo':
 					for (let weapon of player.inventory.items.values()) {
 						console.log(`Player ${player.index} picked up ammo for ${weapon.name}`);
-						if (player.addAmmo(weapon.name, weapon.maxAmmo / 2)) {
+						if (player.addAmmo(weapon.name, weapon.magazineSize)) {
 							this.collected = true;
 							break;
 						}
@@ -3884,6 +3892,7 @@
 					break;
 				case 'schutzweste':
 				case 'tarnanzug':
+					console.log(`Player ${player.index} picked up ${this.type}`);
 					if (!player.equipment.has(this.type)) {
 						player.equipment.add(this.type);
 						this.collected = true;
