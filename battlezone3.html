@@ -1551,7 +1551,7 @@
 			console.log(`Removing item: ${item.name} from inventory`);
 			if (!item) return false;
 			for (let i = 0; i < this.items.size; i++) {
-				if (this.items.get(i).name === item.name) {
+				if (this.items.get(i)?.name === item.name) {
 					this.items.delete(i);
 					return true;
 				}
@@ -3022,50 +3022,99 @@
 	class Grenade extends GameObject {
 		constructor(x, y, angle, owner) {
 			super(x, y, 10, 'orange');
-			this.speed = 5;
+			this.speed = 15;             // Höhere Anfangsgeschwindigkeit
+			this.gravity = 0.5;          // Gravitationseffekt
+			this.bounceEnergy = 0.6;     // Energie die beim Aufprall bleibt
 			this.vx = Math.cos(angle) * this.speed;
 			this.vy = Math.sin(angle) * this.speed;
-			this.timer = 100;
+			this.timer = 120;            // 2 Sekunden bei 60 FPS
 			this.owner = owner;
+			this.hasExploded = false;
+			this.explosionRadius = 150;   // Größerer Explosionsradius
+			this.maxDamage = 150;        // Maximaler Schaden im Zentrum
+			// Explosionsanimation
+			this.explosionFrames = 0;
+			this.maxExplosionFrames = 15;
 		}
 
 		update() {
 			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
 
+			if (this.hasExploded) {
+				this.explosionFrames++;
+				if (this.explosionFrames >= this.maxExplosionFrames) {
+					grenades.splice(grenades.indexOf(this), 1);
+				}
+				return;
+			}
+
 			this.timer--;
+			if (this.timer <= 0) {
+				this.explode();
+				return;
+			}
+
+			// Physikalische Bewegung
+			this.vy += this.gravity;
 			const newX = this.x + this.vx;
 			const newY = this.y + this.vy;
 
-			if (!isColliding(newX, newY)) {
-				this.x = newX;
-				this.y = newY;
+			// Kollisionsprüfung
+			if (isColliding(newX, this.y)) {
+				this.vx *= -this.bounceEnergy;
 			} else {
-				this.vx = 0;
-				this.vy = 0;
+				this.x = newX;
 			}
 
-			if (this.timer <= 0) {
-				this.explode();
-				grenades.splice(grenades.indexOf(this), 1);
+			if (isColliding(this.x, newY)) {
+				this.vy *= -this.bounceEnergy;
+			} else {
+				this.y = newY;
 			}
+
+			// Abbremsung durch Reibung
+			this.vx *= 0.5;
+			this.vy *= 0.5;
 		}
 
 		explode() {
-			// Explosionseffekt
+			this.hasExploded = true;
+
+			// Schallwelle erzeugen (alle Gegner in der Nähe alarmieren)
 			enemies.forEach(enemy => {
-				if (Math.hypot(this.x - enemy.x, this.y - enemy.y) < 100) {
-					enemy.health -= 100; // Angepasster Schaden
-					if (enemy.health <= 0) {
-						enemy.isAlive = false;
-					}
+				const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+				if (dist < this.explosionRadius * 2) {
+					enemy.alertness = 'alert';
+					enemy.alertnessLevel = 10;
+					enemy.lastSuspiciousPosition = {x: this.x, y: this.y};
 				}
 			});
-			// Fahrzeuge beschädigen
-			vehicles.forEach(vehicle => {
-				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 100) {
-					vehicle.condition -= 100;
-					if (vehicle.condition <= 0) {
-						vehicle.destroy();
+
+			// Schaden mit Falloff basierend auf Distanz
+			const damageTargets = [...enemies, ...players, ...vehicles];
+			damageTargets.forEach(target => {
+				if (!target.isAlive && !target.isDestroyed) return;
+
+				const dist = Math.hypot(this.x - target.x, this.y - target.y);
+				if (dist < this.explosionRadius) {
+					const damageMultiplier = 1 - (dist / this.explosionRadius);
+					const damage = Math.round(this.maxDamage * damageMultiplier);
+
+					if (target instanceof Vehicle) {
+						target.condition -= damage * 1.5; // Erhöhter Fahrzeugschaden
+						if (target.condition <= 0) {
+							target.destroy();
+						}
+					} else {
+						target.health -= damage;
+						if (target.health <= 0) {
+							if (target instanceof Player) {
+								target.isAlive = false;
+								checkGameOver();
+							} else {
+								target.isAlive = false;
+							}
+						}
 					}
 				}
 			});
@@ -3074,38 +3123,136 @@
 		draw() {
 			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
 
-			ctx.fillStyle = this.color;
-			ctx.beginPath();
-			ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-			ctx.fill();
+			if (this.hasExploded) {
+				// Explosionsanimation
+				const radius = (this.explosionRadius * this.explosionFrames) / this.maxExplosionFrames;
+				const alpha = 1 - (this.explosionFrames / this.maxExplosionFrames);
+
+				ctx.save();
+				ctx.globalAlpha = alpha;
+
+				// Äußerer Explosionsring
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255, 87, 34, ${alpha * 0.5})`;
+				ctx.fill();
+
+				// Innerer Explosionskern
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, radius * 0.6, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255, 193, 7, ${alpha * 0.8})`;
+				ctx.fill();
+
+				ctx.restore();
+			} else {
+				// Normale Granate
+				ctx.save();
+				ctx.fillStyle = this.color;
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+				ctx.fill();
+
+				// Zünder visualisieren
+				const fuseColor = this.timer < 30 ? 'red' : 'yellow';
+				ctx.strokeStyle = fuseColor;
+				ctx.beginPath();
+				ctx.moveTo(this.x, this.y);
+				ctx.lineTo(
+					this.x + Math.cos(Date.now() * 0.01) * 8,
+					this.y + Math.sin(Date.now() * 0.01) * 8
+				);
+				ctx.stroke();
+				ctx.restore();
+			}
 		}
 	}
 
 	class Mine extends GameObject {
 		constructor(x, y) {
 			super(x, y, 15, 'brown');
+			this.armed = false;
+			this.armDelay = 60;  // 1 Sekunde Verzögerung
+			this.explosionRadius = 120;
+			this.maxDamage = 200;
+			this.triggerRadius = 30;
+			this.hasExploded = false;
+			this.explosionFrames = 0;
+			this.maxExplosionFrames = 15;
 		}
 
 		update() {
 			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
 
-			// Warten auf Feinde oder Fahrzeuge
-			enemies.forEach(enemy => {
-				if (enemy.isAlive && Math.hypot(this.x - enemy.x, this.y - enemy.y) < 20) {
-					enemy.health -= 100; // Sofort töten
-					if (enemy.health <= 0) {
-						enemy.isAlive = false;
-					}
+			if (this.hasExploded) {
+				this.explosionFrames++;
+				if (this.explosionFrames >= this.maxExplosionFrames) {
 					mines.splice(mines.indexOf(this), 1);
 				}
+				return;
+			}
+
+			if (this.armDelay > 0) {
+				this.armDelay--;
+				return;
+			}
+
+			if (!this.armed) {
+				this.armed = true;
+				return;
+			}
+
+			// Prüfen auf Auslöser in der Nähe
+			const triggers = [...players, ...enemies, ...vehicles];
+			for (const target of triggers) {
+				if (target.isAlive === false || target.isDestroyed) continue;
+
+				const dist = Math.hypot(this.x - target.x, this.y - target.y);
+				if (dist < this.triggerRadius) {
+					this.explode();
+					break;
+				}
+			}
+		}
+
+		explode() {
+			this.hasExploded = true;
+
+			// Schallwelle und Alarm
+			enemies.forEach(enemy => {
+				const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+				if (dist < this.explosionRadius * 2) {
+					enemy.alertness = 'alert';
+					enemy.alertnessLevel = 10;
+					enemy.lastSuspiciousPosition = {x: this.x, y: this.y};
+				}
 			});
-			vehicles.forEach(vehicle => {
-				if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < 20) {
-					vehicle.condition -= 100;
-					if (vehicle.condition <= 0) {
-						vehicle.destroy();
+
+			// Schaden mit Distanz-basiertem Falloff
+			const targets = [...enemies, ...players, ...vehicles];
+			targets.forEach(target => {
+				if (!target.isAlive && !target.isDestroyed) return;
+
+				const dist = Math.hypot(this.x - target.x, this.y - target.y);
+				if (dist < this.explosionRadius) {
+					const damageMultiplier = 1 - (dist / this.explosionRadius);
+					const damage = Math.round(this.maxDamage * damageMultiplier);
+
+					if (target instanceof Vehicle) {
+						target.condition -= damage * 2; // Erhöhter Fahrzeugschaden
+						if (target.condition <= 0) {
+							target.destroy();
+						}
+					} else {
+						target.health -= damage;
+						if (target.health <= 0) {
+							if (target instanceof Player) {
+								target.isAlive = false;
+								checkGameOver();
+							} else {
+								target.isAlive = false;
+							}
+						}
 					}
-					mines.splice(mines.indexOf(this), 1);
 				}
 			});
 		}
@@ -3113,13 +3260,48 @@
 		draw() {
 			if (gameState !== 'playing') return; // Zeichnen nur wenn das Spiel läuft
 
-			ctx.fillStyle = this.color;
-			ctx.fillRect(
-				this.x - this.size / 2,
-				this.y - this.size / 2,
-				this.size,
-				this.size
-			);
+			if (this.hasExploded) {
+				// Explosionsanimation ähnlich wie bei Granaten
+				const radius = (this.explosionRadius * this.explosionFrames) / this.maxExplosionFrames;
+				const alpha = 1 - (this.explosionFrames / this.maxExplosionFrames);
+
+				ctx.save();
+				ctx.globalAlpha = alpha;
+
+				// Explosionsringe
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255, 87, 34, ${alpha * 0.5})`;
+				ctx.fill();
+
+				ctx.beginPath();
+				ctx.arc(this.x, this.y, radius * 0.6, 0, Math.PI * 2);
+				ctx.fillStyle = `rgba(255, 193, 7, ${alpha * 0.8})`;
+				ctx.fill();
+
+				ctx.restore();
+			} else {
+				ctx.save();
+				ctx.fillStyle = this.color;
+				ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+
+				// Zeige Armierungsstatus
+				if (!this.armed) {
+					const armProgress = 1 - (this.armDelay / 60);
+					ctx.strokeStyle = 'red';
+					ctx.beginPath();
+					ctx.arc(this.x, this.y, this.size * 0.8, 0, Math.PI * 2 * armProgress);
+					ctx.stroke();
+				} else {
+					// Kleines rotes Licht wenn scharf
+					ctx.fillStyle = 'red';
+					ctx.beginPath();
+					ctx.arc(this.x + this.size / 4, this.y - this.size / 4, 2, 0, Math.PI * 2);
+					ctx.fill();
+				}
+
+				ctx.restore();
+			}
 		}
 	}
 
@@ -3575,8 +3757,8 @@
 					medipack: 0.5,  // Pro Bildschirmausschnitt
 					ammo: 0.5,      // Pro Bildschirmausschnitt
 					weapon: 0.1,    // Sehr selten
-					granate: 2.2,
-					mine: 2.2,
+					granate: 0.2,
+					mine: 0.2,
 					schutzweste: 0.15,
 					tarnanzug: 0.15
 				},
