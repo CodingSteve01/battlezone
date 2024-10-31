@@ -159,16 +159,46 @@
 </div>
 
 <!-- Steuerungsinfo -->
-<div id="controlsInfo" style="display: none;">
-    <h3>Steuerung Einzelspieler:</h3>
-    <p>Bewegung: W, A, S, D</p>
-    <p>Gegenstand verwenden: F</p>
-    <p>Ziel wechseln/Rollenwechsel im Fahrzeug: R</p>
-    <p>Gegenstand wechseln: 1-4</p>
-    <p>Gegenstand ablegen: G</p>
-    <p>Ducken (Stealth): C</p>
-    <p>Ein-/Aussteigen: E</p>
-    <button id="backToMenu">Zurück</button>
+<div id="controlsInfo" style="display: none; background: rgba(34, 34, 34, 0.95); color: white; position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+    <div style="max-width: 800px; width: 100%; display: flex; justify-content: space-between; gap: 40px;">
+        <!-- Spieler 1 -->
+        <div style="flex: 1;">
+            <h3 style="font-size: 24px; margin-bottom: 20px;">Steuerung Spieler 1</h3>
+            <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 5px;">
+                <p>Bewegung: W, A, S, D</p>
+                <p>Gegenstand verwenden: F</p>
+                <p>Ziel wechseln/Rollenwechsel im Fahrzeug: R</p>
+                <p>Gegenstand wechseln: 1-4</p>
+                <p>Gegenstand ablegen: G</p>
+                <p>Ducken (Stealth): C</p>
+                <p>Ein-/Aussteigen: E</p>
+                <p>Nahkampf: V</p>
+            </div>
+        </div>
+
+        <!-- Spieler 2 -->
+        <div style="flex: 1;">
+            <h3 style="font-size: 24px; margin-bottom: 20px;">Steuerung Spieler 2</h3>
+            <div style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 5px;">
+                <p>Bewegung: I, J, K, L</p>
+                <p>Gegenstand verwenden: O</p>
+                <p>Ziel wechseln/Rollenwechsel im Fahrzeug: P</p>
+                <p>Gegenstand wechseln: 7-0</p>
+                <p>Gegenstand ablegen: H</p>
+                <p>Ducken (Stealth): ;</p>
+                <p>Ein-/Aussteigen: U</p>
+                <p>Nahkampf: M</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Allgemeine Controls -->
+    <div style="margin-top: 30px; background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 5px; width: 800px;">
+        <h3 style="font-size: 20px; margin-bottom: 10px;">Allgemeine Steuerung</h3>
+        <p>Pause: ESC</p>
+    </div>
+
+    <button id="backToMenu" style="margin-top: 30px; padding: 10px 20px; font-size: 24px; cursor: pointer;">Zurück</button>
 </div>
 
 <!-- Game Over Menü -->
@@ -265,6 +295,7 @@
 	});
 
 	// Hauptmenü-Buttons
+	document.getElementById('controlsInfo').style.display = 'none';
 	document.getElementById('startSingle').addEventListener('click', () => {
 		singlePlayer = true;
 		gameState = 'playing'; // Setze gameState vor initGame
@@ -4308,10 +4339,15 @@
 			customBehavior: {
 				canFire: player => player.inventory.grenades > 0,
 				isEmpty: player => player.inventory.grenades <= 0,
-				fire: player => {
-					grenades.push(new Grenade(player.x, player.y, player.angle, player));
-					player.inventory.grenades = Math.max(0, player.inventory.grenades - 1);
-				},
+		        fire: player => {
+		            grenades.push(new Grenade(
+		                player.x, 
+		                player.y, 
+		                player.angle,
+		                player
+		            ));
+		            player.inventory.grenades = Math.max(0, player.inventory.grenades - 1);
+		        },
 				getAmmoStatus: player => player.inventory.grenades
 			},
 			removeOnEmpty: true
