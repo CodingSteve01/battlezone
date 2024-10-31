@@ -2204,7 +2204,7 @@
 					const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
 
 					// Tote in Sichtweite entdecken
-					if (dist < this.viewDistance && this.isInView(enemy)) {
+					if (dist < this.viewDistance && this.canSee(enemy)) {
 						this.knownDeadAllies.add(enemy.id);
 
 						// Alarmzustand erhöhen
@@ -3939,9 +3939,10 @@
 					}
 					break;
 				case 'ammo':
-					for (let weapon of player.inventory.items.values()) {
-						console.log(`Player ${player.index} picked up ammo for ${weapon.name}`);
-						if (player.addAmmo(weapon.name, weapon.magazineSize)) {
+					var currentWeapon = player.inventory.getSelectedItem();
+					if (currentWeapon) {
+						console.log(`Player ${player.index} picked up ammo for ${currentWeapon.name}`);
+						if (player.addAmmo(currentWeapon.name, currentWeapon.magazineSize)) {
 							this.collected = true;
 							break;
 						}
@@ -3955,19 +3956,21 @@
 					}
 					break;
 				case 'granate':
-					console.log(`Player ${player.index} picked up a grenade`);
-					player.inventory.addItem('grenade');
-					this.collected = true;
+					if (player.inventory.addItem('grenade')) {
+						console.log(`Player ${player.index} picked up a grenade`);
+						this.collected = true;
+					}
 					break;
 				case 'mine':
-					console.log(`Player ${player.index} picked up a mine`);
-					player.inventory.addItem('mine');
-					this.collected = true;
+					if (player.inventory.addItem('mine')) {
+						console.log(`Player ${player.index} picked up a mine`);
+						this.collected = true;
+					}
 					break;
 				case 'schutzweste':
 				case 'tarnanzug':
-					console.log(`Player ${player.index} picked up ${this.type}`);
 					if (!player.equipment.has(this.type)) {
+						console.log(`Player ${player.index} picked up ${this.type}`);
 						player.equipment.add(this.type);
 						this.collected = true;
 					}

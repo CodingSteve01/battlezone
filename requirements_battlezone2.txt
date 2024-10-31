@@ -148,9 +148,13 @@
 --------------------------------------------
 
 
-Mit einem Tarnanzug sollte man zum einen anders aussehen und zum anderen müsste man nur auf Wiesen nicht so leicht zu erkennen sein, wenn man natürlich direct vor der Nase eines Gegner rumläuft sieht der einen natürlich. Und sobald ich schieße oder krach mache ist meine Tarnung natürlich sofort weg und die Gegner sollte mich sehen so wie sonst.
+[x] Mit einem Tarnanzug sollte man zum einen anders aussehen und zum anderen müsste man nur auf Wiesen nicht so leicht zu erkennen sein, wenn man natürlich direct vor der Nase eines Gegner rumläuft sieht der einen natürlich. Und sobald ich schieße oder krach mache ist meine Tarnung natürlich sofort weg und die Gegner sollte mich sehen so wie sonst.
 
-Die Gegner reagieren unangemessen auf Beschuss und laufen auch sonst zu wenig rum. Eigentlich sollten sie sich verteilen, patroulieren, dynamisch Gegenstände bewachen. Momentan kann ich zum Beispiel selenruhig aus dem Hinterhalt auf eine Gegner schießen, ohne dass er wegläuft oder irgendwie reagiert. Er ist nur alamiert. Die Kollegen um ihn herum machen weiter als ob nichts wäre. Das sollte nicht so sein, die Stimmung muss sich im Umkreis übertragen. Es sollte ggf. so ein Globales System geben, wo bestimmte Koordinaten, Geräusche usw. von allen AIs abgerfen warden können und wo die AIs sich auch austauschen (immer nur in einem umkreis von ca. 8 Bildschirmgrößen.
+[ ] Die Gegner reagieren unangemessen auf Beschuss und laufen auch sonst zu wenig rum. Eigentlich sollten sie sich verteilen, patroulieren, dynamisch Gegenstände bewachen. Momentan kann ich zum Beispiel selenruhig aus dem Hinterhalt auf eine Gegner schießen, ohne dass er wegläuft oder irgendwie reagiert. Er ist nur alamiert. Die Kollegen um ihn herum machen weiter als ob nichts wäre. Das sollte nicht so sein, die Stimmung muss sich im Umkreis übertragen. Es sollte ggf. so ein Globales System geben, wo bestimmte Koordinaten, Geräusche usw. von allen AIs abgerfen warden können und wo die AIs sich auch austauschen (immer nur in einem umkreis von ca. 8 Bildschirmgrößen.)
+
+[ ] Granaten fliegen immer nur in eine Richtung, das ist ein wenig komisch und sollte so nicht sein. Der Spieler sollte die Granaten in eine Richtung werfen können.
+
+[ ] Das automatische Zielen klappt irgendwie nicht immer. Bei manchen Gegnern klappt es und bei manchen nicht?!?
 
 Die generierte Map ist total langweilig und lieblos. Ein Dorf ist doch nicht einfach ein Maze, da hätte ich gerne einfach Häuser und Straßen und Wege. Man muss in die Häuser gehen können.
 
