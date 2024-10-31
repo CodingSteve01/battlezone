@@ -1608,6 +1608,12 @@
 			this.autoAimTargets = [];
 			this.currentTargetIndex = 0;
 			this.spottedEnemies = new Set(); // Für die Minikarte
+			
+			this.stealthStatus = {
+	            isCamouflaged: false,
+	            lastActionTime: 0,
+	            detectionModifier: 1.0  // 1.0 = normale Erkennung, 0.3 = schwer zu erkennen
+	        };
 
 			// Startausrüstung
 			this.addWeapon(WEAPONS.PISTOL);
@@ -1619,10 +1625,11 @@
 
 		useWeapon() {
 			const currentWeapon = this.inventory.getSelectedItem();
-			if (currentWeapon && currentWeapon.fire(this)) {
-				return currentWeapon;
-			}
-			return null;
+	        if (currentWeapon && currentWeapon.fire(this)) {
+	            this.stealthStatus.lastActionTime = Date.now(); // Tarnung temporär aufheben
+	            return currentWeapon;
+	        }
+	        return null;
 		}
 
 		addAmmo(weaponName, amount) {
@@ -1720,6 +1727,32 @@
 					enemy.y < screenBounds.bottom
 				);
 			});
+
+			// Prüfen ob der Spieler sich auf Gras befindet
+			const isMoving = dx != 0 || dy != 0;
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map[tileY][tileX];
+
+			// Tarneffekt nur auf Gras und mit Tarnanzug
+			if (this.equipment.has('tarnanzug')) {
+				if (currentTile === TILE_TYPES.GRASS || 
+					currentTile === TILE_TYPES.HIGH_GRASS) {
+					this.stealthStatus.isCamouflaged = true;
+					this.stealthStatus.detectionModifier = 0.3;
+				} else {
+					this.stealthStatus.isCamouflaged = false;
+					this.stealthStatus.detectionModifier = 0.7; // Leichter Tarneffekt auf anderen Untergründen
+				}
+
+				// Tarnung verlieren bei Aktionen
+				if (isMoving || Date.now() - this.stealthStatus.lastActionTime < 3000) {
+					this.stealthStatus.detectionModifier *= 2; // Bewegung macht sichtbarer
+				}
+			} else {
+				this.stealthStatus.isCamouflaged = false;
+				this.stealthStatus.detectionModifier = 1.0;
+			}
 
 			if (keys[this.controls.switchRole]) {
 				// Rollenwechsel im Fahrzeug
@@ -1956,9 +1989,16 @@
 			ctx.save();
 			ctx.translate(this.x, this.y);
 			ctx.rotate(this.angle);
-			// Körper
-			ctx.fillStyle = this.color;
-			ctx.fillRect(-15, -15, 30, 30);
+
+	        // Basis-Spielerkörper
+	        ctx.fillStyle = this.color;
+	        ctx.fillRect(-15, -15, 30, 30);
+
+	        // Tarnanzug-Effekt
+	        if (this.equipment.has('tarnanzug')) {
+	            const pattern = this.stealthStatus.isCamouflaged ? 'camo' : 'urban';
+	            this.drawCamouflagePattern(ctx, pattern, -15, -15, 30, 30);
+	        }
 
 			// Ausrüstung anzeigen
 			if (this.equipment.has('schutzweste')) {
@@ -2001,6 +2041,38 @@
 				ctx.arc(currentTarget.x, currentTarget.y, currentTarget.size / 2 + 5, 0, Math.PI * 2);
 				ctx.stroke();
 			}
+		}
+
+		drawCamouflagePattern(ctx, pattern, x, y, w, h) {
+		    if (pattern === 'camo') {
+		        // Simples Waldtarn - nur 3 Flecken
+		        const colors = ['#4B5320', '#2F4F2F'];
+		        
+		        // Hintergrund
+		        ctx.fillStyle = '#556B2F';
+		        ctx.fillRect(x, y, w, h);
+		        
+		        // Nur zwei simple Tarnflecken
+		        ctx.fillStyle = colors[0];
+		        ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
+		        
+		        ctx.fillStyle = colors[1];
+		        ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
+		    } else {
+		        // Urbanes Tarn - nur 2 Flecken
+		        const colors = ['#696969', '#A9A9A9'];
+		        
+		        // Hintergrund
+		        ctx.fillStyle = '#808080';
+		        ctx.fillRect(x, y, w, h);
+		        
+		        // Zwei simple Rechtecke
+		        ctx.fillStyle = colors[0];
+		        ctx.fillRect(x + w * 0.3, y + h * 0.2, w * 0.3, h * 0.3);
+		        
+		        ctx.fillStyle = colors[1];
+		        ctx.fillRect(x + w * 0.4, y + h * 0.5, w * 0.3, h * 0.3);
+		    }
 		}
 	}
 
@@ -2263,7 +2335,7 @@
 			players.forEach(player => {
 				if (!player.isAlive || player.equipment.has('tarnanzug')) return;
 
-				const inView = this.isInView(player);
+				const inView = this.canSee(player);
 				const canHear = this.canHear(player);
 
 				if (inView || canHear) {
@@ -2570,21 +2642,6 @@
 				}, null)?.player;
 		}
 
-		isInView(player) {
-			const dx = player.x - this.x;
-			const dy = player.y - this.y;
-			const dist = Math.hypot(dx, dy);
-
-			if (dist > this.viewDistance) return false;
-
-			const angleToPlayer = Math.atan2(dy, dx);
-			const angleDiff = Math.abs(this.normalizeAngle(angleToPlayer - this.angle));
-
-			if (angleDiff > this.viewAngle / 2) return false;
-
-			return !lineOfSightBlocked(this.x, this.y, player.x, player.y);
-		}
-
 		normalizeAngle(angle) {
 			while (angle > Math.PI) angle -= 2 * Math.PI;
 			while (angle < -Math.PI) angle += 2 * Math.PI;
@@ -2612,19 +2669,36 @@
 		}
 
 		canSee(player) {
-			if (!player.isAlive || player.equipment.has('tarnanzug')) return false;
-			const dx = player.x - this.x;
-			const dy = player.y - this.y;
-			const dist = Math.hypot(dx, dy);
-			if (dist > this.viewDistance) return false;
-			const angleToPlayer = Math.atan2(dy, dx);
-			let angleDifference = angleToPlayer - this.angle;
-			angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
-			if (Math.abs(angleDifference) > this.viewAngle / 2) return false;
-			// Check for obstacles between enemy and player
-			if (lineOfSightBlocked(this.x, this.y, player.x, player.y)) return false;
-			return true;
-		}
+	        if (!player.isAlive) return false;
+
+	        const dx = player.x - this.x;
+	        const dy = player.y - this.y;
+	        const dist = Math.hypot(dx, dy);
+	        
+	        // Basis-Sichtweite mit Tarnmodifikator
+	        const modifiedViewDistance = this.viewDistance * player.stealthStatus.detectionModifier;
+	        
+	        if (dist > modifiedViewDistance) return false;
+
+	        // Sichtwinkel-Check
+	        const angleToPlayer = Math.atan2(dy, dx);
+	        let angleDifference = angleToPlayer - this.angle;
+	        angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+	        
+	        // Erweiterter Sichtwinkel wenn der Spieler sich bewegt oder kürzlich geschossen hat
+	        const viewAngleModifier = player.stealthStatus.detectionModifier > 0.5 ? 1.5 : 1.0;
+	        if (Math.abs(angleDifference) > this.viewAngle * viewAngleModifier / 2) return false;
+
+	        // Hindernischeck
+	        if (lineOfSightBlocked(this.x, this.y, player.x, player.y)) return false;
+
+	        // Zusätzliche Wahrscheinlichkeitsberechnung für getarnte Spieler
+	        if (player.stealthStatus.isCamouflaged && Math.random() > player.stealthStatus.detectionModifier) {
+	            return false;
+	        }
+
+	        return true;
+	    }
 
 		canHear(player) {
 			if (!player.isAlive) return false;
