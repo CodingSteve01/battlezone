@@ -967,99 +967,237 @@
 	}
 
 	class EnemySpawner {
-		constructor() {
-			this.lastSpanwTime = Date.now();
-			this.spawnInterval = 30000; // Alle 30 Sekunden
+	    constructor() {
+	        this.lastSpawnTime = Date.now();
+	        this.spawnInterval = 30000; // Alle 30 Sekunden
+	        this.maxEnemies = 150; // Maximale Anzahl von Gegnern auf der Map
+	        this.minGroupSize = 3;  // Mindestgröße einer Gruppe
+	        this.maxGroupSize = 8;  // Maximalgröße einer Gruppe
+	        this.spawnDistance = { 
+	            min: SIGHT_RADIUS + 200,  // Mindestens außer Sicht
+	            max: SIGHT_RADIUS + 600   // Aber nicht zu weit weg
+	        };
+	        this.groupSpread = {
+	            min: 50,   // Minimaler Abstand zwischen Gruppenmitgliedern
+	            max: 150   // Maximaler Abstand zwischen Gruppenmitgliedern
+	        };
+	    }
+
+	    update() {
+	        const currentTime = Date.now();
+	        if (currentTime - this.lastSpawnTime > this.spawnInterval) {
+	            // Spawne nur neue Gegner wenn die Gesamtzahl unter dem Maximum liegt
+	            if (enemies.length < this.maxEnemies) {
+	                this.spawnEnemiesAroundPlayers();
+	            }
+	            this.lastSpawnTime = currentTime;
+
+	            // Entferne tote Gegner die zu weit von allen Spielern entfernt sind
+	            this.cleanupDeadEnemies();
+	        }
+	    }
+
+	    // Für das initiale Spawnen von Feinden
+	    spawnEnemies() {
+		    enemies = [];
+		    
+		    // Spawne Gruppen um wichtige Positionen
+		    this.spawnGroupsAtStrategicLocations();
+		    
+		    // Spawne zusätzliche zufällige Gruppen
+		    const numberOfGroups = 6 + Math.floor(Math.random() * 8); // 6-14 Gruppen
+		    
+		    for (let i = 0; i < numberOfGroups; i++) {
+		        let x, y;
+		        let attempts = 0;
+		        const maxAttempts = 10;
+
+		        do {
+		            // Nutze die Map-Dimensionen statt Spielerpositionen
+		            x = TILE_SIZE * (2 + Math.random() * (MAP_WIDTH - 4));  // 2 Tiles Abstand vom Rand
+		            y = TILE_SIZE * (2 + Math.random() * (MAP_HEIGHT - 4)); // 2 Tiles Abstand vom Rand
+		            attempts++;
+		        } while ((isColliding(x, y) || this.isTooCloseToSpawnPoint(x, y)) && attempts < maxAttempts);
+
+		        if (attempts < maxAttempts) {
+		            const groupSize = this.minGroupSize + 
+		                Math.floor(Math.random() * (this.maxGroupSize - this.minGroupSize));
+		            const formation = Math.random() < 0.5 ? this.getLineFormation() : this.getDefensiveFormation();
+		            this.spawnEnemyGroup(x, y, groupSize, formation);
+		        }
+		    }
+
+		    console.log('Initial enemies spawned:', enemies.length);
 		}
 
-		update() {
-			const currentTime = Date.now();
-			if (currentTime - this.lastSpanwTime > this.spawnInterval) {
-				this.spawnEnemiesAroundPlayers();
-				this.lastSpanwTime = currentTime;
-			}
+		// Neue Hilfsmethode um zu prüfen, ob die Position zu nah am Spawn ist
+		isTooCloseToSpawnPoint(x, y) {
+		    // Position des wahrscheinlichen Spieler-Spawns (z.B. Kartenrand oder spezielle Spawn-Zonen)
+		    const spawnAreas = [
+		        { x: TILE_SIZE * 2, y: TILE_SIZE * 2 },                    // Obere linke Ecke
+		        { x: TILE_SIZE * (MAP_WIDTH - 2), y: TILE_SIZE * 2 },      // Obere rechte Ecke
+		        { x: TILE_SIZE * 2, y: TILE_SIZE * (MAP_HEIGHT - 2) },     // Untere linke Ecke
+		        { x: TILE_SIZE * (MAP_WIDTH - 2), y: TILE_SIZE * (MAP_HEIGHT - 2) } // Untere rechte Ecke
+		    ];
+
+		    // Mindestabstand zum Spawn (z.B. 5 Tile-Längen)
+		    const minSpawnDistance = TILE_SIZE * 5;
+
+		    // Prüfe Abstand zu allen möglichen Spawn-Bereichen
+		    return spawnAreas.some(spawnPoint => 
+		        Math.hypot(x - spawnPoint.x, y - spawnPoint.y) < minSpawnDistance
+		    );
 		}
 
-		// Für das initiale Spawnen von Feinden
-		spawnEnemies() {
-			enemies = [];
+	    spawnGroupsAtStrategicLocations() {
+	        // Finde strategische Positionen auf der Karte
+	        const strategicLocations = this.findStrategicLocations();
+	        
+	        strategicLocations.forEach(location => {
+	            const groupSize = this.minGroupSize + 
+	                Math.floor(Math.random() * (this.maxGroupSize - this.minGroupSize));
+	            
+	            // Wähle Formation basierend auf Position
+	            let formation;
+	            if (location.type === 'village') {
+	                formation = this.getDefensiveFormation();
+	            } else if (location.type === 'road') {
+	                formation = this.getPatrolFormation();
+	            } else {
+	                formation = this.getLineFormation();
+	            }
+	            
+	            this.spawnEnemyGroup(location.x, location.y, groupSize, formation);
+	        });
+	    }
 
-			const numberOfGroups = 10 + Math.floor(Math.random() * 15); // Zufällige Anzahl von Gruppen
+	    findStrategicLocations() {
+	        const locations = [];
+	        
+	        // Suche Dörfer
+	        const villageTiles = MapGenerator.findTilesByType(map, TILE_TYPES.VILLAGE_CENTER);
+	        villageTiles.forEach(tile => {
+	            locations.push({
+	                x: tile.x * TILE_SIZE,
+	                y: tile.y * TILE_SIZE,
+	                type: 'village'
+	            });
+	        });
+	        
+	        // Suche wichtige Straßenkreuzungen
+	        const roadTiles = MapGenerator.findTilesByType(map, TILE_TYPES.ROAD);
+	        // TODO: Implementiere Logik zur Erkennung von Straßenkreuzungen
+	        
+	        return locations;
+	    }
 
-			for (let i = 0; i < numberOfGroups; i++) {
-				let x, y;
-				do {
-					x = Math.random() * MAP_WIDTH * TILE_SIZE;
-					y = Math.random() * MAP_HEIGHT * TILE_SIZE;
-				} while (isColliding(x, y) || isInPlayerSight(x, y));
+	    getLineFormation() {
+	        return {
+	            type: 'line',
+	            getPosition: (index, total, center) => {
+	                const spread = this.groupSpread.min + 
+	                    Math.random() * (this.groupSpread.max - this.groupSpread.min);
+	                const offset = (index - (total - 1) / 2) * (spread / total);
+	                return {
+	                    x: center.x + offset,
+	                    y: center.y
+	                };
+	            }
+	        };
+	    }
 
-				// Spawn als Gruppe
-				const groupSize = 2 + Math.floor(Math.random() * 4); // Zufällige Gruppengröße
-				const groupFormation = Math.random() < 0.5 ? 'line' : 'circle'; // Zufällige Formation
-				this.spawnEnemyGroup(x, y, groupSize, groupFormation);
-			}
+	    getDefensiveFormation() {
+	        return {
+	            type: 'circle',
+	            getPosition: (index, total, center) => {
+	                const angle = (Math.PI * 2 * index) / total;
+	                const spread = this.groupSpread.min + 
+	                    Math.random() * (this.groupSpread.max - this.groupSpread.min);
+	                return {
+	                    x: center.x + Math.cos(angle) * spread,
+	                    y: center.y + Math.sin(angle) * spread
+	                };
+	            }
+	        };
+	    }
 
-			console.log('Enemies spawned:', enemies.length);
-		}
+	    getPatrolFormation() {
+	        return {
+	            type: 'patrol',
+	            getPosition: (index, total, center) => {
+	                const spread = this.groupSpread.min;
+	                const row = Math.floor(index / 2);
+	                const col = index % 2;
+	                return {
+	                    x: center.x + (col * 2 - 1) * spread,
+	                    y: center.y + row * spread
+	                };
+	            }
+	        };
+	    }
 
-		spawnEnemyGroup(centerX, centerY, groupSize = 5, formation = 'circle') {
-			const group = [];
-			const radius = 50; // Abstand der Gegner innerhalb der Gruppe
+	    spawnEnemyGroup(centerX, centerY, groupSize, formation) {
+	        const group = [];
+	        // Commander ist jetzt häufiger der erste in der Gruppe
+	        const commanderId = Math.random() < 0.7 ? 0 : Math.floor(Math.random() * groupSize);
 
-			const commanderId = Math.floor(Math.random() * groupSize);
-			for (let i = 0; i < groupSize; i++) {
-				let angle = 0;
-				let offsetX = 0;
-				let offsetY = 0;
+	        for (let i = 0; i < groupSize; i++) {
+	            const pos = formation.getPosition(i, groupSize, {x: centerX, y: centerY});
 
-				if (formation === 'circle') {
-					angle = (Math.PI * 2 / groupSize) * i;
-					offsetX = Math.cos(angle) * radius;
-					offsetY = Math.sin(angle) * radius;
-				} else if (formation === 'line') {
-					offsetX = (i - Math.floor(groupSize / 2)) * (TILE_SIZE / 2);
-					offsetY = 0;
-				}
+	            if (!isColliding(pos.x, pos.y) && !isInPlayerSight(pos.x, pos.y)) {
+	                const enemy = new Enemy(pos.x, pos.y, i === commanderId);
+	                // Setze spezielle Gruppeneigenschaften
+	                enemy.groupId = Date.now(); // Unique Gruppen-ID
+	                enemy.groupRole = i === commanderId ? 'commander' : 'soldier';
+	                group.push(enemy);
+	                enemies.push(enemy);
+	            }
+	        }
 
-				const x = centerX + offsetX;
-				const y = centerY + offsetY;
+	        return group;
+	    }
 
-				if (!isColliding(x, y) && !isInPlayerSight(x, y)) {
-					const enemy = new Enemy(x, y, i === commanderId);
-					group.push(enemy);
-					enemies.push(enemy);
-				}
-			}
+	    spawnEnemiesAroundPlayers() {
+	        const spawnGroups = 2; // Anzahl der Gruppen pro Spawn-Zyklus
 
-			return group;
-		}
+	        for (let i = 0; i < spawnGroups; i++) {
+	            const player = players[Math.floor(Math.random() * players.length)];
+	            let x, y;
+	            let attempts = 0;
+	            const maxAttempts = 10;
 
-		spawnEnemiesAroundPlayers() {
-			const maxEnemies = 150; // Maximale Anzahl von Gegnern auf der Map
-			if (enemies.length >= maxEnemies) return;
+	            do {
+	                const angle = Math.random() * Math.PI * 2;
+	                const distance = this.spawnDistance.min + 
+	                    Math.random() * (this.spawnDistance.max - this.spawnDistance.min);
+	                x = player.x + Math.cos(angle) * distance;
+	                y = player.y + Math.sin(angle) * distance;
+	                attempts++;
+	            } while ((isColliding(x, y) || isInPlayerSight(x, y)) && attempts < maxAttempts);
 
-			const spawnGroups = 2; // Anzahl der Gruppen pro Spawn-Zyklus
+	            if (attempts < maxAttempts) {
+	                const groupSize = this.minGroupSize + 
+	                    Math.floor(Math.random() * (this.maxGroupSize - this.minGroupSize));
+	                const formation = Math.random() < 0.5 ? this.getLineFormation() : this.getDefensiveFormation();
+	                this.spawnEnemyGroup(x, y, groupSize, formation);
+	            }
+	        }
+	    }
 
-			for (let i = 0; i < spawnGroups; i++) {
-				const player = players[Math.floor(Math.random() * players.length)];
-				let x, y;
-				let attempts = 0;
-
-				do {
-					const angle = Math.random() * Math.PI * 2;
-					const distance = MIN_SPAWN_DISTANCE + Math.random() * 300;
-					x = player.x + Math.cos(angle) * distance;
-					y = player.y + Math.sin(angle) * distance;
-					attempts++;
-				} while ((isColliding(x, y) || isInPlayerSight(x, y)) && attempts < 10);
-
-				if (attempts < 10) {
-					const groupSize = 2 + Math.floor(Math.random() * 4);
-					const groupFormation = Math.random() < 0.5 ? 'line' : 'circle';
-					this.spawnEnemyGroup(x, y, groupSize, groupFormation);
-				}
-			}
-		}
+	    cleanupDeadEnemies() {
+	        const maxCleanupDistance = SIGHT_RADIUS * 3; // Entfernung für Aufräumen
+	        
+	        enemies = enemies.filter(enemy => {
+	            if (!enemy.isAlive) {
+	                // Prüfe Entfernung zu allen Spielern
+	                const tooFarFromAllPlayers = players.every(player => 
+	                    Math.hypot(player.x - enemy.x, player.y - enemy.y) > maxCleanupDistance
+	                );
+	                return !tooFarFromAllPlayers;
+	            }
+	            return true;
+	        });
+	    }
 	}
 
 	class Mission {
@@ -2143,7 +2281,20 @@
 	        this.vehicleSearchRadius = 400;
 	        this.lastVehicleCheck = Date.now();
 	        this.vehicleCheckCooldown = 2000;
+    
+		    // Ausrüstung
+		    this.equipment = new Set();
+		    if (Math.random() < 0.3) this.equipment.add('schutzweste');
+		    if (Math.random() < 0.2) this.equipment.add('tarnanzug');
+		    
+		    // Waffe
+		    this.weapon = this.getRandomWeapon();
 	    }
+
+		getRandomWeapon() {
+			const weapons = ['Pistole', 'Maschinengewehr', 'Schrotflinte'];
+			return weapons[Math.floor(Math.random() * weapons.length)];
+		}
 
 	    update() {
 	        if (!this.isAlive) {
@@ -2569,27 +2720,40 @@
 		    }
 		}
 
+		findSuitableVehicle() {
+		    return vehicles.find(vehicle => 
+		        !vehicle.isDestroyed &&
+		        vehicle.passengers.length === 0 && // Nur leere Fahrzeuge
+		        !vehicle.passengers.some(p => p instanceof Player) && // Keine Spielerfahrzeuge
+		        Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
+		        (!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
+		        !this.isVehicleInDanger(vehicle)
+		    );
+		}
+
 	    updateVehicleBehavior() {
-	        const currentTime = Date.now();
+		    const currentTime = Date.now();
 
-	        // Regelmäßig nach Fahrzeugen suchen
-	        if (currentTime - this.lastVehicleCheck > this.vehicleCheckCooldown) {
-	            this.lastVehicleCheck = currentTime;
+		    // Regelmäßig nach Fahrzeugen suchen
+		    if (currentTime - this.lastVehicleCheck > this.vehicleCheckCooldown) {
+		        this.lastVehicleCheck = currentTime;
 
-	            // Suche nach Fahrzeugen wenn eine Bedrohung durch Fahrzeuge bekannt ist
-	            if (this.shouldSearchForVehicle()) {
-	                const nearbyVehicle = this.findSuitableVehicle();
-	                if (nearbyVehicle) {
-	                    this.enterVehicle(nearbyVehicle);
-	                }
-	            }
-	        }
+		        // Suche nach Fahrzeugen wenn eine Bedrohung durch Fahrzeuge bekannt ist
+		        if (this.shouldSearchForVehicle()) {
+		            const nearbyVehicle = this.findSuitableVehicle();
+		            if (nearbyVehicle) {
+		                // Statt enterVehicle die vorhandene addPassenger-Methode nutzen
+		                nearbyVehicle.addPassenger(this);
+		                this.currentVehicle = nearbyVehicle;
+		            }
+		        }
+		    }
 
-	        // Wenn in einem Fahrzeug
-	        if (this.currentVehicle) {
-	            this.updateVehicleCombat();
-	        }
-	    }
+		    // Wenn in einem Fahrzeug
+		    if (this.currentVehicle) {
+		        this.updateVehicleCombat();
+		    }
+		}
 
 	    shouldSearchForVehicle() {
 	        // Suche nach Fahrzeug wenn:
@@ -2604,12 +2768,13 @@
 	        return enemyVehicleNearby || needsEvacuation || needsMobility;
 	    }
 
-	    isEnemyVehicleNearby() {
-	        return players.some(player => 
-	            player.vehicle &&
-	            Math.hypot(player.x - this.x, player.y - this.y) < this.vehicleSearchRadius
-	        );
-	    }
+		isEnemyVehicleNearby() {
+			return players.some(player => 
+				player.vehicle &&
+				!player.vehicle.isDestroyed &&
+				Math.hypot(player.x - this.x, player.y - this.y) < this.vehicleSearchRadius
+			);
+		}
 
 	    findSuitableVehicle() {
 	        return vehicles.find(vehicle => 
@@ -2812,40 +2977,88 @@
 		}
 
 		generatePatrolPoints() {
-			const points = [];
-			const patrolRadius = 200;
+		    const points = [];
+		    const patrolRadius = 200;
 
-			switch (this.patrolType) {
-				case 'linear':
-					// Linie mit zwei Punkten
-					points.push({x: this.x - patrolRadius, y: this.y});
-					points.push({x: this.x + patrolRadius, y: this.y});
-					break;
+		    // Wichtig: Prüfe ob die Punkte überhaupt erreichbar sind BEVOR wir sie zurückgeben
+		    const generateValidPoint = (baseX, baseY, offsetX, offsetY) => {
+		        const x = baseX + offsetX;
+		        const y = baseY + offsetY;
+		        // Prüfe nicht nur Kollision, sondern auch ob der Weg dorthin frei ist
+		        if (!isColliding(x, y) && !lineOfSightBlocked(this.x, this.y, x, y)) {
+		            return {x, y};
+		        }
+		        return null;
+		    };
 
-				case 'circular':
-					// Kreis mit mehreren Punkten
-					for (let i = 0; i < 6; i++) {
-						const angle = (Math.PI * 2 * i) / 6;
-						points.push({
-							x: this.x + Math.cos(angle) * patrolRadius,
-							y: this.y + Math.sin(angle) * patrolRadius
-						});
-					}
-					break;
+		    switch (this.patrolType) {
+		        case 'linear':
+		            // Versuche alternative Punkte wenn die ursprünglichen nicht gehen
+		            let leftPoint = generateValidPoint(this.x, this.y, -patrolRadius, 0);
+		            let rightPoint = generateValidPoint(this.x, this.y, patrolRadius, 0);
+		            
+		            if (!leftPoint || !rightPoint) {
+		                // Versuche vertikale Patrouillenroute
+		                leftPoint = generateValidPoint(this.x, this.y, 0, -patrolRadius);
+		                rightPoint = generateValidPoint(this.x, this.y, 0, patrolRadius);
+		            }
 
-				case 'random':
-					// Zufällige Punkte
-					for (let i = 0; i < 4; i++) {
-						points.push({
-							x: this.x + (Math.random() - 0.5) * patrolRadius * 2,
-							y: this.y + (Math.random() - 0.5) * patrolRadius * 2
-						});
-					}
-					break;
-			}
+		            if (leftPoint) points.push(leftPoint);
+		            if (rightPoint) points.push(rightPoint);
+		            break;
 
-			// Punkte filtern, die nicht erreichbar sind
-			return points.filter(p => !isColliding(p.x, p.y));
+		        case 'circular':
+		            // Generiere mehrere mögliche Punkte und nutze die validen
+		            for (let i = 0; i < 6; i++) {
+		                const angle = (Math.PI * 2 * i) / 6;
+		                const point = generateValidPoint(
+		                    this.x, 
+		                    this.y,
+		                    Math.cos(angle) * patrolRadius,
+		                    Math.sin(angle) * patrolRadius
+		                );
+		                if (point) points.push(point);
+		            }
+		            break;
+
+		        case 'random':
+		            // Generiere genug valide Punkte
+		            let attempts = 0;
+		            while (points.length < 4 && attempts < 20) {
+		                const point = generateValidPoint(
+		                    this.x,
+		                    this.y,
+		                    (Math.random() - 0.5) * patrolRadius * 2,
+		                    (Math.random() - 0.5) * patrolRadius * 2
+		                );
+		                if (point) points.push(point);
+		                attempts++;
+		            }
+		            break;
+		    }
+
+		    // Wenn keine Punkte gefunden wurden, erstelle wenigstens einen nahen Punkt
+		    if (points.length === 0) {
+		        for (let radius = 50; radius <= patrolRadius; radius += 50) {
+		            let found = false;
+		            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+		                const point = generateValidPoint(
+		                    this.x,
+		                    this.y,
+		                    Math.cos(angle) * radius,
+		                    Math.sin(angle) * radius
+		                );
+		                if (point) {
+		                    points.push(point);
+		                    found = true;
+		                    break;
+		                }
+		            }
+		            if (found) break;
+		        }
+		    }
+
+		    return points;
 		}
 
 		updatePatrol() {
@@ -3098,35 +3311,61 @@
 		}
 
 		canSee(player) {
-			if (!player.isAlive) return false;
+		    if (!player.isAlive) return false;
 
-			const dx = player.x - this.x;
-			const dy = player.y - this.y;
-			const dist = Math.hypot(dx, dy);
-			
-			// Basis-Sichtweite mit Tarnmodifikator
-			const modifiedViewDistance = this.viewDistance * player.stealthStatus.detectionModifier;
-			
-			if (dist > modifiedViewDistance) return false;
+		    const dx = player.x - this.x;
+		    const dy = player.y - this.y;
+		    const dist = Math.hypot(dx, dy);
+		    
+		    // Basis-Sichtweite mit Tarnmodifikator
+		    const modifiedViewDistance = this.viewDistance * player.stealthStatus.detectionModifier;
+		    
+		    if (dist > modifiedViewDistance) return false;
 
-			// Sichtwinkel-Check
-			const angleToPlayer = Math.atan2(dy, dx);
-			let angleDifference = angleToPlayer - this.angle;
-			angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
-			
-			// Erweiterter Sichtwinkel wenn der Spieler sich bewegt oder kürzlich geschossen hat
-			const viewAngleModifier = player.stealthStatus.detectionModifier > 0.5 ? 1.5 : 1.0;
-			if (Math.abs(angleDifference) > this.viewAngle * viewAngleModifier / 2) return false;
+		    // Präziserer Sichtwinkel-Check
+		    const angleToPlayer = Math.atan2(dy, dx);
+		    let angleDifference = angleToPlayer - this.angle;
+		    angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
 
-			// Hindernischeck
-			if (lineOfSightBlocked(this.x, this.y, player.x, player.y)) return false;
+		    // Engerer Sichtwinkel und zusätzliche Checks
+		    const effectiveViewAngle = this.viewAngle * 
+		        (this.alertness === 'combat' ? 1.2 : 0.8); // Im Kampf aufmerksamer
+		    
+		    if (Math.abs(angleDifference) > effectiveViewAngle / 2) return false;
 
-			// Zusätzliche Wahrscheinlichkeitsberechnung für getarnte Spieler
-			if (player.stealthStatus.isCamouflaged && Math.random() > player.stealthStatus.detectionModifier) {
-				return false;
-			}
+		    // Mehrere Sichtlinien-Checks für breitere Objekte
+		    const checkPoints = [
+		        {x: player.x, y: player.y}, // Zentrum
+		        {x: player.x - player.size/2, y: player.y}, // Links
+		        {x: player.x + player.size/2, y: player.y}, // Rechts
+		        {x: player.x, y: player.y - player.size/2}, // Oben
+		        {x: player.x, y: player.y + player.size/2}  // Unten
+		    ];
 
-			return true;
+		    // Wenn mindestens einer der Punkte sichtbar ist
+		    const visiblePoints = checkPoints.filter(point => 
+		        !lineOfSightBlocked(this.x, this.y, point.x, point.y)
+		    );
+
+		    if (visiblePoints.length === 0) return false;
+
+		    // Zusätzliche Wahrscheinlichkeitsberechnung für getarnte Spieler
+		    if (player.stealthStatus.isCamouflaged) {
+		        // Je mehr Punkte sichtbar sind, desto wahrscheinlicher die Erkennung
+		        const detectionChance = player.stealthStatus.detectionModifier * 
+		            (visiblePoints.length / checkPoints.length);
+		        if (Math.random() > detectionChance) {
+		            return false;
+		        }
+		    }
+
+		    // Bewegungsbasierte Erkennung
+		    const playerMoving = player.speed > 0;
+		    if (playerMoving && dist < modifiedViewDistance * 0.8) {
+		        return true; // Bewegung macht sehr sichtbar auf kurze Distanz
+		    }
+
+		    return true;
 		}
 
 		canHear(player) {
@@ -3160,60 +3399,129 @@
 		}
 
 		draw() {
-			if (!this.isAlive) {
-				ctx.save();
-				ctx.translate(this.x, this.y);
-				ctx.rotate(Math.PI / 2); // Umfallen
-				ctx.fillStyle = this.color;
-				ctx.fillRect(-15, -15, 30, 30);
-				ctx.restore();
-				return;
-			}
+		    if (!this.isAlive) {
+		        ctx.save();
+		        ctx.translate(this.x, this.y);
+		        ctx.rotate(Math.PI / 2); // Umfallen
+		        ctx.fillStyle = this.color;
+		        ctx.fillRect(-15, -15, 30, 30);
+		        ctx.restore();
+		        return;
+		    }
 
-			// Sichtfeld zeichnen
-			this.drawVisionCone();
+		    // Sichtfeld zeichnen
+		    this.drawVisionCone();
 
-			// Gegner selbst zeichnen
-			ctx.save();
-			ctx.translate(this.x, this.y);
-			ctx.rotate(this.angle);
+		    // Gegner selbst zeichnen
+		    ctx.save();
+		    ctx.translate(this.x, this.y);
+		    ctx.rotate(this.angle);
 
-			// Körper
-			ctx.fillStyle = this.color;
-			ctx.fillRect(-15, -15, 30, 30);
+		    // Körper
+		    ctx.fillStyle = this.color;
+		    ctx.fillRect(-15, -15, 30, 30);
 
-			// Waffe zeichnen
-			ctx.fillStyle = 'black';
-			if (this.weapon === 'Pistole') {
-				ctx.fillRect(0, -5, 15, 5);
-			} else if (this.weapon === 'Maschinengewehr') {
-				ctx.fillRect(0, -5, 20, 5);
-			} else if (this.weapon === 'Schrotflinte') {
-				ctx.fillRect(0, -5, 25, 5);
-			}
+		    // Ausrüstung zeichnen (analog zum Player)
+		    if (this.equipment.has('schutzweste')) {
+		        ctx.fillStyle = 'gray';
+		        ctx.fillRect(-10, -10, 20, 20);
+		    }
+		    if (this.equipment.has('tarnanzug')) {
+		        ctx.strokeStyle = 'green';
+		        ctx.strokeRect(-15, -15, 30, 30);
+		        this.drawCamouflagePattern(ctx, 'camo', -15, -15, 30, 30);
+		    }
 
-			// Status-Indikator zeichnen
-			if (this.alertness !== 'patrol') {
-				ctx.beginPath();
-				ctx.arc(0, -25, 5, 0, Math.PI * 2);
-				switch(this.alertness) {
-					case 'suspicious':
-						ctx.fillStyle = 'yellow';
-						break;
-					case 'alert':
-						ctx.fillStyle = 'orange';
-						break;
-					case 'combat':
-						ctx.fillStyle = 'red';
-						break;
-				}
-				ctx.fill();
-			}
+		    // Waffe detaillierter zeichnen
+		    ctx.fillStyle = 'black';
+		    switch (this.weapon) {
+		        case 'Pistole':
+		            ctx.fillRect(0, -5, 15, 5);
+		            break;
+		        case 'Maschinengewehr':
+		            ctx.fillRect(0, -5, 20, 5);
+		            // Zusätzliche Details
+		            ctx.fillRect(15, -7, 5, 9);  // Mündung
+		            break;
+		        case 'Schrotflinte':
+		            ctx.fillRect(0, -5, 25, 5);
+		            // Zusätzliche Details
+		            ctx.fillRect(20, -6, 5, 7);  // Mündung
+		            break;
+		        case 'Pistole mit Schalldämpfer':
+		            ctx.fillRect(0, -5, 20, 5);  // Längerer Lauf
+		            ctx.fillRect(15, -6, 7, 7);  // Schalldämpfer
+		            break;
+		    }
 
-			ctx.restore();
+		    // Status-Indikator zeichnen
+		    if (this.alertness !== 'patrol') {
+		        ctx.beginPath();
+		        ctx.arc(0, -25, 5, 0, Math.PI * 2);
+		        switch(this.alertness) {
+		            case 'suspicious':
+		                ctx.fillStyle = 'yellow';
+		                break;
+		            case 'alert':
+		                ctx.fillStyle = 'orange';
+		                break;
+		            case 'combat':
+		                ctx.fillStyle = 'red';
+		                break;
+		        }
+		        ctx.fill();
+		    }
 
-			// Lebensanzeige
-			this.drawHealthBar();
+		    // Commander-Markierung falls zutreffend
+		    if (this.isCommander) {
+		        ctx.strokeStyle = 'gold';
+		        ctx.lineWidth = 2;
+		        ctx.strokeRect(-18, -18, 36, 36);
+		    }
+
+		    ctx.restore();
+
+		    // Lebensanzeige
+		    this.drawHealthBar();
+		}
+
+		drawCamouflagePattern(ctx, pattern, x, y, w, h) {
+		    if (pattern === 'camo') {
+		        const colors = ['#4B5320', '#2F4F2F'];
+		        
+		        // Hintergrund
+		        ctx.fillStyle = '#556B2F';
+		        ctx.fillRect(x, y, w, h);
+		        
+		        // Tarnflecken
+		        ctx.fillStyle = colors[0];
+		        ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
+		        
+		        ctx.fillStyle = colors[1];
+		        ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
+		    }
+		}
+
+		drawHealthBar() {
+		    ctx.save();
+		    ctx.fillStyle = 'black';
+		    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+		    
+		    // Farbe basierend auf Gesundheit
+		    if (this.health > 60) ctx.fillStyle = 'lime';
+		    else if (this.health > 30) ctx.fillStyle = 'yellow';
+		    else ctx.fillStyle = 'red';
+		    
+		    const healthPercentage = Math.max(this.health / 100, 0);
+		    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+		    
+		    // Optionale Statuseffekte
+		    if (this.isRetreating) {
+		        ctx.fillStyle = 'white';
+		        ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
+		    }
+		    
+		    ctx.restore();
 		}
 
 		drawVisionCone() {
@@ -3236,16 +3544,6 @@
 			ctx.lineWidth = 2;
 			ctx.stroke();
 
-			ctx.restore();
-		}
-
-		drawHealthBar() {
-			ctx.save();
-			ctx.fillStyle = 'black';
-			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-			ctx.fillStyle = this.health > 30 ? 'lime' : 'red';
-			const healthPercentage = Math.max(this.health / 100, 0);
-			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
 			ctx.restore();
 		}
 	}
@@ -3865,7 +4163,7 @@
 
 			// Turm-Steuerung für den Schützen
 			const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
-			if (gunner) {
+			if (gunner && gunner.controls) {
 				// Turm mit A/D oder J/L drehen (je nach Spieler)
 				if (keys[gunner.controls.left]) this.turretAngle -= 0.05;
 				if (keys[gunner.controls.right]) this.turretAngle += 0.05;
@@ -4487,10 +4785,11 @@
 	function initGame() {
 		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
 		map = mapGenerator.generateMap();
+		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
+
 		generateMissions();
 		enemySpawner.spawnEnemies();
 		spawnVehicles();
-		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
 
 		// Spawn players at safe positions near each other
 		players = [];
