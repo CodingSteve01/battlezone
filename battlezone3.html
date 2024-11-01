@@ -1884,6 +1884,16 @@
 		}, duration);
 	}
 
+	const WATER_MECHANICS = {
+	    SWIM_SPEED: 1.2,           // Schwimmgeschwindigkeit (multiplier)
+	    MAX_SWIM_TIME: 60000,      // 1 Minute maximale Schwimmzeit
+	    VEHICLE_SINK_TIME: 15000,  // 15 Sekunden bis Fahrzeug versinkt
+	    VEHICLE_SINK_DAMAGE: 1,    // Schaden pro Frame im tiefen Wasser
+	    STAMINA_DRAIN: 0.5,        // Ausdauerverlust pro Frame beim Schwimmen
+	    STAMINA_REGEN: 0.2,        // Ausdauer-Regeneration pro Frame an Land
+	    DROWNING_DAMAGE: 1         // Schaden pro Frame wenn Ausdauer leer
+	};
+
 	// Klassen
 	class GameObject {
 		constructor(x, y, size, color) {
@@ -1898,6 +1908,60 @@
 			this.mass = size * size * 0.1; // Basis-Masse basierend auf Größe
 			this.momentum = {x: 0, y: 0};
 			this.elasticity = 0.3; // Wie elastisch Kollisionen sind
+			
+	        this.swimming = false;
+	        this.stamina = 100;
+	        this.swimStartTime = 0;
+		}
+
+		updateWaterPhysics() {
+			const currentTile = map.getTile(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE));
+			const wasSwimming = this.swimming;
+			
+			if (currentTile) {
+				this.swimming = currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER';
+				
+				if (this.swimming && !wasSwimming) {
+					this.swimStartTime = Date.now();
+					this.onEnterWater();
+				} else if (!this.swimming && wasSwimming) {
+					this.onExitWater();
+				}
+				
+				if (this.swimming) {
+					this.handleSwimming(currentTile.type);
+				} else {
+					this.stamina = Math.min(100, this.stamina + WATER_MECHANICS.STAMINA_REGEN);
+				}
+			}
+		}
+
+		handleSwimming(waterType) {
+			// Ausdauer verringern
+			this.stamina = Math.max(0, this.stamina - WATER_MECHANICS.STAMINA_DRAIN);
+			
+			// Wenn Ausdauer leer, Schaden nehmen
+			if (this.stamina <= 0) {
+				this.health -= WATER_MECHANICS.DROWNING_DAMAGE;
+				if (this.health <= 0) {
+					this.isAlive = false;
+				}
+			}
+			
+			// Geschwindigkeit im Wasser anpassen
+			if (waterType === 'DEEP_WATER') {
+				this.speed = this.baseSpeed * WATER_MECHANICS.SWIM_SPEED * 0.7;
+			} else {
+				this.speed = this.baseSpeed * WATER_MECHANICS.SWIM_SPEED;
+			}
+		}
+
+		onEnterWater() {
+			// Kann von Unterklassen überschrieben werden
+		}
+
+		onExitWater() {
+			// Kann von Unterklassen überschrieben werden
 		}
 
 		draw() {
@@ -1908,7 +1972,22 @@
 				this.size,
 				this.size
 			);
+
+	        if (this.swimming) {
+	            this.drawSwimmingEffect();
+	        }
 		}
+
+	    drawSwimmingEffect() {
+	        ctx.save();
+	        // Welleneffekt um die Einheit
+	        ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
+	        ctx.beginPath();
+	        const waveOffset = Math.sin(Date.now() * 0.005) * 3;
+	        ctx.arc(this.x, this.y + waveOffset, this.size * 0.6, 0, Math.PI * 2);
+	        ctx.stroke();
+	        ctx.restore();
+	    }
 	}
 
 	class Inventory {
@@ -2077,6 +2156,21 @@
 		update() {
 			if (!this.isAlive) return;
 
+			// Check current tile type
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map.getTile(tileX, tileY);
+
+			// Adjust speed based on water
+			let speedMultiplier = 1;
+			if (currentTile) {
+				if (currentTile.type === 'DEEP_WATER') {
+					speedMultiplier = 0.3; // Sehr langsam in tiefem Wasser
+				} else if (currentTile.type === 'SHALLOW_WATER') {
+					speedMultiplier = 0.6; // Langsamer in flachem Wasser
+				}
+			}
+
 			// Waffen-Updates
 			const currentWeapon = this.inventory.getSelectedItem();
 			if (currentWeapon instanceof Weapon) {
@@ -2112,22 +2206,23 @@
 			if (keys[this.controls.down]) dy += 1;
 			if (keys[this.controls.left]) dx -= 1;
 			if (keys[this.controls.right]) dx += 1;
-
+			
 			if (dx !== 0 || dy !== 0) {
-				const length = Math.hypot(dx, dy);
-				dx /= length;
-				dy /= length;
+		        const length = Math.hypot(dx, dy);
+		        dx /= length;
+		        dy /= length;
 
-				const newX = this.x + dx * this.speed;
-				const newY = this.y + dy * this.speed;
+		        const adjustedSpeed = this.speed * speedMultiplier;
+		        const newX = this.x + dx * adjustedSpeed;
+		        const newY = this.y + dy * adjustedSpeed;
 
-				if (!isColliding(newX, newY, this)) {
-					this.x = newX;
-					this.y = newY;
-				}
+		        if (!isColliding(newX, newY, this)) {
+		            this.x = newX;
+		            this.y = newY;
+		        }
 
-				this.angle = Math.atan2(dy, dx);
-			}
+		        this.angle = Math.atan2(dy, dx);
+		    }
 
 			// Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
 			const weaponRange = currentWeapon ? currentWeapon.range : 100;
@@ -2153,9 +2248,6 @@
 
 			// Prüfen ob der Spieler sich auf Gras befindet
 			const isMoving = dx != 0 || dy != 0;
-			const tileX = Math.floor(this.x / TILE_SIZE);
-			const tileY = Math.floor(this.y / TILE_SIZE);
-			const currentTile = map.getTile(tileX, tileY);
 
             // Tarneffekt nur auf Gras und mit Tarnanzug
 			if (this.equipment.has('tarnanzug')) {
@@ -2427,7 +2519,50 @@
 		}
 
 		draw() {
-			if (this.vehicle && this.vehicle.isClosed) return; // Spieler nicht rendern, wenn in geschlossenem Fahrzeug
+			if (this.vehicle) return; // Spieler nicht rendern, wenn in Fahrzeug
+
+		    const tileX = Math.floor(this.x / TILE_SIZE);
+		    const tileY = Math.floor(this.y / TILE_SIZE);
+		    const currentTile = map.getTile(tileX, tileY);
+		    const isInWater = currentTile && 
+		        (currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER');
+
+			if (isInWater) {
+				// Wasser-Effekt
+				ctx.save();
+				
+				// Welleneffekt
+				const waveHeight = Math.sin(Date.now() * 0.005) * 3;
+				const waterLine = this.y + waveHeight;
+				
+				// Wasserlinien
+				ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+
+				// Wellenmuster links und rechts vom Charakter
+				for (let i = -2; i <= 2; i++) {
+					const xOffset = i * 10;
+					const yOffset = Math.sin((Date.now() * 0.005) + i) * 3;
+					ctx.moveTo(this.x + xOffset - 15, waterLine + yOffset);
+					ctx.lineTo(this.x + xOffset + 15, waterLine + yOffset);
+				}
+				ctx.stroke();
+
+				// Wasserspritzer (kleine Kreise)
+				if (this.speed > 0.1) {  // Nur wenn Bewegung
+					ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
+					for (let i = 0; i < 3; i++) {
+						const splashX = this.x + (Math.random() - 0.5) * 30;
+						const splashY = waterLine + (Math.random() - 0.5) * 10;
+						ctx.beginPath();
+						ctx.arc(splashX, splashY, 2, 0, Math.PI * 2);
+						ctx.fill();
+					}
+				}
+
+				ctx.restore();
+			}
 
 			ctx.save();
 			ctx.translate(this.x, this.y);
@@ -2610,6 +2745,9 @@
 
 			// Waffe
 			this.weapon = this.getRandomWeapon();
+        
+	        // Erweitere pathfinding um Wassermeidung
+	        this.waterAvoidance = 0.8; // 80% Chance Wasser zu meiden
 		}
 
 		getRandomWeapon() {
@@ -2627,6 +2765,25 @@
 				}
 				return;
 			}
+
+			// Check current tile type
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map.getTile(tileX, tileY);
+
+			// Adjust speed based on water
+			let speedMultiplier = 1;
+			if (currentTile) {
+				if (currentTile.type === 'DEEP_WATER') {
+					speedMultiplier = 0.3;
+				} else if (currentTile.type === 'SHALLOW_WATER') {
+					speedMultiplier = 0.6;
+				}
+			}
+
+			// Apply speed multiplier to all movement
+			const originalSpeed = this.speed;
+			this.speed *= speedMultiplier;
 
 			// Update Verbündeten-Netzwerk
 			this.updateAllyNetwork();
@@ -2655,6 +2812,8 @@
 
 			// Fahrzeug-Management
 			this.updateVehicleBehavior();
+			
+			this.speed = originalSpeed;
 		}
 
 		analyzeSituation() {
@@ -3772,6 +3931,49 @@
 				return;
 			}
 
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map.getTile(tileX, tileY);
+			const isInWater = currentTile && 
+				(currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER');
+
+			if (isInWater) {
+				// Wasser-Effekt
+				ctx.save();
+				
+				// Welleneffekt
+				const waveHeight = Math.sin(Date.now() * 0.005) * 3;
+				const waterLine = this.y + waveHeight;
+				
+				// Wasserlinien
+				ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+
+				// Wellenmuster links und rechts vom Charakter
+				for (let i = -2; i <= 2; i++) {
+					const xOffset = i * 10;
+					const yOffset = Math.sin((Date.now() * 0.005) + i) * 3;
+					ctx.moveTo(this.x + xOffset - 15, waterLine + yOffset);
+					ctx.lineTo(this.x + xOffset + 15, waterLine + yOffset);
+				}
+				ctx.stroke();
+
+				// Wasserspritzer (kleine Kreise)
+				if (this.speed > 0.1) {  // Nur wenn Bewegung
+					ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
+					for (let i = 0; i < 3; i++) {
+						const splashX = this.x + (Math.random() - 0.5) * 30;
+						const splashY = waterLine + (Math.random() - 0.5) * 10;
+						ctx.beginPath();
+						ctx.arc(splashX, splashY, 2, 0, Math.PI * 2);
+						ctx.fill();
+					}
+				}
+
+				ctx.restore();
+			}
+
 			// Sichtfeld zeichnen
 			this.drawVisionCone();
 
@@ -4579,6 +4781,47 @@
 			this.wreckHeight = 0; // Für Rendering-Ordnung
 			this.lastCollisionTime = 0;
 			this.collisionCooldown = 100; // ms zwischen Kollisionsschäden
+	        this.baseSpeed = this.maxSpeed;
+	        this.sinkProgress = 0;
+	        this.waterDamage = 0;
+		}
+
+		updateWaterPhysics() {
+			super.updateWaterPhysics();
+			
+			if (this.swimming) {
+				const tile = map.getTile(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE));
+				
+				if (tile.type === 'DEEP_WATER') {
+					this.sinkProgress += 1000 / 60; // Fortschritt pro Frame
+					this.waterDamage += WATER_MECHANICS.VEHICLE_SINK_DAMAGE;
+					
+					if (this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
+						this.destroy();
+						return;
+					}
+					
+					// Verringere Geschwindigkeit basierend auf Sink-Fortschritt
+					this.maxSpeed = this.baseSpeed * (1 - this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME);
+					
+					// Warnung für Passagiere
+					if (this.sinkProgress > WATER_MECHANICS.VEHICLE_SINK_TIME * 0.7) {
+						this.passengers.forEach(passenger => {
+							showMessage("Fahrzeug sinkt! Sofort verlassen!", 1000);
+						});
+					}
+				}
+				
+				// Schaden am Fahrzeug
+				this.health -= this.waterDamage;
+				if (this.health <= 0) {
+					this.destroy();
+				}
+			} else {
+				// Regeneriere langsam wenn nicht im Wasser
+				this.sinkProgress = Math.max(0, this.sinkProgress - 500 / 60);
+				this.waterDamage = 0;
+			}
 		}
 
 		addPassenger(player) {
@@ -4980,6 +5223,10 @@
 		}
 
 		draw() {
+	        if (this.swimming) {
+	            this.drawSinkingEffect();
+	        }
+
 			if (this.isDestroyed) {
 				this.drawDestroyedVehicle();
 				return;
@@ -5006,6 +5253,21 @@
 
 			// Health bar ohne Rotation zeichnen
 			this.drawHealthBar();
+		}
+
+		drawSinkingEffect() {
+			if (this.sinkProgress > 0) {
+				const sinkRatio = this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME;
+				ctx.save();
+				// Wasserlinien-Effekt
+				ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
+				ctx.beginPath();
+				const waterLine = this.y - this.size / 2 + (this.size * sinkRatio);
+				ctx.moveTo(this.x - this.size / 2, waterLine);
+				ctx.lineTo(this.x + this.size / 2, waterLine);
+				ctx.stroke();
+				ctx.restore();
+			}
 		}
 
 		drawVehicleBody() {
