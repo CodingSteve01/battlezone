@@ -1061,46 +1061,126 @@
 	        return this.map;
 	    }
 
-	    generateHeightmap() {
-		    const scale = this.heightScale;
-		    const waterThreshold = 0.3; // Erhöht von 0.2, weniger Wasser
-		    const beachThreshold = 0.35; // Erhöht von 0.3
-		    const mountainThreshold = 0.8; // Unverändert
-		    const hillThreshold = 0.6; // Unverändert
+		generateHeightmap() {
+	        const scale = this.heightScale;
+	        const waterThreshold = 0.3;
+	        const beachThreshold = 0.35;
 
-		    for(let y = 0; y < this.height; y++) {
-		        for(let x = 0; x < this.width; x++) {
-		            // Basis-Höhenwert mit Perlin-Rauschen
-		            const heightValue = noise.perlin2(x * scale, y * scale);
-		            
-		            // Verstärkter Kontinental-Effekt
-		            const normalizedHeight = (heightValue + 1) / 2;
-		            
-		            // Angepasster Küstenlinien-Effekt für mehr Land
-		            const distanceToEdge = Math.min(
-		                x, y, this.width - x - 1, this.height - y - 1
-		            ) / Math.min(this.width, this.height);
-		            
-		            // Erhöhter Landanteil durch angepasste Gewichtung
-		            const finalHeight = normalizedHeight * (0.5 + 0.5 * distanceToEdge);
+	        // Erste Phase: Basis-Heightmap generieren
+	        let heightMap = Array(this.height).fill().map(() => Array(this.width).fill(0));
+	        
+	        for(let y = 0; y < this.height; y++) {
+	            for(let x = 0; x < this.width; x++) {
+	                const heightValue = noise.perlin2(x * scale, y * scale);
+	                const normalizedHeight = (heightValue + 1) / 2;
+	                
+	                const distanceToEdge = Math.min(
+	                    x, y, this.width - x - 1, this.height - y - 1
+	                ) / Math.min(this.width, this.height);
+	                
+	                heightMap[y][x] = normalizedHeight * (0.5 + 0.5 * distanceToEdge);
+	            }
+	        }
 
-		            // Angepasste Höhenwert-zu-Terrain Umwandlung
-		            if(finalHeight < waterThreshold) {
-		                this.map.setTile(x, y, 'DEEP_WATER');
-		            } else if(finalHeight < beachThreshold) {
-		                this.map.setTile(x, y, 'SHALLOW_WATER');
-		            } else if(finalHeight < beachThreshold + 0.05) {
-		                this.map.setTile(x, y, 'BEACH');
-		            } else if(finalHeight > mountainThreshold) {
-		                this.map.setTile(x, y, 'MOUNTAIN');
-		            } else if(finalHeight > hillThreshold) {
-		                this.map.setTile(x, y, 'HILL');
-		            } else {
-		                this.map.setTile(x, y, 'GRASS');
-		            }
-		        }
-		    }
-		}
+	        // Zweite Phase: Ensure minimum land width
+	        heightMap = this.ensureMinimumLandWidth(heightMap, waterThreshold, 3);
+
+	        // Dritte Phase: Terrain setzen
+	        for(let y = 0; y < this.height; y++) {
+	            for(let x = 0; x < this.width; x++) {
+	                const finalHeight = heightMap[y][x];
+	                
+	                if(finalHeight < waterThreshold) {
+	                    this.map.setTile(x, y, 'DEEP_WATER');
+	                } else if(finalHeight < beachThreshold) {
+	                    this.map.setTile(x, y, 'SHALLOW_WATER');
+	                } else if(finalHeight < beachThreshold + 0.05) {
+	                    this.map.setTile(x, y, 'BEACH');
+	                } else if(finalHeight > 0.8) {
+	                    this.map.setTile(x, y, 'MOUNTAIN');
+	                } else if(finalHeight > 0.6) {
+	                    this.map.setTile(x, y, 'HILL');
+	                } else {
+	                    this.map.setTile(x, y, 'GRASS');
+	                }
+	            }
+	        }
+	    }
+
+	    ensureMinimumLandWidth(heightMap, waterThreshold, minWidth) {
+	        const result = heightMap.map(row => [...row]);
+	        
+	        // Horizontale Prüfung und Korrektur
+	        for(let y = 0; y < this.height; y++) {
+	            for(let x = 0; x < this.width - minWidth; x++) {
+	                if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'horizontal')) {
+	                    this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'horizontal');
+	                }
+	            }
+	        }
+	        
+	        // Vertikale Prüfung und Korrektur
+	        for(let x = 0; x < this.width; x++) {
+	            for(let y = 0; y < this.height - minWidth; y++) {
+	                if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'vertical')) {
+	                    this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'vertical');
+	                }
+	            }
+	        }
+	        
+	        return result;
+	    }
+
+	    isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
+	        let landCount = 0;
+	        
+	        if (direction === 'horizontal') {
+	            for(let i = 0; i < minWidth; i++) {
+	                if (heightMap[y][x + i] >= waterThreshold) landCount++;
+	            }
+	        } else {
+	            for(let i = 0; i < minWidth; i++) {
+	                if (heightMap[y + i][x] >= waterThreshold) landCount++;
+	            }
+	        }
+	        
+	        return landCount > 0 && landCount < minWidth;
+	    }
+
+	    fixNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
+	        // Entscheide ob zu Land oder Wasser konvertiert wird
+	        let convertToLand = false;
+	        let surroundingLand = 0;
+	        
+	        // Prüfe Umgebung
+	        for(let dy = -1; dy <= 1; dy++) {
+	            for(let dx = -1; dx <= 1; dx++) {
+	                const checkY = y + dy;
+	                const checkX = x + dx;
+	                if (checkY >= 0 && checkY < this.height && 
+	                    checkX >= 0 && checkX < this.width) {
+	                    if (heightMap[checkY][checkX] >= waterThreshold) {
+	                        surroundingLand++;
+	                    }
+	                }
+	            }
+	        }
+	        
+	        convertToLand = surroundingLand >= 4; // Mehr Land als Wasser in der Umgebung
+	        
+	        // Konvertiere den schmalen Streifen
+	        const newHeight = convertToLand ? waterThreshold + 0.1 : waterThreshold - 0.1;
+	        
+	        if (direction === 'horizontal') {
+	            for(let i = 0; i < minWidth; i++) {
+	                heightMap[y][x + i] = newHeight;
+	            }
+	        } else {
+	            for(let i = 0; i < minWidth; i++) {
+	                heightMap[y + i][x] = newHeight;
+	            }
+	        }
+	    }
 
 	    placeBiomes() {
 	        const scale = this.biomeScale;
