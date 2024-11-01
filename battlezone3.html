@@ -4781,9 +4781,10 @@
 			this.wreckHeight = 0; // Für Rendering-Ordnung
 			this.lastCollisionTime = 0;
 			this.collisionCooldown = 100; // ms zwischen Kollisionsschäden
-	        this.baseSpeed = this.maxSpeed;
+	        this.baseSpeed = this.maxSpeed; // Ursprüngliche Geschwindigkeit speichern
 	        this.sinkProgress = 0;
 	        this.waterDamage = 0;
+	        this.distanceToShore = 0;
 		}
 
 		updateWaterPhysics() {
@@ -4793,26 +4794,34 @@
 				const tile = map.getTile(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE));
 				
 				if (tile.type === 'DEEP_WATER') {
-					this.sinkProgress += 1000 / 60; // Fortschritt pro Frame
-					this.waterDamage += WATER_MECHANICS.VEHICLE_SINK_DAMAGE;
+					// Berechne Abstand zum nächsten Ufer
+					this.distanceToShore = this.calculateDistanceToShore();
+					
+					// Schnelleres Sinken je weiter vom Ufer entfernt
+					const sinkMultiplier = Math.min(2, 1 + (this.distanceToShore / 500));
+					this.sinkProgress += (1000 / 60) * sinkMultiplier; // Fortschritt pro Frame
+					
+					// Erhöhter Schaden weiter vom Ufer entfernt
+					this.waterDamage = WATER_MECHANICS.VEHICLE_SINK_DAMAGE * sinkMultiplier;
 					
 					if (this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
 						this.destroy();
 						return;
 					}
 					
-					// Verringere Geschwindigkeit basierend auf Sink-Fortschritt
+					// Geschwindigkeit basierend auf Sink-Fortschritt reduzieren
 					this.maxSpeed = this.baseSpeed * (1 - this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME);
 					
 					// Warnung für Passagiere
 					if (this.sinkProgress > WATER_MECHANICS.VEHICLE_SINK_TIME * 0.7) {
-						this.passengers.forEach(passenger => {
-							showMessage("Fahrzeug sinkt! Sofort verlassen!", 1000);
-						});
+						this.warnPassengers();
 					}
+				} else if (tile.type === 'SHALLOW_WATER') {
+					// Reduzierte Geschwindigkeit in flachem Wasser
+					this.maxSpeed = this.baseSpeed * 0.5;
 				}
 				
-				// Schaden am Fahrzeug
+				// Kontinuierlicher Schaden im Wasser
 				this.health -= this.waterDamage;
 				if (this.health <= 0) {
 					this.destroy();
@@ -4821,7 +4830,40 @@
 				// Regeneriere langsam wenn nicht im Wasser
 				this.sinkProgress = Math.max(0, this.sinkProgress - 500 / 60);
 				this.waterDamage = 0;
+				this.maxSpeed = this.baseSpeed;
 			}
+		}
+
+		calculateDistanceToShore() {
+			const maxSearchRadius = 20; // Maximaler Suchradius in Tiles
+			const currentTileX = Math.floor(this.x / TILE_SIZE);
+			const currentTileY = Math.floor(this.y / TILE_SIZE);
+			
+			for (let radius = 1; radius <= maxSearchRadius; radius++) {
+				// Suche in einem Kreis
+				for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+					const checkX = currentTileX + Math.round(Math.cos(angle) * radius);
+					const checkY = currentTileY + Math.round(Math.sin(angle) * radius);
+					
+					const tile = map.getTile(checkX, checkY);
+					if (tile && (tile.type === 'BEACH' || tile.type === 'GRASS' || tile.type === 'DIRT')) {
+						return radius * TILE_SIZE;
+					}
+				}
+			}
+			return maxSearchRadius * TILE_SIZE; // Maximale Distanz wenn kein Ufer gefunden
+		}
+
+		warnPassengers() {
+			this.passengers.forEach(passenger => {
+				const warningInterval = 2000; // 2 Sekunden zwischen Warnungen
+				const currentTime = Date.now();
+				
+				if (!this.lastWarningTime || currentTime - this.lastWarningTime > warningInterval) {
+					showMessage("WARNUNG: Fahrzeug sinkt! Sofort verlassen!", 1000);
+					this.lastWarningTime = currentTime;
+				}
+			});
 		}
 
 		addPassenger(player) {
@@ -4868,8 +4910,6 @@
 		destroy() {
 			if (this.isDestroyed) return;
 
-			console.log(`Fahrzeug ${this.type} zerstört!`);
-
 			this.isDestroyed = true;
 			this.wreckHeight = -1; // Wrack wird unter intakten Fahrzeugen gerendert
 
@@ -4914,6 +4954,31 @@
 
 				this.removePassenger(passenger);
 			});
+        
+	        // Spezielle Effekte beim Versinken
+	        if (this.swimming && this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
+	            // Große Luftblasen beim endgültigen Versinken
+	            for (let i = 0; i < 10; i++) {
+	                setTimeout(() => {
+	                    const bubble = {
+	                        x: this.x + (Math.random() - 0.5) * this.size,
+	                        y: this.y,
+	                        size: 5 + Math.random() * 10,
+	                        speed: 1 + Math.random() * 2
+	                    };
+	                    
+	                    // Animiere die Luftblasen
+	                    const bubbleInterval = setInterval(() => {
+	                        bubble.y -= bubble.speed;
+	                        bubble.size *= 0.95;
+	                        
+	                        if (bubble.size < 1) {
+	                            clearInterval(bubbleInterval);
+	                        }
+	                    }, 50);
+	                }, i * 200);
+	            }
+	        }
 		}
 
 		switchRole(player) {
@@ -4943,6 +5008,23 @@
 		update() {
 			if (this.isDestroyed) return;
 
+			this.updateWaterPhysics();
+
+			// Check current tile type
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map.getTile(tileX, tileY);
+
+			// Adjust speed based on water
+			let speedMultiplier = 1;
+			if (currentTile) {
+				if (currentTile.type === 'DEEP_WATER') {
+					speedMultiplier = 0.1; // Sehr langsam in tiefem Wasser
+				} else if (currentTile.type === 'SHALLOW_WATER') {
+					speedMultiplier = 0.3; // Langsamer in flachem Wasser
+				}
+			}
+
 			// Update passengers
 			this.passengers = this.passengers.filter(p => p.isAlive);
 
@@ -4971,8 +5053,9 @@
 
 			// Bewegung
 			if (Math.abs(this.speed) > 0.1) {
-				const newX = this.x + Math.cos(this.angle) * this.speed;
-				const newY = this.y + Math.sin(this.angle) * this.speed;
+		        const adjustedSpeed = this.speed * speedMultiplier;
+				const newX = this.x + Math.cos(this.angle) * adjustedSpeed;
+				const newY = this.y + Math.sin(this.angle) * adjustedSpeed;
 
 				if (!isColliding(newX, newY, this)) {
 					if (this.trailerLength) {
@@ -5256,19 +5339,41 @@
 		}
 
 		drawSinkingEffect() {
-			if (this.sinkProgress > 0) {
-				const sinkRatio = this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME;
-				ctx.save();
-				// Wasserlinien-Effekt
-				ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
-				ctx.beginPath();
-				const waterLine = this.y - this.size / 2 + (this.size * sinkRatio);
-				ctx.moveTo(this.x - this.size / 2, waterLine);
-				ctx.lineTo(this.x + this.size / 2, waterLine);
-				ctx.stroke();
-				ctx.restore();
-			}
-		}
+	        ctx.save();
+	        // Wasserlinien um das Fahrzeug
+	        const sinkRatio = this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME;
+	        
+	        // Wasserlinien-Effekt
+	        ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
+	        ctx.lineWidth = 2;
+	        ctx.beginPath();
+	        const waterLine = this.y - this.size / 2 + (this.size * sinkRatio);
+	        
+	        // Wellenmuster
+	        for (let i = -this.size/2; i < this.size/2; i += 20) {
+	            const waveOffset = Math.sin(Date.now() * 0.005 + i * 0.1) * 5;
+	            ctx.moveTo(this.x + i, waterLine + waveOffset);
+	            ctx.lineTo(this.x + i + 15, waterLine + waveOffset);
+	        }
+	        ctx.stroke();
+	        
+	        // Luftblasen-Effekt
+	        if (sinkRatio > 0.5) {
+	            const bubbleCount = Math.floor(sinkRatio * 5);
+	            for (let i = 0; i < bubbleCount; i++) {
+	                const bubbleX = this.x + (Math.random() - 0.5) * this.size;
+	                const bubbleY = waterLine - Math.random() * 20;
+	                const bubbleSize = 2 + Math.random() * 3;
+	                
+	                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+	                ctx.beginPath();
+	                ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
+	                ctx.fill();
+	            }
+	        }
+	        
+	        ctx.restore();
+	    }
 
 		drawVehicleBody() {
 			// Fahrzeugspezifische Details
