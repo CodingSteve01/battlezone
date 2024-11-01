@@ -159,7 +159,8 @@
 </div>
 
 <!-- Steuerungsinfo -->
-<div id="controlsInfo" style="display: none; background: rgba(34, 34, 34, 0.95); color: white; position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+<div id="controlsInfo"
+     style="display: none; background: rgba(34, 34, 34, 0.95); color: white; position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
     <div style="max-width: 800px; width: 100%; display: flex; justify-content: space-between; gap: 40px;">
         <!-- Spieler 1 -->
         <div style="flex: 1;">
@@ -198,7 +199,8 @@
         <p>Pause: ESC</p>
     </div>
 
-    <button id="backToMenu" style="margin-top: 30px; padding: 10px 20px; font-size: 24px; cursor: pointer;">Zurück</button>
+    <button id="backToMenu" style="margin-top: 30px; padding: 10px 20px; font-size: 24px; cursor: pointer;">Zurück
+    </button>
 </div>
 
 <!-- Game Over Menü -->
@@ -998,97 +1000,97 @@
 	}
 
 	class EnemySpawner {
-	    constructor() {
-	        this.lastSpawnTime = Date.now();
-	        this.spawnInterval = 1000; // Jede Sekunde prüfen
-	        this.maxEnemies = 10; // Maximale Anzahl lebender Gegner
-	        this.spawnRadius = {
-	            min: MIN_SPAWN_DISTANCE + 200,
-	            max: MIN_SPAWN_DISTANCE + 800
-	        };
-	        this.commanderChance = 0.1; // 10% Chance auf einen Kommandanten
-	        this.despawnRadius = 2000; // Radius nach dem lebende Gegner verschwinden
-	        this.corpseTimeout = 60000; // 60 Sekunden bis Leichen verschwinden
-	    }
+		constructor() {
+			this.lastSpawnTime = Date.now();
+			this.spawnInterval = 1000; // Jede Sekunde prüfen
+			this.maxEnemies = 10; // Maximale Anzahl lebender Gegner
+			this.spawnRadius = {
+				min: MIN_SPAWN_DISTANCE + 200,
+				max: MIN_SPAWN_DISTANCE + 800
+			};
+			this.commanderChance = 0.1; // 10% Chance auf einen Kommandanten
+			this.despawnRadius = 2000; // Radius nach dem lebende Gegner verschwinden
+			this.corpseTimeout = 60000; // 60 Sekunden bis Leichen verschwinden
+		}
 
-	    update() {
-	        const currentTime = Date.now();
-	        
-	        // Regelmäßiges Spawning und Cleanup
-	        if (currentTime - this.lastSpawnTime > this.spawnInterval) {
-	            this.lastSpawnTime = currentTime;
-	            
-	            // Zähle nur lebende Gegner
-	            const livingEnemies = enemies.filter(e => e.isAlive);
-	            
-	            // Spawne neue Gegner wenn nötig
-	            players.forEach(player => {
-	                const nearbyEnemies = this.countNearbyEnemies(player);
-	                if (nearbyEnemies < 10 && livingEnemies.length < this.maxEnemies) {
-	                    this.spawnEnemyNearPlayer(player);
-	                }
-	            });
+		update() {
+			const currentTime = Date.now();
 
-	            // Entferne zu weit entfernte lebende Gegner
-	            this.cleanupDistantEnemies();
-	            
-	            // Entferne alte Leichen
-	            this.cleanupCorpses(currentTime);
-	        }
-	    }
+			// Regelmäßiges Spawning und Cleanup
+			if (currentTime - this.lastSpawnTime > this.spawnInterval) {
+				this.lastSpawnTime = currentTime;
 
-	    countNearbyEnemies(player) {
-	        // Zähle nur lebende Gegner
-	        return enemies.filter(enemy => 
-	            enemy.isAlive && 
-	            Math.hypot(enemy.x - player.x, enemy.y - player.y) < SIGHT_RADIUS * 2
-	        ).length;
-	    }
+				// Zähle nur lebende Gegner
+				const livingEnemies = enemies.filter(e => e.isAlive);
 
-	    spawnEnemyNearPlayer(player) {
-	        let x, y;
-	        let attempts = 0;
-	        const maxAttempts = 10;
+				// Spawne neue Gegner wenn nötig
+				players.forEach(player => {
+					const nearbyEnemies = this.countNearbyEnemies(player);
+					if (nearbyEnemies < 10 && livingEnemies.length < this.maxEnemies) {
+						this.spawnEnemyNearPlayer(player);
+					}
+				});
 
-	        do {
-	            const angle = Math.random() * Math.PI * 2;
-	            const distance = this.spawnRadius.min + 
-	                Math.random() * (this.spawnRadius.max - this.spawnRadius.min);
-	            x = player.x + Math.cos(angle) * distance;
-	            y = player.y + Math.sin(angle) * distance;
-	            attempts++;
-	        } while ((isColliding(x, y) || isInPlayerSight(x, y)) && attempts < maxAttempts);
+				// Entferne zu weit entfernte lebende Gegner
+				this.cleanupDistantEnemies();
 
-	        if (attempts < maxAttempts) {
-	            const isCommander = Math.random() < this.commanderChance;
-	            const enemy = new Enemy(x, y, isCommander);
-	            enemies.push(enemy);
-	        }
-	    }
+				// Entferne alte Leichen
+				this.cleanupCorpses(currentTime);
+			}
+		}
 
-	    cleanupDistantEnemies() {
-	        // Entferne nur lebende Gegner die zu weit weg sind
-	        enemies = enemies.filter(enemy => {
-	            if (!enemy.isAlive) return true; // Leichen bleiben erstmal
-	            return !this.isFarFromAllPlayers(enemy);
-	        });
-	    }
+		countNearbyEnemies(player) {
+			// Zähle nur lebende Gegner
+			return enemies.filter(enemy =>
+				enemy.isAlive &&
+				Math.hypot(enemy.x - player.x, enemy.y - player.y) < SIGHT_RADIUS * 2
+			).length;
+		}
 
-	    cleanupCorpses(currentTime) {
-	        // Entferne Leichen die älter als 60 Sekunden sind
-	        enemies = enemies.filter(enemy => {
-	            if (!enemy.isAlive && enemy.deathTime) {
-	                return currentTime - enemy.deathTime < this.corpseTimeout;
-	            }
-	            return true;
-	        });
-	    }
+		spawnEnemyNearPlayer(player) {
+			let x, y;
+			let attempts = 0;
+			const maxAttempts = 10;
 
-	    isFarFromAllPlayers(enemy) {
-	        return players.every(player => 
-	            Math.hypot(player.x - enemy.x, player.y - enemy.y) > this.despawnRadius
-	        );
-	    }
+			do {
+				const angle = Math.random() * Math.PI * 2;
+				const distance = this.spawnRadius.min +
+					Math.random() * (this.spawnRadius.max - this.spawnRadius.min);
+				x = player.x + Math.cos(angle) * distance;
+				y = player.y + Math.sin(angle) * distance;
+				attempts++;
+			} while ((isColliding(x, y) || isInPlayerSight(x, y)) && attempts < maxAttempts);
+
+			if (attempts < maxAttempts) {
+				const isCommander = Math.random() < this.commanderChance;
+				const enemy = new Enemy(x, y, isCommander);
+				enemies.push(enemy);
+			}
+		}
+
+		cleanupDistantEnemies() {
+			// Entferne nur lebende Gegner die zu weit weg sind
+			enemies = enemies.filter(enemy => {
+				if (!enemy.isAlive) return true; // Leichen bleiben erstmal
+				return !this.isFarFromAllPlayers(enemy);
+			});
+		}
+
+		cleanupCorpses(currentTime) {
+			// Entferne Leichen die älter als 60 Sekunden sind
+			enemies = enemies.filter(enemy => {
+				if (!enemy.isAlive && enemy.deathTime) {
+					return currentTime - enemy.deathTime < this.corpseTimeout;
+				}
+				return true;
+			});
+		}
+
+		isFarFromAllPlayers(enemy) {
+			return players.every(player =>
+				Math.hypot(player.x - enemy.x, player.y - enemy.y) > this.despawnRadius
+			);
+		}
 	}
 
 	class Mission {
@@ -1637,12 +1639,12 @@
 			this.autoAimTargets = [];
 			this.currentTargetIndex = 0;
 			this.spottedEnemies = new Set(); // Für die Minikarte
-			
+
 			this.stealthStatus = {
-	            isCamouflaged: false,
-	            lastActionTime: 0,
-	            detectionModifier: 1.0  // 1.0 = normale Erkennung, 0.3 = schwer zu erkennen
-	        };
+				isCamouflaged: false,
+				lastActionTime: 0,
+				detectionModifier: 1.0  // 1.0 = normale Erkennung, 0.3 = schwer zu erkennen
+			};
 
 			// Startausrüstung
 			this.addWeapon(WEAPONS.PISTOL);
@@ -1654,11 +1656,11 @@
 
 		useWeapon() {
 			const currentWeapon = this.inventory.getSelectedItem();
-	        if (currentWeapon && currentWeapon.fire(this)) {
-	            this.stealthStatus.lastActionTime = Date.now(); // Tarnung temporär aufheben
-	            return currentWeapon;
-	        }
-	        return null;
+			if (currentWeapon && currentWeapon.fire(this)) {
+				this.stealthStatus.lastActionTime = Date.now(); // Tarnung temporär aufheben
+				return currentWeapon;
+			}
+			return null;
 		}
 
 		addAmmo(weaponName, amount) {
@@ -1765,7 +1767,7 @@
 
 			// Tarneffekt nur auf Gras und mit Tarnanzug
 			if (this.equipment.has('tarnanzug')) {
-				if (currentTile === TILE_TYPES.GRASS || 
+				if (currentTile === TILE_TYPES.GRASS ||
 					currentTile === TILE_TYPES.HIGH_GRASS) {
 					this.stealthStatus.isCamouflaged = true;
 					this.stealthStatus.detectionModifier = 0.3;
@@ -2019,15 +2021,15 @@
 			ctx.translate(this.x, this.y);
 			ctx.rotate(this.angle);
 
-	        // Basis-Spielerkörper
-	        ctx.fillStyle = this.color;
-	        ctx.fillRect(-15, -15, 30, 30);
+			// Basis-Spielerkörper
+			ctx.fillStyle = this.color;
+			ctx.fillRect(-15, -15, 30, 30);
 
-	        // Tarnanzug-Effekt
-	        if (this.equipment.has('tarnanzug')) {
-	            const pattern = this.stealthStatus.isCamouflaged ? 'camo' : 'urban';
-	            this.drawCamouflagePattern(ctx, pattern, -15, -15, 30, 30);
-	        }
+			// Tarnanzug-Effekt
+			if (this.equipment.has('tarnanzug')) {
+				const pattern = this.stealthStatus.isCamouflaged ? 'camo' : 'urban';
+				this.drawCamouflagePattern(ctx, pattern, -15, -15, 30, 30);
+			}
 
 			// Ausrüstung anzeigen
 			if (this.equipment.has('schutzweste')) {
@@ -2067,816 +2069,816 @@
 		}
 
 		drawCamouflagePattern(ctx, pattern, x, y, w, h) {
-		    if (pattern === 'camo') {
-		        // Simples Waldtarn - nur 3 Flecken
-		        const colors = ['#4B5320', '#2F4F2F'];
-		        
-		        // Hintergrund
-		        ctx.fillStyle = '#556B2F';
-		        ctx.fillRect(x, y, w, h);
-		        
-		        // Nur zwei simple Tarnflecken
-		        ctx.fillStyle = colors[0];
-		        ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
-		        
-		        ctx.fillStyle = colors[1];
-		        ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
-		    } else {
-		        // Urbanes Tarn - nur 2 Flecken
-		        const colors = ['#696969', '#A9A9A9'];
-		        
-		        // Hintergrund
-		        ctx.fillStyle = '#808080';
-		        ctx.fillRect(x, y, w, h);
-		        
-		        // Zwei simple Rechtecke
-		        ctx.fillStyle = colors[0];
-		        ctx.fillRect(x + w * 0.3, y + h * 0.2, w * 0.3, h * 0.3);
-		        
-		        ctx.fillStyle = colors[1];
-		        ctx.fillRect(x + w * 0.4, y + h * 0.5, w * 0.3, h * 0.3);
-		    }
+			if (pattern === 'camo') {
+				// Simples Waldtarn - nur 3 Flecken
+				const colors = ['#4B5320', '#2F4F2F'];
+
+				// Hintergrund
+				ctx.fillStyle = '#556B2F';
+				ctx.fillRect(x, y, w, h);
+
+				// Nur zwei simple Tarnflecken
+				ctx.fillStyle = colors[0];
+				ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
+
+				ctx.fillStyle = colors[1];
+				ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
+			} else {
+				// Urbanes Tarn - nur 2 Flecken
+				const colors = ['#696969', '#A9A9A9'];
+
+				// Hintergrund
+				ctx.fillStyle = '#808080';
+				ctx.fillRect(x, y, w, h);
+
+				// Zwei simple Rechtecke
+				ctx.fillStyle = colors[0];
+				ctx.fillRect(x + w * 0.3, y + h * 0.2, w * 0.3, h * 0.3);
+
+				ctx.fillStyle = colors[1];
+				ctx.fillRect(x + w * 0.4, y + h * 0.5, w * 0.3, h * 0.3);
+			}
 		}
 
 		drawHealthBar() {
-		    ctx.save();
-		    ctx.fillStyle = 'black';
-		    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-		    
-		    // Farbe basierend auf Gesundheit
-		    if (this.health > 60) ctx.fillStyle = 'lime';
-		    else if (this.health > 30) ctx.fillStyle = 'yellow';
-		    else ctx.fillStyle = 'red';
-		    
-		    const healthPercentage = Math.max(this.health / 100, 0);
-		    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
-		    
-		    // Optionale Statuseffekte
-		    if (this.isRetreating) {
-		        ctx.fillStyle = 'white';
-		        ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
-		    }
-		    
-		    ctx.restore();
+			ctx.save();
+			ctx.fillStyle = 'black';
+			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+
+			// Farbe basierend auf Gesundheit
+			if (this.health > 60) ctx.fillStyle = 'lime';
+			else if (this.health > 30) ctx.fillStyle = 'yellow';
+			else ctx.fillStyle = 'red';
+
+			const healthPercentage = Math.max(this.health / 100, 0);
+			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+
+			// Optionale Statuseffekte
+			if (this.isRetreating) {
+				ctx.fillStyle = 'white';
+				ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
+			}
+
+			ctx.restore();
 		}
 	}
 
 	class Enemy extends GameObject {
-	    constructor(x, y, isCommander = false) {
-	        super(x, y, 30, isCommander ? 'purple' : 'red');
-	        
-	        // Basis-Eigenschaften
-	        this.speed = 2;
-	        this.angle = 0;
-	        this.health = 100;
-	        this.isCommander = isCommander;
-	        this.canUseItem = true;
+		constructor(x, y, isCommander = false) {
+			super(x, y, 30, isCommander ? 'purple' : 'red');
 
-	        // Stealth & Wahrnehmung
-	        this.viewAngle = Math.PI / 3;
-	        this.viewDistance = SIGHT_RADIUS;
+			// Basis-Eigenschaften
+			this.speed = 2;
+			this.angle = 0;
+			this.health = 100;
+			this.isCommander = isCommander;
+			this.canUseItem = true;
+
+			// Stealth & Wahrnehmung
+			this.viewAngle = Math.PI / 3;
+			this.viewDistance = SIGHT_RADIUS;
 			this.communicationRange = 800;
 			this.hearingRange = 1000; // Basis-Hörweite
 			this.combatHearingRange = 1500; // Erweiterte Hörweite während Kämpfen
-	        this.alertness = 'patrol'; // patrol, suspicious, alert, combat
-	        this.alertnessLevel = 0;
-	        this.lastSuspiciousPosition = null;
-	        this.viewColor = 'rgba(255, 255, 0, 0.1)';
-	        this.currentTarget = null;
+			this.alertness = 'patrol'; // patrol, suspicious, alert, combat
+			this.alertnessLevel = 0;
+			this.lastSuspiciousPosition = null;
+			this.viewColor = 'rgba(255, 255, 0, 0.1)';
+			this.currentTarget = null;
 
-	        // Combat-spezifische Eigenschaften
-	        this.fireRate = isCommander ? 800 : 1000;
-	        this.lastShotTime = 0;
-	        this.accuracy = isCommander ? 0.9 : 0.7;
-	        this.lastMinePlacement = 0;
-	        this.minePlacementCooldown = 10000;
-	        this.lastGrenadePlacement = 0;
-	        this.grenadeCooldown = 5000;
+			// Combat-spezifische Eigenschaften
+			this.fireRate = isCommander ? 800 : 1000;
+			this.lastShotTime = 0;
+			this.accuracy = isCommander ? 0.9 : 0.7;
+			this.lastMinePlacement = 0;
+			this.minePlacementCooldown = 10000;
+			this.lastGrenadePlacement = 0;
+			this.grenadeCooldown = 5000;
 
-	        // Patrouille & Wache
-	        this.patrolType = this.getRandomPatrolType();
-	        this.patrolPoints = this.generatePatrolPoints();
-	        this.currentPatrolIndex = 0;
-	        this.guardTarget = null;
-	        this.waitTime = 0;
-	        this.lookAroundTimer = 0;
-	        this.lookDirection = 1;
+			// Patrouille & Wache
+			this.patrolType = this.getRandomPatrolType();
+			this.patrolPoints = this.generatePatrolPoints();
+			this.currentPatrolIndex = 0;
+			this.guardTarget = null;
+			this.waitTime = 0;
+			this.lookAroundTimer = 0;
+			this.lookDirection = 1;
 
-	        // Taktik & Strategie
-	        this.preferredRange = isCommander ? 400 : 200;
-	        this.tacticalBehavior = 'default'; // default, aggressive, defensive, flanking
-	        this.lastTacticalChange = Date.now();
-	        this.tacticalChangeCooldown = 5000;
-	        this.flankingPoint = null;
-	        this.coverPoint = null;
+			// Taktik & Strategie
+			this.preferredRange = isCommander ? 400 : 200;
+			this.tacticalBehavior = 'default'; // default, aggressive, defensive, flanking
+			this.lastTacticalChange = Date.now();
+			this.tacticalChangeCooldown = 5000;
+			this.flankingPoint = null;
+			this.coverPoint = null;
 
-	        // Erweitertes Wahrnehmungssystem
-	        this.knownThreats = new Map(); // Speichert bekannte Bedrohungen mit Zeitstempel
-	        this.lastKnownPositions = new Map(); // Letzte bekannte Positionen von Zielen
-	        this.heardSounds = []; // Array für kürzlich gehörte Geräusche
-	        this.allyNetwork = new Set(); // Verbündete in Kommunikationsreichweite
-	        this.threatMemory = 30000; // Wie lange Bedrohungen im Gedächtnis bleiben (ms)
-	        this.communicationRange = 500; // Reichweite für Kommunikation mit Verbündeten
+			// Erweitertes Wahrnehmungssystem
+			this.knownThreats = new Map(); // Speichert bekannte Bedrohungen mit Zeitstempel
+			this.lastKnownPositions = new Map(); // Letzte bekannte Positionen von Zielen
+			this.heardSounds = []; // Array für kürzlich gehörte Geräusche
+			this.allyNetwork = new Set(); // Verbündete in Kommunikationsreichweite
+			this.threatMemory = 30000; // Wie lange Bedrohungen im Gedächtnis bleiben (ms)
+			this.communicationRange = 500; // Reichweite für Kommunikation mit Verbündeten
 
-	        // Verhaltenszustände
-	        this.isRetreating = false;
-	        this.lastRepositioning = Date.now();
-	        this.repositioningCooldown = 3000;
-	        
-	        // Fahrzeug-Interaktion
-	        this.desiredVehicleType = null; // Welches Fahrzeug gesucht wird
-	        this.vehicleSearchRadius = 400;
-	        this.lastVehicleCheck = Date.now();
-	        this.vehicleCheckCooldown = 2000;
-    
-		    // Ausrüstung
-		    this.equipment = new Set();
-		    if (Math.random() < 0.3) this.equipment.add('schutzweste');
-		    if (Math.random() < 0.2) this.equipment.add('tarnanzug');
-		    
-		    // Waffe
-		    this.weapon = this.getRandomWeapon();
-	    }
+			// Verhaltenszustände
+			this.isRetreating = false;
+			this.lastRepositioning = Date.now();
+			this.repositioningCooldown = 3000;
+
+			// Fahrzeug-Interaktion
+			this.desiredVehicleType = null; // Welches Fahrzeug gesucht wird
+			this.vehicleSearchRadius = 400;
+			this.lastVehicleCheck = Date.now();
+			this.vehicleCheckCooldown = 2000;
+
+			// Ausrüstung
+			this.equipment = new Set();
+			if (Math.random() < 0.3) this.equipment.add('schutzweste');
+			if (Math.random() < 0.2) this.equipment.add('tarnanzug');
+
+			// Waffe
+			this.weapon = this.getRandomWeapon();
+		}
 
 		getRandomWeapon() {
 			const weapons = ['Pistole', 'Maschinengewehr', 'Schrotflinte'];
 			return weapons[Math.floor(Math.random() * weapons.length)];
 		}
 
-	    update() {
-	        if (!this.isAlive) {
-	            if (!this.isDead) {
-	                this.isDead = true;
-	                this.deathTime = Date.now();
-	                // Benachrichtige andere Gegner über den Tod
-	                this.notifyAlliesOfDeath();
-	            }
-	            return;
-	        }
+		update() {
+			if (!this.isAlive) {
+				if (!this.isDead) {
+					this.isDead = true;
+					this.deathTime = Date.now();
+					// Benachrichtige andere Gegner über den Tod
+					this.notifyAlliesOfDeath();
+				}
+				return;
+			}
 
-	        // Update Verbündeten-Netzwerk
-	        this.updateAllyNetwork();
+			// Update Verbündeten-Netzwerk
+			this.updateAllyNetwork();
 
-	        // Bedrohungsanalyse
-	        this.analyzeSituation();
+			// Bedrohungsanalyse
+			this.analyzeSituation();
 
-	        // Taktische Entscheidungen
-	        this.updateTactics();
+			// Taktische Entscheidungen
+			this.updateTactics();
 
-	        // Hauptverhalten basierend auf Alertness
-	        switch (this.alertness) {
-	            case 'patrol':
-	                this.updatePatrol();
-	                break;
-	            case 'suspicious':
-	                this.investigateSuspicion();
-	                break;
-	            case 'alert':
-	                this.searchArea();
-	                break;
-	            case 'combat':
-	                this.engageTarget();
-	                break;
-	        }
+			// Hauptverhalten basierend auf Alertness
+			switch (this.alertness) {
+				case 'patrol':
+					this.updatePatrol();
+					break;
+				case 'suspicious':
+					this.investigateSuspicion();
+					break;
+				case 'alert':
+					this.searchArea();
+					break;
+				case 'combat':
+					this.engageTarget();
+					break;
+			}
 
-	        // Fahrzeug-Management
-	        this.updateVehicleBehavior();
-	    }
+			// Fahrzeug-Management
+			this.updateVehicleBehavior();
+		}
 
-	    analyzeSituation() {
-	        // Überprüfe und aktualisiere bekannte Bedrohungen
-	        this.updateThreats();
+		analyzeSituation() {
+			// Überprüfe und aktualisiere bekannte Bedrohungen
+			this.updateThreats();
 
-	        // Überprüfe Fahrzeuggeräusche und -bewegungen
-	        this.checkVehicleThreats();
+			// Überprüfe Fahrzeuggeräusche und -bewegungen
+			this.checkVehicleThreats();
 
-	        // Überprüfe Verbündete in der Nähe
-	        this.checkNearbyAllies();
+			// Überprüfe Verbündete in der Nähe
+			this.checkNearbyAllies();
 
-	        // Analysiere taktische Situation
-	        this.analyzeTacticalSituation();
-	    }
+			// Analysiere taktische Situation
+			this.analyzeTacticalSituation();
+		}
 
-	    updateThreats() {
-	        // Entferne alte Bedrohungen
-	        const currentTime = Date.now();
-	        for (const [threatId, threatInfo] of this.knownThreats) {
-	            if (currentTime - threatInfo.lastSeen > this.threatMemory) {
-	                this.knownThreats.delete(threatId);
-	            }
-	        }
+		updateThreats() {
+			// Entferne alte Bedrohungen
+			const currentTime = Date.now();
+			for (const [threatId, threatInfo] of this.knownThreats) {
+				if (currentTime - threatInfo.lastSeen > this.threatMemory) {
+					this.knownThreats.delete(threatId);
+				}
+			}
 
-	        // Überprüfe neue Bedrohungen
-	        players.forEach(player => {
-	            if (!player.isAlive) return;
+			// Überprüfe neue Bedrohungen
+			players.forEach(player => {
+				if (!player.isAlive) return;
 
-	            const canSeePlayer = this.canSee(player);
-	            const canHearPlayer = this.canHear(player);
+				const canSeePlayer = this.canSee(player);
+				const canHearPlayer = this.canHear(player);
 
-	            if (canSeePlayer || canHearPlayer) {
-	                const threatLevel = this.calculateThreatLevel(player);
-	                this.knownThreats.set(player.id, {
-	                    target: player,
-	                    threatLevel,
-	                    lastSeen: currentTime,
-	                    position: {x: player.x, y: player.y}
-	                });
+				if (canSeePlayer || canHearPlayer) {
+					const threatLevel = this.calculateThreatLevel(player);
+					this.knownThreats.set(player.id, {
+						target: player,
+						threatLevel,
+						lastSeen: currentTime,
+						position: {x: player.x, y: player.y}
+					});
 
-	                // Informiere Verbündete
-	                this.informAlliesOfThreat(player, threatLevel);
-	            }
-	        });
-	    }
+					// Informiere Verbündete
+					this.informAlliesOfThreat(player, threatLevel);
+				}
+			});
+		}
 
-	    calculateThreatLevel(target) {
-	        let threatLevel = 0;
+		calculateThreatLevel(target) {
+			let threatLevel = 0;
 
-	        // Basis-Bedrohung
-	        if (target instanceof Player) {
-	            threatLevel += 5;
-	        }
+			// Basis-Bedrohung
+			if (target instanceof Player) {
+				threatLevel += 5;
+			}
 
-	        // Waffen-basierte Bedrohung
-	        const currentWeapon = target.inventory?.getSelectedItem();
-	        if (currentWeapon) {
-	            switch (currentWeapon.name) {
-	                case 'Schrotflinte':
-	                    threatLevel += 3;
-	                    break;
-	                case 'Maschinengewehr':
-	                    threatLevel += 4;
-	                    break;
-	                case 'Granate':
-	                    threatLevel += 2;
-	                    break;
-	            }
-	        }
+			// Waffen-basierte Bedrohung
+			const currentWeapon = target.inventory?.getSelectedItem();
+			if (currentWeapon) {
+				switch (currentWeapon.name) {
+					case 'Schrotflinte':
+						threatLevel += 3;
+						break;
+					case 'Maschinengewehr':
+						threatLevel += 4;
+						break;
+					case 'Granate':
+						threatLevel += 2;
+						break;
+				}
+			}
 
-	        // Fahrzeug-basierte Bedrohung
-	        if (target.vehicle) {
-	            switch (target.vehicle.type) {
-	                case 'Panzer':
-	                    threatLevel += 8;
-	                    break;
-	                case 'Jeep':
-	                    threatLevel += 3;
-	                    break;
-	            }
-	        }
+			// Fahrzeug-basierte Bedrohung
+			if (target.vehicle) {
+				switch (target.vehicle.type) {
+					case 'Panzer':
+						threatLevel += 8;
+						break;
+					case 'Jeep':
+						threatLevel += 3;
+						break;
+				}
+			}
 
-	        // Distanz-basierte Modifikation
-	        const distance = Math.hypot(target.x - this.x, target.y - this.y);
-	        threatLevel *= 1 + (1000 - Math.min(distance, 1000)) / 1000;
+			// Distanz-basierte Modifikation
+			const distance = Math.hypot(target.x - this.x, target.y - this.y);
+			threatLevel *= 1 + (1000 - Math.min(distance, 1000)) / 1000;
 
-	        return threatLevel;
-	    }
+			return threatLevel;
+		}
 
-	    engageTarget() {
-	        if (!this.currentTarget || !this.currentTarget.isAlive) {
-	            this.findNewTarget();
-	            if (!this.currentTarget) {
-	                this.alertness = 'alert';
-	                return;
-	            }
-	        }
+		engageTarget() {
+			if (!this.currentTarget || !this.currentTarget.isAlive) {
+				this.findNewTarget();
+				if (!this.currentTarget) {
+					this.alertness = 'alert';
+					return;
+				}
+			}
 
-	        const distToTarget = Math.hypot(
-	            this.currentTarget.x - this.x,
-	            this.currentTarget.y - this.y
-	        );
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-	        // Taktische Positionierung
-	        this.updateTacticalPosition(distToTarget);
+			// Taktische Positionierung
+			this.updateTacticalPosition(distToTarget);
 
-	        // Kampfverhalten basierend auf Taktik
-	        switch (this.tacticalBehavior) {
-	            case 'aggressive':
-	                this.aggressiveEngagement();
-	                break;
-	            case 'defensive':
-	                this.defensiveEngagement();
-	                break;
-	            case 'flanking':
-	                this.flankingEngagement();
-	                break;
-	            default:
-	                this.standardEngagement();
-	                break;
-	        }
-	    }
+			// Kampfverhalten basierend auf Taktik
+			switch (this.tacticalBehavior) {
+				case 'aggressive':
+					this.aggressiveEngagement();
+					break;
+				case 'defensive':
+					this.defensiveEngagement();
+					break;
+				case 'flanking':
+					this.flankingEngagement();
+					break;
+				default:
+					this.standardEngagement();
+					break;
+			}
+		}
 
-	    updateTacticalPosition(distToTarget) {
-	        const currentTime = Date.now();
+		updateTacticalPosition(distToTarget) {
+			const currentTime = Date.now();
 
-	        // Periodische Neupositionierung
-	        if (currentTime - this.lastRepositioning > this.repositioningCooldown) {
-	            this.lastRepositioning = currentTime;
+			// Periodische Neupositionierung
+			if (currentTime - this.lastRepositioning > this.repositioningCooldown) {
+				this.lastRepositioning = currentTime;
 
-	            // Suche nach Deckung wenn Gesundheit niedrig
-	            if (this.health < 40) {
-	                this.findCover();
-	            } else if (Math.abs(distToTarget - this.preferredRange) > 50) {
-	                // Optimale Distanz zum Ziel erreichen
-	                const angleToTarget = Math.atan2(
-	                    this.currentTarget.y - this.y,
-	                    this.currentTarget.x - this.x
-	                );
-	                const idealDistance = this.preferredRange;
-	                const targetX = this.currentTarget.x - Math.cos(angleToTarget) * idealDistance;
-	                const targetY = this.currentTarget.y - Math.sin(angleToTarget) * idealDistance;
-	                
-	                this.moveTowards(targetX, targetY);
-	            }
-	        }
-	    }
+				// Suche nach Deckung wenn Gesundheit niedrig
+				if (this.health < 40) {
+					this.findCover();
+				} else if (Math.abs(distToTarget - this.preferredRange) > 50) {
+					// Optimale Distanz zum Ziel erreichen
+					const angleToTarget = Math.atan2(
+						this.currentTarget.y - this.y,
+						this.currentTarget.x - this.x
+					);
+					const idealDistance = this.preferredRange;
+					const targetX = this.currentTarget.x - Math.cos(angleToTarget) * idealDistance;
+					const targetY = this.currentTarget.y - Math.sin(angleToTarget) * idealDistance;
 
-	    findCover() {
-	        const coverObjects = this.findNearbyObjects();
-	        if (coverObjects.length > 0) {
-	            // Sortiere nach Eignung als Deckung
-	            coverObjects.sort((a, b) => {
-	                const distA = Math.hypot(a.x - this.x, a.y - this.y);
-	                const distB = Math.hypot(b.x - this.x, b.y - this.y);
-	                return distA - distB;
-	            });
+					this.moveTowards(targetX, targetY);
+				}
+			}
+		}
 
-	            this.coverPoint = coverObjects[0];
-	            this.moveTowards(this.coverPoint.x, this.coverPoint.y);
-	        }
-	    }
+		findCover() {
+			const coverObjects = this.findNearbyObjects();
+			if (coverObjects.length > 0) {
+				// Sortiere nach Eignung als Deckung
+				coverObjects.sort((a, b) => {
+					const distA = Math.hypot(a.x - this.x, a.y - this.y);
+					const distB = Math.hypot(b.x - this.x, b.y - this.y);
+					return distA - distB;
+				});
 
-	    findNearbyObjects() {
-	        const objects = [];
-	        const searchRadius = 200;
-	        const tileX = Math.floor(this.x / TILE_SIZE);
-	        const tileY = Math.floor(this.y / TILE_SIZE);
-	        
-	        // Suche in einem Bereich um den Gegner
-	        for (let y = Math.max(0, tileY - 5); y < Math.min(MAP_HEIGHT, tileY + 5); y++) {
-	            for (let x = Math.max(0, tileX - 5); x < Math.min(MAP_WIDTH, tileX + 5); x++) {
-	                const tile = map[y][x];
-	                if (tile === TILE_TYPES.TREE || tile === TILE_TYPES.WALL || 
-	                    tile === TILE_TYPES.BUILDING) {
-	                    objects.push({
-	                        x: x * TILE_SIZE + TILE_SIZE / 2,
-	                        y: y * TILE_SIZE + TILE_SIZE / 2,
-	                        type: tile
-	                    });
-	                }
-	            }
-	        }
+				this.coverPoint = coverObjects[0];
+				this.moveTowards(this.coverPoint.x, this.coverPoint.y);
+			}
+		}
 
-	        return objects;
-	    }
+		findNearbyObjects() {
+			const objects = [];
+			const searchRadius = 200;
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
 
-	    standardEngagement() {
-	        const distToTarget = Math.hypot(
-	            this.currentTarget.x - this.x,
-	            this.currentTarget.y - this.y
-	        );
+			// Suche in einem Bereich um den Gegner
+			for (let y = Math.max(0, tileY - 5); y < Math.min(MAP_HEIGHT, tileY + 5); y++) {
+				for (let x = Math.max(0, tileX - 5); x < Math.min(MAP_WIDTH, tileX + 5); x++) {
+					const tile = map[y][x];
+					if (tile === TILE_TYPES.TREE || tile === TILE_TYPES.WALL ||
+						tile === TILE_TYPES.BUILDING) {
+						objects.push({
+							x: x * TILE_SIZE + TILE_SIZE / 2,
+							y: y * TILE_SIZE + TILE_SIZE / 2,
+							type: tile
+						});
+					}
+				}
+			}
 
-	        // Grundlegendes Schussverhalten
-	        if (this.canSee(this.currentTarget) && distToTarget < this.preferredRange) {
-	            this.fireAtTarget();
-	        }
+			return objects;
+		}
 
-	        // Bewegung und Positionierung
-	        if (distToTarget > this.preferredRange + 50) {
-	            this.moveTowards(this.currentTarget.x, this.currentTarget.y);
-	        } else if (distToTarget < this.preferredRange - 50) {
-	            const angle = Math.atan2(
-	                this.y - this.currentTarget.y,
-	                this.x - this.currentTarget.x
-	            );
-	            const retreatX = this.x + Math.cos(angle) * this.speed;
-	            const retreatY = this.y + Math.sin(angle) * this.speed;
-	            this.moveTowards(retreatX, retreatY);
-	        }
-	    }
+		standardEngagement() {
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-	    aggressiveEngagement() {
-	        const distToTarget = Math.hypot(
-	            this.currentTarget.x - this.x,
-	            this.currentTarget.y - this.y
-	        );
+			// Grundlegendes Schussverhalten
+			if (this.canSee(this.currentTarget) && distToTarget < this.preferredRange) {
+				this.fireAtTarget();
+			}
 
-	        // Aggressives Vorrücken
-	        if (distToTarget > 100) {
-	            this.moveTowards(this.currentTarget.x, this.currentTarget.y);
-	        }
+			// Bewegung und Positionierung
+			if (distToTarget > this.preferredRange + 50) {
+				this.moveTowards(this.currentTarget.x, this.currentTarget.y);
+			} else if (distToTarget < this.preferredRange - 50) {
+				const angle = Math.atan2(
+					this.y - this.currentTarget.y,
+					this.x - this.currentTarget.x
+				);
+				const retreatX = this.x + Math.cos(angle) * this.speed;
+				const retreatY = this.y + Math.sin(angle) * this.speed;
+				this.moveTowards(retreatX, retreatY);
+			}
+		}
 
-	        // Erhöhte Schussfrequenz
-	        if (this.canSee(this.currentTarget)) {
-	            this.fireAtTarget();
-	            
-	            // Granaten werfen wenn nah genug
-	            if (distToTarget < 150) {
-	                this.throwGrenade();
-	            }
-	        }
-	    }
+		aggressiveEngagement() {
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-	    defensiveEngagement() {
-	        const distToTarget = Math.hypot(
-	            this.currentTarget.x - this.x,
-	            this.currentTarget.y - this.y
-	        );
+			// Aggressives Vorrücken
+			if (distToTarget > 100) {
+				this.moveTowards(this.currentTarget.x, this.currentTarget.y);
+			}
 
-	        // In Deckung bleiben und aus sicherer Entfernung schießen
-	        if (distToTarget < this.preferredRange) {
-	            const angle = Math.atan2(
-	                this.y - this.currentTarget.y,
-	                this.x - this.currentTarget.x
-	            );
-	            const retreatX = this.x + Math.cos(angle) * this.speed * 2;
-	            const retreatY = this.y + Math.sin(angle) * this.speed * 2;
-	            this.moveTowards(retreatX, retreatY);
+			// Erhöhte Schussfrequenz
+			if (this.canSee(this.currentTarget)) {
+				this.fireAtTarget();
 
-	            // Minen legen beim Rückzug
-	            this.layMine();
-	        }
+				// Granaten werfen wenn nah genug
+				if (distToTarget < 150) {
+					this.throwGrenade();
+				}
+			}
+		}
 
-	        // Gezieltes Feuer aus der Deckung
-	        if (this.canSee(this.currentTarget) && distToTarget > this.preferredRange / 2) {
-	            this.fireAtTarget();
-	        }
-	    }
+		defensiveEngagement() {
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-	    flankingEngagement() {
-	        // Flankenposition berechnen wenn nötig
-	        if (!this.flankingPoint || Math.random() < 0.05) { // 5% Chance pro Update die Position zu ändern
-	            const angleToTarget = Math.atan2(
-	                this.currentTarget.y - this.y,
-	                this.currentTarget.x - this.x
-	            );
-	            const flankAngle = angleToTarget + (Math.random() < 0.5 ? Math.PI/2 : -Math.PI/2);
-	            this.flankingPoint = {
-	                x: this.currentTarget.x + Math.cos(flankAngle) * this.preferredRange,
-	                y: this.currentTarget.y + Math.sin(flankAngle) * this.preferredRange
-	            };
-	        }
+			// In Deckung bleiben und aus sicherer Entfernung schießen
+			if (distToTarget < this.preferredRange) {
+				const angle = Math.atan2(
+					this.y - this.currentTarget.y,
+					this.x - this.currentTarget.x
+				);
+				const retreatX = this.x + Math.cos(angle) * this.speed * 2;
+				const retreatY = this.y + Math.sin(angle) * this.speed * 2;
+				this.moveTowards(retreatX, retreatY);
 
-	        // Zur Flankenposition bewegen
-	        if (this.flankingPoint) {
-	            this.moveTowards(this.flankingPoint.x, this.flankingPoint.y);
-	        }
+				// Minen legen beim Rückzug
+				this.layMine();
+			}
 
-	        // Feuer wenn freie Sicht
-	        if (this.canSee(this.currentTarget)) {
-	            this.fireAtTarget();
-	        }
-	    }
+			// Gezieltes Feuer aus der Deckung
+			if (this.canSee(this.currentTarget) && distToTarget > this.preferredRange / 2) {
+				this.fireAtTarget();
+			}
+		}
 
-	    fireAtTarget() {
-	        const currentTime = Date.now();
-	        if (currentTime - this.lastShotTime >= this.fireRate) {
-	            const accuracy = Math.random() <= this.accuracy;
-	            const spread = accuracy ? 0.1 : 0.3;
-	            const randomSpread = (Math.random() - 0.5) * spread;
+		flankingEngagement() {
+			// Flankenposition berechnen wenn nötig
+			if (!this.flankingPoint || Math.random() < 0.05) { // 5% Chance pro Update die Position zu ändern
+				const angleToTarget = Math.atan2(
+					this.currentTarget.y - this.y,
+					this.currentTarget.x - this.x
+				);
+				const flankAngle = angleToTarget + (Math.random() < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+				this.flankingPoint = {
+					x: this.currentTarget.x + Math.cos(flankAngle) * this.preferredRange,
+					y: this.currentTarget.y + Math.sin(flankAngle) * this.preferredRange
+				};
+			}
 
-	            // Berechne Winkel zum Ziel
-	            this.angle = Math.atan2(
-	                this.currentTarget.y - this.y,
-	                this.currentTarget.x - this.x
-	            );
+			// Zur Flankenposition bewegen
+			if (this.flankingPoint) {
+				this.moveTowards(this.flankingPoint.x, this.flankingPoint.y);
+			}
 
-	            bullets.push(new Bullet(
-	                this.x,
-	                this.y,
-	                this.angle + randomSpread,
-	                'red',
-	                this,
-	                {
-	                    damage: this.isCommander ? 20 : 15,
-	                    range: 400,
-	                    speed: 10,
-	                    noise: 600
-	                }
-	            ));
+			// Feuer wenn freie Sicht
+			if (this.canSee(this.currentTarget)) {
+				this.fireAtTarget();
+			}
+		}
 
-	            this.lastShotTime = currentTime;
+		fireAtTarget() {
+			const currentTime = Date.now();
+			if (currentTime - this.lastShotTime >= this.fireRate) {
+				const accuracy = Math.random() <= this.accuracy;
+				const spread = accuracy ? 0.1 : 0.3;
+				const randomSpread = (Math.random() - 0.5) * spread;
 
-	            // Alarmiere andere Gegner in der Nähe
-	            this.informAlliesOfCombat();
-	        }
-	    }
+				// Berechne Winkel zum Ziel
+				this.angle = Math.atan2(
+					this.currentTarget.y - this.y,
+					this.currentTarget.x - this.x
+				);
+
+				bullets.push(new Bullet(
+					this.x,
+					this.y,
+					this.angle + randomSpread,
+					'red',
+					this,
+					{
+						damage: this.isCommander ? 20 : 15,
+						range: 400,
+						speed: 10,
+						noise: 600
+					}
+				));
+
+				this.lastShotTime = currentTime;
+
+				// Alarmiere andere Gegner in der Nähe
+				this.informAlliesOfCombat();
+			}
+		}
 
 		checkSafetyForExplosives(position, radius) {
-		    // Prüfe Abstand zu verbündeten Einheiten
-		    const nearbyAllies = enemies.filter(enemy => 
-		        enemy !== this && 
-		        enemy.isAlive && 
-		        Math.hypot(enemy.x - position.x, enemy.y - position.y) < radius * 1.5
-		    );
+			// Prüfe Abstand zu verbündeten Einheiten
+			const nearbyAllies = enemies.filter(enemy =>
+				enemy !== this &&
+				enemy.isAlive &&
+				Math.hypot(enemy.x - position.x, enemy.y - position.y) < radius * 1.5
+			);
 
-		    // Prüfe eigenen Abstand
-		    const ownDistance = Math.hypot(this.x - position.x, this.y - position.y);
-		    
-		    return nearbyAllies.length === 0 && ownDistance > radius * 1.2;
+			// Prüfe eigenen Abstand
+			const ownDistance = Math.hypot(this.x - position.x, this.y - position.y);
+
+			return nearbyAllies.length === 0 && ownDistance > radius * 1.2;
 		}
 
 		throwGrenade() {
-		    const currentTime = Date.now();
-		    if (currentTime - this.lastGrenadePlacement > this.grenadeCooldown) {
-		        const distToTarget = Math.hypot(
-		            this.currentTarget.x - this.x,
-		            this.currentTarget.y - this.y
-		        );
+			const currentTime = Date.now();
+			if (currentTime - this.lastGrenadePlacement > this.grenadeCooldown) {
+				const distToTarget = Math.hypot(
+					this.currentTarget.x - this.x,
+					this.currentTarget.y - this.y
+				);
 
-		        // Bevorzugt gegen Fahrzeuge einsetzen
-		        const shouldUseGrenade = this.currentTarget.vehicle || 
-		                               (distToTarget < 200 && this.currentTarget.health > 50);
+				// Bevorzugt gegen Fahrzeuge einsetzen
+				const shouldUseGrenade = this.currentTarget.vehicle ||
+					(distToTarget < 200 && this.currentTarget.health > 50);
 
-		        if (shouldUseGrenade) {
-		            const targetPos = {
-		                x: this.currentTarget.x,
-		                y: this.currentTarget.y
-		            };
+				if (shouldUseGrenade) {
+					const targetPos = {
+						x: this.currentTarget.x,
+						y: this.currentTarget.y
+					};
 
-		            // Sicherheitscheck
-		            if (this.checkSafetyForExplosives(targetPos, 200)) {
-		                grenades.push(new Grenade(
-		                    this.x,
-		                    this.y,
-		                    Math.atan2(
-		                        this.currentTarget.y - this.y,
-		                        this.currentTarget.x - this.x
-		                    ),
-		                    this
-		                ));
-		                this.lastGrenadePlacement = currentTime;
-		            }
-		        }
-		    }
+					// Sicherheitscheck
+					if (this.checkSafetyForExplosives(targetPos, 200)) {
+						grenades.push(new Grenade(
+							this.x,
+							this.y,
+							Math.atan2(
+								this.currentTarget.y - this.y,
+								this.currentTarget.x - this.x
+							),
+							this
+						));
+						this.lastGrenadePlacement = currentTime;
+					}
+				}
+			}
 		}
 
 		layMine() {
-		    const currentTime = Date.now();
-		    if (currentTime - this.lastMinePlacement > this.minePlacementCooldown) {
-		        // Nur Minen legen wenn Fahrzeuge in der Nähe oder als strategische Sperre
-		        const nearbyVehicles = vehicles.filter(v => 
-		            !v.isDestroyed && 
-		            Math.hypot(v.x - this.x, v.y - this.y) < this.vehicleSearchRadius &&
-		            v.passengers.some(p => p instanceof Player)
-		        );
+			const currentTime = Date.now();
+			if (currentTime - this.lastMinePlacement > this.minePlacementCooldown) {
+				// Nur Minen legen wenn Fahrzeuge in der Nähe oder als strategische Sperre
+				const nearbyVehicles = vehicles.filter(v =>
+					!v.isDestroyed &&
+					Math.hypot(v.x - this.x, v.y - this.y) < this.vehicleSearchRadius &&
+					v.passengers.some(p => p instanceof Player)
+				);
 
-		        if (nearbyVehicles.length > 0 && this.checkSafetyForExplosives(this, 150)) {
-		            mines.push(new Mine(this.x, this.y));
-		            this.lastMinePlacement = currentTime;
-		        }
-		    }
+				if (nearbyVehicles.length > 0 && this.checkSafetyForExplosives(this, 150)) {
+					mines.push(new Mine(this.x, this.y));
+					this.lastMinePlacement = currentTime;
+				}
+			}
 		}
 
 		findSuitableVehicle() {
-		    return vehicles.find(vehicle => 
-		        !vehicle.isDestroyed &&
-		        vehicle.passengers.length === 0 && // Nur leere Fahrzeuge
-		        !vehicle.passengers.some(p => p instanceof Player) && // Keine Spielerfahrzeuge
-		        Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
-		        (!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
-		        !this.isVehicleInDanger(vehicle)
-		    );
+			return vehicles.find(vehicle =>
+				!vehicle.isDestroyed &&
+				vehicle.passengers.length === 0 && // Nur leere Fahrzeuge
+				!vehicle.passengers.some(p => p instanceof Player) && // Keine Spielerfahrzeuge
+				Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
+				(!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
+				!this.isVehicleInDanger(vehicle)
+			);
 		}
 
-	    updateVehicleBehavior() {
-		    const currentTime = Date.now();
+		updateVehicleBehavior() {
+			const currentTime = Date.now();
 
-		    // Regelmäßig nach Fahrzeugen suchen
-		    if (currentTime - this.lastVehicleCheck > this.vehicleCheckCooldown) {
-		        this.lastVehicleCheck = currentTime;
+			// Regelmäßig nach Fahrzeugen suchen
+			if (currentTime - this.lastVehicleCheck > this.vehicleCheckCooldown) {
+				this.lastVehicleCheck = currentTime;
 
-		        // Suche nach Fahrzeugen wenn eine Bedrohung durch Fahrzeuge bekannt ist
-		        if (this.shouldSearchForVehicle()) {
-		            const nearbyVehicle = this.findSuitableVehicle();
-		            if (nearbyVehicle) {
-		                // Statt enterVehicle die vorhandene addPassenger-Methode nutzen
-		                nearbyVehicle.addPassenger(this);
-		                this.currentVehicle = nearbyVehicle;
-		            }
-		        }
-		    }
+				// Suche nach Fahrzeugen wenn eine Bedrohung durch Fahrzeuge bekannt ist
+				if (this.shouldSearchForVehicle()) {
+					const nearbyVehicle = this.findSuitableVehicle();
+					if (nearbyVehicle) {
+						// Statt enterVehicle die vorhandene addPassenger-Methode nutzen
+						nearbyVehicle.addPassenger(this);
+						this.currentVehicle = nearbyVehicle;
+					}
+				}
+			}
 
-		    // Wenn in einem Fahrzeug
-		    if (this.currentVehicle) {
-		        this.updateVehicleCombat();
-		    }
+			// Wenn in einem Fahrzeug
+			if (this.currentVehicle) {
+				this.updateVehicleCombat();
+			}
 		}
 
-	    shouldSearchForVehicle() {
-	        // Suche nach Fahrzeug wenn:
-	        // 1. Feindliches Fahrzeug in der Nähe
-	        const enemyVehicleNearby = this.isEnemyVehicleNearby();
-	        // 2. Gesundheit niedrig und Rückzug nötig
-	        const needsEvacuation = this.health < 30;
-	        // 3. Taktische Situation erfordert Mobilität
-	        const needsMobility = this.alertness === 'combat' && 
-	                            this.tacticalBehavior === 'aggressive';
+		shouldSearchForVehicle() {
+			// Suche nach Fahrzeug wenn:
+			// 1. Feindliches Fahrzeug in der Nähe
+			const enemyVehicleNearby = this.isEnemyVehicleNearby();
+			// 2. Gesundheit niedrig und Rückzug nötig
+			const needsEvacuation = this.health < 30;
+			// 3. Taktische Situation erfordert Mobilität
+			const needsMobility = this.alertness === 'combat' &&
+				this.tacticalBehavior === 'aggressive';
 
-	        return enemyVehicleNearby || needsEvacuation || needsMobility;
-	    }
+			return enemyVehicleNearby || needsEvacuation || needsMobility;
+		}
 
 		isEnemyVehicleNearby() {
-			return players.some(player => 
+			return players.some(player =>
 				player.vehicle &&
 				!player.vehicle.isDestroyed &&
 				Math.hypot(player.x - this.x, player.y - this.y) < this.vehicleSearchRadius
 			);
 		}
 
-	    findSuitableVehicle() {
-	        return vehicles.find(vehicle => 
-	            !vehicle.isDestroyed &&
-	            vehicle.passengers.length < 2 &&
-	            Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
-	            (!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
-	            !this.isVehicleInDanger(vehicle)
-	        );
-	    }
+		findSuitableVehicle() {
+			return vehicles.find(vehicle =>
+				!vehicle.isDestroyed &&
+				vehicle.passengers.length < 2 &&
+				Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
+				(!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
+				!this.isVehicleInDanger(vehicle)
+			);
+		}
 
-	    isVehicleInDanger(vehicle) {
-	        // Prüfe ob das Fahrzeug im Kreuzfeuer oder in Explosionsgefahr ist
-	        return bullets.some(bullet => 
-	            bullet.owner instanceof Player &&
-	            Math.hypot(bullet.x - vehicle.x, bullet.y - vehicle.y) < 100
-	        ) || grenades.some(grenade =>
-	            Math.hypot(grenade.x - vehicle.x, grenade.y - vehicle.y) < 200
-	        );
-	    }
+		isVehicleInDanger(vehicle) {
+			// Prüfe ob das Fahrzeug im Kreuzfeuer oder in Explosionsgefahr ist
+			return bullets.some(bullet =>
+				bullet.owner instanceof Player &&
+				Math.hypot(bullet.x - vehicle.x, bullet.y - vehicle.y) < 100
+			) || grenades.some(grenade =>
+				Math.hypot(grenade.x - vehicle.x, grenade.y - vehicle.y) < 200
+			);
+		}
 
-	    updateVehicleCombat() {
-	        if (!this.currentVehicle) return;
+		updateVehicleCombat() {
+			if (!this.currentVehicle) return;
 
-	        const target = this.findNearestPlayer();
-	        if (!target) return;
+			const target = this.findNearestPlayer();
+			if (!target) return;
 
-	        const distToTarget = Math.hypot(
-	            target.x - this.currentVehicle.x,
-	            target.y - this.currentVehicle.y
-	        );
+			const distToTarget = Math.hypot(
+				target.x - this.currentVehicle.x,
+				target.y - this.currentVehicle.y
+			);
 
-	        // Fahrzeugspezifische Taktiken
-	        if (this.currentVehicle.type === 'Panzer') {
-	            this.updateTankTactics(target, distToTarget);
-	        } else if (this.currentVehicle.type === 'Jeep') {
-	            this.updateJeepTactics(target, distToTarget);
-	        }
-	    }
+			// Fahrzeugspezifische Taktiken
+			if (this.currentVehicle.type === 'Panzer') {
+				this.updateTankTactics(target, distToTarget);
+			} else if (this.currentVehicle.type === 'Jeep') {
+				this.updateJeepTactics(target, distToTarget);
+			}
+		}
 
-	    updateTankTactics(target, distToTarget) {
-	        const optimalRange = 300;
-	        const angleToTarget = Math.atan2(
-	            target.y - this.currentVehicle.y,
-	            target.x - this.currentVehicle.x
-	        );
+		updateTankTactics(target, distToTarget) {
+			const optimalRange = 300;
+			const angleToTarget = Math.atan2(
+				target.y - this.currentVehicle.y,
+				target.x - this.currentVehicle.x
+			);
 
-	        // Positionierung
-	        if (Math.abs(distToTarget - optimalRange) > 50) {
-	            if (distToTarget > optimalRange) {
-	                this.currentVehicle.moveForward();
-	            } else {
-	                this.currentVehicle.moveBackward();
-	            }
-	        }
+			// Positionierung
+			if (Math.abs(distToTarget - optimalRange) > 50) {
+				if (distToTarget > optimalRange) {
+					this.currentVehicle.moveForward();
+				} else {
+					this.currentVehicle.moveBackward();
+				}
+			}
 
-	        // Turm ausrichten und feuern
-	        this.currentVehicle.turretAngle = angleToTarget - this.currentVehicle.angle;
-	        if (this.canSee(target)) {
-	            this.currentVehicle.fire();
-	        }
-	    }
+			// Turm ausrichten und feuern
+			this.currentVehicle.turretAngle = angleToTarget - this.currentVehicle.angle;
+			if (this.canSee(target)) {
+				this.currentVehicle.fire();
+			}
+		}
 
-	    updateJeepTactics(target, distToTarget) {
-	        // Jeeps sind mobiler und sollten sich mehr bewegen
-	        const optimalRange = 200;
-	        const circlingRadius = 150;
-	        const circlingSpeed = 0.03;
+		updateJeepTactics(target, distToTarget) {
+			// Jeeps sind mobiler und sollten sich mehr bewegen
+			const optimalRange = 200;
+			const circlingRadius = 150;
+			const circlingSpeed = 0.03;
 
-	        // Kreisende Bewegung um das Ziel
-	        const circleAngle = Date.now() * circlingSpeed;
-	        const targetX = target.x + Math.cos(circleAngle) * circlingRadius;
-	        const targetY = target.y + Math.sin(circleAngle) * circlingRadius;
+			// Kreisende Bewegung um das Ziel
+			const circleAngle = Date.now() * circlingSpeed;
+			const targetX = target.x + Math.cos(circleAngle) * circlingRadius;
+			const targetY = target.y + Math.sin(circleAngle) * circlingRadius;
 
-	        this.currentVehicle.moveTowards(targetX, targetY);
+			this.currentVehicle.moveTowards(targetX, targetY);
 
-	        // Schießen wenn möglich
-	        if (this.canSee(target) && distToTarget < 250) {
-	            this.currentVehicle.fire();
-	        }
-	    }
+			// Schießen wenn möglich
+			if (this.canSee(target) && distToTarget < 250) {
+				this.currentVehicle.fire();
+			}
+		}
 
-	    updateAllyNetwork() {
-	        this.allyNetwork.clear();
-	        enemies.forEach(enemy => {
-	            if (enemy !== this && enemy.isAlive && 
-	                Math.hypot(enemy.x - this.x, enemy.y - this.y) < this.communicationRange) {
-	                this.allyNetwork.add(enemy);
-	            }
-	        });
-	    }
+		updateAllyNetwork() {
+			this.allyNetwork.clear();
+			enemies.forEach(enemy => {
+				if (enemy !== this && enemy.isAlive &&
+					Math.hypot(enemy.x - this.x, enemy.y - this.y) < this.communicationRange) {
+					this.allyNetwork.add(enemy);
+				}
+			});
+		}
 
-	    informAlliesOfThreat(threat, threatLevel) {
-	        this.allyNetwork.forEach(ally => {
-	            ally.receiveIntel({
-	                type: 'threat',
-	                target: threat,
-	                level: threatLevel,
-	                position: {x: threat.x, y: threat.y},
-	                timestamp: Date.now()
-	            });
-	        });
-	    }
+		informAlliesOfThreat(threat, threatLevel) {
+			this.allyNetwork.forEach(ally => {
+				ally.receiveIntel({
+					type: 'threat',
+					target: threat,
+					level: threatLevel,
+					position: {x: threat.x, y: threat.y},
+					timestamp: Date.now()
+				});
+			});
+		}
 
-	    informAlliesOfCombat() {
-	        this.allyNetwork.forEach(ally => {
-	            ally.receiveIntel({
-	                type: 'combat',
-	                position: {x: this.x, y: this.y},
-	                target: this.currentTarget,
-	                timestamp: Date.now()
-	            });
-	        });
-	    }
+		informAlliesOfCombat() {
+			this.allyNetwork.forEach(ally => {
+				ally.receiveIntel({
+					type: 'combat',
+					position: {x: this.x, y: this.y},
+					target: this.currentTarget,
+					timestamp: Date.now()
+				});
+			});
+		}
 
-	    notifyAlliesOfDeath() {
-	        this.allyNetwork.forEach(ally => {
-	            ally.receiveIntel({
-	                type: 'ally_death',
-	                position: {x: this.x, y: this.y},
-	                timestamp: Date.now()
-	            });
-	        });
-	    }
+		notifyAlliesOfDeath() {
+			this.allyNetwork.forEach(ally => {
+				ally.receiveIntel({
+					type: 'ally_death',
+					position: {x: this.x, y: this.y},
+					timestamp: Date.now()
+				});
+			});
+		}
 
-	    receiveIntel(intel) {
-	        switch (intel.type) {
-	            case 'threat':
-	                this.handleThreatIntel(intel);
-	                break;
-	            case 'combat':
-	                this.handleCombatIntel(intel);
-	                break;
-	            case 'ally_death':
-	                this.handleAllyDeathIntel(intel);
-	                break;
-	        }
-	    }
+		receiveIntel(intel) {
+			switch (intel.type) {
+				case 'threat':
+					this.handleThreatIntel(intel);
+					break;
+				case 'combat':
+					this.handleCombatIntel(intel);
+					break;
+				case 'ally_death':
+					this.handleAllyDeathIntel(intel);
+					break;
+			}
+		}
 
-	    handleThreatIntel(intel) {
-	        // Erhöhe Alarmbereitschaft
-	        this.alertnessLevel = Math.min(this.alertnessLevel + 2, 10);
-	        
-	        if (this.alertness === 'patrol') {
-	            this.alertness = 'suspicious';
-	        }
+		handleThreatIntel(intel) {
+			// Erhöhe Alarmbereitschaft
+			this.alertnessLevel = Math.min(this.alertnessLevel + 2, 10);
 
-	        // Aktualisiere letzte bekannte Position
-	        this.lastKnownPositions.set(intel.target.id, {
-	            position: intel.position,
-	            timestamp: intel.timestamp
-	        });
+			if (this.alertness === 'patrol') {
+				this.alertness = 'suspicious';
+			}
 
-	        // Reagiere basierend auf Bedrohungslevel
-	        if (intel.level > 7) {
-	            this.alertness = 'combat';
-	            // Suche Deckung oder Fahrzeug
-	            if (Math.random() < 0.3) {
-	                this.findCover();
-	            } else {
-	                this.desiredVehicleType = 'Panzer';
-	            }
-	        }
-	    }
+			// Aktualisiere letzte bekannte Position
+			this.lastKnownPositions.set(intel.target.id, {
+				position: intel.position,
+				timestamp: intel.timestamp
+			});
 
-	    handleCombatIntel(intel) {
-	        // Erhöhe Alarmbereitschaft sofort
-	        this.alertnessLevel = Math.min(this.alertnessLevel + 3, 10);
-	        this.alertness = 'alert';
+			// Reagiere basierend auf Bedrohungslevel
+			if (intel.level > 7) {
+				this.alertness = 'combat';
+				// Suche Deckung oder Fahrzeug
+				if (Math.random() < 0.3) {
+					this.findCover();
+				} else {
+					this.desiredVehicleType = 'Panzer';
+				}
+			}
+		}
 
-	        // Wenn nahe genug, direkt in Kampf eingreifen
-	        if (Math.hypot(this.x - intel.position.x, this.y - intel.position.y) < 300) {
-	            this.alertness = 'combat';
-	            this.currentTarget = intel.target;
-	            this.tacticalBehavior = 'flanking'; // Versuche zu flankieren
-	        } else {
-	            // Sonst Position untersuchen
-	            this.lastSuspiciousPosition = intel.position;
-	        }
-	    }
+		handleCombatIntel(intel) {
+			// Erhöhe Alarmbereitschaft sofort
+			this.alertnessLevel = Math.min(this.alertnessLevel + 3, 10);
+			this.alertness = 'alert';
 
-	    handleAllyDeathIntel(intel) {
-	        // Maximale Alarmbereitschaft
-	        this.alertnessLevel = 10;
-	        this.alertness = 'alert';
+			// Wenn nahe genug, direkt in Kampf eingreifen
+			if (Math.hypot(this.x - intel.position.x, this.y - intel.position.y) < 300) {
+				this.alertness = 'combat';
+				this.currentTarget = intel.target;
+				this.tacticalBehavior = 'flanking'; // Versuche zu flankieren
+			} else {
+				// Sonst Position untersuchen
+				this.lastSuspiciousPosition = intel.position;
+			}
+		}
 
-	        // Position des Todes untersuchen
-	        this.lastSuspiciousPosition = intel.position;
+		handleAllyDeathIntel(intel) {
+			// Maximale Alarmbereitschaft
+			this.alertnessLevel = 10;
+			this.alertness = 'alert';
 
-	        // Wenn in der Nähe, sofort in Deckung gehen
-	        if (Math.hypot(this.x - intel.position.x, this.y - intel.position.y) < 200) {
-	            this.findCover();
-	            this.tacticalBehavior = 'defensive';
-	        }
-	    }
+			// Position des Todes untersuchen
+			this.lastSuspiciousPosition = intel.position;
+
+			// Wenn in der Nähe, sofort in Deckung gehen
+			if (Math.hypot(this.x - intel.position.x, this.y - intel.position.y) < 200) {
+				this.findCover();
+				this.tacticalBehavior = 'defensive';
+			}
+		}
 
 		getRandomPatrolType() {
 			const types = ['linear', 'circular', 'random'];
@@ -2884,88 +2886,88 @@
 		}
 
 		generatePatrolPoints() {
-		    const points = [];
-		    const patrolRadius = 200;
+			const points = [];
+			const patrolRadius = 200;
 
-		    // Wichtig: Prüfe ob die Punkte überhaupt erreichbar sind BEVOR wir sie zurückgeben
-		    const generateValidPoint = (baseX, baseY, offsetX, offsetY) => {
-		        const x = baseX + offsetX;
-		        const y = baseY + offsetY;
-		        // Prüfe nicht nur Kollision, sondern auch ob der Weg dorthin frei ist
-		        if (!isColliding(x, y) && !lineOfSightBlocked(this.x, this.y, x, y)) {
-		            return {x, y};
-		        }
-		        return null;
-		    };
+			// Wichtig: Prüfe ob die Punkte überhaupt erreichbar sind BEVOR wir sie zurückgeben
+			const generateValidPoint = (baseX, baseY, offsetX, offsetY) => {
+				const x = baseX + offsetX;
+				const y = baseY + offsetY;
+				// Prüfe nicht nur Kollision, sondern auch ob der Weg dorthin frei ist
+				if (!isColliding(x, y) && !lineOfSightBlocked(this.x, this.y, x, y)) {
+					return {x, y};
+				}
+				return null;
+			};
 
-		    switch (this.patrolType) {
-		        case 'linear':
-		            // Versuche alternative Punkte wenn die ursprünglichen nicht gehen
-		            let leftPoint = generateValidPoint(this.x, this.y, -patrolRadius, 0);
-		            let rightPoint = generateValidPoint(this.x, this.y, patrolRadius, 0);
-		            
-		            if (!leftPoint || !rightPoint) {
-		                // Versuche vertikale Patrouillenroute
-		                leftPoint = generateValidPoint(this.x, this.y, 0, -patrolRadius);
-		                rightPoint = generateValidPoint(this.x, this.y, 0, patrolRadius);
-		            }
+			switch (this.patrolType) {
+				case 'linear':
+					// Versuche alternative Punkte wenn die ursprünglichen nicht gehen
+					let leftPoint = generateValidPoint(this.x, this.y, -patrolRadius, 0);
+					let rightPoint = generateValidPoint(this.x, this.y, patrolRadius, 0);
 
-		            if (leftPoint) points.push(leftPoint);
-		            if (rightPoint) points.push(rightPoint);
-		            break;
+					if (!leftPoint || !rightPoint) {
+						// Versuche vertikale Patrouillenroute
+						leftPoint = generateValidPoint(this.x, this.y, 0, -patrolRadius);
+						rightPoint = generateValidPoint(this.x, this.y, 0, patrolRadius);
+					}
 
-		        case 'circular':
-		            // Generiere mehrere mögliche Punkte und nutze die validen
-		            for (let i = 0; i < 6; i++) {
-		                const angle = (Math.PI * 2 * i) / 6;
-		                const point = generateValidPoint(
-		                    this.x, 
-		                    this.y,
-		                    Math.cos(angle) * patrolRadius,
-		                    Math.sin(angle) * patrolRadius
-		                );
-		                if (point) points.push(point);
-		            }
-		            break;
+					if (leftPoint) points.push(leftPoint);
+					if (rightPoint) points.push(rightPoint);
+					break;
 
-		        case 'random':
-		            // Generiere genug valide Punkte
-		            let attempts = 0;
-		            while (points.length < 4 && attempts < 20) {
-		                const point = generateValidPoint(
-		                    this.x,
-		                    this.y,
-		                    (Math.random() - 0.5) * patrolRadius * 2,
-		                    (Math.random() - 0.5) * patrolRadius * 2
-		                );
-		                if (point) points.push(point);
-		                attempts++;
-		            }
-		            break;
-		    }
+				case 'circular':
+					// Generiere mehrere mögliche Punkte und nutze die validen
+					for (let i = 0; i < 6; i++) {
+						const angle = (Math.PI * 2 * i) / 6;
+						const point = generateValidPoint(
+							this.x,
+							this.y,
+							Math.cos(angle) * patrolRadius,
+							Math.sin(angle) * patrolRadius
+						);
+						if (point) points.push(point);
+					}
+					break;
 
-		    // Wenn keine Punkte gefunden wurden, erstelle wenigstens einen nahen Punkt
-		    if (points.length === 0) {
-		        for (let radius = 50; radius <= patrolRadius; radius += 50) {
-		            let found = false;
-		            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-		                const point = generateValidPoint(
-		                    this.x,
-		                    this.y,
-		                    Math.cos(angle) * radius,
-		                    Math.sin(angle) * radius
-		                );
-		                if (point) {
-		                    points.push(point);
-		                    found = true;
-		                    break;
-		                }
-		            }
-		            if (found) break;
-		        }
-		    }
+				case 'random':
+					// Generiere genug valide Punkte
+					let attempts = 0;
+					while (points.length < 4 && attempts < 20) {
+						const point = generateValidPoint(
+							this.x,
+							this.y,
+							(Math.random() - 0.5) * patrolRadius * 2,
+							(Math.random() - 0.5) * patrolRadius * 2
+						);
+						if (point) points.push(point);
+						attempts++;
+					}
+					break;
+			}
 
-		    return points;
+			// Wenn keine Punkte gefunden wurden, erstelle wenigstens einen nahen Punkt
+			if (points.length === 0) {
+				for (let radius = 50; radius <= patrolRadius; radius += 50) {
+					let found = false;
+					for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+						const point = generateValidPoint(
+							this.x,
+							this.y,
+							Math.cos(angle) * radius,
+							Math.sin(angle) * radius
+						);
+						if (point) {
+							points.push(point);
+							found = true;
+							break;
+						}
+					}
+					if (found) break;
+				}
+			}
+
+			return points;
 		}
 
 		updatePatrol() {
@@ -3107,28 +3109,28 @@
 		}
 
 		moveTowards(x, y) {
-		    const dx = x - this.x;
-		    const dy = y - this.y;
-		    const dist = Math.hypot(dx, dy);
-		    
-		    if (dist < 1) return; // Verhindert Mikrobewegungen
-		    
-		    const dirX = dx / dist;
-		    const dirY = dy / dist;
-		    const newX = this.x + dirX * this.speed;
-		    const newY = this.y + dirY * this.speed;
+			const dx = x - this.x;
+			const dy = y - this.y;
+			const dist = Math.hypot(dx, dy);
 
-		    // Prüfe Kollision für X und Y separat
-		    const canMoveX = !isColliding(newX, this.y, this);
-		    const canMoveY = !isColliding(this.x, newY, this);
+			if (dist < 1) return; // Verhindert Mikrobewegungen
 
-		    if (canMoveX) this.x = newX;
-		    if (canMoveY) this.y = newY;
+			const dirX = dx / dist;
+			const dirY = dy / dist;
+			const newX = this.x + dirX * this.speed;
+			const newY = this.y + dirY * this.speed;
 
-		    // Nur Winkel aktualisieren wenn wirklich Bewegung stattfindet
-		    if (canMoveX || canMoveY) {
-		        this.angle = Math.atan2(dy, dx);
-		    }
+			// Prüfe Kollision für X und Y separat
+			const canMoveX = !isColliding(newX, this.y, this);
+			const canMoveY = !isColliding(this.x, newY, this);
+
+			if (canMoveX) this.x = newX;
+			if (canMoveY) this.y = newY;
+
+			// Nur Winkel aktualisieren wenn wirklich Bewegung stattfindet
+			if (canMoveX || canMoveY) {
+				this.angle = Math.atan2(dy, dx);
+			}
 		}
 
 		updateTactics() {
@@ -3180,7 +3182,7 @@
 		checkNearbyAllies() {
 			let nearbyAllies = 0;
 			enemies.forEach(enemy => {
-				if (enemy !== this && enemy.isAlive && 
+				if (enemy !== this && enemy.isAlive &&
 					Math.hypot(enemy.x - this.x, enemy.y - this.y) < 200) {
 					nearbyAllies++;
 				}
@@ -3193,31 +3195,31 @@
 		}
 
 		analyzeTacticalSituation() {
-	        if (!this.currentTarget) return;
+			if (!this.currentTarget) return;
 
-	        const distToTarget = Math.hypot(
-	            this.currentTarget.x - this.x,
-	            this.currentTarget.y - this.y
-	        );
+			const distToTarget = Math.hypot(
+				this.currentTarget.x - this.x,
+				this.currentTarget.y - this.y
+			);
 
-	        // Zähle Verbündete in der Nähe
-	        let nearbyAlliesCount = 0;
-	        enemies.forEach(enemy => {
-	            if (enemy !== this && enemy.isAlive && 
-	                Math.hypot(enemy.x - this.x, enemy.y - this.y) < 200) {
-	                nearbyAlliesCount++;
-	            }
-	        });
+			// Zähle Verbündete in der Nähe
+			let nearbyAlliesCount = 0;
+			enemies.forEach(enemy => {
+				if (enemy !== this && enemy.isAlive &&
+					Math.hypot(enemy.x - this.x, enemy.y - this.y) < 200) {
+					nearbyAlliesCount++;
+				}
+			});
 
-	        // Taktische Entscheidungen basierend auf Situation
-	        if (this.health < 40) {
-	            this.tacticalBehavior = 'defensive';
-	        } else if (distToTarget < 100) {
-	            this.tacticalBehavior = this.currentTarget.vehicle ? 'defensive' : 'aggressive';
-	        } else if (nearbyAlliesCount >= 2) {
-	            this.tacticalBehavior = 'flanking';
-	        }
-	    }
+			// Taktische Entscheidungen basierend auf Situation
+			if (this.health < 40) {
+				this.tacticalBehavior = 'defensive';
+			} else if (distToTarget < 100) {
+				this.tacticalBehavior = this.currentTarget.vehicle ? 'defensive' : 'aggressive';
+			} else if (nearbyAlliesCount >= 2) {
+				this.tacticalBehavior = 'flanking';
+			}
+		}
 
 		returnToPatrol() {
 			this.alertness = 'patrol';
@@ -3228,86 +3230,86 @@
 		}
 
 		canSee(player) {
-		    if (!player.isAlive) return false;
+			if (!player.isAlive) return false;
 
-		    const dx = player.x - this.x;
-		    const dy = player.y - this.y;
-		    const dist = Math.hypot(dx, dy);
-		    
-		    // Basis-Sichtweite mit Tarnmodifikator
-		    const modifiedViewDistance = this.viewDistance * player.stealthStatus.detectionModifier;
-		    
-		    if (dist > modifiedViewDistance) return false;
+			const dx = player.x - this.x;
+			const dy = player.y - this.y;
+			const dist = Math.hypot(dx, dy);
 
-		    // Präziserer Sichtwinkel-Check
-		    const angleToPlayer = Math.atan2(dy, dx);
-		    let angleDifference = angleToPlayer - this.angle;
-		    angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
+			// Basis-Sichtweite mit Tarnmodifikator
+			const modifiedViewDistance = this.viewDistance * player.stealthStatus.detectionModifier;
 
-		    // Engerer Sichtwinkel und zusätzliche Checks
-		    const effectiveViewAngle = this.viewAngle * 
-		        (this.alertness === 'combat' ? 1.2 : 0.8); // Im Kampf aufmerksamer
-		    
-		    if (Math.abs(angleDifference) > effectiveViewAngle / 2) return false;
+			if (dist > modifiedViewDistance) return false;
 
-		    // Mehrere Sichtlinien-Checks für breitere Objekte
-		    const checkPoints = [
-		        {x: player.x, y: player.y}, // Zentrum
-		        {x: player.x - player.size/2, y: player.y}, // Links
-		        {x: player.x + player.size/2, y: player.y}, // Rechts
-		        {x: player.x, y: player.y - player.size/2}, // Oben
-		        {x: player.x, y: player.y + player.size/2}  // Unten
-		    ];
+			// Präziserer Sichtwinkel-Check
+			const angleToPlayer = Math.atan2(dy, dx);
+			let angleDifference = angleToPlayer - this.angle;
+			angleDifference = Math.atan2(Math.sin(angleDifference), Math.cos(angleDifference));
 
-		    // Wenn mindestens einer der Punkte sichtbar ist
-		    const visiblePoints = checkPoints.filter(point => 
-		        !lineOfSightBlocked(this.x, this.y, point.x, point.y)
-		    );
+			// Engerer Sichtwinkel und zusätzliche Checks
+			const effectiveViewAngle = this.viewAngle *
+				(this.alertness === 'combat' ? 1.2 : 0.8); // Im Kampf aufmerksamer
 
-		    if (visiblePoints.length === 0) return false;
+			if (Math.abs(angleDifference) > effectiveViewAngle / 2) return false;
 
-		    // Zusätzliche Wahrscheinlichkeitsberechnung für getarnte Spieler
-		    if (player.stealthStatus.isCamouflaged) {
-		        // Je mehr Punkte sichtbar sind, desto wahrscheinlicher die Erkennung
-		        const detectionChance = player.stealthStatus.detectionModifier * 
-		            (visiblePoints.length / checkPoints.length);
-		        if (Math.random() > detectionChance) {
-		            return false;
-		        }
-		    }
+			// Mehrere Sichtlinien-Checks für breitere Objekte
+			const checkPoints = [
+				{x: player.x, y: player.y}, // Zentrum
+				{x: player.x - player.size / 2, y: player.y}, // Links
+				{x: player.x + player.size / 2, y: player.y}, // Rechts
+				{x: player.x, y: player.y - player.size / 2}, // Oben
+				{x: player.x, y: player.y + player.size / 2}  // Unten
+			];
 
-		    // Bewegungsbasierte Erkennung
-		    const playerMoving = player.speed > 0;
-		    if (playerMoving && dist < modifiedViewDistance * 0.8) {
-		        return true; // Bewegung macht sehr sichtbar auf kurze Distanz
-		    }
+			// Wenn mindestens einer der Punkte sichtbar ist
+			const visiblePoints = checkPoints.filter(point =>
+				!lineOfSightBlocked(this.x, this.y, point.x, point.y)
+			);
 
-		    return true;
+			if (visiblePoints.length === 0) return false;
+
+			// Zusätzliche Wahrscheinlichkeitsberechnung für getarnte Spieler
+			if (player.stealthStatus.isCamouflaged) {
+				// Je mehr Punkte sichtbar sind, desto wahrscheinlicher die Erkennung
+				const detectionChance = player.stealthStatus.detectionModifier *
+					(visiblePoints.length / checkPoints.length);
+				if (Math.random() > detectionChance) {
+					return false;
+				}
+			}
+
+			// Bewegungsbasierte Erkennung
+			const playerMoving = player.speed > 0;
+			if (playerMoving && dist < modifiedViewDistance * 0.8) {
+				return true; // Bewegung macht sehr sichtbar auf kurze Distanz
+			}
+
+			return true;
 		}
 
 		canHear(player) {
-		    if (!player.isAlive) return false;
-		    
-		    const dist = Math.hypot(player.x - this.x, player.y - this.y);
-		    const baseRange = this.alertness === 'combat' ? 
-		                     this.combatHearingRange : 
-		                     this.hearingRange;
-		    
-		    // Geräuschquellen prüfen
-		    if (player.isCrouching) {
-		        return dist < baseRange * 0.3;
-		    } else if (player.speed > 3) {
-		        return dist < baseRange * 0.8;
-		    }
-		    
-		    // Waffen-Geräusche
-		    const currentWeapon = player.inventory?.getSelectedItem();
-		    if (currentWeapon && currentWeapon.noise) {
-		        const weaponNoise = currentWeapon.noise || 800;
-		        return dist < weaponNoise;
-		    }
+			if (!player.isAlive) return false;
 
-		    return dist < baseRange * 0.5;
+			const dist = Math.hypot(player.x - this.x, player.y - this.y);
+			const baseRange = this.alertness === 'combat' ?
+				this.combatHearingRange :
+				this.hearingRange;
+
+			// Geräuschquellen prüfen
+			if (player.isCrouching) {
+				return dist < baseRange * 0.3;
+			} else if (player.speed > 3) {
+				return dist < baseRange * 0.8;
+			}
+
+			// Waffen-Geräusche
+			const currentWeapon = player.inventory?.getSelectedItem();
+			if (currentWeapon && currentWeapon.noise) {
+				const weaponNoise = currentWeapon.noise || 800;
+				return dist < weaponNoise;
+			}
+
+			return dist < baseRange * 0.5;
 		}
 
 		hearNoise(x, y) {
@@ -3316,129 +3318,129 @@
 		}
 
 		draw() {
-		    if (!this.isAlive) {
-		        ctx.save();
-		        ctx.translate(this.x, this.y);
-		        ctx.rotate(Math.PI / 2); // Umfallen
-		        ctx.fillStyle = this.color;
-		        ctx.fillRect(-15, -15, 30, 30);
-		        ctx.restore();
-		        return;
-		    }
+			if (!this.isAlive) {
+				ctx.save();
+				ctx.translate(this.x, this.y);
+				ctx.rotate(Math.PI / 2); // Umfallen
+				ctx.fillStyle = this.color;
+				ctx.fillRect(-15, -15, 30, 30);
+				ctx.restore();
+				return;
+			}
 
-		    // Sichtfeld zeichnen
-		    this.drawVisionCone();
+			// Sichtfeld zeichnen
+			this.drawVisionCone();
 
-		    // Gegner selbst zeichnen
-		    ctx.save();
-		    ctx.translate(this.x, this.y);
-		    ctx.rotate(this.angle);
+			// Gegner selbst zeichnen
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle);
 
-		    // Körper
-		    ctx.fillStyle = this.color;
-		    ctx.fillRect(-15, -15, 30, 30);
+			// Körper
+			ctx.fillStyle = this.color;
+			ctx.fillRect(-15, -15, 30, 30);
 
-		    // Ausrüstung zeichnen (analog zum Player)
-		    if (this.equipment.has('schutzweste')) {
-		        ctx.fillStyle = 'gray';
-		        ctx.fillRect(-10, -10, 20, 20);
-		    }
-		    if (this.equipment.has('tarnanzug')) {
-		        ctx.strokeStyle = 'green';
-		        ctx.strokeRect(-15, -15, 30, 30);
-		        this.drawCamouflagePattern(ctx, 'camo', -15, -15, 30, 30);
-		    }
+			// Ausrüstung zeichnen (analog zum Player)
+			if (this.equipment.has('schutzweste')) {
+				ctx.fillStyle = 'gray';
+				ctx.fillRect(-10, -10, 20, 20);
+			}
+			if (this.equipment.has('tarnanzug')) {
+				ctx.strokeStyle = 'green';
+				ctx.strokeRect(-15, -15, 30, 30);
+				this.drawCamouflagePattern(ctx, 'camo', -15, -15, 30, 30);
+			}
 
-		    // Waffe detaillierter zeichnen
-		    ctx.fillStyle = 'black';
-		    switch (this.weapon) {
-		        case 'Pistole':
-		            ctx.fillRect(0, -5, 15, 5);
-		            break;
-		        case 'Maschinengewehr':
-		            ctx.fillRect(0, -5, 20, 5);
-		            // Zusätzliche Details
-		            ctx.fillRect(15, -7, 5, 9);  // Mündung
-		            break;
-		        case 'Schrotflinte':
-		            ctx.fillRect(0, -5, 25, 5);
-		            // Zusätzliche Details
-		            ctx.fillRect(20, -6, 5, 7);  // Mündung
-		            break;
-		        case 'Pistole mit Schalldämpfer':
-		            ctx.fillRect(0, -5, 20, 5);  // Längerer Lauf
-		            ctx.fillRect(15, -6, 7, 7);  // Schalldämpfer
-		            break;
-		    }
+			// Waffe detaillierter zeichnen
+			ctx.fillStyle = 'black';
+			switch (this.weapon) {
+				case 'Pistole':
+					ctx.fillRect(0, -5, 15, 5);
+					break;
+				case 'Maschinengewehr':
+					ctx.fillRect(0, -5, 20, 5);
+					// Zusätzliche Details
+					ctx.fillRect(15, -7, 5, 9);  // Mündung
+					break;
+				case 'Schrotflinte':
+					ctx.fillRect(0, -5, 25, 5);
+					// Zusätzliche Details
+					ctx.fillRect(20, -6, 5, 7);  // Mündung
+					break;
+				case 'Pistole mit Schalldämpfer':
+					ctx.fillRect(0, -5, 20, 5);  // Längerer Lauf
+					ctx.fillRect(15, -6, 7, 7);  // Schalldämpfer
+					break;
+			}
 
-		    // Status-Indikator zeichnen
-		    if (this.alertness !== 'patrol') {
-		        ctx.beginPath();
-		        ctx.arc(0, -25, 5, 0, Math.PI * 2);
-		        switch(this.alertness) {
-		            case 'suspicious':
-		                ctx.fillStyle = 'yellow';
-		                break;
-		            case 'alert':
-		                ctx.fillStyle = 'orange';
-		                break;
-		            case 'combat':
-		                ctx.fillStyle = 'red';
-		                break;
-		        }
-		        ctx.fill();
-		    }
+			// Status-Indikator zeichnen
+			if (this.alertness !== 'patrol') {
+				ctx.beginPath();
+				ctx.arc(0, -25, 5, 0, Math.PI * 2);
+				switch (this.alertness) {
+					case 'suspicious':
+						ctx.fillStyle = 'yellow';
+						break;
+					case 'alert':
+						ctx.fillStyle = 'orange';
+						break;
+					case 'combat':
+						ctx.fillStyle = 'red';
+						break;
+				}
+				ctx.fill();
+			}
 
-		    // Commander-Markierung falls zutreffend
-		    if (this.isCommander) {
-		        ctx.strokeStyle = 'gold';
-		        ctx.lineWidth = 2;
-		        ctx.strokeRect(-18, -18, 36, 36);
-		    }
+			// Commander-Markierung falls zutreffend
+			if (this.isCommander) {
+				ctx.strokeStyle = 'gold';
+				ctx.lineWidth = 2;
+				ctx.strokeRect(-18, -18, 36, 36);
+			}
 
-		    ctx.restore();
+			ctx.restore();
 
-		    // Lebensanzeige
-		    this.drawHealthBar();
+			// Lebensanzeige
+			this.drawHealthBar();
 		}
 
 		drawCamouflagePattern(ctx, pattern, x, y, w, h) {
-		    if (pattern === 'camo') {
-		        const colors = ['#4B5320', '#2F4F2F'];
-		        
-		        // Hintergrund
-		        ctx.fillStyle = '#556B2F';
-		        ctx.fillRect(x, y, w, h);
-		        
-		        // Tarnflecken
-		        ctx.fillStyle = colors[0];
-		        ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
-		        
-		        ctx.fillStyle = colors[1];
-		        ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
-		    }
+			if (pattern === 'camo') {
+				const colors = ['#4B5320', '#2F4F2F'];
+
+				// Hintergrund
+				ctx.fillStyle = '#556B2F';
+				ctx.fillRect(x, y, w, h);
+
+				// Tarnflecken
+				ctx.fillStyle = colors[0];
+				ctx.fillRect(x + w * 0.2, y + h * 0.2, w * 0.3, h * 0.3);
+
+				ctx.fillStyle = colors[1];
+				ctx.fillRect(x + w * 0.5, y + h * 0.5, w * 0.3, h * 0.3);
+			}
 		}
 
 		drawHealthBar() {
-		    ctx.save();
-		    ctx.fillStyle = 'black';
-		    ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
-		    
-		    // Farbe basierend auf Gesundheit
-		    if (this.health > 60) ctx.fillStyle = 'lime';
-		    else if (this.health > 30) ctx.fillStyle = 'yellow';
-		    else ctx.fillStyle = 'red';
-		    
-		    const healthPercentage = Math.max(this.health / 100, 0);
-		    ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
-		    
-		    // Optionale Statuseffekte
-		    if (this.isRetreating) {
-		        ctx.fillStyle = 'white';
-		        ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
-		    }
-		    
-		    ctx.restore();
+			ctx.save();
+			ctx.fillStyle = 'black';
+			ctx.fillRect(this.x - 25, this.y - 35, 50, 5); // Hintergrund
+
+			// Farbe basierend auf Gesundheit
+			if (this.health > 60) ctx.fillStyle = 'lime';
+			else if (this.health > 30) ctx.fillStyle = 'yellow';
+			else ctx.fillStyle = 'red';
+
+			const healthPercentage = Math.max(this.health / 100, 0);
+			ctx.fillRect(this.x - 25, this.y - 35, 50 * healthPercentage, 5);
+
+			// Optionale Statuseffekte
+			if (this.isRetreating) {
+				ctx.fillStyle = 'white';
+				ctx.fillRect(this.x - 25, this.y - 38, 50 * healthPercentage, 2);
+			}
+
+			ctx.restore();
 		}
 
 		drawVisionCone() {
@@ -3929,73 +3931,156 @@
 
 	class Vehicle extends GameObject {
 		constructor(x, y, type) {
-			super(x, y, type === 'Jeep' ? 120 : 200, 'gray');
+			const vehicleTypes = {
+				Panzer: {
+					size: 200,
+					maxHealth: 1000,
+					color: '#4b5320',
+					hasGunner: true,
+					isClosed: true,
+					maxSpeed: 3,
+					acceleration: 0.2,
+					deceleration: 0.99
+				},
+				Jeep: {
+					size: 120,
+					maxHealth: 200,
+					color: '#8B7355',
+					hasGunner: true,
+					isClosed: false,
+					maxSpeed: 6,
+					acceleration: 0.3,
+					deceleration: 0.95
+				},
+				LKW: {
+					size: 240,
+					maxHealth: 400,
+					color: '#556B2F',
+					hasGunner: false,
+					isClosed: false,
+					maxSpeed: 4,
+					acceleration: 0.15,
+					deceleration: 0.97,
+					hasTrailer: true
+				},
+				PKW: {
+					size: 100,
+					maxHealth: 150,
+					color: '#2F4F4F',
+					hasGunner: false,
+					isClosed: false,
+					maxSpeed: 7,
+					acceleration: 0.4,
+					deceleration: 0.95
+				},
+				Pickup: {
+					size: 110,
+					maxHealth: 180,
+					color: '#8B4513',
+					hasGunner: true,
+					isClosed: false,
+					maxSpeed: 6,
+					acceleration: 0.35,
+					deceleration: 0.95
+				}
+			};
+
+			const config = vehicleTypes[type];
+			super(x, y, config.size, config.color);
+
 			this.type = type;
+			this.config = config;
+			this.health = config.maxHealth;
+			this.maxHealth = config.maxHealth;
 			this.speed = 0;
-			this.maxSpeed = 5;
+			this.maxSpeed = config.maxSpeed;
+			this.acceleration = config.acceleration;
+			this.deceleration = config.deceleration;
 			this.angle = 0;
-			this.turretAngle = 0; // Neuer Turm-Winkel
+			this.turretAngle = 0;
+			this.targetTurretAngle = 0;
 			this.passengers = [];
-			this.condition = 100;
-			this.roleAssignment = {};
-			this.isClosed = type === 'Panzer';
+			this.roles = new Map();
+			this.isClosed = config.isClosed;
+			this.hasGunner = config.hasGunner;
 			this.isDestroyed = false;
+			this.lastShotTime = 0;
+			this.trailerLength = type === 'LKW' ? 160 : 0;
+			this.trailerAngle = this.angle;
+			this.previousPositions = [];
+
+			// Festes Tarnmuster statt zufälligem
+			this.camoPattern = type === 'Panzer' ? 'woodland' :
+				type === 'LKW' ? 'urban' : null;
 		}
 
 		addPassenger(player) {
-			if (this.passengers.length < 2 && !this.isDestroyed) {
-				this.passengers.push(player);
-				// Erste Person ist standardmäßig Fahrer
-				this.roleAssignment[player.index] = this.passengers.length === 1 ? 'driver' : 'gunner';
-				player.vehicle = this; // Wichtig: Setze die Fahrzeugreferenz
+			if (this.isDestroyed || this.passengers.length >= 2) return false;
 
-				// Turm-Winkel beim Einsteigen an Spieler-Winkel anpassen
-				if (this.roleAssignment[player.index] === 'gunner') {
-					this.turretAngle = 0; // Reset beim Einsteigen
-				}
+			// Bestimme Rolle basierend auf Fahrzeugtyp und aktuellen Passagieren
+			let role = 'passenger';
+			if (this.passengers.length === 0) {
+				role = 'driver';
+			} else if (this.hasGunner && !this.getGunner()) {
+				role = 'gunner';
 			}
+
+			this.passengers.push(player);
+			this.roles.set(player, role);
+			player.vehicle = this;
+
+			return true;
 		}
 
 		removePassenger(player) {
 			const index = this.passengers.indexOf(player);
 			if (index !== -1) {
 				this.passengers.splice(index, 1);
-				delete this.roleAssignment[player.index];
-				player.vehicle = null; // Wichtig: Entferne die Fahrzeugreferenz
+				this.roles.delete(player);
+				player.vehicle = null;
 
-				// Wenn der Fahrer aussteigt und es noch einen Schützen gibt, wird dieser zum Fahrer
-				if (this.passengers.length === 1 && this.roleAssignment[this.passengers[0].index] === 'gunner') {
-					this.roleAssignment[this.passengers[0].index] = 'driver';
+				// Reorganisiere Rollen wenn nötig
+				if (this.passengers.length > 0 && !this.getDriver()) {
+					const newDriver = this.passengers[0];
+					this.roles.set(newDriver, 'driver');
 				}
 			}
+		}
+
+		getDriver() {
+			return this.passengers.find(p => this.roles.get(p) === 'driver');
+		}
+
+		getGunner() {
+			return this.passengers.find(p => this.roles.get(p) === 'gunner');
 		}
 
 		destroy() {
 			this.isDestroyed = true;
-			for (let i = this.passengers.length - 1; i >= 0; i--) {
-				this.removePassenger(this.passengers[i]);
-			}
+			// Alle Passagiere aussteigen lassen
+			[...this.passengers].forEach(passenger => {
+				this.removePassenger(passenger);
+			});
+			// Explosionseffekt oder Soundeffekt könnte hier hinzugefügt werden
 		}
 
 		switchRole(player) {
-			// Wenn nur ein Spieler im Fahrzeug ist, wechsle zwischen Fahrer und Schütze
-			if (this.passengers.length === 1) {
-				const currentRole = this.roleAssignment[player.index];
-				this.roleAssignment[player.index] = currentRole === 'driver' ? 'gunner' : 'driver';
+			if (!this.passengers.includes(player)) return;
 
-				// Fahrzeug anhalten wenn niemand fährt
-				if (this.roleAssignment[player.index] === 'gunner') {
-					this.speed = 0;
+			const currentRole = this.roles.get(player);
+			const otherPassenger = this.passengers.find(p => p !== player);
+
+			if (this.passengers.length === 1) {
+				// Alleine im Fahrzeug
+				if (this.hasGunner) {
+					this.roles.set(player, currentRole === 'driver' ? 'gunner' : 'driver');
+					if (this.roles.get(player) === 'gunner') this.speed = 0;
 				}
-			}
-			// Bei zwei Spielern die Rollen tauschen
-			else if (this.passengers.length === 2) {
-				const otherPlayer = this.passengers.find(p => p !== player);
-				if (otherPlayer) {
-					const tempRole = this.roleAssignment[player.index];
-					this.roleAssignment[player.index] = this.roleAssignment[otherPlayer.index];
-					this.roleAssignment[otherPlayer.index] = tempRole;
-				}
+			} else if (otherPassenger) {
+				// Tausche Rollen
+				const otherRole = this.roles.get(otherPassenger);
+				this.roles.set(player, otherRole);
+				this.roles.set(otherPassenger, currentRole);
 			}
 		}
 
@@ -4006,54 +4091,42 @@
 		update() {
 			if (this.isDestroyed) return;
 
-			// Collision with players
-			players.forEach(player => {
-				if (
-					player.vehicle !== this && // Player is not already in this vehicle
-					Math.hypot(this.x - player.x, this.y - player.y) <
-					(this.size / 2 + player.size / 2) - 10
-				) {
-					// Prevent collision
-					const angle = Math.atan2(player.y - this.y, player.x - this.x);
-					player.x = this.x + Math.cos(angle) * ((this.size / 2 + player.size / 2) - 10);
-					player.y = this.y + Math.sin(angle) * ((this.size / 2 + player.size / 2) - 10);
-				}
-			});
+			// Update passengers
+			this.passengers = this.passengers.filter(p => p.isAlive);
 
-			// Kollision mit anderen Fahrzeugen
-			vehicles.forEach(vehicle => {
-				if (vehicle !== this && !vehicle.isDestroyed) {
-					if (
-						Math.hypot(this.x - vehicle.x, this.y - vehicle.y) <
-						(this.size + vehicle.size) / 2
-					) {
-						// Kollision verhindern
-						const angle = Math.atan2(vehicle.y - this.y, vehicle.x - this.x);
-						this.x -= Math.cos(angle) * 2;
-						this.y -= Math.sin(angle) * 2;
-						vehicle.x += Math.cos(angle) * 2;
-						vehicle.y += Math.sin(angle) * 2;
-					}
+			const driver = this.getDriver();
+			if (driver?.controls) {
+				// Beschleunigung/Bremsung mit Acceleration
+				if (keys[driver.controls.up]) {
+					this.speed = Math.min(this.speed + this.acceleration, this.maxSpeed);
+				} else if (keys[driver.controls.down]) {
+					this.speed = Math.max(this.speed - this.acceleration, -this.maxSpeed * 0.5);
+				} else {
+					// Ausrollen mit Deceleration
+					this.speed *= this.deceleration;
 				}
-			});
 
-			// Fahrzeugbewegung - nur wenn ein Fahrer da ist
-			const driver = this.passengers.find(p => this.roleAssignment[p.index] === 'driver');
-			if (driver && driver.controls && players.some(p => p.vehicle === this)) {
-				if (keys[driver.controls.up]) this.speed = this.maxSpeed;
-				if (keys[driver.controls.down]) this.speed = -this.maxSpeed;
-				if (keys[driver.controls.left]) this.angle -= 0.05;
-				if (keys[driver.controls.right]) this.angle += 0.05;
+				// Lenkung
+				if (Math.abs(this.speed) > 0.1) {
+					const turnSpeed = 0.03 * (this.speed / this.maxSpeed);
+					if (keys[driver.controls.left]) this.angle -= turnSpeed;
+					if (keys[driver.controls.right]) this.angle += turnSpeed;
+				}
 			} else {
-				// Fahrzeug langsam zum Stillstand bringen wenn kein Fahrer
-				this.speed *= 0.9;
+				// Ausrollen wenn kein Fahrer
+				this.speed *= this.deceleration;
 			}
 
-			// Bewegung anwenden
+			// Bewegung
 			if (Math.abs(this.speed) > 0.1) {
 				const newX = this.x + Math.cos(this.angle) * this.speed;
 				const newY = this.y + Math.sin(this.angle) * this.speed;
+
 				if (!isColliding(newX, newY, this)) {
+					if (this.trailerLength) {
+						this.previousPositions.unshift({x: this.x, y: this.y, angle: this.angle});
+						if (this.previousPositions.length > 10) this.previousPositions.pop();
+					}
 					this.x = newX;
 					this.y = newY;
 				} else {
@@ -4061,66 +4134,120 @@
 				}
 			}
 
-			// Reibung
-			this.speed *= 0.95;
+			// Turret update
+			if (this.hasGunner) {
+				const gunner = this.getGunner();
+				if (gunner?.controls) {
+					if (keys[gunner.controls.left]) this.targetTurretAngle -= 0.03;
+					if (keys[gunner.controls.right]) this.targetTurretAngle += 0.03;
+				}
 
-			// Aktualisiere Passagierpositionen
+				// Smooth turret rotation
+				const angleDiff = this.targetTurretAngle - this.turretAngle;
+				this.turretAngle += angleDiff * 0.1;
+			}
+
+			// Update passenger positions
 			this.passengers.forEach(p => {
 				p.x = this.x;
 				p.y = this.y;
+				p.angle = this.angle + (this.roles.get(p) === 'gunner' ? this.turretAngle : 0);
 			});
 
-			// Turm-Steuerung für den Schützen
-			const gunner = this.passengers.find(p => this.roleAssignment[p.index] === 'gunner');
-			if (gunner && gunner.controls) {
-				// Turm mit A/D oder J/L drehen (je nach Spieler)
-				if (keys[gunner.controls.left]) this.turretAngle -= 0.05;
-				if (keys[gunner.controls.right]) this.turretAngle += 0.05;
-
-				// Schießen
-				if (keys[gunner.controls.useItem] && gunner.canUseItem) {
-					const gunOffset = this.type === 'Panzer' ? 80 : 40; // Länge des Kanonenrohrs
-					const bulletX = this.x + Math.cos(this.angle + this.turretAngle) * gunOffset;
-					const bulletY = this.y + Math.sin(this.angle + this.turretAngle) * gunOffset;
-
-					bullets.push(new Bullet(bulletX, bulletY, this.angle + this.turretAngle, gunner.color, gunner, {
-						damage: this.type === 'Panzer' ? 50 : 25,
-						range: this.type === 'Panzer' ? 500 : 300,
-						speed: this.type === 'Panzer' ? 15 : 10,
-						noise: this.type === 'Panzer' ? 4000 : 1800
-					}));
-					gunner.canUseItem = false;
-					setTimeout(() => {
-						gunner.canUseItem = true;
-					}, this.type === 'Panzer' ? 1000 : 300); // Panzer schießt langsamer
-				}
+			// Gesundheit/Zerstörung
+			if (this.health <= 0 && !this.isDestroyed) {
+				this.destroy();
 			}
 
-			// Kollision mit Feinden - nur ab bestimmter geschwindigkeit überfahren
-			if (this.speed > 2) {
+			// Collision checks
+			this.checkCollisions();
+		}
+
+		checkCollisions() {
+			// Vehicle-Vehicle collisions
+			vehicles.forEach(vehicle => {
+				if (vehicle !== this && !vehicle.isDestroyed) {
+					const dist = Math.hypot(this.x - vehicle.x, this.y - vehicle.y);
+					if (dist < (this.size + vehicle.size) / 2) {
+						const angle = Math.atan2(vehicle.y - this.y, vehicle.x - this.x);
+						const overlap = (this.size + vehicle.size) / 2 - dist;
+						this.x -= Math.cos(angle) * overlap / 2;
+						this.y -= Math.sin(angle) * overlap / 2;
+						vehicle.x += Math.cos(angle) * overlap / 2;
+						vehicle.y += Math.sin(angle) * overlap / 2;
+
+						// Geschwindigkeitsreduktion bei Kollision
+						this.speed *= 0.8;
+						vehicle.speed *= 0.8;
+					}
+				}
+			});
+
+			// Vehicle-Enemy collisions (nur bei höherer Geschwindigkeit)
+			if (Math.abs(this.speed) > 2) {
 				enemies.forEach(enemy => {
-					if (
-						enemy.isAlive &&
-						Math.hypot(this.x - enemy.x, this.y - enemy.y) <
-						(this.size + enemy.size) / 2
-					) {
-						enemy.health -= 50;
+					if (enemy.isAlive &&
+						Math.hypot(this.x - enemy.x, this.y - enemy.y) < (this.size + enemy.size) / 2) {
+						const damage = Math.abs(this.speed) * 20;
+						enemy.health -= damage;
 						if (enemy.health <= 0) {
 							enemy.isAlive = false;
 						}
+						// Fahrzeug wird auch leicht beschädigt
+						this.health -= damage * 0.2;
+						this.speed *= 0.7;
 					}
 				});
 			}
+
+			// Bullet damage
+			bullets.forEach((bullet, index) => {
+				if (Math.hypot(bullet.x - this.x, bullet.y - this.y) < this.size / 2) {
+					this.health -= bullet.damage;
+					bullets.splice(index, 1);
+					if (this.health <= 0 && !this.isDestroyed) {
+						this.destroy();
+					}
+				}
+			});
+		}
+
+		fire(gunner) {
+			if (!this.hasGunner || this.isDestroyed) return false;
+
+			const currentTime = Date.now();
+			const cooldown = this.type === 'Panzer' ? 2000 : 200; // Panzer schießt langsamer
+
+			if (currentTime - this.lastShotTime < cooldown) return false;
+
+			const gunOffset = this.type === 'Panzer' ? 80 : 40;
+			const globalAngle = this.angle + this.turretAngle;
+			const bulletX = this.x + Math.cos(globalAngle) * gunOffset;
+			const bulletY = this.y + Math.sin(globalAngle) * gunOffset;
+
+			const weaponConfig = {
+				damage: this.type === 'Panzer' ? 100 : 25,
+				range: this.type === 'Panzer' ? 800 : 400,
+				speed: this.type === 'Panzer' ? 15 : 10,
+				noise: this.type === 'Panzer' ? 2000 : 1000
+			};
+
+			bullets.push(new Bullet(
+				bulletX,
+				bulletY,
+				globalAngle,
+				gunner.color,
+				gunner,
+				weaponConfig
+			));
+
+			this.lastShotTime = currentTime;
+			return true;
 		}
 
 		draw() {
 			if (this.isDestroyed) {
-				ctx.save();
-				ctx.translate(this.x, this.y);
-				ctx.rotate(Math.PI / 2); // Umkippen
-				ctx.fillStyle = 'black';
-				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
-				ctx.restore();
+				this.drawDestroyedVehicle();
 				return;
 			}
 
@@ -4128,47 +4255,282 @@
 			ctx.translate(this.x, this.y);
 			ctx.rotate(this.angle);
 
-			// Fahrzeugkörper
-			ctx.fillStyle = this.color;
-			if (this.type === 'Jeep') {
-				ctx.fillRect(-60, -30, 120, 60);
-				// Maschinengewehr auf dem Jeep
-				ctx.save();
-				ctx.rotate(this.turretAngle); // Turm dreht sich unabhängig
-				ctx.fillStyle = 'darkgray';
-				ctx.fillRect(20, -5, 30, 10);
-				ctx.restore();
+			// Grundform des Fahrzeugs
+			this.drawVehicleBody();
 
-				// Spieler sichtbar
-				this.passengers.forEach(p => {
-					ctx.fillStyle = p.color;
-					ctx.fillRect(-20, -20, 40, 40);
-				});
-			} else if (this.type === 'Panzer') {
-				// Panzer-Körper
-				ctx.fillRect(-100, -50, 200, 100);
+			// Turm wenn vorhanden
+			if (this.hasGunner) {
+				this.drawTurret();
+			}
 
-				// Turm (dreht sich unabhängig)
-				ctx.save();
-				ctx.rotate(this.turretAngle);
-				// Turm-Basis
-				ctx.fillStyle = 'darkgray';
-				ctx.fillRect(-30, -30, 60, 60);
-				// Kanonenrohr
-				ctx.fillRect(30, -10, 60, 20);
-				// Optional: Visier oder andere Details
-				ctx.strokeStyle = 'black';
-				ctx.beginPath();
-				ctx.moveTo(90, 0);
-				ctx.lineTo(100, 0);
-				ctx.stroke();
-				ctx.restore();
-			} else {
-				// LKW
-				ctx.fillRect(-80, -40, 160, 80);
+			// Anhänger für LKW
+			if (this.trailerLength) {
+				this.drawTrailer();
 			}
 
 			ctx.restore();
+
+			// Health bar ohne Rotation zeichnen
+			this.drawHealthBar();
+		}
+
+		drawVehicleBody() {
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
+			// Fahrzeugspezifische Details
+			switch (this.type) {
+				case 'Panzer':
+					this.drawTankDetails();
+					break;
+				case 'LKW':
+					this.drawTruckDetails();
+					break;
+				case 'Jeep':
+					this.drawJeepDetails();
+					break;
+				case 'PKW':
+					this.drawCarDetails();
+					break;
+				case 'Pickup':
+					this.drawPickupDetails();
+					break;
+			}
+		}
+
+		drawCamoPattern() {
+			const patterns = {
+				woodland: ['#4B5320', '#1B4D3E', '#51603D'],
+				desert: ['#C19A6B', '#BE9B7B', '#A17C5B'],
+				urban: ['#707070', '#8C8C8C', '#505050'],
+				winter: ['#FFFFFF', '#E8E8E8', '#D0D0D0']
+			};
+
+			const colors = patterns[this.camoPattern];
+			const baseWidth = this.size / 2;
+			const baseHeight = this.size / 4;
+
+			// Grundfarbe
+			ctx.fillStyle = colors[0];
+			ctx.fillRect(-baseWidth, -baseHeight, this.size, this.size / 2);
+
+			// Tarnflecken
+			colors.slice(1).forEach((color, i) => {
+				ctx.fillStyle = color;
+				for (let j = 0; j < 3; j++) {
+					const x = (Math.random() - 0.5) * this.size;
+					const y = (Math.random() - 0.5) * (this.size / 2);
+					const width = Math.random() * (this.size / 3) + this.size / 6;
+					const height = Math.random() * (this.size / 4) + this.size / 8;
+					ctx.beginPath();
+					ctx.ellipse(x, y, width / 2, height / 2, Math.random() * Math.PI, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			});
+		}
+
+		drawTankDetails() {
+			// Ketten
+			ctx.fillStyle = '#1a1a1a';
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 8);
+			ctx.fillRect(-this.size / 2, this.size / 8, this.size, this.size / 8);
+
+			// Panzerplatten
+			ctx.strokeStyle = '#2F4F4F';
+			ctx.lineWidth = 3;
+			for (let i = -this.size / 2; i < this.size / 2; i += this.size / 6) {
+				ctx.beginPath();
+				ctx.moveTo(i, -this.size / 4);
+				ctx.lineTo(i, this.size / 4);
+				ctx.stroke();
+			}
+		}
+
+		drawTruckDetails() {
+			// Führerhaus
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
+
+			// Fenster
+			ctx.fillStyle = '#87CEEB';
+			ctx.fillRect(-this.size / 2.2, -this.size / 5, this.size / 4, this.size / 6);
+
+			// Ladefläche
+			ctx.fillStyle = '#8B4513';
+			ctx.fillRect(-this.size / 6, -this.size / 4, this.size / 1.5, this.size / 2);
+		}
+
+		drawJeepDetails() {
+			// Motorhaube
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
+
+			// Windschutzscheibe
+			ctx.fillStyle = '#87CEEB';
+			ctx.beginPath();
+			ctx.moveTo(-this.size / 6, -this.size / 4);
+			ctx.lineTo(0, -this.size / 3);
+			ctx.lineTo(0, -this.size / 4);
+			ctx.closePath();
+			ctx.fill();
+		}
+
+		drawTurret() {
+			ctx.save();
+			ctx.rotate(this.turretAngle);
+
+			if (this.type === 'Panzer') {
+				// Turm-Basis
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 6, -this.size / 6, this.size / 3, this.size / 3);
+
+				// Kanonenrohr
+				ctx.fillStyle = '#1a1a1a';
+				ctx.fillRect(this.size / 6, -this.size / 16, this.size / 2, this.size / 8);
+			} else {
+				// MG-Halterung für andere Fahrzeuge
+				ctx.fillStyle = '#1a1a1a';
+				ctx.fillRect(0, -this.size / 16, this.size / 4, this.size / 8);
+			}
+
+			ctx.restore();
+		}
+
+		drawTrailer() {
+			if (this.previousPositions.length > 0) {
+				const trailerPos = this.previousPositions[Math.min(5, this.previousPositions.length - 1)];
+
+				ctx.save();
+				ctx.translate(trailerPos.x - this.x, trailerPos.y - this.y);
+				ctx.rotate(trailerPos.angle - this.angle);
+
+				// Anhänger-Körper
+				ctx.fillStyle = '#8B4513';
+				ctx.fillRect(-this.trailerLength / 2, -this.size / 5, this.trailerLength, this.size / 2.5);
+
+				// Räder
+				ctx.fillStyle = '#1a1a1a';
+				ctx.fillRect(-this.trailerLength / 3, this.size / 8, this.size / 6, this.size / 8);
+				ctx.fillRect(this.trailerLength / 3, this.size / 8, this.size / 6, this.size / 8);
+
+				ctx.restore();
+			}
+		}
+
+		drawHealthBar() {
+			const barWidth = this.size * 0.8;
+			const barHeight = 8;
+			const xPos = this.x - barWidth / 2;
+			const yPos = this.y - this.size / 2 - 20;
+
+			// Background
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+			ctx.fillRect(xPos, yPos, barWidth, barHeight);
+
+			// Health bar
+			const healthPercent = this.health / this.maxHealth;
+			ctx.fillStyle = healthPercent > 0.6 ? '#00ff00' :
+				healthPercent > 0.3 ? '#ffff00' : '#ff0000';
+			ctx.fillRect(xPos, yPos, barWidth * healthPercent, barHeight);
+		}
+
+		drawDestroyedVehicle() {
+			ctx.save();
+			ctx.translate(this.x, this.y);
+			ctx.rotate(this.angle + Math.PI / 6); // Leicht gekippt
+
+			// Verbranntes Wrack
+			ctx.fillStyle = '#1a1a1a';
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+
+			// Raucheffekt
+			this.drawSmoke();
+
+			// Beschädigungsdetails
+			ctx.strokeStyle = '#454545';
+			ctx.lineWidth = 2;
+			for (let i = 0; i < 5; i++) {
+				const x1 = (Math.random() - 0.5) * this.size;
+				const y1 = (Math.random() - 0.5) * this.size / 2;
+				const x2 = x1 + (Math.random() - 0.5) * 30;
+				const y2 = y1 + (Math.random() - 0.5) * 30;
+				ctx.beginPath();
+				ctx.moveTo(x1, y1);
+				ctx.lineTo(x2, y2);
+				ctx.stroke();
+			}
+
+			ctx.restore();
+		}
+
+		drawSmoke() {
+			// Rauchpartikel basierend auf der Zeit
+			const time = Date.now() / 1000;
+			for (let i = 0; i < 3; i++) {
+				const offset = i * (Math.PI * 2 / 3);
+				const x = Math.sin(time + offset) * 10;
+				const y = -this.size / 3 - Math.cos(time + offset) * 10;
+				const alpha = 0.3 + Math.sin(time * 2 + offset) * 0.1;
+
+				ctx.fillStyle = `rgba(100, 100, 100, ${alpha})`;
+				ctx.beginPath();
+				ctx.arc(x, y, 15 + Math.sin(time * 3 + offset) * 5, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		drawCarDetails() {
+			// Motorhaube
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
+
+			// Fahrgastraum
+			ctx.fillRect(-this.size / 6, -this.size / 3, this.size / 2, this.size / 1.5);
+
+			// Fenster
+			ctx.fillStyle = '#87CEEB';
+			ctx.beginPath();
+			ctx.moveTo(-this.size / 6, -this.size / 3.2);
+			ctx.lineTo(this.size / 3, -this.size / 3.2);
+			ctx.lineTo(this.size / 3.5, -this.size / 4);
+			ctx.lineTo(-this.size / 7, -this.size / 4);
+			ctx.closePath();
+			ctx.fill();
+
+			// Räder
+			ctx.fillStyle = '#1a1a1a';
+			ctx.fillRect(-this.size / 2.5, this.size / 6, this.size / 6, this.size / 8);
+			ctx.fillRect(this.size / 3, this.size / 6, this.size / 6, this.size / 8);
+		}
+
+		drawPickupDetails() {
+			// Führerhaus
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 2, this.size / 2);
+
+			// Ladefläche
+			ctx.fillStyle = '#8B4513';
+			ctx.fillRect(0, -this.size / 5, this.size / 2, this.size / 2.5);
+
+			// Windschutzscheibe
+			ctx.fillStyle = '#87CEEB';
+			ctx.beginPath();
+			ctx.moveTo(-this.size / 4, -this.size / 4);
+			ctx.lineTo(-this.size / 8, -this.size / 3);
+			ctx.lineTo(0, -this.size / 4);
+			ctx.closePath();
+			ctx.fill();
+
+			// MG-Halterung auf der Ladefläche wenn hasGunner
+			if (this.hasGunner) {
+				ctx.fillStyle = '#1a1a1a';
+				ctx.fillRect(this.size / 4, -this.size / 4, this.size / 16, this.size / 8);
+			}
 		}
 	}
 
@@ -4337,15 +4699,15 @@
 			customBehavior: {
 				canFire: player => player.inventory.grenades > 0,
 				isEmpty: player => player.inventory.grenades <= 0,
-		        fire: player => {
-		            grenades.push(new Grenade(
-		                player.x, 
-		                player.y, 
-		                player.angle,
-		                player
-		            ));
-		            player.inventory.grenades = Math.max(0, player.inventory.grenades - 1);
-		        },
+				fire: player => {
+					grenades.push(new Grenade(
+						player.x,
+						player.y,
+						player.angle,
+						player
+					));
+					player.inventory.grenades = Math.max(0, player.inventory.grenades - 1);
+				},
 				getAmmoStatus: player => player.inventory.grenades
 			},
 			removeOnEmpty: true
