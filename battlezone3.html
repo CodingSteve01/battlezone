@@ -2685,16 +2685,6 @@
 			);
 		}
 
-		findSuitableVehicle() {
-			return vehicles.find(vehicle =>
-				!vehicle.isDestroyed &&
-				vehicle.passengers.length < 2 &&
-				Math.hypot(vehicle.x - this.x, vehicle.y - this.y) < this.vehicleSearchRadius &&
-				(!this.desiredVehicleType || vehicle.type === this.desiredVehicleType) &&
-				!this.isVehicleInDanger(vehicle)
-			);
-		}
-
 		isVehicleInDanger(vehicle) {
 			// Prüfe ob das Fahrzeug im Kreuzfeuer oder in Explosionsgefahr ist
 			return bullets.some(bullet =>
@@ -2731,19 +2721,35 @@
 				target.x - this.currentVehicle.x
 			);
 
-			// Positionierung
-			if (Math.abs(distToTarget - optimalRange) > 50) {
-				if (distToTarget > optimalRange) {
-					this.currentVehicle.moveForward();
-				} else {
-					this.currentVehicle.moveBackward();
-				}
+			// Statt moveForward/moveBackward nutzen wir direkt die Fahrzeugsteuerung
+			if (distToTarget > optimalRange + 50) {
+				// Vorwärts fahren
+				this.currentVehicle.speed = Math.min(
+					this.currentVehicle.speed + this.currentVehicle.acceleration,
+					this.currentVehicle.maxSpeed
+				);
+			} else if (distToTarget < optimalRange - 50) {
+				// Rückwärts fahren
+				this.currentVehicle.speed = Math.max(
+					this.currentVehicle.speed - this.currentVehicle.acceleration,
+					-this.currentVehicle.maxSpeed * 0.5
+				);
+			} else {
+				// Anhalten
+				this.currentVehicle.speed *= this.currentVehicle.deceleration;
+			}
+
+			// Zum Ziel drehen
+			const angleDiff = normalizeAngle(angleToTarget - this.currentVehicle.angle);
+			if (Math.abs(angleDiff) > 0.1) {
+				const turnSpeed = 0.03 * (this.currentVehicle.speed / this.currentVehicle.maxSpeed);
+				this.currentVehicle.angle += Math.sign(angleDiff) * turnSpeed;
 			}
 
 			// Turm ausrichten und feuern
-			this.currentVehicle.turretAngle = angleToTarget - this.currentVehicle.angle;
+			this.currentVehicle.targetTurretAngle = angleToTarget - this.currentVehicle.angle;
 			if (this.canSee(target)) {
-				this.currentVehicle.fire();
+				this.currentVehicle.fire(this);
 			}
 		}
 
@@ -2751,18 +2757,43 @@
 			// Jeeps sind mobiler und sollten sich mehr bewegen
 			const optimalRange = 200;
 			const circlingRadius = 150;
-			const circlingSpeed = 0.03;
+			const angleToTarget = Math.atan2(
+				target.y - this.currentVehicle.y,
+				target.x - this.currentVehicle.x
+			);
 
-			// Kreisende Bewegung um das Ziel
-			const circleAngle = Date.now() * circlingSpeed;
+			// Kreisende Bewegung
+			const circleAngle = angleToTarget + Math.PI/2; // 90 Grad versetzt für Kreisbewegung
 			const targetX = target.x + Math.cos(circleAngle) * circlingRadius;
 			const targetY = target.y + Math.sin(circleAngle) * circlingRadius;
 
-			this.currentVehicle.moveTowards(targetX, targetY);
+			// Zum Zielpunkt fahren
+			const angleToPoint = Math.atan2(
+				targetY - this.currentVehicle.y,
+				targetX - this.currentVehicle.x
+			);
+
+			const angleDiff = normalizeAngle(angleToPoint - this.currentVehicle.angle);
+
+			// Lenken
+			if (Math.abs(angleDiff) > 0.1) {
+				const turnSpeed = 0.03 * (this.currentVehicle.speed / this.currentVehicle.maxSpeed);
+				this.currentVehicle.angle += Math.sign(angleDiff) * turnSpeed;
+			}
+
+			// Geschwindigkeit anpassen
+			if (distToTarget > optimalRange + 50) {
+				this.currentVehicle.speed = Math.min(
+					this.currentVehicle.speed + this.currentVehicle.acceleration,
+					this.currentVehicle.maxSpeed
+				);
+			} else {
+				this.currentVehicle.speed *= this.currentVehicle.deceleration;
+			}
 
 			// Schießen wenn möglich
 			if (this.canSee(target) && distToTarget < 250) {
-				this.currentVehicle.fire();
+				this.currentVehicle.fire(this);
 			}
 		}
 
@@ -3577,7 +3608,7 @@
 		}
 
 		update() {
-			if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
+			if (gameState !== 'playing') return;
 
 			// Neue Position berechnen
 			const newX = this.x + this.vx;
@@ -3586,14 +3617,14 @@
 			// Distanz zur Startposition berechnen
 			this.distanceTraveled = Math.hypot(newX - this.initialX, newY - this.initialY);
 
-			// Prüfen ob die Kugel ihre maximale Reichweite erreicht hat
+			// Reichweiten-Check
 			if (this.distanceTraveled >= this.range) {
 				const index = bullets.indexOf(this);
 				if (index !== -1) bullets.splice(index, 1);
 				return;
 			}
 
-			// Kollision mit Terrain prüfen
+			// Terrain-Kollision
 			if (isColliding(newX, newY)) {
 				const index = bullets.indexOf(this);
 				if (index !== -1) bullets.splice(index, 1);
@@ -3604,7 +3635,7 @@
 			this.x = newX;
 			this.y = newY;
 
-			// Kartenrand prüfen
+			// Kartenrand-Check
 			if (this.x < 0 || this.x > MAP_WIDTH * TILE_SIZE ||
 				this.y < 0 || this.y > MAP_HEIGHT * TILE_SIZE) {
 				const index = bullets.indexOf(this);
@@ -3612,23 +3643,81 @@
 				return;
 			}
 
-			// Verbesserte Kollisionserkennung für Gegner
+			// Verbesserte Kollisionserkennung
 			if (this.owner instanceof Player) {
-				const bulletRadius = this.size / 2;
-				enemies.forEach(enemy => {
-					if (enemy.isAlive) {
-						const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
-						const hitRadius = (enemy.size / 2) + bulletRadius;
-						if (dist < hitRadius) {
-							enemy.health -= this.damage;
-							if (enemy.health <= 0) {
-								enemy.isAlive = false;
+				// Kollision mit Gegnern
+				for (const enemy of enemies) {
+					if (enemy.isAlive &&
+						Math.hypot(this.x - enemy.x, this.y - enemy.y) < (this.size + enemy.size) / 2) {
+						enemy.health -= this.damage;
+						if (enemy.health <= 0) {
+							enemy.isAlive = false;
+						}
+						const index = bullets.indexOf(this);
+						if (index !== -1) bullets.splice(index, 1);
+						break;
+					}
+				}
+
+				// Kollision mit feindlichen Fahrzeugen
+				for (const vehicle of vehicles) {
+					if (!vehicle.isDestroyed &&
+						(!vehicle.passengers.some(p => p instanceof Player)) && // Nur feindliche Fahrzeuge
+						Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < vehicle.size / 2) {
+						// Zusätzlicher Schaden für Panzerabwehrwaffen
+						const damageMultiplier = this.weapon?.name === 'Panzerabwehr' ? 3 : 1;
+						vehicle.health -= this.damage * damageMultiplier;
+						if (vehicle.health <= 0) {
+							vehicle.destroy();
+						}
+						const index = bullets.indexOf(this);
+						if (index !== -1) bullets.splice(index, 1);
+						break;
+					}
+				}
+			} else if (this.owner instanceof Enemy) {
+				// Kollision mit Spielern und ihren Fahrzeugen
+				for (const player of players) {
+					if (!player.isAlive) continue;
+
+					if (player.vehicle) {
+						// Fahrzeug-Treffer
+						if (Math.hypot(this.x - player.vehicle.x, this.y - player.vehicle.y) < player.vehicle.size / 2) {
+							if (player.vehicle.isClosed) {
+								// Geschlossene Fahrzeuge nehmen weniger Schaden
+								player.vehicle.health -= this.damage * 0.5;
+							} else {
+								// Offene Fahrzeuge: Fahrzeug und Insassen können getroffen werden
+								player.vehicle.health -= this.damage;
+								if (Math.random() < 0.3) { // 30% Chance die Insassen zu treffen
+									player.health -= this.damage;
+								}
+							}
+							if (player.vehicle.health <= 0) {
+								player.vehicle.destroy();
+							}
+							if (player.health <= 0) {
+								player.isAlive = false;
+								checkGameOver();
 							}
 							const index = bullets.indexOf(this);
 							if (index !== -1) bullets.splice(index, 1);
+							break;
+						}
+					} else {
+						// Direkter Spieler-Treffer
+						if (Math.hypot(this.x - player.x, this.y - player.y) < (this.size + player.size) / 2) {
+							player.health -= this.damage;
+							if (player.health <= 0) {
+								player.isAlive = false;
+								checkGameOver();
+							}
+							const index = bullets.indexOf(this);
+							if (index !== -1) bullets.splice(index, 1);
+							break;
 						}
 					}
-				});
+				}
 			}
 		}
 
@@ -4057,11 +4146,47 @@
 
 		destroy() {
 			this.isDestroyed = true;
-			// Alle Passagiere aussteigen lassen
+			// Alle Passagiere vor dem Fahrzeug aussetzen
 			[...this.passengers].forEach(passenger => {
+				// Finde eine freie Position um das Fahrzeug
+				const angles = [0, Math.PI/2, Math.PI, -Math.PI/2];
+				let placed = false;
+
+				for (const angle of angles) {
+					const testX = this.x + Math.cos(angle) * (this.size/2 + passenger.size/2 + 10);
+					const testY = this.y + Math.sin(angle) * (this.size/2 + passenger.size/2 + 10);
+
+					if (!isColliding(testX, testY, passenger)) {
+						passenger.x = testX;
+						passenger.y = testY;
+						placed = true;
+						break;
+					}
+				}
+
+				// Wenn keine Position gefunden wurde, platziere mit force-push
+				if (!placed) {
+					let angle = Math.random() * Math.PI * 2;
+					let distance = this.size/2 + passenger.size/2 + 10;
+					let maxAttempts = 10;
+
+					while (maxAttempts > 0) {
+						const testX = this.x + Math.cos(angle) * distance;
+						const testY = this.y + Math.sin(angle) * distance;
+
+						if (!isColliding(testX, testY, passenger)) {
+							passenger.x = testX;
+							passenger.y = testY;
+							break;
+						}
+
+						distance += 10;
+						maxAttempts--;
+					}
+				}
+
 				this.removePassenger(passenger);
 			});
-			// Explosionseffekt oder Soundeffekt könnte hier hinzugefügt werden
 		}
 
 		switchRole(player) {
@@ -4275,14 +4400,6 @@
 		}
 
 		drawVehicleBody() {
-			// Basis-Fahrzeugkörper
-			if (this.camoPattern) {
-				this.drawCamoPattern();
-			} else {
-				ctx.fillStyle = this.config.color;
-				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
-			}
-
 			// Fahrzeugspezifische Details
 			switch (this.type) {
 				case 'Panzer':
@@ -4340,6 +4457,14 @@
 			ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 8);
 			ctx.fillRect(-this.size / 2, this.size / 8, this.size, this.size / 8);
 
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
 			// Panzerplatten
 			ctx.strokeStyle = '#2F4F4F';
 			ctx.lineWidth = 3;
@@ -4352,6 +4477,14 @@
 		}
 
 		drawTruckDetails() {
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
 			// Führerhaus
 			ctx.fillStyle = this.config.color;
 			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
@@ -4366,6 +4499,14 @@
 		}
 
 		drawJeepDetails() {
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
 			// Motorhaube
 			ctx.fillStyle = this.config.color;
 			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
@@ -4485,6 +4626,14 @@
 		}
 
 		drawCarDetails() {
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
 			// Motorhaube
 			ctx.fillStyle = this.config.color;
 			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 3, this.size / 2);
@@ -4509,6 +4658,14 @@
 		}
 
 		drawPickupDetails() {
+			// Basis-Fahrzeugkörper
+			if (this.camoPattern) {
+				this.drawCamoPattern();
+			} else {
+				ctx.fillStyle = this.config.color;
+				ctx.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+			}
+
 			// Führerhaus
 			ctx.fillStyle = this.config.color;
 			ctx.fillRect(-this.size / 2, -this.size / 4, this.size / 2, this.size / 2);
@@ -4938,6 +5095,91 @@
 	}
 
 	// Hilfsfunktionen
+	function normalizeAngle(angle) {
+		while (angle > Math.PI) angle -= 2 * Math.PI;
+		while (angle < -Math.PI) angle += 2 * Math.PI;
+		return angle;
+	}
+
+	function rotatedRectangleCollision(rect1, rect2) {
+		// Konvertiere Winkel in Radianten wenn nötig
+		const angle1 = rect1.angle || 0;
+		const angle2 = rect2.angle || 0;
+
+		// Berechne die Ecken der Rechtecke
+		const corners1 = getRotatedRectangleCorners(rect1);
+		const corners2 = getRotatedRectangleCorners(rect2);
+
+		// Prüfe Separating Axis Theorem (SAT)
+		const axes = getAxes(corners1).concat(getAxes(corners2));
+
+		for (const axis of axes) {
+			const projection1 = projectCornersOntoAxis(corners1, axis);
+			const projection2 = projectCornersOntoAxis(corners2, axis);
+
+			if (!projectionOverlap(projection1, projection2)) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	function getRotatedRectangleCorners(rect) {
+		const cos = Math.cos(rect.angle);
+		const sin = Math.sin(rect.angle);
+
+		const width = rect.size || rect.width || 30;
+		const height = rect.size || rect.height || 30;
+
+		const corners = [
+			{x: -width/2, y: -height/2},
+			{x: width/2, y: -height/2},
+			{x: width/2, y: height/2},
+			{x: -width/2, y: height/2}
+		];
+
+		// Rotiere und verschiebe die Ecken
+		return corners.map(corner => ({
+			x: rect.x + (corner.x * cos - corner.y * sin),
+			y: rect.y + (corner.x * sin + corner.y * cos)
+		}));
+	}
+
+	function getAxes(corners) {
+		const axes = [];
+		for (let i = 0; i < corners.length; i++) {
+			const j = (i + 1) % corners.length;
+			const edge = {
+				x: corners[j].x - corners[i].x,
+				y: corners[j].y - corners[i].y
+			};
+			// Normalisierte Normale des Edges
+			axes.push({
+				x: -edge.y,
+				y: edge.x
+			});
+		}
+		return axes;
+	}
+
+	function projectCornersOntoAxis(corners, axis) {
+		let min = Infinity;
+		let max = -Infinity;
+
+		corners.forEach(corner => {
+			const projection = (corner.x * axis.x + corner.y * axis.y);
+			min = Math.min(min, projection);
+			max = Math.max(max, projection);
+		});
+
+		return { min, max };
+	}
+
+	function projectionOverlap(proj1, proj2) {
+		return !(proj1.max < proj2.min || proj2.max < proj1.min);
+	}
+
 	function isColliding(x, y, object) {
 		const tileX = Math.floor(x / TILE_SIZE);
 		const tileY = Math.floor(y / TILE_SIZE);
@@ -4953,19 +5195,31 @@
 		// Wasser-Kollisionen
 		if (tile === TILE_TYPES.DEEP_WATER || tile === TILE_TYPES.SHALLOW_WATER) {
 			if (object instanceof Vehicle) {
-				return true; // Vehicles cannot move over water
+				return true;
 			} else if (object instanceof Player) {
-				return false; // Players can swim
+				return false;
 			} else {
 				return true;
 			}
 		}
 
 		if (object) {
-			// Kollision mit anderen Spielern (außer Fahrzeug mit Fahrern)
-			for (let player of players.filter(e => e.isAlive)) {
-				if (player !== object) { // Objekt selbst ausschließen
-					if (player.vehicle === object) continue; // Fahrzeug mit Fahrern überspringen
+			// Fahrzeug-Kollisionen mit genauer Rechteck-Prüfung
+			for (let vehicle of vehicles) {
+				if (vehicle !== object && !vehicle.isDestroyed) {
+					// Verwende rotierte Rechteck-Kollision für Fahrzeuge
+					if (rotatedRectangleCollision(
+						{x, y, angle: object?.angle || 0, size: object?.size || 30},
+						{x: vehicle.x, y: vehicle.y, angle: vehicle.angle, size: vehicle.size}
+					)) {
+						return true;
+					}
+				}
+			}
+
+			// Kollision mit anderen Spielern (außer wenn im gleichen Fahrzeug)
+			for (let player of players.filter(p => p.isAlive)) {
+				if (player !== object && (!object.passengers || !object.passengers.includes(player))) {
 					const distance = Math.hypot(x - player.x, y - player.y);
 					if (distance < (object.size + player.size) / 2) {
 						return true;
@@ -4973,12 +5227,7 @@
 				}
 			}
 
-			// Wenn das Objekt ein Fahrzeug ist, keine weiteren Kollisionen prüfen
-			if (object instanceof Vehicle) {
-				return false;
-			}
-
-			// Kollision nur mit lebenden Gegnern prüfen
+			// Kollision mit lebenden Gegnern
 			for (let enemy of enemies.filter(e => e.isAlive)) {
 				if (enemy !== object) {
 					const distance = Math.hypot(x - enemy.x, y - enemy.y);
@@ -4987,6 +5236,32 @@
 					}
 				}
 			}
+		}
+
+		return false;
+	}
+
+	function pushOutOfObstacles(object) {
+		const directions = [
+			{x: 1, y: 0}, {x: -1, y: 0}, {x: 0, y: 1}, {x: 0, y: -1},
+			{x: 1, y: 1}, {x: -1, y: 1}, {x: 1, y: -1}, {x: -1, y: -1}
+		];
+
+		let distance = 1;
+		const maxAttempts = 50;
+
+		while (isColliding(object.x, object.y, object) && distance < maxAttempts) {
+			for (const dir of directions) {
+				const testX = object.x + dir.x * (distance * 5);
+				const testY = object.y + dir.y * (distance * 5);
+
+				if (!isColliding(testX, testY, object)) {
+					object.x = testX;
+					object.y = testY;
+					return true;
+				}
+			}
+			distance++;
 		}
 
 		return false;
@@ -5137,6 +5412,13 @@
 		// Standardausrüstung für Spieler
 		players.forEach(player => {
 			player.addWeapon(WEAPONS.PISTOL);
+		});
+
+		// Sicherstellen, dass die Spieler nicht in Wänden spawnen
+		players.forEach(player => {
+			if (isColliding(player.x, player.y, player)) {
+				pushOutOfObstacles(player);
+			}
 		});
 
 		generateMissions();
