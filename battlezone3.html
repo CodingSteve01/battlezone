@@ -237,24 +237,184 @@
 
 	// Erweiterte Tile-Typen
 	const TILE_TYPES = {
-		DEEP_WATER: 0,
-		SHALLOW_WATER: 1,
-		BEACH: 2,
-		GRASS: 3,
-		HIGH_GRASS: 4,
-		FOREST: 5,
-		DENSE_FOREST: 6,
-		MOUNTAIN: 7,
-		SNOW: 8,
-		ROAD: 9,
-		DIRT_ROAD: 10,
-		BUILDING: 11,
-		VILLAGE_CENTER: 12,
-		FARM: 13,
-		BRIDGE: 14,
-		TREE: 15,
-		BUSH: 16,
-		WALL: 17
+		// Wasser-Tiles
+		OCEAN: {
+			id: 1,
+			name: 'ocean',
+			color: '#001433',
+			height: -2,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.1,
+			provides: ['fish', 'deepwater']
+		},
+		DEEP_WATER: {
+			id: 2,
+			name: 'deep_water',
+			color: '#002966',
+			height: -1.5,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['fish', 'deepwater']
+		},
+		SHALLOW_WATER: {
+			id: 3,
+			name: 'shallow_water',
+			color: '#0066ff',
+			height: -1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.3,
+			provides: ['water']
+		},
+		BEACH: {
+			id: 4,
+			name: 'beach',
+			color: '#ffcc99',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.4,
+			provides: ['sand']
+		},
+
+		// Grund-Tiles
+		GRASS: {
+			id: 5,
+			name: 'grass',
+			color: '#66cc00',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.2,
+			provides: ['grass', 'cover']
+		},
+		HIGH_GRASS: {
+			id: 6,
+			name: 'high_grass',
+			color: '#339900',
+			height: 0.2,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.1,
+			provides: ['grass', 'cover', 'stealth']
+		},
+		DIRT: {
+			id: 7,
+			name: 'dirt',
+			color: '#996633',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.3
+		},
+
+		// Wald-Tiles
+		FOREST_LIGHT: {
+			id: 8,
+			name: 'forest_light',
+			color: '#2d5a27',
+			height: 0.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.15,
+			provides: ['wood', 'cover', 'stealth']
+		},
+		FOREST_DENSE: {
+			id: 9,
+			name: 'forest_dense',
+			color: '#1a3d1a',
+			height: 1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.1,
+			provides: ['wood', 'cover', 'stealth']
+		},
+		BUSH: {
+			id: 10,
+			name: 'bush',
+			color: '#29a329',
+			height: 0.3,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['cover', 'stealth']
+		},
+
+		// Höhen-Tiles
+		HILL: {
+			id: 11,
+			name: 'hill',
+			color: '#666633',
+			height: 1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.4,
+			provides: ['elevation']
+		},
+		MOUNTAIN: {
+			id: 12,
+			name: 'mountain',
+			color: '#4d4d4d',
+			height: 2,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.5,
+			provides: ['elevation', 'stone']
+		},
+		SNOW: {
+			id: 13,
+			name: 'snow',
+			color: '#ffffff',
+			height: 2.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.3
+		},
+
+		// Straßen und Wege
+		ROAD: {
+			id: 14,
+			name: 'road',
+			color: '#666666',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.4,
+			speedModifier: 1.5
+		},
+		PATH: {
+			id: 15,
+			name: 'path',
+			color: '#8B4513',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.3,
+			speedModifier: 1.2
+		},
+
+		// Gebäude und Strukturen
+		HOUSE: {
+			id: 16,
+			name: 'house',
+			color: '#cc6600',
+			height: 1.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['shelter', 'loot']
+		},
+		WALL: {
+			id: 17,
+			name: 'wall',
+			color: '#808080',
+			height: 1.5,
+			walkable: false,
+			vehiclePassable: false,
+			bulletProof: true
+		}
 	};
 
 	// Farben für die Tiles
@@ -442,560 +602,654 @@
 	// Kachelbasierte Karte erstellen
 	let map = [];
 
-	class MapGenerator {
-		constructor(width, height, tileSize) {
-			this.MAP_WIDTH = width || 100; // Default width
-			this.MAP_HEIGHT = height || 100; // Default height
-			this.TILE_SIZE = tileSize || 1; // Default tile size
-			this.map = []; // The main map
-			this.heightMap = []; // Height map
-			this.MAX_VILLAGE_PLACEMENT_ATTEMPTS = 1000; // Sicherheitsgrenze für Dorfplatzierung
-			this.MAX_ROAD_CREATION_ATTEMPTS = 1000; // Sicherheitsgrenze für Straßenerstellung
+	class Tile {
+		constructor(type, variant = 0) {
+			const config = TILE_TYPES[type];
+			if (!config) throw new Error(`Invalid tile type: ${type}`);
+
+			this.type = type;
+			this.config = config;
+			this.variant = variant;
+			this.entities = new Set();
+			this.modifiers = new Set();
+			this.height = config.height;
+
+			// Dynamic properties
+			this.currentNoise = config.noise;
+			this.currentVisibility = 1.0;
+			this.weatherEffect = null;
 		}
 
-		generateMap() {
-			// 1. Create a low-resolution height map
-			const lowResSize = 4;
-			let lowResHeightMap = this.createLowResHeightMap(lowResSize);
-
-			// 2. Smooth the low-resolution height map
-			lowResHeightMap = this.smoothMap(lowResHeightMap, 3);
-
-			// 3. Upscale the height map to desired size
-			this.heightMap = this.upscaleHeightMap(lowResHeightMap, this.MAP_WIDTH, this.MAP_HEIGHT);
-
-			// 4. Determine terrain based on height
-			this.map = this.determineTerrain(this.heightMap);
-
-			// 5. Place water bodies (sea and lakes)
-			this.placeWaterBodies();
-
-			// 6. Place villages
-			const villages = this.placeVillages();
-
-			// 7. Connect villages with roads using A* for smooth roads with curves
-			this.connectVillagesWithRoads(villages);
-
-			// 8. Add vegetation
-			this.addVegetation();
-
-			// Wassergrenzen nur teilweise generieren
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (x === 0 || x === this.MAP_WIDTH - 1 ||
-						y === 0 || y === this.MAP_HEIGHT - 1) {
-						// 30% Chance auf Wasser am Rand
-						if (Math.random() < 0.3) {
-							this.map[y][x] = TILE_TYPES.DEEP_WATER;
-						} else {
-							// Sonst zufälliges Terrain
-							this.map[y][x] = Math.random() < 0.5 ?
-								TILE_TYPES.GRASS : TILE_TYPES.FOREST;
-						}
-					}
-				}
-			}
-
-			return this.map;
+		addEntity(entity) {
+			this.entities.add(entity);
+			this.updateProperties();
 		}
 
-		// 1. Create a low-resolution height map with random heights
-		createLowResHeightMap(size) {
-			const map = [];
-			for (let y = 0; y < size; y++) {
-				const row = [];
-				for (let x = 0; x < size; x++) {
-					row.push(Math.random()); // Heights between 0 and 1
-				}
-				map.push(row);
-			}
-			return map;
+		removeEntity(entity) {
+			this.entities.delete(entity);
+			this.updateProperties();
 		}
 
-		// 2. Smooth the height map using averaging
-		smoothMap(map, iterations) {
-			const size = map.length;
-			for (let iter = 0; iter < iterations; iter++) {
-				const newMap = [];
-				for (let y = 0; y < size; y++) {
-					const row = [];
-					for (let x = 0; x < size; x++) {
-						let sum = 0;
-						let count = 0;
-						for (let dy = -1; dy <= 1; dy++) {
-							for (let dx = -1; dx <= 1; dx++) {
-								const ny = y + dy;
-								const nx = x + dx;
-								if (ny >= 0 && ny < size && nx >= 0 && nx < size) {
-									sum += map[ny][nx];
-									count++;
-								}
-							}
-						}
-						row.push(sum / count);
-					}
-					newMap.push(row);
+		updateProperties() {
+			// Aktualisiert Tile-Eigenschaften basierend auf Entities
+			this.currentNoise = this.config.noise;
+			this.currentVisibility = 1.0;
+
+			this.entities.forEach(entity => {
+				if (entity.affects) {
+					if (entity.affects.noise) this.currentNoise *= entity.affects.noise;
+					if (entity.affects.visibility) this.currentVisibility *= entity.affects.visibility;
 				}
-				// Update map for next iteration
-				for (let y = 0; y < size; y++) {
-					for (let x = 0; x < size; x++) {
-						map[y][x] = newMap[y][x];
-					}
-				}
-			}
-			return map;
-		}
-
-		// 3. Upscale the height map using bilinear interpolation
-		upscaleHeightMap(lowResMap, targetWidth, targetHeight) {
-			const lowSize = lowResMap.length;
-			const highResMap = Array.from({length: targetHeight}, () => Array(targetWidth).fill(0));
-
-			for (let y = 0; y < targetHeight; y++) {
-				for (let x = 0; x < targetWidth; x++) {
-					const fx = (x / targetWidth) * (lowSize - 1);
-					const fy = (y / targetHeight) * (lowSize - 1);
-
-					const x0 = Math.floor(fx);
-					const y0 = Math.floor(fy);
-					const x1 = Math.min(x0 + 1, lowSize - 1);
-					const y1 = Math.min(y0 + 1, lowSize - 1);
-
-					const sx = fx - x0;
-					const sy = fy - y0;
-
-					// Bilinear interpolation
-					const top = lowResMap[y0][x0] * (1 - sx) + lowResMap[y0][x1] * sx;
-					const bottom = lowResMap[y1][x0] * (1 - sx) + lowResMap[y1][x1] * sx;
-					const value = top * (1 - sy) + bottom * sy;
-
-					highResMap[y][x] = value;
-				}
-			}
-
-			// Apply additional smoothing if necessary
-			return this.smoothMap(highResMap, 2);
-		}
-
-		// 4. Determine terrain based on height
-		determineTerrain(heightMap) {
-			const map = [];
-			for (let y = 0; y < heightMap.length; y++) {
-				const row = [];
-				for (let x = 0; x < heightMap[0].length; x++) {
-					const height = heightMap[y][x];
-					if (height < 0.3) {
-						row.push(TILE_TYPES.SHALLOW_WATER);
-					} else if (height < 0.35) {
-						row.push(TILE_TYPES.BEACH);
-					} else if (height < 0.6) {
-						row.push(TILE_TYPES.GRASS);
-					} else if (height < 0.75) {
-						row.push(TILE_TYPES.FOREST);
-					} else if (height < 0.85) {
-						row.push(TILE_TYPES.MOUNTAIN);
-					} else {
-						row.push(TILE_TYPES.SNOW);
-					}
-				}
-				map.push(row);
-			}
-			return map;
-		}
-
-		// 5. Place water bodies such as seas and lakes
-		placeWaterBodies() {
-			// Designate the edges as sea (DEEP_WATER)
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				this.map[y][0] = TILE_TYPES.DEEP_WATER;
-				this.map[y][this.MAP_WIDTH - 1] = TILE_TYPES.DEEP_WATER;
-			}
-			for (let x = 0; x < this.MAP_WIDTH; x++) {
-				this.map[0][x] = TILE_TYPES.DEEP_WATER;
-				this.map[this.MAP_HEIGHT - 1][x] = TILE_TYPES.DEEP_WATER;
-			}
-
-			// Optionally, add some lakes randomly
-			const lakeCount = Math.floor(this.MAP_WIDTH / 20);
-			for (let i = 0; i < lakeCount; i++) {
-				const lakeSize = Math.floor(Math.random() * 5) + 3;
-				const centerX = Math.floor(Math.random() * (this.MAP_WIDTH - 20)) + 10;
-				const centerY = Math.floor(Math.random() * (this.MAP_HEIGHT - 20)) + 10;
-
-				for (let y = -lakeSize; y <= lakeSize; y++) {
-					for (let x = -lakeSize; x <= lakeSize; x++) {
-						if (Math.sqrt(x * x + y * y) <= lakeSize) {
-							const newX = centerX + x;
-							const newY = centerY + y;
-							if (this.isValidTile(newX, newY) && this.map[newY][newX] !== TILE_TYPES.DEEP_WATER) {
-								this.map[newY][newX] = TILE_TYPES.SHALLOW_WATER;
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// 6. Place villages on grass tiles
-		placeVillages() {
-			const villages = [];
-			const villageCount = Math.max(1, Math.floor(this.MAP_WIDTH / 20));
-			let attempts = 0;
-
-			for (let i = 0; i < villageCount; i++) {
-				let placed = false;
-				while (!placed && attempts < this.MAX_VILLAGE_PLACEMENT_ATTEMPTS) {
-					attempts++;
-					const x = Math.floor(Math.random() * this.MAP_WIDTH);
-					const y = Math.floor(Math.random() * this.MAP_HEIGHT);
-
-					if (this.map[y][x] === TILE_TYPES.GRASS) {
-						// Ensure minimum distance from other villages
-						const minDistance = 10;
-						let tooClose = false;
-						for (const village of villages) {
-							const dist = Math.hypot(village.x - x, village.y - y);
-							if (dist < minDistance) {
-								tooClose = true;
-								break;
-							}
-						}
-
-						if (!tooClose) {
-							this.map[y][x] = TILE_TYPES.VILLAGE_CENTER;
-							villages.push({x, y});
-							this.createVillageBuildings(x, y);
-							placed = true;
-						}
-					}
-				}
-
-				if (attempts >= this.MAX_VILLAGE_PLACEMENT_ATTEMPTS && !placed) {
-					console.warn(`Max village placement attempts reached. Placed ${villages.length} villages out of ${villageCount}.`);
-					break;
-				}
-			}
-
-			return villages;
-		}
-
-		generateVillageMaze(centerX, centerY, size = 20) {
-			// Simple Recursive Backtracker Maze Generation
-			const maze = Array.from({length: size}, () => Array(size).fill(1)); // 1 = Wall, 0 = Path
-			const stack = [];
-			const startX = Math.floor(Math.random() * size);
-			const startY = Math.floor(Math.random() * size);
-			maze[startY][startX] = 0;
-			stack.push({x: startX, y: startY});
-
-			const directions = [
-				{dx: 0, dy: -2},
-				{dx: 2, dy: 0},
-				{dx: 0, dy: 2},
-				{dx: -2, dy: 0}
-			];
-
-			while (stack.length > 0) {
-				const current = stack[stack.length - 1];
-				const neighbors = [];
-
-				directions.forEach(dir => {
-					const nx = current.x + dir.dx;
-					const ny = current.y + dir.dy;
-					if (nx >= 0 && nx < size && ny >= 0 && ny < size && maze[ny][nx] === 1) {
-						neighbors.push({x: nx, y: ny, dx: dir.dx, dy: dir.dy});
-					}
-				});
-
-				if (neighbors.length > 0) {
-					const randIndex = Math.floor(Math.random() * neighbors.length);
-					const neighbor = neighbors[randIndex];
-					maze[neighbor.y][neighbor.x] = 0;
-					maze[current.y + neighbor.dy / 2][current.x + neighbor.dx / 2] = 0;
-					stack.push({x: neighbor.x, y: neighbor.y});
-				} else {
-					stack.pop();
-				}
-			}
-
-			// Übertragen des Mazes auf die Karte
-			for (let y = 0; y < size; y++) {
-				for (let x = 0; x < size; x++) {
-					const mapX = centerX + x;
-					const mapY = centerY + y;
-					if (mapY >= 0 && mapY < this.MAP_HEIGHT && mapX >= 0 && mapX < this.MAP_WIDTH) {
-						this.map[mapY][mapX] = maze[y][x] === 1 ? TILE_TYPES.WALL : TILE_TYPES.GRASS;
-					}
-				}
-			}
-		}
-
-		createVillageBuildings(centerX, centerY) {
-			this.generateVillageMaze(centerX, centerY, 20);
-		}
-
-		createWallAroundBuilding(x, y) {
-			const wallRadius = 3; // Größe der Mauer
-			for (let dy = -wallRadius; dy <= wallRadius; dy++) {
-				for (let dx = -wallRadius; dx <= wallRadius; dx++) {
-					const dist = Math.sqrt(dx * dx + dy * dy);
-					if (dist <= wallRadius) {
-						const newX = x + dx;
-						const newY = y + dy;
-						if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
-							this.map[newY][newX] = TILE_TYPES.WALL;
-						}
-					}
-				}
-			}
-		}
-
-		// 7. Connect villages with roads using A* for smooth roads with curves
-		connectVillagesWithRoads(villages) {
-			if (villages.length < 2) return; // Nothing to connect
-
-			// Create a graph connecting all villages
-			const connected = new Set();
-			connected.add(villages[0]);
-
-			let attempts = 0;
-
-			while (connected.size < villages.length && attempts < this.MAX_ROAD_CREATION_ATTEMPTS) {
-				attempts++;
-				let nearestDistance = Infinity;
-				let nearestPair = [null, null];
-
-				connected.forEach(villageA => {
-					villages.forEach(villageB => {
-						if (!connected.has(villageB)) {
-							const dist = Math.hypot(villageA.x - villageB.x, villageA.y - villageB.y);
-							if (dist < nearestDistance) {
-								nearestDistance = dist;
-								nearestPair = [villageA, villageB];
-							}
-						}
-					});
-				});
-
-				if (nearestPair[0] && nearestPair[1]) {
-					this.createRoad(nearestPair[0], nearestPair[1]);
-					connected.add(nearestPair[1]);
-				} else {
-					break;
-				}
-			}
-
-			if (attempts >= this.MAX_ROAD_CREATION_ATTEMPTS) {
-				console.warn(`Max road creation attempts reached. Connected ${connected.size} out of ${villages.length} villages.`);
-			}
-		}
-
-		// A* Pathfinding to create smooth roads with curves
-		createRoad(start, end) {
-			const path = this.aStarPathfind(start, end);
-
-			if (path.length === 0) return; // No path found
-
-			// Draw road with width 2x2 tiles
-			path.forEach(point => {
-				this.setRoadTile(point.x, point.y);
-				// Also set adjacent tiles to make the road 2x2
-				this.setRoadTile(point.x + 1, point.y);
-				this.setRoadTile(point.x, point.y + 1);
-				this.setRoadTile(point.x + 1, point.y + 1);
 			});
 		}
 
-		isWaterTile(tileType) {
-			return tileType === TILE_TYPES.DEEP_WATER || tileType === TILE_TYPES.SHALLOW_WATER;
+		isWalkable() {
+			return this.config.walkable &&
+				!Array.from(this.entities).some(e => e.blocksMovement);
 		}
 
-		isGrassTile(tileType) {
-			return tileType === TILE_TYPES.GRASS || tileType === TILE_TYPES.HIGH_GRASS;
+		isVehiclePassable() {
+			return this.config.vehiclePassable &&
+				!Array.from(this.entities).some(e => e.blocksVehicles);
 		}
 
-		isValidTile(x, y) {
-			return x >= 0 && x < this.MAP_WIDTH && y >= 0 && y < this.MAP_HEIGHT;
+		providesCover() {
+			return this.config.provides &&
+				(this.config.provides.includes('cover') ||
+					this.config.provides.includes('stealth'));
 		}
 
-		// Set road tile if possible
-		setRoadTile(x, y) {
-			if (this.isValidTile(x, y) && !this.isWaterTile(this.map[y][x])) {
-				// Prefer roads over dirt roads and buildings
-				if (
-					this.map[y][x] !== TILE_TYPES.ROAD &&
-					this.map[y][x] !== TILE_TYPES.BUILDING &&
-					this.map[y][x] !== TILE_TYPES.WALL
-				) {
-					this.map[y][x] = TILE_TYPES.ROAD;
+		getSpeedModifier() {
+			let modifier = this.config.speedModifier || 1;
+			this.entities.forEach(entity => {
+				if (entity.affects && entity.affects.speed) {
+					modifier *= entity.affects.speed;
 				}
+			});
+			return modifier;
+		}
+
+		getColor() {
+			// Basisfarbe mit Varianten und Wettereffekten
+			let color = this.config.color;
+			if (this.weatherEffect) {
+				// Hier Wettereffekte auf die Farbe anwenden
+				color = this.applyWeatherEffect(color);
+			}
+			return color;
+		}
+
+		applyWeatherEffect(baseColor) {
+			// Beispiel für Wettereffekte
+			switch(this.weatherEffect) {
+				case 'rain':
+					return this.darkenColor(baseColor, 0.2);
+				case 'snow':
+					return this.blendColors(baseColor, '#FFFFFF', 0.3);
+				default:
+					return baseColor;
 			}
 		}
 
-		// A* Pathfinding Algorithm
-		aStarPathfind(start, end) {
-			const openSet = [];
-			const closedSet = new Set();
-			const cameFrom = new Map();
+		darkenColor(color, factor) {
+			// Helfer-Funktion zum Verdunkeln einer Farbe
+			let r = parseInt(color.substr(1,2), 16);
+			let g = parseInt(color.substr(3,2), 16);
+			let b = parseInt(color.substr(5,2), 16);
 
-			const startKey = `${start.x},${start.y}`;
-			const endKey = `${end.x},${end.y}`;
+			r = Math.floor(r * (1 - factor));
+			g = Math.floor(g * (1 - factor));
+			b = Math.floor(b * (1 - factor));
 
-			const gScore = {};
-			const fScore = {};
+			return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+		}
 
-			gScore[startKey] = 0;
-			fScore[startKey] = this.heuristic(start, end);
+		blendColors(color1, color2, factor) {
+			// Helfer-Funktion zum Mischen zweier Farben
+			let r1 = parseInt(color1.substr(1,2), 16);
+			let g1 = parseInt(color1.substr(3,2), 16);
+			let b1 = parseInt(color1.substr(5,2), 16);
 
-			openSet.push({x: start.x, y: start.y, f: fScore[startKey]});
+			let r2 = parseInt(color2.substr(1,2), 16);
+			let g2 = parseInt(color2.substr(3,2), 16);
+			let b2 = parseInt(color2.substr(5,2), 16);
 
-			while (openSet.length > 0) {
-				// Get the node with the lowest fScore
-				openSet.sort((a, b) => a.f - b.f);
-				const current = openSet.shift();
-				const currentKey = `${current.x},${current.y}`;
+			let r = Math.floor(r1 * (1 - factor) + r2 * factor);
+			let g = Math.floor(g1 * (1 - factor) + g2 * factor);
+			let b = Math.floor(b1 * (1 - factor) + b2 * factor);
 
-				if (currentKey === endKey) {
-					return this.reconstructPath(cameFrom, currentKey);
-				}
+			return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+		}
+	}
 
-				closedSet.add(currentKey);
-
-				const neighbors = this.getNeighbors(current.x, current.y);
-				neighbors.forEach(neighbor => {
-					const neighborKey = `${neighbor.x},${neighbor.y}`;
-					if (closedSet.has(neighborKey)) return;
-
-					const tentative_gScore = gScore[currentKey] + 1; // Assuming uniform cost
-
-					if (!gScore.hasOwnProperty(neighborKey) || tentative_gScore < gScore[neighborKey]) {
-						cameFrom.set(neighborKey, currentKey);
-						gScore[neighborKey] = tentative_gScore;
-						fScore[neighborKey] = tentative_gScore + this.heuristic(neighbor, end);
-
-						if (!openSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
-							openSet.push({x: neighbor.x, y: neighbor.y, f: fScore[neighborKey]});
-						}
+	class TileFactory {
+		static createTile(type) {
+			const tileConfigs = {
+				grass: {
+					type: 'grass',
+					height: 0,
+					isObstacle: false,
+					sprites: [
+						{ offsetX: 0, offsetY: 0, sprite: 'grass1' },
+						{ offsetX: 1, offsetY: 0, sprite: 'grass2' },
+						{ offsetX: 2, offsetY: 0, sprite: 'grass3' }
+					],
+					variants: 3,
+					properties: {
+						canGrowVegetation: true,
+						stealth: 1.0
 					}
-				});
+				},
+				road: {
+					type: 'road',
+					height: 0,
+					isObstacle: false,
+					sprites: [
+						{ offsetX: 0, offsetY: 1, sprite: 'road_straight' },
+						{ offsetX: 1, offsetY: 1, sprite: 'road_corner' },
+						{ offsetX: 2, offsetY: 1, sprite: 'road_t' },
+						{ offsetX: 3, offsetY: 1, sprite: 'road_cross' }
+					],
+					properties: {
+						speedMultiplier: 1.5,
+						noiseMultiplier: 1.2
+					}
+				},
+				wall: {
+					type: 'wall',
+					height: 2,
+					isObstacle: true,
+					walkable: false,
+					vehiclePassable: false,
+					sprites: [
+						{ offsetX: 0, offsetY: 2, sprite: 'wall' }
+					],
+					properties: {
+						bulletProof: true,
+						health: 1000
+					}
+				},
+				water: {
+					type: 'water',
+					height: -1,
+					isObstacle: false,
+					walkable: true,
+					vehiclePassable: false,
+					sprites: [
+						{ offsetX: 0, offsetY: 3, sprite: 'water_shallow' }
+					],
+					properties: {
+						speedMultiplier: 0.5,
+						requiresSwimming: true
+					}
+				}
+				// Weitere Tile-Typen hier...
+			};
+
+			if (!tileConfigs[type]) {
+				console.warn(`Unknown tile type: ${type}`);
+				return new Tile(tileConfigs.grass);  // Fallback zu Grass
 			}
 
-			// No path found
-			console.warn(`No path found between (${start.x}, ${start.y}) and (${end.x}, ${end.y}).`);
-			return [];
+			return new Tile(tileConfigs[type]);
+		}
+	}
+	class GameMap {
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.tiles = Array(height).fill().map(() => Array(width));
+			this.structures = new Set();
+			this.regions = new Map();
 		}
 
-		heuristic(a, b) {
-			// Use Manhattan distance
-			return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+		setTile(x, y, tileType, variant = 0) {
+			if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+				this.tiles[y][x] = new Tile(tileType, variant);
+				return true;
+			}
+			return false;
 		}
 
-		reconstructPath(cameFrom, currentKey) {
-			const path = [];
-			let current = currentKey;
+		getTile(x, y) {
+			if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+				return this.tiles[y][x];
+			}
+			return null;
+		}
 
-			while (cameFrom.has(current)) {
-				const [x, y] = current.split(',').map(Number);
-				path.push({x, y});
-				current = cameFrom.get(current);
+		findTilesByType(type) {
+			const tiles = [];
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const tile = this.getTile(x, y);
+					if (tile && tile.type === type) {
+						tiles.push({x, y});
+					}
+				}
+			}
+			return tiles;
+		}
+
+		addStructure(structure) {
+			this.structures.add(structure);
+			// Struktur-Tiles zur Map hinzufügen
+			structure.tiles.forEach(({x, y, type}) => {
+				this.setTile(x, y, type);
+			});
+		}
+
+		defineRegion(name, tiles) {
+			this.regions.set(name, new Set(tiles));
+		}
+
+		isInRegion(name, x, y) {
+			const region = this.regions.get(name);
+			return region && region.has(`${x},${y}`);
+		}
+
+		isPassable(x, y, forVehicle = false) {
+			const tile = this.getTile(x, y);
+			if (!tile) return false;
+			return forVehicle ? tile.vehiclePassable : tile.walkable;
+		}
+
+		// Optimierte Rendering-Methode
+		render(ctx, viewport) {
+			const startX = Math.max(0, Math.floor(viewport.left / this.tileSize));
+			const endX = Math.min(this.width, Math.ceil(viewport.right / this.tileSize));
+			const startY = Math.max(0, Math.floor(viewport.top / this.tileSize));
+			const endY = Math.min(this.height, Math.ceil(viewport.bottom / this.tileSize));
+
+			// Erste Ebene: Grund-Tiles
+			for (let y = startY; y < endY; y++) {
+				for (let x = startX; x < endX; x++) {
+					const tile = this.tiles[y][x];
+					if (!tile) continue;
+
+					const screenX = x * this.tileSize;
+					const screenY = y * this.tileSize;
+
+					// Basis-Tile zeichnen
+					this.renderTile(ctx, tile, screenX, screenY, 0);
+				}
 			}
 
-			const [x, y] = current.split(',').map(Number);
-			path.push({x, y});
-			return path.reverse();
+			// Zweite Ebene: Erhöhte Tiles
+			for (let y = startY; y < endY; y++) {
+				for (let x = startX; x < endX; x++) {
+					const tile = this.tiles[y][x];
+					if (!tile || tile.height <= 0) continue;
+
+					const screenX = x * this.tileSize;
+					const screenY = y * this.tileSize;
+
+					// Schatten für erhöhte Tiles
+					if (tile.height > 0) {
+						this.renderShadow(ctx, screenX, screenY, tile.height);
+					}
+
+					// Erhöhtes Tile mit Offset zeichnen
+					this.renderTile(ctx, tile, screenX, screenY - tile.height * 8);
+				}
+			}
 		}
 
+		renderTile(ctx, tile, x, y, heightOffset = 0) {
+			const sprite = tile.getSpriteForPosition(x / this.tileSize, y / this.tileSize);
+			if (sprite) {
+				// Hier würde normalerweise das Sprite gerendert
+				// Für dieses Beispiel verwenden wir Farben
+				ctx.fillStyle = this.getTileColor(tile);
+				ctx.fillRect(x, y - heightOffset, this.tileSize, this.tileSize);
+			}
+		}
+
+		renderShadow(ctx, x, y, height) {
+			ctx.save();
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+			ctx.fillRect(x + 4, y + 4, this.tileSize, this.tileSize);
+			ctx.restore();
+		}
+
+		// Hilfsmethode für die Farbdarstellung (bis Sprites implementiert sind)
+		getTileColor(tile) {
+			const colors = {
+				grass: '#90EE90',
+				road: '#696969',
+				wall: '#808080',
+				water: '#4682B4'
+			};
+			return colors[tile.type] || '#FFF';
+		}
+
+		// Pathfinding-Unterstützung
 		getNeighbors(x, y) {
+			const neighbors = [];
 			const directions = [
-				{dx: -1, dy: 0},
-				{dx: 1, dy: 0},
-				{dx: 0, dy: -1},
-				{dx: 0, dy: 1},
-				{dx: -1, dy: -1},
-				{dx: 1, dy: -1},
-				{dx: -1, dy: 1},
-				{dx: 1, dy: 1}
+				{dx: -1, dy: 0}, {dx: 1, dy: 0},
+				{dx: 0, dy: -1}, {dx: 0, dy: 1}
 			];
 
-			const neighbors = [];
-			directions.forEach(dir => {
-				const newX = x + dir.dx;
-				const newY = y + dir.dy;
-				if (this.isValidTile(newX, newY) && !this.isWaterTile(this.map[newY][newX])) {
-					neighbors.push({x: newX, y: newY});
+			directions.forEach(({dx, dy}) => {
+				const newX = x + dx;
+				const newY = y + dy;
+				const tile = this.getTile(newX, newY);
+				if (tile && tile.walkable) {
+					neighbors.push({
+						x: newX,
+						y: newY,
+						cost: tile.getPassageCost()
+					});
 				}
 			});
 
 			return neighbors;
 		}
 
-		// 8. Add vegetation like trees and bushes
-		addVegetation() {
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (this.map[y][x] === TILE_TYPES.GRASS || this.map[y][x] === TILE_TYPES.FOREST) {
-						const rand = Math.random();
-						if (rand < 0.05) {
-							this.map[y][x] = TILE_TYPES.TREE;
-						} else if (rand < 0.10) {
-							this.map[y][x] = TILE_TYPES.BUSH;
+		findPath(startX, startY, endX, endY) {
+			// A* Pathfinding
+			const open = new Set([[startX, startY]]);
+			const closed = new Set();
+			const cameFrom = new Map();
+			const gScore = new Map();
+			const fScore = new Map();
+
+			gScore.set(`${startX},${startY}`, 0);
+			fScore.set(`${startX},${startY}`, this.heuristic(startX, startY, endX, endY));
+
+			while (open.size > 0) {
+				let current = this.getLowestFScore([...open], fScore);
+				if (current[0] === endX && current[1] === endY) {
+					return this.reconstructPath(cameFrom, current);
+				}
+
+				open.delete(current);
+				closed.add(`${current[0]},${current[1]}`);
+
+				this.getNeighbors(current[0], current[1]).forEach(({x, y, tile}) => {
+					if (!tile.isWalkable() || closed.has(`${x},${y}`)) return;
+
+					const tentativeGScore = gScore.get(`${current[0]},${current[1]}`) +
+						tile.getSpeedModifier();
+
+					if (!open.has([x, y]) ||
+						tentativeGScore < gScore.get(`${x},${y}`)) {
+						cameFrom.set(`${x},${y}`, current);
+						gScore.set(`${x},${y}`, tentativeGScore);
+						fScore.set(`${x},${y}`,
+							tentativeGScore + this.heuristic(x, y, endX, endY));
+						open.add([x, y]);
+					}
+				});
+			}
+
+			return null; // Kein Pfad gefunden
+		}
+
+		heuristic(x1, y1, x2, y2) {
+			return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+		}
+
+		reconstructPath(cameFrom, current) {
+			const path = [current];
+			let key = `${current[0]},${current[1]}`;
+
+			while (cameFrom.has(key)) {
+				current = cameFrom.get(key);
+				path.unshift(current);
+				key = `${current[0]},${current[1]}`;
+			}
+
+			return path;
+		}
+
+		getLowestFScore(array, fScore) {
+			return array.reduce((a, b) =>
+				(fScore.get(`${a[0]},${a[1]}`) || Infinity) <
+				(fScore.get(`${b[0]},${b[1]}`) || Infinity) ? a : b
+			);
+		}
+	}
+
+	class MapGenerator {
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.map = new GameMap(width, height);
+			this.noise = new SimplexNoise(); // Für natürlich aussehende Landschaften
+
+			// Biom-Verteilung
+			this.biomeWeights = {
+				FOREST: 0.3,    // 30% Waldgebiete
+				GRASSLAND: 0.4, // 40% Grasland/Wiesen
+				WATER: 0.15,    // 15% Gewässer
+				MOUNTAIN: 0.15  // 15% Bergregionen
+			};
+
+			// Minimale Größe für zusammenhängende Gebiete
+			this.minRegionSize = 10;
+		}
+
+		generate() {
+			// 1. Basis-Heightmap generieren
+			this.generateHeightmap();
+
+			// 2. Biome platzieren
+			this.placeBiomes();
+
+			// 3. Straßen und Wege
+			this.generateRoads();
+
+			// 4. Strukturen (Häuser, etc.)
+			this.placeStructures();
+
+			// 5. Details hinzufügen
+			this.addDetails();
+
+			return this.map;
+		}
+
+		generateHeightmap() {
+			const scale = 0.05; // Bestimmt wie "hügelig" die Landschaft ist
+
+			for(let y = 0; y < this.height; y++) {
+				for(let x = 0; x < this.width; x++) {
+					// Basis-Höhenwert
+					const height = (this.noise.noise2D(x * scale, y * scale) + 1) / 2;
+
+					// Küstenlinien-Effekt
+					const distanceToEdge = Math.min(
+						x, y, this.width - x, this.height - y
+					) / Math.min(this.width, this.height);
+
+					const finalHeight = height * (0.3 + 0.7 * distanceToEdge);
+
+					// Höhenwert in Terrain umwandeln
+					if(finalHeight < 0.2) {
+						this.map.setTile(x, y, 'DEEP_WATER');
+					} else if(finalHeight < 0.3) {
+						this.map.setTile(x, y, 'SHALLOW_WATER');
+					} else if(finalHeight < 0.35) {
+						this.map.setTile(x, y, 'BEACH');
+					} else if(finalHeight > 0.8) {
+						this.map.setTile(x, y, 'MOUNTAIN');
+					} else {
+						this.map.setTile(x, y, 'GRASS');
+					}
+				}
+			}
+		}
+
+		placeBiomes() {
+			const scale = 0.03;
+
+			for(let y = 0; y < this.height; y++) {
+				for(let x = 0; x < this.width; x++) {
+					const tile = this.map.getTile(x, y);
+					if(!tile || tile.type === 'DEEP_WATER' || tile.type === 'MOUNTAIN') continue;
+
+					const biomeNoise = this.noise.noise2D(x * scale + 1000, y * scale + 1000);
+
+					if(tile.type === 'GRASS') {
+						if(biomeNoise > 0.3) {
+							this.map.setTile(x, y, 'FOREST_LIGHT');
+						} else if(biomeNoise > 0) {
+							this.map.setTile(x, y, 'HIGH_GRASS');
+						}
+
+						// Zufällig Büsche platzieren
+						if(Math.random() < 0.05) {
+							this.map.setTile(x, y, 'BUSH');
 						}
 					}
 				}
 			}
-
-			// Optionally, add tree lines along roads
-			this.addTreeLines();
 		}
 
-		addTreeLines() {
-			for (let y = 0; y < this.MAP_HEIGHT; y++) {
-				for (let x = 0; x < this.MAP_WIDTH; x++) {
-					if (this.map[y][x] === TILE_TYPES.ROAD) {
-						// Add trees on both sides of the road with some probability
-						const adjacentOffsets = [
-							{dx: -2, dy: 0},
-							{dx: 2, dy: 0},
-							{dx: 0, dy: -2},
-							{dx: 0, dy: 2}
-						];
+		generateRoads() {
+			// Hauptstraße durch die Karte
+			const mainRoadY = Math.floor(this.height * 0.4);
 
-						adjacentOffsets.forEach(offset => {
-							const newX = x + offset.dx;
-							const newY = y + offset.dy;
-							if (this.isValidTile(newX, newY) && this.map[newY][newX] === TILE_TYPES.GRASS) {
-								if (Math.random() < 0.3) {
-									this.map[newY][newX] = TILE_TYPES.TREE;
-								}
-							}
-						});
+			for(let x = 0; x < this.width; x++) {
+				const offset = Math.floor(Math.sin(x * 0.05) * 3); // Leichte Kurven
+				const y = mainRoadY + offset;
+
+				if(y >= 0 && y < this.height) {
+					this.map.setTile(x, y, 'ROAD');
+
+					// Straßenränder
+					if(y - 1 >= 0) this.ensureWalkableTile(x, y - 1);
+					if(y + 1 < this.height) this.ensureWalkableTile(x, y + 1);
+				}
+			}
+
+			// Nebenwege
+			this.generatePaths();
+		}
+
+		generatePaths() {
+			const pathCount = Math.floor(Math.min(this.width, this.height) * 0.1);
+
+			for(let i = 0; i < pathCount; i++) {
+				const startX = Math.floor(Math.random() * this.width);
+				const startY = Math.floor(Math.random() * this.height);
+
+				if(!this.map.getTile(startX, startY).isWalkable()) continue;
+
+				let x = startX;
+				let y = startY;
+				const pathLength = 20 + Math.floor(Math.random() * 30);
+
+				for(let j = 0; j < pathLength; j++) {
+					if(x >= 0 && x < this.width && y >= 0 && y < this.height) {
+						const currentTile = this.map.getTile(x, y);
+						if(currentTile.type !== 'DEEP_WATER' &&
+							currentTile.type !== 'MOUNTAIN') {
+							this.map.setTile(x, y, 'PATH');
+						}
+					}
+
+					// Zufällige Richtungsänderung
+					const dir = Math.floor(Math.random() * 4);
+					switch(dir) {
+						case 0: x++; break;
+						case 1: x--; break;
+						case 2: y++; break;
+						case 3: y--; break;
 					}
 				}
 			}
 		}
 
-		// Methode wird benötigt (ist bereits im Code eingebunden)
-		static findTilesByType(searchMap, tileType) {
-			const tiles = [];
-			for (let y = 0; y < searchMap.length; y++) {
-				for (let x = 0; x < searchMap[0].length; x++) {
-					if (searchMap[y][x] === tileType) {
-						tiles.push({x, y});
+		placeStructures() {
+			// Häuser entlang der Hauptstraße
+			for(let x = 0; x < this.width; x += 8) {
+				for(let y = 0; y < this.height; y++) {
+					const tile = this.map.getTile(x, y);
+					if(tile && tile.type === 'ROAD' && Math.random() < 0.3) {
+						this.placeHouse(x, y - 2);
+						this.placeHouse(x, y + 2);
 					}
 				}
 			}
+		}
 
-			// Optional: Sort by distance to map center
-			const centerX = searchMap[0].length / 2;
-			const centerY = searchMap.length / 2;
+		placeHouse(x, y) {
+			if(x < 0 || x >= this.width - 2 || y < 0 || y >= this.height - 2) return;
 
-			tiles.sort((a, b) => {
-				const distA = Math.hypot(a.x - centerX, a.y - centerY);
-				const distB = Math.hypot(b.x - centerX, b.y - centerY);
-				return distA - distB;
-			});
+			// Prüfe ob Platz für Haus
+			for(let dx = 0; dx < 2; dx++) {
+				for(let dy = 0; dy < 2; dy++) {
+					const tile = this.map.getTile(x + dx, y + dy);
+					if(!tile || !tile.isWalkable()) return;
+				}
+			}
 
-			return tiles;
+			// Haus platzieren
+			this.map.setTile(x, y, 'HOUSE');
+			this.map.setTile(x + 1, y, 'HOUSE');
+			this.map.setTile(x, y + 1, 'HOUSE');
+			this.map.setTile(x + 1, y + 1, 'HOUSE');
+		}
+
+		addDetails() {
+			for(let y = 0; y < this.height; y++) {
+				for(let x = 0; x < this.width; x++) {
+					const tile = this.map.getTile(x, y);
+					if(!tile) continue;
+
+					// Einzelne Bäume im Grasland
+					if(tile.type === 'GRASS' && Math.random() < 0.02) {
+						this.map.setTile(x, y, 'FOREST_LIGHT');
+					}
+
+					// Dichte Wälder neben bestehenden Wäldern
+					if(tile.type === 'FOREST_LIGHT' && this.countNeighborsOfType(x, y, 'FOREST_LIGHT') > 2) {
+						this.map.setTile(x, y, 'FOREST_DENSE');
+					}
+				}
+			}
+		}
+
+		ensureWalkableTile(x, y) {
+			const tile = this.map.getTile(x, y);
+			if(tile && !tile.isWalkable()) {
+				this.map.setTile(x, y, 'GRASS');
+			}
+		}
+
+		countNeighborsOfType(x, y, type) {
+			let count = 0;
+			for(let dx = -1; dx <= 1; dx++) {
+				for(let dy = -1; dy <= 1; dy++) {
+					if(dx === 0 && dy === 0) continue;
+
+					const tile = this.map.getTile(x + dx, y + dy);
+					if(tile && tile.type === type) count++;
+				}
+			}
+			return count;
+		}
+	}
+
+	// Einfache Implementierung von SimplexNoise
+	class SimplexNoise {
+		constructor() {
+			this.perm = new Array(512);
+			this.grad3 = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+				[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+				[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+
+			for(let i = 0; i < 256; i++) {
+				this.perm[i] = this.perm[i + 256] = Math.floor(Math.random() * 256);
+			}
+		}
+
+		noise2D(xin, yin) {
+			// Vereinfachte 2D Noise Implementation
+			const n0 = xin * 57.0 + yin * 43.0;
+			return Math.sin(n0) * 0.5 + 0.5;
 		}
 	}
 
@@ -1441,16 +1695,19 @@
 			let x, y, type;
 
 			// Position finden
+            let tile;
 			do {
-				x = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2; // 2 Tiles vom Rand entfernt
+				x = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2;
 				y = Math.floor(Math.random() * (MAP_HEIGHT - 4)) + 2;
+				tile = map.getTile(x, y);
 			} while (
-				map[y][x] === TILE_TYPES.DEEP_WATER ||
-				map[y][x] === TILE_TYPES.SHALLOW_WATER ||
-				map[y][x] === TILE_TYPES.BUILDING ||
-				map[y][x] === TILE_TYPES.MOUNTAIN ||
-				map[y][x] === TILE_TYPES.WALL ||
-				map[y][x] === TILE_TYPES.TREE
+				!tile ||
+				tile.type === 'DEEP_WATER' ||
+				tile.type === 'SHALLOW_WATER' ||
+				tile.type === 'BUILDING' ||
+				tile.type === 'MOUNTAIN' ||
+				tile.type === 'WALL' ||
+				tile.type === 'TREE'
 				);
 
 			// Einzigartigen Missionstyp wählen
@@ -1775,12 +2032,11 @@
 			const isMoving = dx != 0 || dy != 0;
 			const tileX = Math.floor(this.x / TILE_SIZE);
 			const tileY = Math.floor(this.y / TILE_SIZE);
-			const currentTile = map[tileY][tileX];
+			const currentTile = map.getTile(tileX, tileY);
 
-			// Tarneffekt nur auf Gras und mit Tarnanzug
+            // Tarneffekt nur auf Gras und mit Tarnanzug
 			if (this.equipment.has('tarnanzug')) {
-				if (currentTile === TILE_TYPES.GRASS ||
-					currentTile === TILE_TYPES.HIGH_GRASS) {
+				if (currentTile && (currentTile.type === 'GRASS' || currentTile.type === 'HIGH_GRASS')) {
 					this.stealthStatus.isCamouflaged = true;
 					this.stealthStatus.detectionModifier = 0.3;
 				} else {
@@ -2449,9 +2705,10 @@
 			// Suche in einem Bereich um den Gegner
 			for (let y = Math.max(0, tileY - 5); y < Math.min(MAP_HEIGHT, tileY + 5); y++) {
 				for (let x = Math.max(0, tileX - 5); x < Math.min(MAP_WIDTH, tileX + 5); x++) {
-					const tile = map[y][x];
-					if (tile === TILE_TYPES.TREE || tile === TILE_TYPES.WALL ||
-						tile === TILE_TYPES.BUILDING) {
+					const tile = map.getTile(x, y);
+					if (tile && (tile.type === 'TREE' ||
+						tile.type === 'WALL' ||
+						tile.type === 'BUILDING')) {
 						objects.push({
 							x: x * TILE_SIZE + TILE_SIZE / 2,
 							y: y * TILE_SIZE + TILE_SIZE / 2,
@@ -3752,7 +4009,7 @@
 				const damageReduction = vehicle.isClosed ? 0.5 : 1;
 
 				// Schaden am Fahrzeug
-                console.log(`Treffer auf ${vehicle.type}!`);
+				console.log(`Treffer auf ${vehicle.type}!`);
 				vehicle.health -= this.damage * damageMultiplier * damageReduction;
 
 				// Schaden an Insassen bei offenen Fahrzeugen
@@ -5428,23 +5685,13 @@
 		const tileX = Math.floor(x / TILE_SIZE);
 		const tileY = Math.floor(y / TILE_SIZE);
 
-		// Kartenrand- und Terrain-Kollisionen
 		if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
 
-		const tile = map[tileY][tileX];
-		if (tile === TILE_TYPES.MOUNTAIN || tile === TILE_TYPES.WALL) {
-			return true;
-		}
+		const tile = map.getTile(tileX, tileY);
+		if (!tile) return true;
 
-		// Wasser-Kollisionen
-		if (tile === TILE_TYPES.DEEP_WATER || tile === TILE_TYPES.SHALLOW_WATER) {
-			if (object instanceof Vehicle) {
-				return true;
-			} else if (object instanceof Player) {
-				return false;
-			} else {
-				return true;
-			}
+		if (!(object instanceof Vehicle ? !tile.isVehiclePassable() : !tile.isWalkable())) {
+			return false;
 		}
 
 		// Keine weiteren Kollisionsprüfungen für Spieler direkt nach dem Aussteigen
@@ -5528,15 +5775,14 @@
 	function isObstacleAt(x, y) {
 		const tileX = Math.floor(x / TILE_SIZE);
 		const tileY = Math.floor(y / TILE_SIZE);
-		if (
-			tileX < 0 ||
-			tileX >= MAP_WIDTH ||
-			tileY < 0 ||
-			tileY >= MAP_HEIGHT
-		)
+		if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT)
 			return true;
-		const tile = map[tileY][tileX];
-		return tile === TILE_TYPES.BUILDING || tile === TILE_TYPES.FOREST || tile === TILE_TYPES.MOUNTAIN || tile === TILE_TYPES.WALL;
+		const tile = map.getTile(tileX, tileY);
+		return !tile ||
+			tile.type === 'BUILDING' ||
+			tile.type === 'FOREST' ||
+			tile.type === 'MOUNTAIN' ||
+			tile.type === 'WALL';
 	}
 
 	function drawMissionArrow(player, mission) {
@@ -5577,8 +5823,9 @@
 
 	// Initialisierung des Spiels
 	function initGame() {
-		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT, TILE_SIZE);
-		map = mapGenerator.generateMap();
+		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT);
+		const gameMap = mapGenerator.generate();
+		map = gameMap; // Existierende map-Variable mit der neuen GameMap ersetzen
 		powerUpManager.spawnPowerUps(MAP_WIDTH, MAP_HEIGHT);
 
 		// Spawn players at safe positions near each other
@@ -5702,8 +5949,8 @@
 	// Überarbeitetes Fahrzeug-Spawning
 	function spawnVehicles() {
 		vehicles = [];
-		const villageTiles = MapGenerator.findTilesByType(map, TILE_TYPES.VILLAGE_CENTER);
-		const roadTiles = MapGenerator.findTilesByType(map, TILE_TYPES.ROAD);
+		const villageTiles = map.findTilesByType('VILLAGE_CENTER');
+		const roadTiles = map.findTilesByType('ROAD');
 
 		// Ein Panzer an strategischer Position
 		const panzerSpawnTile = roadTiles[Math.floor(Math.random() * roadTiles.length)];
@@ -5829,14 +6076,12 @@
 		const startTileY = Math.max(0, Math.floor(viewport.top / TILE_SIZE));
 		const endTileY = Math.min(MAP_HEIGHT, Math.ceil(viewport.bottom / TILE_SIZE));
 
-		// Vorberechnung der Tile-Positionen für bessere Performance
 		for (let y = startTileY; y < endTileY; y++) {
-			const tileY = y * TILE_SIZE;
 			for (let x = startTileX; x < endTileX; x++) {
-				const tileType = map[y][x];
-				if (tileType !== undefined) {
-					ctx.fillStyle = TILE_COLORS[tileType] || '#777';
-					ctx.fillRect(x * TILE_SIZE, tileY, TILE_SIZE, TILE_SIZE);
+				const tile = map.getTile(x, y);
+				if (tile) {
+					ctx.fillStyle = tile.getColor();
+					ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 				}
 			}
 		}
@@ -6003,8 +6248,8 @@
 					tileY >= startY &&
 					tileY <= startY + mapHeight
 				) {
-					const tileType = map[y][x];
-					minimapCtx.fillStyle = TILE_COLORS[tileType] || '#777';
+					const tile = map.getTile(x, y);
+					minimapCtx.fillStyle = tile ? tile.getColor() : '#777';
 					minimapCtx.fillRect(
 						(tileX - startX) * scaleX,
 						(tileY - startY) * scaleY,
