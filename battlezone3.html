@@ -1513,6 +1513,11 @@
 			this.color = color;
 			this.health = 100;
 			this.isAlive = true;
+
+			// Physikalische Eigenschaften
+			this.mass = size * size * 0.1; // Basis-Masse basierend auf Größe
+			this.momentum = { x: 0, y: 0 };
+			this.elasticity = 0.3; // Wie elastisch Kollisionen sind
 		}
 
 		draw() {
@@ -4051,7 +4056,11 @@
 					isClosed: true,
 					maxSpeed: 3,
 					acceleration: 0.2,
-					deceleration: 0.99
+					deceleration: 0.99,
+					mass: 60000,
+					armor: 0.8,    // Reduziert eingehenden Schaden
+					elasticity: 0.1,
+					pushForce: 2.0 // Wie stark das Fahrzeug andere wegschieben kann
 				},
 				Jeep: {
 					size: 120,
@@ -4061,7 +4070,11 @@
 					isClosed: false,
 					maxSpeed: 6,
 					acceleration: 0.3,
-					deceleration: 0.95
+					deceleration: 0.95,
+					mass: 2000,
+					armor: 0.3,
+					elasticity: 0.4,
+					pushForce: 0.5
 				},
 				LKW: {
 					size: 240,
@@ -4072,7 +4085,11 @@
 					maxSpeed: 4,
 					acceleration: 0.15,
 					deceleration: 0.97,
-					hasTrailer: true
+					hasTrailer: true,
+					mass: 8000,
+					armor: 0.4,
+					elasticity: 0.3,
+					pushForce: 0.8
 				},
 				PKW: {
 					size: 100,
@@ -4082,7 +4099,11 @@
 					isClosed: false,
 					maxSpeed: 7,
 					acceleration: 0.4,
-					deceleration: 0.95
+					deceleration: 0.95,
+					mass: 1500,
+					armor: 0.2,
+					elasticity: 0.5,
+					pushForce: 0.3
 				},
 				Pickup: {
 					size: 110,
@@ -4092,7 +4113,11 @@
 					isClosed: false,
 					maxSpeed: 6,
 					acceleration: 0.35,
-					deceleration: 0.95
+					deceleration: 0.95,
+					mass: 2500,
+					armor: 0.25,
+					elasticity: 0.4,
+					pushForce: 0.4
 				}
 			};
 
@@ -4114,7 +4139,6 @@
 			this.roles = new Map();
 			this.isClosed = config.isClosed;
 			this.hasGunner = config.hasGunner;
-			this.isDestroyed = false;
 			this.lastShotTime = 0;
 			this.trailerLength = type === 'LKW' ? 160 : 0;
 			this.trailerAngle = this.angle;
@@ -4125,6 +4149,19 @@
 			// Festes Tarnmuster statt zufälligem
 			this.camoPattern = type === 'Panzer' ? 'woodland' :
 				type === 'LKW' ? 'urban' : null;
+
+			// Physikalische Eigenschaften setzen
+			const physics = vehicleTypes[type];
+			this.mass = physics.mass;
+			this.armor = physics.armor;
+			this.elasticity = physics.elasticity;
+			this.pushForce = physics.pushForce;
+
+			// Existierende Eigenschaften erweitern
+			this.isDestroyed = false;
+			this.wreckHeight = 0; // Für Rendering-Ordnung
+			this.lastCollisionTime = 0;
+			this.collisionCooldown = 100; // ms zwischen Kollisionsschäden
 		}
 
 		addPassenger(player) {
@@ -4169,7 +4206,11 @@
 		}
 
 		destroy() {
+			if (this.isDestroyed) return;
+
 			this.isDestroyed = true;
+			this.wreckHeight = -1; // Wrack wird unter intakten Fahrzeugen gerendert
+
 			// Alle Passagiere vor dem Fahrzeug aussetzen
 			[...this.passengers].forEach(passenger => {
 				// Finde eine freie Position um das Fahrzeug
@@ -4177,8 +4218,8 @@
 				let placed = false;
 
 				for (const angle of angles) {
-					const testX = this.x + Math.cos(angle) * (this.size / 2 + passenger.size / 2 + 10);
-					const testY = this.y + Math.sin(angle) * (this.size / 2 + passenger.size / 2 + 10);
+					const testX = this.x + Math.cos(angle) * (this.size/2 + passenger.size/2 + 10);
+					const testY = this.y + Math.sin(angle) * (this.size/2 + passenger.size/2 + 10);
 
 					if (!isColliding(testX, testY, passenger)) {
 						passenger.x = testX;
@@ -4191,7 +4232,7 @@
 				// Wenn keine Position gefunden wurde, platziere mit force-push
 				if (!placed) {
 					let angle = Math.random() * Math.PI * 2;
-					let distance = this.size / 2 + passenger.size / 2 + 10;
+					let distance = this.size/2 + passenger.size/2 + 10;
 					let maxAttempts = 10;
 
 					while (maxAttempts > 0) {
@@ -4315,6 +4356,75 @@
 			this.checkCollisions();
 		}
 
+		// Kollisionsschaden berechnen
+		calculateCollisionDamage(relativeVelocity, otherVehicle) {
+			const velocityMagnitude = Math.hypot(relativeVelocity.x, relativeVelocity.y);
+			const baseDamage = (velocityMagnitude * this.mass) / 1000;
+
+			// Reduziere Schaden basierend auf Panzerung
+			return baseDamage * (1 - this.armor);
+		}
+
+		// Kollisionsauflösung zwischen Fahrzeugen
+		resolveVehicleCollision(otherVehicle) {
+			const currentTime = Date.now();
+			if (currentTime - this.lastCollisionTime < this.collisionCooldown) return;
+
+			const dx = otherVehicle.x - this.x;
+			const dy = otherVehicle.y - this.y;
+			const distance = Math.hypot(dx, dy);
+			const overlap = (this.size + otherVehicle.size) / 2 - distance;
+
+			if (overlap <= 0) return;
+
+			// Relative Geschwindigkeit berechnen
+			const relativeVelocity = {
+				x: otherVehicle.speed * Math.cos(otherVehicle.angle) - this.speed * Math.cos(this.angle),
+				y: otherVehicle.speed * Math.sin(otherVehicle.angle) - this.speed * Math.sin(this.angle)
+			};
+
+			// Normalisierte Kollisionsrichtung
+			const normal = {
+				x: dx / distance,
+				y: dy / distance
+			};
+
+			// Impulsberechnung
+			const velocityAlongNormal = relativeVelocity.x * normal.x + relativeVelocity.y * normal.y;
+			if (velocityAlongNormal > 0) return;
+
+			const restitution = Math.min(this.elasticity, otherVehicle.elasticity);
+			const j = -(1 + restitution) * velocityAlongNormal;
+			const impulse = j / (1/this.mass + 1/otherVehicle.mass);
+
+			// Geschwindigkeiten aktualisieren
+			if (!(this.type === 'Panzer' && otherVehicle.type === 'Panzer')) {
+				this.speed -= (impulse / this.mass) * Math.hypot(normal.x, normal.y);
+				otherVehicle.speed += (impulse / otherVehicle.mass) * Math.hypot(normal.x, normal.y);
+
+				// Position korrigieren
+				const correctionFactor = overlap / 2;
+				this.x -= normal.x * correctionFactor;
+				this.y -= normal.y * correctionFactor;
+				otherVehicle.x += normal.x * correctionFactor;
+				otherVehicle.y += normal.y * correctionFactor;
+			}
+
+			// Schaden berechnen und anwenden
+			const damage = this.calculateCollisionDamage(relativeVelocity, otherVehicle);
+			if (damage > 10) { // Minimaler Schadensschwellwert
+				this.health -= damage;
+				otherVehicle.health -= damage;
+
+				// Zerstörungscheck
+				if (this.health <= 0) this.destroy();
+				if (otherVehicle.health <= 0) otherVehicle.destroy();
+			}
+
+			this.lastCollisionTime = currentTime;
+			otherVehicle.lastCollisionTime = currentTime;
+		}
+
 		checkCollisionDamage() {
 			const currentTime = Date.now();
 			if (currentTime - this.lastDamageTime < this.damageInterval) return;
@@ -4432,6 +4542,14 @@
 			const bulletX = this.x + Math.cos(globalAngle) * gunOffset;
 			const bulletY = this.y + Math.sin(globalAngle) * gunOffset;
 
+			// Bullet-Kollisionscheck mit eigenem Fahrzeug
+			const bulletDir = { x: Math.cos(globalAngle), y: Math.sin(globalAngle) };
+			const rayStart = { x: this.x, y: this.y };
+			const rayEnd = { x: bulletX, y: bulletY };
+			if (this.rayIntersectsVehicle(rayStart, rayEnd, bulletDir)) {
+				return false; // Schuss würde eigenes Fahrzeug treffen
+			}
+
 			const weaponConfig = {
 				damage: this.type === 'Panzer' ? 100 : 25,
 				range: this.type === 'Panzer' ? 800 : 400,
@@ -4450,6 +4568,24 @@
 
 			this.lastShotTime = currentTime;
 			return true;
+		}
+
+		rayIntersectsVehicle(start, end, dir) {
+			// Vereinfachte Kollisionsprüfung mit dem eigenen Fahrzeug
+			const steps = 10;
+			const stepX = (end.x - start.x) / steps;
+			const stepY = (end.y - start.y) / steps;
+
+			for (let i = 0; i < steps; i++) {
+				const checkX = start.x + stepX * i;
+				const checkY = start.y + stepY * i;
+				const distToCenter = Math.hypot(checkX - this.x, checkY - this.y);
+
+				if (distToCenter < this.size / 2) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		draw() {
@@ -5578,6 +5714,22 @@
 		});
 	}
 
+	function updateVehicleCollisions() {
+		for (let i = 0; i < vehicles.length; i++) {
+			for (let j = i + 1; j < vehicles.length; j++) {
+				const v1 = vehicles[i];
+				const v2 = vehicles[j];
+
+				if (!v1.isDestroyed && !v2.isDestroyed) {
+					const dist = Math.hypot(v1.x - v2.x, v1.y - v2.y);
+					if (dist < (v1.size + v2.size) / 2) {
+						v1.resolveVehicleCollision(v2);
+					}
+				}
+			}
+		}
+	}
+
 	// Hauptupdate-Funktion
 	function update() {
 		if (gameState !== 'playing') return; // Update nur wenn das Spiel läuft
@@ -5586,6 +5738,8 @@
 
 		// Enemy respawning
 		enemySpawner.update();
+
+		updateVehicleCollisions();
 
 		// Optimiertes Rendering
 		renderGame();
@@ -5679,7 +5833,11 @@
 		});
 
 		// Fahrzeuge aktualisieren und zeichnen
-		vehicles.forEach(vehicle => {
+		vehicles.filter(v => v.isDestroyed).forEach(vehicle => {
+			vehicle.update();
+			vehicle.draw();
+		});
+		vehicles.filter(v => !v.isDestroyed).forEach(vehicle => {
 			vehicle.update();
 			vehicle.draw();
 		});
