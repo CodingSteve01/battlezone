@@ -1661,6 +1661,12 @@
 		}
 
 		useWeapon() {
+			// Wenn im Fahrzeug und als Schütze
+			if (this.vehicle && this.vehicle.roles.get(this) === 'gunner') {
+				return this.vehicle.fire(this);
+			}
+
+			// Normales Waffenverhalten
 			const currentWeapon = this.inventory.getSelectedItem();
 			if (currentWeapon && currentWeapon.fire(this)) {
 				this.stealthStatus.lastActionTime = Date.now(); // Tarnung temporär aufheben
@@ -3646,15 +3652,13 @@
 
 			// Reichweiten-Check
 			if (this.distanceTraveled >= this.range) {
-				const index = bullets.indexOf(this);
-				if (index !== -1) bullets.splice(index, 1);
+				this.destroy();
 				return;
 			}
 
 			// Terrain-Kollision
 			if (isColliding(newX, newY)) {
-				const index = bullets.indexOf(this);
-				if (index !== -1) bullets.splice(index, 1);
+				this.destroy();
 				return;
 			}
 
@@ -3665,87 +3669,120 @@
 			// Kartenrand-Check
 			if (this.x < 0 || this.x > MAP_WIDTH * TILE_SIZE ||
 				this.y < 0 || this.y > MAP_HEIGHT * TILE_SIZE) {
-				const index = bullets.indexOf(this);
-				if (index !== -1) bullets.splice(index, 1);
+				this.destroy();
 				return;
 			}
 
-			// Verbesserte Kollisionserkennung
-			if (this.owner instanceof Player) {
-				// Kollision mit Gegnern
-				for (const enemy of enemies) {
-					if (enemy.isAlive &&
-						Math.hypot(this.x - enemy.x, this.y - enemy.y) < (this.size + enemy.size) / 2) {
-						enemy.health -= this.damage;
-						if (enemy.health <= 0) {
-							enemy.isAlive = false;
-						}
-						const index = bullets.indexOf(this);
-						if (index !== -1) bullets.splice(index, 1);
-						break;
-					}
-				}
+			// Einheitliche Kollisionserkennung für alle Ziele
+			this.checkCollisions();
+		}
 
-				// Kollision mit feindlichen Fahrzeugen
-				for (const vehicle of vehicles) {
-					if (!vehicle.isDestroyed &&
-						(!vehicle.passengers.some(p => p instanceof Player)) && // Nur feindliche Fahrzeuge
-						Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < vehicle.size / 2) {
-						// Zusätzlicher Schaden für Panzerabwehrwaffen
-						const damageMultiplier = this.weapon?.name === 'Panzerabwehr' ? 3 : 1;
-						vehicle.health -= this.damage * damageMultiplier;
-						if (vehicle.health <= 0) {
-							vehicle.destroy();
+		checkCollisions() {
+			// Vehicle-Vehicle collisions wenn der Besitzer ein Fahrzeug ist
+			if (this.owner instanceof Vehicle) {
+				vehicles.forEach(vehicle => {
+					if (vehicle !== this.owner && !vehicle.isDestroyed) {
+						const dist = Math.hypot(this.x - vehicle.x, this.y - vehicle.y);
+						if (dist < vehicle.size / 2) {
+							console.log(`Treffer auf ${vehicle.type}!`);
+							vehicle.health -= this.damage;
+							this.destroy();
+							if (vehicle.health <= 0) {
+								vehicle.destroy();
+							}
 						}
-						const index = bullets.indexOf(this);
-						if (index !== -1) bullets.splice(index, 1);
-						break;
 					}
-				}
-			} else if (this.owner instanceof Enemy) {
-				// Kollision mit Spielern und ihren Fahrzeugen
-				for (const player of players) {
-					if (!player.isAlive) continue;
+				});
+			}
 
-					if (player.vehicle) {
-						// Fahrzeug-Treffer
-						if (Math.hypot(this.x - player.vehicle.x, this.y - player.vehicle.y) < player.vehicle.size / 2) {
-							if (player.vehicle.isClosed) {
-								// Geschlossene Fahrzeuge nehmen weniger Schaden
-								player.vehicle.health -= this.damage * 0.5;
-							} else {
-								// Offene Fahrzeuge: Fahrzeug und Insassen können getroffen werden
-								player.vehicle.health -= this.damage;
-								if (Math.random() < 0.3) { // 30% Chance die Insassen zu treffen
-									player.health -= this.damage;
-								}
-							}
-							if (player.vehicle.health <= 0) {
-								player.vehicle.destroy();
-							}
-							if (player.health <= 0) {
-								player.isAlive = false;
-								checkGameOver();
-							}
-							const index = bullets.indexOf(this);
-							if (index !== -1) bullets.splice(index, 1);
-							break;
-						}
-					} else {
-						// Direkter Spieler-Treffer
-						if (Math.hypot(this.x - player.x, this.y - player.y) < (this.size + player.size) / 2) {
-							player.health -= this.damage;
-							if (player.health <= 0) {
-								player.isAlive = false;
-								checkGameOver();
-							}
-							const index = bullets.indexOf(this);
-							if (index !== -1) bullets.splice(index, 1);
-							break;
-						}
+			// Prüfe Kollisionen mit Spielern
+			for (const player of players) {
+				if (!player.isAlive || player === this.owner) continue;
+
+				// Prüfe Fahrzeug-Kollision falls Spieler in einem Fahrzeug sitzt
+				if (player.vehicle) {
+					if (this.checkVehicleCollision(player.vehicle)) return;
+				}
+				// Prüfe direkte Spieler-Kollision
+				else if (this.checkEntityCollision(player)) {
+					player.health -= this.damage;
+					if (player.health <= 0) {
+						player.isAlive = false;
+						checkGameOver();
 					}
+					this.destroy();
+					return;
 				}
 			}
+
+			// Prüfe Kollisionen mit Gegnern
+			for (const enemy of enemies) {
+				if (!enemy.isAlive || enemy === this.owner) continue;
+
+				if (this.checkEntityCollision(enemy)) {
+					enemy.health -= this.damage;
+					if (enemy.health <= 0) {
+						enemy.isAlive = false;
+					}
+					this.destroy();
+					return;
+				}
+			}
+
+			// Prüfe Kollisionen mit Fahrzeugen
+			for (const vehicle of vehicles) {
+				if (vehicle.isDestroyed || vehicle === this.owner) continue;
+
+				// Ignoriere Fahrzeuge die dem Besitzer gehören
+				if (vehicle.passengers.includes(this.owner)) continue;
+
+				if (this.checkVehicleCollision(vehicle)) return;
+			}
+		}
+
+		checkEntityCollision(entity) {
+			return Math.hypot(this.x - entity.x, this.y - entity.y) < (this.size + entity.size) / 2;
+		}
+
+		checkVehicleCollision(vehicle) {
+			if (vehicle === this.owner) return false;
+
+			if (Math.hypot(this.x - vehicle.x, this.y - vehicle.y) < vehicle.size / 2) {
+				const damageMultiplier = this.weapon?.name === 'Panzerabwehr' ? 3 : 1;
+				const damageReduction = vehicle.isClosed ? 0.5 : 1;
+
+				// Schaden am Fahrzeug
+                console.log(`Treffer auf ${vehicle.type}!`);
+				vehicle.health -= this.damage * damageMultiplier * damageReduction;
+
+				// Schaden an Insassen bei offenen Fahrzeugen
+				if (!vehicle.isClosed && Math.random() < 0.3) {
+					vehicle.passengers.forEach(passenger => {
+						if (passenger !== this.owner) {
+							passenger.health -= this.damage;
+							if (passenger.health <= 0) {
+								passenger.isAlive = false;
+								if (passenger instanceof Player) {
+									checkGameOver();
+								}
+							}
+						}
+					});
+				}
+
+				if (vehicle.health <= 0) {
+					vehicle.destroy();
+				}
+
+				this.destroy();
+				return true;
+			}
+			return false;
+		}
+
+		destroy() {
+			const index = bullets.indexOf(this);
+			if (index !== -1) bullets.splice(index, 1);
 		}
 
 		draw() {
@@ -4208,6 +4245,8 @@
 		destroy() {
 			if (this.isDestroyed) return;
 
+			console.log(`Fahrzeug ${this.type} zerstört!`);
+
 			this.isDestroyed = true;
 			this.wreckHeight = -1; // Wrack wird unter intakten Fahrzeugen gerendert
 
@@ -4413,6 +4452,7 @@
 			// Schaden berechnen und anwenden
 			const damage = this.calculateCollisionDamage(relativeVelocity, otherVehicle);
 			if (damage > 10) { // Minimaler Schadensschwellwert
+				console.log(`Kollisionsschaden: ${damage.toFixed(0)}`);
 				this.health -= damage;
 				otherVehicle.health -= damage;
 
@@ -4468,6 +4508,7 @@
 						if (otherVehicle !== this && !otherVehicle.isDestroyed) {
 							const dist = Math.hypot(this.x - otherVehicle.x, this.y - otherVehicle.y);
 							if (dist < (this.size + otherVehicle.size) / 2) {
+								console.log(`Panzer-Kollision mit ${otherVehicle.type}`);
 								otherVehicle.health -= baseDamage * 1.5;
 								this.lastDamageTime = currentTime;
 								if (otherVehicle.health <= 0) {
@@ -4516,17 +4557,6 @@
 					}
 				});
 			}
-
-			// Bullet damage
-			bullets.forEach((bullet, index) => {
-				if (Math.hypot(bullet.x - this.x, bullet.y - this.y) < this.size / 2) {
-					this.health -= bullet.damage;
-					bullets.splice(index, 1);
-					if (this.health <= 0 && !this.isDestroyed) {
-						this.destroy();
-					}
-				}
-			});
 		}
 
 		fire(gunner) {
@@ -4542,50 +4572,31 @@
 			const bulletX = this.x + Math.cos(globalAngle) * gunOffset;
 			const bulletY = this.y + Math.sin(globalAngle) * gunOffset;
 
-			// Bullet-Kollisionscheck mit eigenem Fahrzeug
-			const bulletDir = {x: Math.cos(globalAngle), y: Math.sin(globalAngle)};
-			const rayStart = {x: this.x, y: this.y};
-			const rayEnd = {x: bulletX, y: bulletY};
-			if (this.rayIntersectsVehicle(rayStart, rayEnd, bulletDir)) {
-				return false; // Schuss würde eigenes Fahrzeug treffen
-			}
-
 			const weaponConfig = {
 				damage: this.type === 'Panzer' ? 100 : 25,
 				range: this.type === 'Panzer' ? 800 : 400,
 				speed: this.type === 'Panzer' ? 15 : 10,
-				noise: this.type === 'Panzer' ? 2000 : 1000
+				noise: this.type === 'Panzer' ? 2000 : 1000,
+				name: this.type === 'Panzer' ? 'Panzerkanone' : 'Fahrzeug-MG'
 			};
 
 			bullets.push(new Bullet(
 				bulletX,
 				bulletY,
 				globalAngle,
-				gunner.color,
-				gunner,
+				'#575151',
+				this,
 				weaponConfig
 			));
 
 			this.lastShotTime = currentTime;
-			return true;
-		}
 
-		rayIntersectsVehicle(start, end, dir) {
-			// Vereinfachte Kollisionsprüfung mit dem eigenen Fahrzeug
-			const steps = 10;
-			const stepX = (end.x - start.x) / steps;
-			const stepY = (end.y - start.y) / steps;
-
-			for (let i = 0; i < steps; i++) {
-				const checkX = start.x + stepX * i;
-				const checkY = start.y + stepY * i;
-				const distToCenter = Math.hypot(checkX - this.x, checkY - this.y);
-
-				if (distToCenter < this.size / 2) {
-					return true;
-				}
+			// Mache Lärm für die KI
+			if (gunner) {
+				gunner.makeNoise(weaponConfig.noise);
 			}
-			return false;
+
+			return true;
 		}
 
 		draw() {
@@ -5452,6 +5463,7 @@
 					if (dist < combinedSize) {
 						// Panzer können andere Fahrzeuge überfahren
 						if (object instanceof Vehicle && object.type === 'Panzer') {
+							console.log('Panzer ran over another vehicle');
 							vehicle.health -= 200; // Massiver Schaden
 							if (vehicle.health <= 0) {
 								vehicle.destroy();
