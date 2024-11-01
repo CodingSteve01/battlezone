@@ -1639,6 +1639,7 @@
 			this.autoAimTargets = [];
 			this.currentTargetIndex = 0;
 			this.spottedEnemies = new Set(); // Für die Minikarte
+			this.lastVehicleExitTime = 0;
 
 			this.stealthStatus = {
 				isCamouflaged: false,
@@ -1870,6 +1871,7 @@
 							this.y = exitY;
 							this.vehicle.removePassenger(this);
 							this.vehicle = null;
+							this.lastVehicleExitTime = Date.now();
 							exited = true;
 							break;
 						}
@@ -1880,11 +1882,31 @@
 						showMessage('Ausstiegsposition blockiert!', 2000);
 					}
 				} else {
-					// Einsteigen
-					const nearbyVehicle = vehicles.find(v =>
-						Math.hypot(this.x - v.x, this.y - v.y) < v.size / 2 + this.size / 2 &&
-						!v.isDestroyed
-					);
+					// Einsteigen - Verbesserte Erkennung
+					const nearbyVehicle = vehicles.find(v => {
+						if (v.isDestroyed) return false;
+
+						// Basis-Distanz zwischen Spieler und Fahrzeug
+						const dist = Math.hypot(this.x - v.x, this.y - v.y);
+
+						// Erweiterte Interaktionszone basierend auf Fahrzeuggröße
+						const interactionRadius = (v.size / 2 + this.size / 2) * 1.5;
+
+						// Prüfe erst die Distanz (schneller) und dann detaillierter
+						if (dist <= interactionRadius) {
+							// Optional: Prüfe ob der Spieler nahe einer Tür ist
+							const angleToVehicle = Math.atan2(v.y - this.y, v.x - this.x);
+							const relativeDoorAngles = [0, Math.PI / 2, Math.PI, -Math.PI / 2]; // Vorne, Rechts, Hinten, Links
+
+							return relativeDoorAngles.some(doorAngle => {
+								const doorWorldAngle = v.angle + doorAngle;
+								const angleDiff = Math.abs(normalizeAngle(angleToVehicle - doorWorldAngle));
+								return angleDiff < Math.PI / 4; // 45-Grad-Toleranz
+							});
+						}
+						return false;
+					});
+
 					if (nearbyVehicle) {
 						nearbyVehicle.addPassenger(this);
 					}
@@ -2763,7 +2785,7 @@
 			);
 
 			// Kreisende Bewegung
-			const circleAngle = angleToTarget + Math.PI/2; // 90 Grad versetzt für Kreisbewegung
+			const circleAngle = angleToTarget + Math.PI / 2; // 90 Grad versetzt für Kreisbewegung
 			const targetX = target.x + Math.cos(circleAngle) * circlingRadius;
 			const targetY = target.y + Math.sin(circleAngle) * circlingRadius;
 
@@ -4097,6 +4119,8 @@
 			this.trailerLength = type === 'LKW' ? 160 : 0;
 			this.trailerAngle = this.angle;
 			this.previousPositions = [];
+			this.lastDamageTime = 0;
+			this.damageInterval = 500; // Schadensintervall in ms
 
 			// Festes Tarnmuster statt zufälligem
 			this.camoPattern = type === 'Panzer' ? 'woodland' :
@@ -4149,12 +4173,12 @@
 			// Alle Passagiere vor dem Fahrzeug aussetzen
 			[...this.passengers].forEach(passenger => {
 				// Finde eine freie Position um das Fahrzeug
-				const angles = [0, Math.PI/2, Math.PI, -Math.PI/2];
+				const angles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
 				let placed = false;
 
 				for (const angle of angles) {
-					const testX = this.x + Math.cos(angle) * (this.size/2 + passenger.size/2 + 10);
-					const testY = this.y + Math.sin(angle) * (this.size/2 + passenger.size/2 + 10);
+					const testX = this.x + Math.cos(angle) * (this.size / 2 + passenger.size / 2 + 10);
+					const testY = this.y + Math.sin(angle) * (this.size / 2 + passenger.size / 2 + 10);
 
 					if (!isColliding(testX, testY, passenger)) {
 						passenger.x = testX;
@@ -4167,7 +4191,7 @@
 				// Wenn keine Position gefunden wurde, platziere mit force-push
 				if (!placed) {
 					let angle = Math.random() * Math.PI * 2;
-					let distance = this.size/2 + passenger.size/2 + 10;
+					let distance = this.size / 2 + passenger.size / 2 + 10;
 					let maxAttempts = 10;
 
 					while (maxAttempts > 0) {
@@ -4284,8 +4308,66 @@
 				this.destroy();
 			}
 
+			// Kollisionsschaden
+			this.checkCollisionDamage();
+
 			// Collision checks
 			this.checkCollisions();
+		}
+
+		checkCollisionDamage() {
+			const currentTime = Date.now();
+			if (currentTime - this.lastDamageTime < this.damageInterval) return;
+
+			if (Math.abs(this.speed) > 2) { // Nur bei höherer Geschwindigkeit
+				const damageMultiplier = this.type === 'Panzer' ? 2 : 1;
+				const baseDamage = Math.abs(this.speed) * 20 * damageMultiplier;
+
+				// Schaden an Spielern
+				players.forEach(player => {
+					if (player.vehicle !== this && player.isAlive) { // Nicht die eigenen Passagiere
+						const dist = Math.hypot(this.x - player.x, this.y - player.y);
+						if (dist < (this.size + player.size) / 2) {
+							player.health -= baseDamage;
+							this.lastDamageTime = currentTime;
+							if (player.health <= 0) {
+								player.isAlive = false;
+								checkGameOver();
+							}
+						}
+					}
+				});
+
+				// Schaden an Gegnern
+				enemies.forEach(enemy => {
+					if (enemy.isAlive) {
+						const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+						if (dist < (this.size + enemy.size) / 2) {
+							enemy.health -= baseDamage;
+							this.lastDamageTime = currentTime;
+							if (enemy.health <= 0) {
+								enemy.isAlive = false;
+							}
+						}
+					}
+				});
+
+				// Fahrzeug-Fahrzeug Kollisionen
+				if (this.type === 'Panzer') {
+					vehicles.forEach(otherVehicle => {
+						if (otherVehicle !== this && !otherVehicle.isDestroyed) {
+							const dist = Math.hypot(this.x - otherVehicle.x, this.y - otherVehicle.y);
+							if (dist < (this.size + otherVehicle.size) / 2) {
+								otherVehicle.health -= baseDamage * 1.5;
+								this.lastDamageTime = currentTime;
+								if (otherVehicle.health <= 0) {
+									otherVehicle.destroy();
+								}
+							}
+						}
+					});
+				}
+			}
 		}
 
 		checkCollisions() {
@@ -5098,7 +5180,7 @@
 	function normalizeAngle(angle) {
 		while (angle > Math.PI) angle -= 2 * Math.PI;
 		while (angle < -Math.PI) angle += 2 * Math.PI;
-		return angle;
+		return Math.abs(angle);
 	}
 
 	function rotatedRectangleCollision(rect1, rect2) {
@@ -5133,10 +5215,10 @@
 		const height = rect.size || rect.height || 30;
 
 		const corners = [
-			{x: -width/2, y: -height/2},
-			{x: width/2, y: -height/2},
-			{x: width/2, y: height/2},
-			{x: -width/2, y: height/2}
+			{x: -width / 2, y: -height / 2},
+			{x: width / 2, y: -height / 2},
+			{x: width / 2, y: height / 2},
+			{x: -width / 2, y: height / 2}
 		];
 
 		// Rotiere und verschiebe die Ecken
@@ -5173,7 +5255,7 @@
 			max = Math.max(max, projection);
 		});
 
-		return { min, max };
+		return {min, max};
 	}
 
 	function projectionOverlap(proj1, proj2) {
@@ -5203,35 +5285,33 @@
 			}
 		}
 
+		// Keine weiteren Kollisionsprüfungen für Spieler direkt nach dem Aussteigen
+		if (object instanceof Player && object.lastVehicleExitTime &&
+			Date.now() - object.lastVehicleExitTime < 1000) {
+			return false;
+		}
+
 		if (object) {
-			// Fahrzeug-Kollisionen mit genauer Rechteck-Prüfung
+			// Fahrzeug-Kollisionen
 			for (let vehicle of vehicles) {
 				if (vehicle !== object && !vehicle.isDestroyed) {
-					// Verwende rotierte Rechteck-Kollision für Fahrzeuge
-					if (rotatedRectangleCollision(
-						{x, y, angle: object?.angle || 0, size: object?.size || 30},
-						{x: vehicle.x, y: vehicle.y, angle: vehicle.angle, size: vehicle.size}
-					)) {
-						return true;
-					}
-				}
-			}
+					const dist = Math.hypot(x - vehicle.x, y - vehicle.y);
+					const combinedSize = (vehicle.size + (object.size || 30)) / 2;
 
-			// Kollision mit anderen Spielern (außer wenn im gleichen Fahrzeug)
-			for (let player of players.filter(p => p.isAlive)) {
-				if (player !== object && (!object.passengers || !object.passengers.includes(player))) {
-					const distance = Math.hypot(x - player.x, y - player.y);
-					if (distance < (object.size + player.size) / 2) {
-						return true;
-					}
-				}
-			}
-
-			// Kollision mit lebenden Gegnern
-			for (let enemy of enemies.filter(e => e.isAlive)) {
-				if (enemy !== object) {
-					const distance = Math.hypot(x - enemy.x, y - enemy.y);
-					if (distance < (object.size + enemy.size) / 2) {
+					if (dist < combinedSize) {
+						// Panzer können andere Fahrzeuge überfahren
+						if (object instanceof Vehicle && object.type === 'Panzer') {
+							vehicle.health -= 200; // Massiver Schaden
+							if (vehicle.health <= 0) {
+								vehicle.destroy();
+							}
+							return false;
+						}
+						// Fahrzeuge können Spieler und Gegner überfahren
+						else if (object instanceof Vehicle &&
+							(vehicle instanceof Player || vehicle instanceof Enemy)) {
+							return false;
+						}
 						return true;
 					}
 				}
