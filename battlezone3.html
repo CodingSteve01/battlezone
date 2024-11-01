@@ -5463,6 +5463,7 @@
 				}
 			};
 			this.powerUps = [];
+			this.validSpawnTiles = ['GRASS', 'DIRT', 'ROAD', 'PATH', 'BEACH'];
 		}
 
 		trySpawnNearPlayer(player, type) {
@@ -5503,27 +5504,45 @@
 		}
 
 		spawnSinglePowerUp(type, mapWidth, mapHeight) {
-			let x, y;
-			let attempts = 0;
-			const maxAttempts = 50;
+	        let attempts = 0;
+	        const maxAttempts = 50;
 
-			do {
-				x = Math.random() * mapWidth;
-				y = Math.random() * mapHeight;
-				attempts++;
-			} while (isColliding(x, y) && attempts < maxAttempts);
+	        while (attempts < maxAttempts) {
+	            const x = Math.floor(Math.random() * mapWidth);
+	            const y = Math.floor(Math.random() * mapHeight);
+	            
+	            // Prüfe ob Position valid ist und genug Platz drumherum
+	            if (this.isValidSpawnLocation(x, y)) {
+	                if (type === 'weapon') {
+	                    const rareWeapons = [WEAPONS.ASSAULT_RIFLE, WEAPONS.SHOTGUN, WEAPONS.SILENCED_PISTOL];
+	                    const weapon = rareWeapons[Math.floor(Math.random() * rareWeapons.length)];
+	                    const powerUp = new PowerUp(x, y, type);
+	                    powerUp.weapon = weapon;
+	                    powerUps.push(powerUp);
+	                } else {
+	                    powerUps.push(new PowerUp(x, y, type));
+	                }
+	                return true;
+	            }
+	            attempts++;
+	        }
+	        return false;
+	    }
 
-			if (attempts < maxAttempts) {
-				if (type === 'weapon') {
-					const rareWeapons = [WEAPONS.ASSAULT_RIFLE, WEAPONS.SHOTGUN, WEAPONS.SILENCED_PISTOL];
-					const weapon = rareWeapons[Math.floor(Math.random() * rareWeapons.length)];
-					const powerUp = new PowerUp(x, y, type);
-					powerUp.weapon = weapon;
-					powerUps.push(powerUp);
-				} else {
-					powerUps.push(new PowerUp(x, y, type));
+		isValidSpawnLocation(x, y) {
+			const tileX = Math.floor(x / TILE_SIZE);
+			const tileY = Math.floor(y / TILE_SIZE);
+			
+			// Prüfe 3x3 Bereich um die Spawn-Position
+			for (let dy = -1; dy <= 1; dy++) {
+				for (let dx = -1; dx <= 1; dx++) {
+					const tile = map.getTile(tileX + dx, tileY + dy);
+					if (!tile || !this.validSpawnTiles.includes(tile.type)) {
+						return false;
+					}
 				}
 			}
+			return true;
 		}
 
 		update() {
@@ -5873,28 +5892,35 @@
 
 		// Spawn players at safe positions near each other
 		players = [];
-		let spawnX, spawnY;
-		do {
-			spawnX = Math.random() * MAP_WIDTH * TILE_SIZE;
-			spawnY = Math.random() * MAP_HEIGHT * TILE_SIZE;
-		} while (isColliding(spawnX, spawnY) || isEnemyNearby(spawnX, spawnY));
+		
+		const initialSpawn = findValidPlayerSpawn();
+	    if (!initialSpawn) {
+	        console.error("Konnte keine valide Spawn-Position finden!");
+	        return;
+	    }
+	    const spawnX = initialSpawn.x;
+	    const spawnY = initialSpawn.y;
 
-		const spawnDistance = 50; // Mindestabstand zwischen den Spielern
-		let playerPositions = []; // Um gespeicherte Positionen der Spieler zu verwalten
+	    players = [];
+	    const spawnDistance = 50;
+	    let playerPositions = [];
 
-		for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
-			let x, y;
-			do {
-				x = spawnX + (Math.random() - 0.5) * 100; // Spawn in der Nähe des ersten Spielers
-				y = spawnY + (Math.random() - 0.5) * 100;
+	    for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
+			const playerSpawn = isValidPlayerSpawnArea(
+	            Math.floor(spawnX/TILE_SIZE), 
+	            Math.floor(spawnY/TILE_SIZE), 
+	            ['GRASS', 'DIRT', 'ROAD', 'PATH']
+	        ) ? { x: spawnX + (Math.random() - 0.5) * 100, 
+	             y: spawnY + (Math.random() - 0.5) * 100 }
+	          : findValidPlayerSpawn();
 
-				// Überprüfe, ob der neue Spieler zu nahe an anderen Spielern spawnt
-				const isTooClose = playerPositions.some(([px, py]) => {
-					const distance = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
-					return distance < spawnDistance;
-				});
-				if (isTooClose) continue;
-			} while (isColliding(x, y));
+	        if (!playerSpawn) {
+	            console.error("Konnte keine valide Spieler-Position finden!");
+	            continue;
+	        }
+
+	        const x = playerSpawn.x;
+	        const y = playerSpawn.y;
 
 			// Speichere die Position des aktuellen Spielers
 			playerPositions.push([x, y]);
@@ -5970,6 +5996,111 @@
 		if (gameState === 'playing') {
 			requestAnimationFrame(update);
 		}
+	}
+
+	function findValidPlayerSpawn() {
+	    const validTiles = ['GRASS', 'DIRT', 'ROAD', 'PATH'];
+	    
+	    // 1. Erste Phase: Schneller Zufallsversuch
+	    let attempts = 0;
+	    const quickAttempts = 100;
+	    
+	    while (attempts < quickAttempts) {
+	        const x = Math.floor(Math.random() * MAP_WIDTH);
+	        const y = Math.floor(Math.random() * MAP_HEIGHT);
+	        
+	        if (isValidPlayerSpawnArea(x, y, validTiles)) {
+	            return {
+	                x: x * TILE_SIZE + TILE_SIZE / 2,
+	                y: y * TILE_SIZE + TILE_SIZE / 2
+	            };
+	        }
+	        attempts++;
+	    }
+	    
+	    // 2. Phase: Systematische Suche
+	    console.log("Schnelle Suche fehlgeschlagen, starte systematische Suche...");
+	    
+	    // Spiralförmige Suche von der Kartenmitte aus
+	    const centerX = Math.floor(MAP_WIDTH / 2);
+	    const centerY = Math.floor(MAP_HEIGHT / 2);
+	    const spiral = generateSpiralPattern(Math.max(MAP_WIDTH, MAP_HEIGHT));
+	    
+	    for (const [dx, dy] of spiral) {
+	        const x = centerX + dx;
+	        const y = centerY + dy;
+	        
+	        // Prüfe ob Position innerhalb der Karte
+	        if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+	            if (isValidPlayerSpawnArea(x, y, validTiles)) {
+	                console.log(`Spawn-Position gefunden bei ${x},${y}`);
+	                return {
+	                    x: x * TILE_SIZE + TILE_SIZE / 2,
+	                    y: y * TILE_SIZE + TILE_SIZE / 2
+	                };
+	            }
+	        }
+	    }
+	    
+	    // 3. Phase: Absolute Notlösung - Akzeptiere auch einzelne valide Tiles
+	    console.log("Systematische Suche fehlgeschlagen, suche einzelne valide Tiles...");
+	    
+	    for (let y = 0; y < MAP_HEIGHT; y++) {
+	        for (let x = 0; x < MAP_WIDTH; x++) {
+	            const tile = map.getTile(x, y);
+	            if (tile && validTiles.includes(tile.type)) {
+	                console.log(`Notfall-Spawn-Position gefunden bei ${x},${y}`);
+	                return {
+	                    x: x * TILE_SIZE + TILE_SIZE / 2,
+	                    y: y * TILE_SIZE + TILE_SIZE / 2
+	                };
+	            }
+	        }
+	    }
+	    
+	    // Wenn wirklich gar nichts gefunden wurde
+	    console.error("Keine valide Spawn-Position gefunden!");
+	    return null;
+	}
+
+	// Hilfsfunktion zur Generierung eines Spiralmusters
+	function* generateSpiralPattern(size) {
+	    let x = 0;
+	    let y = 0;
+	    let dx = 0;
+	    let dy = -1;
+	    let maxSteps = size * size;
+	    let steps = 0;
+	    
+	    while (steps < maxSteps) {
+	        if ((-size/2 <= x && x <= size/2) && (-size/2 <= y && y <= size/2)) {
+	            yield [x, y];
+	            steps++;
+	        }
+	        
+	        if (x === y || (x < 0 && x === -y) || (x > 0 && x === 1-y)) {
+	            // Richtungswechsel
+	            [dx, dy] = [-dy, dx];
+	        }
+	        
+	        x += dx;
+	        y += dy;
+	    }
+	}
+
+	function isValidPlayerSpawnArea(x, y, validTiles) {
+	    // Prüfe 5x5 Bereich für sicheren Spieler-Spawn
+	    for (let dy = -2; dy <= 2; dy++) {
+	        for (let dx = -2; dx <= 2; dx++) {
+	            const tile = map.getTile(x + dx, y + dy);
+	            if (!tile || !validTiles.includes(tile.type)) {
+	                return false;
+	            }
+	        }
+	    }
+	    
+	    // Prüfe ob keine Feinde in der Nähe sind
+	    return !isEnemyNearby(x * TILE_SIZE, y * TILE_SIZE);
 	}
 
 	// Funktion, um Feinde in der Nähe zu überprüfen
