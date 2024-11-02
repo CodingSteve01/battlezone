@@ -480,7 +480,7 @@
 			name: 'FOREST_LIGHT',
 			color: '#2d5a27',
 			height: 0.5,
-			walkable: true,
+			walkable: false,
 			vehiclePassable: false,
 			noise: 0.15,
 			provides: ['wood', 'cover', 'stealth']
@@ -490,7 +490,7 @@
 			name: 'FOREST_DENSE',
 			color: '#1a3d1a',
 			height: 1,
-			walkable: true,
+			walkable: false,
 			vehiclePassable: false,
 			noise: 0.1,
 			provides: ['wood', 'cover', 'stealth']
@@ -1232,7 +1232,7 @@
 		}
 
 		isObstacle(type) {
-			return ['OCEAN', 'DEEP_WATER', 'WALL', 'HOUSE'].includes(type);
+			return ['FOREST_DENSE', 'FOREST_LIGHT', 'WALL', 'HOUSE'].includes(type);
 		}
 
 		renderEdgeBlends(ctx, x, y, size, blendSize, neighbors) {
@@ -2188,8 +2188,7 @@
 
 		isWalkable() {
 			return this.config.walkable &&
-				!Array.from(this.entities).some(e => e.blocksMovement) &&
-				!this.isObstacle();
+				!Array.from(this.entities).some(e => e.blocksMovement);
 		}
 
 		isVehiclePassable() {
@@ -7734,11 +7733,6 @@
 
 	    const tile = map.getTile(tileX, tileY);
 	    if (!tile) {
-	        return true;
-	    }
-
-	    // Überprüfe, ob das Tile als Hindernis gekennzeichnet ist
-	    if (tile.isObstacle()) {
 	        return true;
 	    }
 
