@@ -603,6 +603,121 @@
 		// Füge weitere Tiles nach Bedarf hinzu
 	};
 
+	class ViewportCache {
+		constructor(tileSize = 32) {
+			this.tileSize = tileSize;
+			this.padding = 2;
+			this.cachedViewports = new Map();
+		}
+
+		createViewportCache(viewportKey, width, height) {
+			const canvas = document.createElement('canvas');
+			canvas.width = width;
+			canvas.height = height;
+			const ctx = canvas.getContext('2d', { alpha: false });
+			return { canvas, ctx, lastUpdate: Date.now() };
+		}
+
+		getViewportKey(x, y) {
+			// Wir verwenden die tatsächlichen Pixel-Koordinaten für den Key
+			const gridX = Math.floor(x / (this.tileSize * 16));
+			const gridY = Math.floor(y / (this.tileSize * 16));
+			return `${gridX},${gridY}`;
+		}
+
+		renderToCache(map, viewportKey, startX, startY, width, height) {
+			let cache = this.cachedViewports.get(viewportKey);
+
+			if (!cache) {
+				cache = this.createViewportCache(viewportKey, width, height);
+				this.cachedViewports.set(viewportKey, cache);
+			}
+
+			const startTileX = Math.floor(startX / this.tileSize);
+			const startTileY = Math.floor(startY / this.tileSize);
+			const endTileX = Math.ceil((startX + width) / this.tileSize);
+			const endTileY = Math.ceil((startY + height) / this.tileSize);
+
+			cache.ctx.clearRect(0, 0, width, height);
+
+			for (let y = startTileY; y < endTileY; y++) {
+				for (let x = startTileX; x < endTileX; x++) {
+					const tile = map.getTile(x, y);
+					if (tile && !this.isDynamicTile(tile.type)) {
+						// Wichtig: Exakte Pixel-Position im Cache berechnen
+						const screenX = (x * this.tileSize) - startX;
+						const screenY = (y * this.tileSize) - startY;
+						const tileInstance = new Tile(map, x, y, this.tileSize, tile.type);
+						tileInstance.render(cache.ctx, screenX, screenY, this.tileSize);
+					}
+				}
+			}
+
+			cache.lastUpdate = Date.now();
+			return cache;
+		}
+
+		render(ctx, map, viewport) {
+			// Cache-Bereich mit Padding berechnen, aber OHNE Tile-Alignment
+			const cacheStartX = viewport.left - (this.padding * this.tileSize);
+			const cacheStartY = viewport.top - (this.padding * this.tileSize);
+			const cacheWidth = (viewport.right - viewport.left) + (this.padding * 2 * this.tileSize);
+			const cacheHeight = (viewport.bottom - viewport.top) + (this.padding * 2 * this.tileSize);
+
+			const viewportKey = this.getViewportKey(viewport.left, viewport.top);
+
+			// Cache aktualisieren wenn nötig
+			let cache = this.cachedViewports.get(viewportKey);
+			if (!cache || Date.now() - cache.lastUpdate > 5000) {
+				cache = this.renderToCache(map, viewportKey, cacheStartX, cacheStartY, cacheWidth, cacheHeight);
+			}
+
+			// Cache zeichnen mit exakten Pixel-Positionen
+			ctx.drawImage(
+				cache.canvas,
+				viewport.left - cacheStartX, viewport.top - cacheStartY,  // Quelle X,Y
+				viewport.right - viewport.left, viewport.bottom - viewport.top,  // Quelle Breite,Höhe
+				viewport.left, viewport.top,  // Ziel X,Y
+				viewport.right - viewport.left, viewport.bottom - viewport.top   // Ziel Breite,Höhe
+			);
+
+			// Dynamische Tiles direkt rendern
+			this.renderDynamicTiles(ctx, map, viewport);
+		}
+
+		renderDynamicTiles(ctx, map, viewport) {
+			const startTileX = Math.floor(viewport.left / this.tileSize);
+			const endTileX = Math.ceil(viewport.right / this.tileSize);
+			const startTileY = Math.floor(viewport.top / this.tileSize);
+			const endTileY = Math.ceil(viewport.bottom / this.tileSize);
+
+			for (let y = startTileY; y < endTileY; y++) {
+				for (let x = startTileX; x < endTileX; x++) {
+					const tile = map.getTile(x, y);
+					if (tile && this.isDynamicTile(tile.type)) {
+						const screenX = x * this.tileSize;
+						const screenY = y * this.tileSize;
+						const tileInstance = new Tile(map, x, y, this.tileSize, tile.type);
+						tileInstance.render(ctx, screenX, screenY, this.tileSize);
+					}
+				}
+			}
+		}
+
+		isDynamicTile(tileType) {
+			return ['OCEAN', 'DEEP_WATER', 'SHALLOW_WATER'].includes(tileType);
+		}
+
+		cleanupCache() {
+			const now = Date.now();
+			for (const [key, cache] of this.cachedViewports.entries()) {
+				if (now - cache.lastUpdate > 10000) {
+					this.cachedViewports.delete(key);
+				}
+			}
+		}
+	}
+
 	class Tile {
 		constructor(map, x, y, size, type, variant = 0) {
 			const config = TILE_TYPES[type];
@@ -7754,6 +7869,7 @@
 
 	// Initialisierung des Spiels
 	function initGame() {
+		window.viewportCache = null;
 		const mapGenerator = new MapGenerator(MAP_WIDTH, MAP_HEIGHT);
 		const gameMap = mapGenerator.generate();
 		map = gameMap; // Existierende map-Variable mit der neuen GameMap ersetzen
@@ -8257,43 +8373,36 @@
 
 	// 2. Neue optimierte Render-Funktion
 	function renderGame() {
+		if (!window.viewportCache) {
+			console.log('Creating new ViewportCache...');
+			window.viewportCache = new ViewportCache(TILE_SIZE);
+		}
+
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-		// Kamera-Offset berechnen
 		const centerX = players.reduce((sum, player) => sum + player.x, 0) / players.length;
 		const centerY = players.reduce((sum, player) => sum + player.y, 0) / players.length;
 		const cameraX = centerX - canvas.width / 2;
 		const cameraY = centerY - canvas.height / 2;
 
-		// Viewport-Grenzen berechnen
 		const viewport = {
-			left: cameraX - TILE_SIZE,
-			right: cameraX + canvas.width + TILE_SIZE,
-			top: cameraY - TILE_SIZE,
-			bottom: cameraY + canvas.height + TILE_SIZE
+			left: Math.max(0, Math.floor(cameraX - TILE_SIZE)),
+			right: Math.min(MAP_WIDTH * TILE_SIZE, Math.ceil(cameraX + canvas.width + TILE_SIZE)),
+			top: Math.max(0, Math.floor(cameraY - TILE_SIZE)),
+			bottom: Math.min(MAP_HEIGHT * TILE_SIZE, Math.ceil(cameraY + canvas.height + TILE_SIZE))
 		};
 
 		ctx.save();
 		ctx.translate(-cameraX, -cameraY);
 
-		// 1. Terrain Layer
-		renderTerrain(viewport);
-
-		// 2. Objekte Layer
+		window.viewportCache.render(ctx, map, viewport);
 		renderObjects(viewport);
-
-		// 3. Effekte Layer
 		renderEffects(viewport);
 
 		ctx.restore();
-
-		// Jetzt im Screen Space zeichnen
 		renderMissions(viewport);
-
-		// 4. UI Layer (nicht transformiert)
 		renderUI();
 
-		// Fortsetzen der Update-Schleife
 		requestAnimationFrame(update);
 	}
 
