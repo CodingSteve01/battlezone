@@ -977,8 +977,7 @@
 
 		    // Zeichne das gerundete Rechteck
 		    ctx.fillStyle = this.config.color;
-		    this.drawConditionalRoundedRect(ctx, x, y, size, radius, roundCorners);
-		    ctx.fill();
+		    ctx.fillRect(x, y, size, size);
 
 		    // Führe die bestehenden Kanten- und Eckenglättungen durch
 		    this.renderEdgeBlends(ctx, x, y, size, blendSize, neighbors);
@@ -1235,38 +1234,6 @@
 		isObstacle(type) {
 			return ['OCEAN', 'DEEP_WATER', 'WALL', 'HOUSE'].includes(type);
 		}
-
-		drawConditionalRoundedRect(ctx, x, y, size, radius, roundCorners) {
-	        ctx.beginPath();
-	        // Start oben links
-	        ctx.moveTo(x + (roundCorners.tl ? radius : 0), y);
-	        
-	        // Obere Kante
-	        ctx.lineTo(x + size - (roundCorners.tr ? radius : 0), y);
-	        if (roundCorners.tr) {
-	            ctx.quadraticCurveTo(x + size, y, x + size, y + (roundCorners.tr ? radius : 0));
-	        }
-	        
-	        // Rechte Kante
-	        ctx.lineTo(x + size, y + size - (roundCorners.br ? radius : 0));
-	        if (roundCorners.br) {
-	            ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
-	        }
-	        
-	        // Untere Kante
-	        ctx.lineTo(x + (roundCorners.bl ? radius : 0), y + size);
-	        if (roundCorners.bl) {
-	            ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
-	        }
-	        
-	        // Linke Kante
-	        ctx.lineTo(x, y + (roundCorners.tl ? radius : 0));
-	        if (roundCorners.tl) {
-	            ctx.quadraticCurveTo(x, y, x + (roundCorners.tl ? radius : 0), y);
-	        }
-	        
-	        ctx.closePath();
-	    }
 
 		renderEdgeBlends(ctx, x, y, size, blendSize, neighbors) {
 	        // Norden
