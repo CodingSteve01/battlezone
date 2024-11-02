@@ -226,8 +226,8 @@
 	let lastMinimapUpdate = Date.now();
 	let singlePlayer = true;
 	const TILE_SIZE = 50;
-	const MAP_WIDTH = 200; // Größerer Level
-	const MAP_HEIGHT = 200;
+	const MAP_WIDTH = 400;
+	const MAP_HEIGHT = 400;
 	const SIGHT_RADIUS = 450;
 	const MIN_ENEMY_PLAYER_DISTANCE = 50;
 	let lastEnemySpawnTime = Date.now();
@@ -398,606 +398,2028 @@
 
 	// Kachelbasierte Karte erstellen
 	let map = [];
-	
+
 	// Erweiterte Tile-Typen
 	const TILE_TYPES = {
-	    // Wasser-Tiles
-	    OCEAN: {
-	        id: 1,
-	        name: 'OCEAN',
-	        color: '#001433',
-	        height: -2,
-	        walkable: false,
-	        vehiclePassable: false,
-	        noise: 0.1,
-	        provides: ['fish', 'deepwater']
-	    },
-	    DEEP_WATER: {
-	        id: 2,
-	        name: 'DEEP_WATER',
-	        color: '#002966',
-	        height: -1.5,
-	        walkable: false,
-	        vehiclePassable: false,
-	        noise: 0.2,
-	        provides: ['fish', 'deepwater']
-	    },
-	    SHALLOW_WATER: {
-	        id: 3,
-	        name: 'SHALLOW_WATER',
-	        color: '#0066ff',
-	        height: -1,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.3,
-	        provides: ['water']
-	    },
-	    BEACH: {
-	        id: 4,
-	        name: 'BEACH',
-	        color: '#ffcc99',
-	        height: 0,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.4,
-	        provides: ['sand']
-	    },
+		// Wasser-Tiles
+		OCEAN: {
+			id: 1,
+			name: 'OCEAN',
+			color: '#001433',
+			height: -2,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.1,
+			provides: ['fish', 'deepwater']
+		},
+		DEEP_WATER: {
+			id: 2,
+			name: 'DEEP_WATER',
+			color: '#002966',
+			height: -1.5,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['fish', 'deepwater']
+		},
+		SHALLOW_WATER: {
+			id: 3,
+			name: 'SHALLOW_WATER',
+			color: '#0066ff',
+			height: -1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.3,
+			provides: ['water']
+		},
+		BEACH: {
+			id: 4,
+			name: 'BEACH',
+			color: '#ffcc99',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.4,
+			provides: ['sand']
+		},
 
-	    // Grund-Tiles
-	    GRASS: {
-	        id: 5,
-	        name: 'GRASS',
-	        color: '#66cc00',
-	        height: 0,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.2,
-	        provides: ['grass', 'cover']
-	    },
-	    HIGH_GRASS: {
-	        id: 6,
-	        name: 'HIGH_GRASS',
-	        color: '#339900',
-	        height: 0.2,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.1,
-	        provides: ['grass', 'cover', 'stealth']
-	    },
-	    DIRT: {
-	        id: 7,
-	        name: 'DIRT',
-	        color: '#996633',
-	        height: 0,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.3
-	    },
+		// Grund-Tiles
+		GRASS: {
+			id: 5,
+			name: 'GRASS',
+			color: '#66cc00',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.2,
+			provides: ['grass', 'cover']
+		},
+		HIGH_GRASS: {
+			id: 6,
+			name: 'HIGH_GRASS',
+			color: '#339900',
+			height: 0.2,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.1,
+			provides: ['grass', 'cover', 'stealth']
+		},
+		DIRT: {
+			id: 7,
+			name: 'DIRT',
+			color: '#996633',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.3
+		},
 
-	    // Wald-Tiles
-	    FOREST_LIGHT: {
-	        id: 8,
-	        name: 'FOREST_LIGHT',
-	        color: '#2d5a27',
-	        height: 0.5,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.15,
-	        provides: ['wood', 'cover', 'stealth']
-	    },
-	    FOREST_DENSE: {
-	        id: 9,
-	        name: 'FOREST_DENSE',
-	        color: '#1a3d1a',
-	        height: 1,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.1,
-	        provides: ['wood', 'cover', 'stealth']
-	    },
-	    BUSH: {
-	        id: 10,
-	        name: 'BUSH',
-	        color: '#29a329',
-	        height: 0.3,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.2,
-	        provides: ['cover', 'stealth']
-	    },
+		// Wald-Tiles
+		FOREST_LIGHT: {
+			id: 8,
+			name: 'FOREST_LIGHT',
+			color: '#2d5a27',
+			height: 0.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.15,
+			provides: ['wood', 'cover', 'stealth']
+		},
+		FOREST_DENSE: {
+			id: 9,
+			name: 'FOREST_DENSE',
+			color: '#1a3d1a',
+			height: 1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.1,
+			provides: ['wood', 'cover', 'stealth']
+		},
+		BUSH: {
+			id: 10,
+			name: 'BUSH',
+			color: '#29a329',
+			height: 0.3,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['cover', 'stealth']
+		},
 
-	    // Höhen-Tiles
-	    HILL: {
-	        id: 11,
-	        name: 'HILL',
-	        color: '#666633',
-	        height: 1,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.4,
-	        provides: ['elevation']
-	    },
-	    MOUNTAIN: {
-	        id: 12,
-	        name: 'MOUNTAIN',
-	        color: '#4d4d4d',
-	        height: 2,
-	        walkable: false,
-	        vehiclePassable: false,
-	        noise: 0.5,
-	        provides: ['elevation', 'stone']
-	    },
-	    SNOW: {
-	        id: 13,
-	        name: 'SNOW',
-	        color: '#ffffff',
-	        height: 2.5,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.3
-	    },
+		// Höhen-Tiles
+		HILL: {
+			id: 11,
+			name: 'HILL',
+			color: '#666633',
+			height: 1,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.4,
+			provides: ['elevation']
+		},
+		MOUNTAIN: {
+			id: 12,
+			name: 'MOUNTAIN',
+			color: '#4d4d4d',
+			height: 2,
+			walkable: false,
+			vehiclePassable: false,
+			noise: 0.5,
+			provides: ['elevation', 'stone']
+		},
+		SNOW: {
+			id: 13,
+			name: 'SNOW',
+			color: '#ffffff',
+			height: 2.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.3
+		},
 
-	    // Straßen und Wege
-	    ROAD: {
-	        id: 14,
-	        name: 'ROAD',
-	        color: '#666666',
-	        height: 0,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.4,
-	        speedModifier: 1.5
-	    },
-	    PATH: {
-	        id: 15,
-	        name: 'PATH',
-	        color: '#8B4513',
-	        height: 0,
-	        walkable: true,
-	        vehiclePassable: true,
-	        noise: 0.3,
-	        speedModifier: 1.2
-	    },
+		// Straßen und Wege
+		ROAD: {
+			id: 14,
+			name: 'ROAD',
+			color: '#666666',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.4,
+			speedModifier: 1.5
+		},
+		PATH: {
+			id: 15,
+			name: 'PATH',
+			color: '#8B4513',
+			height: 0,
+			walkable: true,
+			vehiclePassable: true,
+			noise: 0.3,
+			speedModifier: 1.2
+		},
 
-	    // Gebäude und Strukturen
-	    HOUSE: {
-	        id: 16,
-	        name: 'HOUSE',
-	        color: '#cc6600',
-	        height: 1.5,
-	        walkable: true,
-	        vehiclePassable: false,
-	        noise: 0.2,
-	        provides: ['shelter', 'loot']
-	    },
-	    WALL: {
-	        id: 17,
-	        name: 'WALL',
-	        color: '#808080',
-	        height: 1.5,
-	        walkable: false,
-	        vehiclePassable: false,
-	        bulletProof: true
-	    }
+		// Gebäude und Strukturen
+		HOUSE: {
+			id: 16,
+			name: 'HOUSE',
+			color: '#cc6600',
+			height: 1.5,
+			walkable: true,
+			vehiclePassable: false,
+			noise: 0.2,
+			provides: ['shelter', 'loot']
+		},
+		WALL: {
+			id: 17,
+			name: 'WALL',
+			color: '#808080',
+			height: 1.5,
+			walkable: false,
+			vehiclePassable: false,
+			bulletProof: true
+		}
 	};
 
 	// Farben für die Tiles
 	const TILE_COLORS = {
-	    'OCEAN': '#001433',
-	    'DEEP_WATER': '#002966',
-	    'SHALLOW_WATER': '#0066ff',
-	    'BEACH': '#ffcc99',
-	    'GRASS': '#66cc00',
-	    'HIGH_GRASS': '#339900',
-	    'FOREST_LIGHT': '#2d5a27',
-	    'FOREST_DENSE': '#1a3d1a',
-	    'BUSH': '#29a329',
-	    'HILL': '#666633',
-	    'MOUNTAIN': '#4d4d4d',
-	    'SNOW': '#ffffff',
-	    'ROAD': '#666666',
-	    'PATH': '#8B4513',
-	    'HOUSE': '#cc6600',
-	    'WALL': '#808080',
-	    'DIRT': '#996633',
-	    // Füge weitere Tiles nach Bedarf hinzu
+		'OCEAN': '#001433',
+		'DEEP_WATER': '#002966',
+		'SHALLOW_WATER': '#0066ff',
+		'BEACH': '#ffcc99',
+		'GRASS': '#66cc00',
+		'HIGH_GRASS': '#339900',
+		'FOREST_LIGHT': '#2d5a27',
+		'FOREST_DENSE': '#1a3d1a',
+		'BUSH': '#29a329',
+		'HILL': '#666633',
+		'MOUNTAIN': '#4d4d4d',
+		'SNOW': '#ffffff',
+		'ROAD': '#666666',
+		'PATH': '#8B4513',
+		'HOUSE': '#cc6600',
+		'WALL': '#808080',
+		'DIRT': '#996633',
+		// Füge weitere Tiles nach Bedarf hinzu
 	};
 
 	class Tile {
-	    constructor(type, variant = 0) {
-	        const config = TILE_TYPES[type];
-	        if (!config) throw new Error(`Invalid tile type: ${type}`);
+		constructor(map, x, y, size, type, variant = 0) {
+			const config = TILE_TYPES[type];
+			if (!config) throw new Error(`Invalid tile type: ${type}`);
 
-	        this.type = type;
-	        this.config = config;
-	        this.variant = variant;
-	        this.entities = new Set();
-	        this.modifiers = new Set();
-	        this.height = config.height;
+			this.map = map;
+			this.x = x;
+			this.y = y;
+			this.type = type;
+			this.config = config;
+			this.variant = variant;
+			this.entities = new Set();
+			this.modifiers = new Set();
+			this.height = config.height;
+			this.tileId = `${x},${y}`;
+			this.TILE_SIZE = size || 32; // Ein Tile ist 32x32 Pixel groß (Standard für viele Top-Down Spiele)
 
-	        // Dynamische Eigenschaften
-	        this.currentNoise = config.noise;
-	        this.currentVisibility = 1.0;
-	        this.weatherEffect = null;
-	    }
+			// Dynamische Eigenschaften
+			this.currentNoise = config.noise;
+			this.currentVisibility = 1.0;
+			this.weatherEffect = null;
+			this.animationOffset = (Math.sin(x * 0.3) + Math.cos(y * 0.3)) * 1000;
+			this.lastUpdate = Date.now();
+		}
 
-	    addEntity(entity) {
-	        this.entities.add(entity);
-	        this.updateProperties();
-	    }
+		getNeighbors() {
+			const neighbors = {
+				n: this.map.getTile(this.x, this.y - 1),
+				s: this.map.getTile(this.x, this.y + 1),
+				e: this.map.getTile(this.x + 1, this.y),
+				w: this.map.getTile(this.x - 1, this.y),
+				ne: this.map.getTile(this.x + 1, this.y - 1),
+				nw: this.map.getTile(this.x - 1, this.y - 1),
+				se: this.map.getTile(this.x + 1, this.y + 1),
+				sw: this.map.getTile(this.x - 1, this.y + 1)
+			};
+			return neighbors;
+		}
 
-	    removeEntity(entity) {
-	        this.entities.delete(entity);
-	        this.updateProperties();
-	    }
+		render(ctx, x, y, size) {
+			const currentTime = Date.now();
+			ctx.save();
 
-	    updateProperties() {
-	        // Aktualisiert Tile-Eigenschaften basierend auf Entities
-	        this.currentNoise = this.config.noise;
-	        this.currentVisibility = 1.0;
+			// Basis-Rendering basierend auf Typ
+			switch (this.type) {
+				case 'ROAD':
+				case 'PATH':
+					this.renderRoadOrPath(ctx, x, y, size);
+					break;
+				case 'WATER':
+				case 'OCEAN':
+				case 'DEEP_WATER':
+				case 'SHALLOW_WATER':
+					this.renderWaterWithShore(ctx, x, y, size, currentTime);
+					break;
+				default:
+					this.renderDefaultTile(ctx, x, y, size);
+			}
 
-	        this.entities.forEach(entity => {
-	            if (entity.affects) {
-	                if (entity.affects.noise) this.currentNoise *= entity.affects.noise;
-	                if (entity.affects.visibility) this.currentVisibility *= entity.affects.visibility;
-	            }
-	        });
-	    }
+			// Übergänge zu Nachbartiles
+			this.renderTransitions(ctx, x, y, size);
 
-	    isWalkable() {
-	        return this.config.walkable &&
-	            !Array.from(this.entities).some(e => e.blocksMovement);
-	    }
+			// Details und Dekorationen
+			this.renderDetails(ctx, x, y, size);
 
-	    isVehiclePassable() {
-	        return this.config.vehiclePassable &&
-	            !Array.from(this.entities).some(e => e.blocksVehicles);
-	    }
+			// Höheneffekte
+			if (this.height > 0) {
+				this.renderHeightEffect(ctx, x, y, size);
+			}
 
-	    providesCover() {
-	        return this.config.provides &&
-	            (this.config.provides.includes('cover') ||
-	             this.config.provides.includes('stealth'));
-	    }
+			// Wetter-Effekte
+			if (this.weatherEffect) {
+				this.renderWeatherEffect(ctx, x, y, size, currentTime);
+			}
 
-	    getSpeedModifier() {
-	        let modifier = this.config.speedModifier || 1;
-	        this.entities.forEach(entity => {
-	            if (entity.affects && entity.affects.speed) {
-	                modifier *= entity.affects.speed;
-	            }
-	        });
-	        return modifier;
-	    }
+			ctx.restore();
+		}
 
-	    getColor() {
-	        // Basisfarbe mit Varianten und Wettereffekten
-	        let color = TILE_COLORS[this.type] || '#FFFFFF';
-	        if (this.weatherEffect) {
-	            // Hier Wettereffekte auf die Farbe anwenden
-	            color = this.applyWeatherEffect(color);
-	        }
-	        return color;
-	    }
+		renderRoadOrPath(ctx, x, y, size) {
+			const neighbors = this.getNeighbors();
+			const isRoad = this.type === 'ROAD';
 
-	    applyWeatherEffect(baseColor) {
-	        // Beispiel für Wettereffekte
-	        switch(this.weatherEffect) {
-	            case 'rain':
-	                return this.darkenColor(baseColor, 0.2);
-	            case 'snow':
-	                return this.blendColors(baseColor, '#FFFFFF', 0.3);
-	            default:
-	                return baseColor;
-	        }
-	    }
+			// Grundfarbe
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
 
-	    darkenColor(color, factor) {
-	        // Helfer-Funktion zum Verdunkeln einer Farbe
-	        let r = parseInt(color.substr(1,2), 16);
-	        let g = parseInt(color.substr(3,2), 16);
-	        let b = parseInt(color.substr(5,2), 16);
+			// Straßentextur
+			if (isRoad) {
+				this.renderAsphaltTexture(ctx, x, y, size);
+			} else {
+				this.renderPathTexture(ctx, x, y, size);
+			}
 
-	        r = Math.floor(r * (1 - factor));
-	        g = Math.floor(g * (1 - factor));
-	        b = Math.floor(b * (1 - factor));
+			// Straßenverbindungen und Markierungen
+			this.renderRoadConnections(ctx, x, y, size, neighbors, isRoad);
+		}
 
-	        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-	    }
+		renderRoadConnections(ctx, x, y, size, neighbors, isRoad) {
+			const connections = {
+				n: neighbors.n?.type === this.type,
+				s: neighbors.s?.type === this.type,
+				e: neighbors.e?.type === this.type,
+				w: neighbors.w?.type === this.type
+			};
 
-	    blendColors(color1, color2, factor) {
-	        // Helfer-Funktion zum Mischen zweier Farben
-	        let r1 = parseInt(color1.substr(1,2), 16);
-	        let g1 = parseInt(color1.substr(3,2), 16);
-	        let b1 = parseInt(color1.substr(5,2), 16);
+			if (isRoad) {
+				// Straßenränder
+				ctx.strokeStyle = '#888888';
+				ctx.lineWidth = 1;
+				this.drawRoadEdges(ctx, x, y, size, connections);
 
-	        let r2 = parseInt(color2.substr(1,2), 16);
-	        let g2 = parseInt(color2.substr(3,2), 16);
-	        let b2 = parseInt(color2.substr(5,2), 16);
+				// Mittellinie nur bei geraden Straßen
+				if ((connections.n && connections.s && !connections.e && !connections.w) ||
+					(connections.e && connections.w && !connections.n && !connections.s)) {
+					this.drawRoadLines(ctx, x, y, size, connections);
+				}
+			}
+		}
 
-	        let r = Math.floor(r1 * (1 - factor) + r2 * factor);
-	        let g = Math.floor(g1 * (1 - factor) + g2 * factor);
-	        let b = Math.floor(b1 * (1 - factor) + b2 * factor);
+		drawRoadEdges(ctx, x, y, size, connections) {
+			const margin = size * 0.1; // Randabstand
 
-	        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-	    }
+			if (connections.n || connections.s) {
+				// Vertikale Ränder
+				ctx.beginPath();
+				ctx.moveTo(x + margin, connections.n ? y : y + margin);
+				ctx.lineTo(x + margin, connections.s ? y + size : y + size - margin);
+				ctx.moveTo(x + size - margin, connections.n ? y : y + margin);
+				ctx.lineTo(x + size - margin, connections.s ? y + size : y + size - margin);
+				ctx.stroke();
+			}
+
+			if (connections.e || connections.w) {
+				// Horizontale Ränder
+				ctx.beginPath();
+				ctx.moveTo(connections.w ? x : x + margin, y + margin);
+				ctx.lineTo(connections.e ? x + size : x + size - margin, y + margin);
+				ctx.moveTo(connections.w ? x : x + margin, y + size - margin);
+				ctx.lineTo(connections.e ? x + size : x + size - margin, y + size - margin);
+				ctx.stroke();
+			}
+		}
+
+		drawRoadLines(ctx, x, y, size, connections) {
+			ctx.strokeStyle = '#FFFFFF';
+			ctx.lineWidth = 2;
+			ctx.setLineDash([size * 0.2, size * 0.2]); // Gestrichelte Linie
+
+			if (connections.n && connections.s) {
+				// Vertikale Mittellinie
+				ctx.beginPath();
+				ctx.moveTo(x + size / 2, y);
+				ctx.lineTo(x + size / 2, y + size);
+				ctx.stroke();
+			} else if (connections.e && connections.w) {
+				// Horizontale Mittellinie
+				ctx.beginPath();
+				ctx.moveTo(x, y + size / 2);
+				ctx.lineTo(x + size, y + size / 2);
+				ctx.stroke();
+			}
+
+			ctx.setLineDash([]); // Reset dash pattern
+		}
+
+		renderWaterWithShore(ctx, x, y, size, currentTime) {
+			const neighbors = this.getNeighbors();
+
+			// Basis-Wasser
+			this.renderWater(ctx, x, y, size, currentTime);
+
+			// Uferlinien
+			this.renderShoreLines(ctx, x, y, size, neighbors);
+		}
+
+		renderWater(ctx, x, y, size, currentTime) {
+			// Basis-Wasserfarbe
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Parameter für Wasserbewegung
+			const waveTime = (currentTime + this.animationOffset) * 0.001;
+			const waveCount = {
+				'OCEAN': 4,
+				'DEEP_WATER': 3,
+				'SHALLOW_WATER': 2
+			}[this.type] || 2;
+
+			const waveAmplitude = {
+				'OCEAN': 0.4,
+				'DEEP_WATER': 0.3,
+				'SHALLOW_WATER': 0.2
+			}[this.type] || 0.2;
+
+			// Wellenbewegung
+			this.renderWaterWaves(ctx, x, y, size, waveTime, waveCount, waveAmplitude);
+
+			// Wassertiefeneffekt
+			this.renderWaterDepth(ctx, x, y, size);
+
+			// Glanzeffekte
+			this.renderWaterHighlights(ctx, x, y, size, waveTime);
+
+			// Oberflächendetails
+			this.renderWaterSurfaceDetails(ctx, x, y, size, currentTime);
+		}
+
+		renderWaterWaves(ctx, x, y, size, waveTime, waveCount, waveAmplitude) {
+			const baseSize = size * 0.1; // Basisgröße für Wellen
+
+			// Hauptwellen
+			for (let i = 0; i < waveCount; i++) {
+				const phaseOffset = (i * Math.PI * 2) / waveCount;
+				const alpha = 0.1 - (i * 0.02); // Wellen werden nach hinten transparenter
+
+				ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+
+				// Wellenlinien
+				for (let wx = 0; wx <= size; wx += size / 16) {
+					const waveOffset = Math.sin(waveTime * 1.5 + phaseOffset + (wx / size) * Math.PI * 2);
+					const wy = y + (size * 0.3) + (i * baseSize) + (waveOffset * size * waveAmplitude);
+
+					if (wx === 0) {
+						ctx.moveTo(x + wx, wy);
+					} else {
+						ctx.lineTo(x + wx, wy);
+					}
+				}
+				ctx.stroke();
+			}
+		}
+
+		renderWaterDepth(ctx, x, y, size) {
+			// Tiefeneffekt basierend auf Wassertyp
+			const depthGradient = ctx.createLinearGradient(x, y, x, y + size);
+
+			switch(this.type) {
+				case 'OCEAN':
+					depthGradient.addColorStop(0, 'rgba(0, 20, 51, 0.2)');
+					depthGradient.addColorStop(1, 'rgba(0, 20, 51, 0.6)');
+					break;
+				case 'DEEP_WATER':
+					depthGradient.addColorStop(0, 'rgba(0, 41, 102, 0.2)');
+					depthGradient.addColorStop(1, 'rgba(0, 41, 102, 0.4)');
+					break;
+				case 'SHALLOW_WATER':
+					depthGradient.addColorStop(0, 'rgba(0, 102, 255, 0.1)');
+					depthGradient.addColorStop(1, 'rgba(0, 102, 255, 0.2)');
+					break;
+				default:
+					return;
+			}
+
+			ctx.fillStyle = depthGradient;
+			ctx.fillRect(x, y, size, size);
+		}
+
+		renderWaterHighlights(ctx, x, y, size, waveTime) {
+			// Dynamische Glanzlichter
+			const highlightCount = {
+				'OCEAN': 3,
+				'DEEP_WATER': 2,
+				'SHALLOW_WATER': 1
+			}[this.type] || 1;
+
+			for (let i = 0; i < highlightCount; i++) {
+				const seed = parseInt(this.tileId || '0') + i;
+				const highlightTime = waveTime * 0.7 + (i * Math.PI / highlightCount);
+
+				// Position der Glanzlichter
+				const hx = x + size * 0.5 + Math.cos(highlightTime) * (size * 0.2);
+				const hy = y + size * 0.5 + Math.sin(highlightTime) * (size * 0.2);
+
+				// Größe und Form der Glanzlichter
+				const radiusX = size * 0.15 * (1 + Math.sin(highlightTime) * 0.2);
+				const radiusY = size * 0.1 * (1 + Math.cos(highlightTime) * 0.2);
+				const rotation = highlightTime;
+
+				// Gradient für weiches Glanzlicht
+				const highlight = ctx.createRadialGradient(
+					hx, hy, 0,
+					hx, hy, Math.max(radiusX, radiusY)
+				);
+				highlight.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+				highlight.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+				highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+				ctx.save();
+				ctx.translate(hx, hy);
+				ctx.rotate(rotation);
+				ctx.scale(radiusX / radiusY, 1);
+
+				ctx.fillStyle = highlight;
+				ctx.beginPath();
+				ctx.arc(0, 0, radiusY, 0, Math.PI * 2);
+				ctx.fill();
+
+				ctx.restore();
+			}
+		}
+
+		renderWaterSurfaceDetails(ctx, x, y, size, currentTime) {
+			const seed = parseInt(this.tileId || '0');
+			const detailTime = currentTime * 0.001;
+
+			// Kleine Oberflächendetails wie Kräuselungen
+			for (let i = 0; i < 8; i++) {
+				const px = x + ((this.pseudoRandom(seed + i) + Math.sin(detailTime + i)) * 0.5) * size;
+				const py = y + ((this.pseudoRandom(seed + i + 1) + Math.cos(detailTime + i)) * 0.5) * size;
+
+				const radius = size * 0.1 * this.pseudoRandom(seed + i + 2);
+				const opacity = 0.1 + 0.05 * Math.sin(detailTime * 2 + i);
+
+				ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+				ctx.beginPath();
+				ctx.arc(px, py, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+
+			// Unterschiedliche Details je nach Wassertyp
+			switch(this.type) {
+				case 'OCEAN':
+					this.renderOceanDetails(ctx, x, y, size, detailTime);
+					break;
+				case 'SHALLOW_WATER':
+					this.renderShallowWaterDetails(ctx, x, y, size, detailTime);
+					break;
+			}
+		}
+
+		renderOceanDetails(ctx, x, y, size, time) {
+			// Schaumkronen auf Wellen
+			const seed = parseInt(this.tileId || '0');
+
+			for (let i = 0; i < 5; i++) {
+				const foamX = x + this.pseudoRandom(seed + i) * size;
+				const foamY = y + this.pseudoRandom(seed + i + 1) * size;
+				const foamSize = size * 0.15 * this.pseudoRandom(seed + i + 2);
+				const foamOpacity = 0.15 + 0.1 * Math.sin(time * 2 + i);
+
+				// Unregelmäßige Schaumform
+				ctx.fillStyle = `rgba(255, 255, 255, ${foamOpacity})`;
+				ctx.beginPath();
+				ctx.moveTo(foamX, foamY);
+
+				for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+					const radius = foamSize * (0.8 + 0.2 * Math.sin(angle * 3 + time));
+					const px = foamX + Math.cos(angle) * radius;
+					const py = foamY + Math.sin(angle) * radius;
+
+					if (angle === 0) {
+						ctx.moveTo(px, py);
+					} else {
+						ctx.lineTo(px, py);
+					}
+				}
+
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+
+		renderShallowWaterDetails(ctx, x, y, size, time) {
+			// Unterwasserdetails wie Steine oder Pflanzen
+			const seed = parseInt(this.tileId || '0');
+
+			for (let i = 0; i < 3; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+
+				// Unterwasserpflanzen
+				const plantHeight = size * 0.2;
+				const swayAmount = Math.sin(time * 2 + i) * size * 0.05;
+
+				ctx.strokeStyle = 'rgba(0, 100, 0, 0.3)';
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(px, py + plantHeight);
+
+				// Geschwungene Pflanzenlinie
+				for (let j = 0; j <= 1; j += 0.1) {
+					const currHeight = plantHeight * j;
+					const sway = swayAmount * Math.sin(j * Math.PI);
+					ctx.lineTo(px + sway, py + plantHeight - currHeight);
+				}
+
+				ctx.stroke();
+			}
+		}
+
+		renderShoreLines(ctx, x, y, size, neighbors) {
+			ctx.strokeStyle = '#85acc9';
+			ctx.lineWidth = 2;
+
+			Object.entries(neighbors).forEach(([direction, neighbor]) => {
+				if (neighbor && !this.isWaterTile(neighbor.type)) {
+					this.drawShoreLine(ctx, x, y, size, direction);
+				}
+			});
+		}
+
+		isWaterTile(type) {
+			return ['OCEAN', 'DEEP_WATER', 'SHALLOW_WATER'].includes(type);
+		}
+
+		drawShoreLine(ctx, x, y, size, direction) {
+			const margin = size * 0.1;
+			ctx.beginPath();
+
+			switch (direction) {
+				case 'n':
+					ctx.moveTo(x, y + margin);
+					ctx.quadraticCurveTo(x + size / 2, y + margin * 2, x + size, y + margin);
+					break;
+				case 's':
+					ctx.moveTo(x, y + size - margin);
+					ctx.quadraticCurveTo(x + size / 2, y + size - margin * 2, x + size, y + size - margin);
+					break;
+				case 'e':
+					ctx.moveTo(x + size - margin, y);
+					ctx.quadraticCurveTo(x + size - margin * 2, y + size / 2, x + size - margin, y + size);
+					break;
+				case 'w':
+					ctx.moveTo(x + margin, y);
+					ctx.quadraticCurveTo(x + margin * 2, y + size / 2, x + margin, y + size);
+					break;
+			}
+
+			ctx.stroke();
+		}
+
+		renderTransitions(ctx, x, y, size) {
+			const neighbors = this.getNeighbors();
+
+			// Übergangslogik für verschiedene Terrain-Typen
+			Object.entries(neighbors).forEach(([direction, neighbor]) => {
+				if (neighbor && neighbor.type !== this.type) {
+					this.renderTransition(ctx, x, y, size, direction, neighbor);
+				}
+			});
+		}
+
+		renderTransition(ctx, x, y, size, direction, neighbor) {
+			const transitionSize = size * 0.15;
+			const gradient = ctx.createLinearGradient(
+				x + (direction.includes('e') ? size - transitionSize : 0),
+				y + (direction.includes('s') ? size - transitionSize : 0),
+				x + (direction.includes('w') ? transitionSize : size),
+				y + (direction.includes('n') ? transitionSize : size)
+			);
+
+			gradient.addColorStop(0, this.config.color);
+			gradient.addColorStop(1, neighbor.config.color);
+
+			ctx.fillStyle = gradient;
+
+			// Übergangsbereich zeichnen
+			this.drawTransitionArea(ctx, x, y, size, direction, transitionSize);
+		}
+
+		drawTransitionArea(ctx, x, y, size, direction, transitionSize) {
+			ctx.beginPath();
+
+			switch (direction) {
+				case 'n':
+					ctx.rect(x, y, size, transitionSize);
+					break;
+				case 's':
+					ctx.rect(x, y + size - transitionSize, size, transitionSize);
+					break;
+				case 'e':
+					ctx.rect(x + size - transitionSize, y, transitionSize, size);
+					break;
+				case 'w':
+					ctx.rect(x, y, transitionSize, size);
+					break;
+				case 'ne':
+					ctx.moveTo(x + size - transitionSize, y);
+					ctx.lineTo(x + size, y);
+					ctx.lineTo(x + size, y + transitionSize);
+					ctx.closePath();
+					break;
+				case 'nw':
+					ctx.moveTo(x, y);
+					ctx.lineTo(x + transitionSize, y);
+					ctx.lineTo(x, y + transitionSize);
+					ctx.closePath();
+					break;
+				case 'se':
+					ctx.moveTo(x + size, y + size - transitionSize);
+					ctx.lineTo(x + size, y + size);
+					ctx.lineTo(x + size - transitionSize, y + size);
+					ctx.closePath();
+					break;
+				case 'sw':
+					ctx.moveTo(x, y + size - transitionSize);
+					ctx.lineTo(x, y + size);
+					ctx.lineTo(x + transitionSize, y + size);
+					ctx.closePath();
+					break;
+			}
+
+			ctx.fill();
+		}
+
+		renderDetails(ctx, x, y, size) {
+			// Details basierend auf Tile-Typ
+			switch (this.type) {
+				case 'GRASS':
+				case 'HIGH_GRASS':
+					this.renderGrassDetails(ctx, x, y, size);
+					break;
+				case 'FOREST_LIGHT':
+				case 'FOREST_DENSE':
+					this.renderForestDetails(ctx, x, y, size);
+					break;
+				case 'MOUNTAIN':
+					this.renderMountainDetails(ctx, x, y, size);
+					break;
+			}
+		}
+
+		renderGrassDetails(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			const isHighGrass = this.type === 'HIGH_GRASS';
+			const grassCount = isHighGrass ? 25 : 15;
+
+			// Basis-Grasfläche
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Grashalme
+			for (let i = 0; i < grassCount; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const height = size * (isHighGrass ? 0.3 : 0.15) * (0.7 + this.pseudoRandom(seed + i + 2) * 0.3);
+				const bend = (this.pseudoRandom(seed + i + 3) - 0.5) * 0.5;
+
+				ctx.strokeStyle = isHighGrass ? '#2d5a27' : '#4d8533';
+				ctx.lineWidth = isHighGrass ? 1.5 : 1;
+
+				// Geschwungener Grashalm
+				ctx.beginPath();
+				ctx.moveTo(px, py);
+				ctx.quadraticCurveTo(
+					px + bend * height,
+					py - height * 0.5,
+					px + bend * height * 2,
+					py - height
+				);
+				ctx.stroke();
+			}
+
+			// Subtile Schatten am Boden
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+			for (let i = 0; i < grassCount / 3; i++) {
+				const px = x + this.pseudoRandom(seed + i + 100) * size;
+				const py = y + this.pseudoRandom(seed + i + 101) * size;
+				ctx.beginPath();
+				ctx.arc(px, py, size * 0.1, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderMountainDetails(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			const neighbors = this.getNeighbors();
+
+			// Basis-Berg
+			ctx.fillStyle = this.config.color;
+			ctx.beginPath();
+			ctx.moveTo(x, y + size);
+
+			// Bergkontur basierend auf Nachbarn
+			if (!neighbors.n?.type === 'MOUNTAIN') {
+				// Bergspitzen wenn oben kein Berg ist
+				const peaks = [0.3, 0.7];
+				peaks.forEach(peakX => {
+					const px = x + size * peakX;
+					const py = y + size * 0.2;
+					ctx.lineTo(px, py);
+				});
+			} else {
+				ctx.lineTo(x, y);
+			}
+
+			ctx.lineTo(x + size, y + size);
+			ctx.closePath();
+			ctx.fill();
+
+			// Felsstruktur
+			for (let i = 0; i < 5; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + size * 0.4 + this.pseudoRandom(seed + i + 1) * size * 0.6;
+
+				ctx.fillStyle = `rgba(60, 60, 60, ${0.2 + this.pseudoRandom(seed + i) * 0.2})`;
+				ctx.beginPath();
+				ctx.moveTo(px, py);
+				ctx.lineTo(px + size * 0.1, py);
+				ctx.lineTo(px + size * 0.05, py - size * 0.1);
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+
+		renderForestDetails(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			const isDense = this.type === 'FOREST_DENSE';
+
+			// Waldboden
+			this.renderForestGround(ctx, x, y, size, seed);
+
+			// Bäume
+			const treeCount = isDense ? 6 : 4;
+			const trees = this.calculateTreePositions(x, y, size, treeCount, seed);
+
+			// Sortiere Bäume nach Y-Position für korrektes Überlappen
+			trees.sort((a, b) => a.y - b.y);
+
+			// Rendere jeden Baum
+			trees.forEach((tree, index) => {
+				this.renderTree(ctx, tree.x, tree.y, size, seed + index, isDense);
+			});
+
+			// Unterholz und Schatten
+			this.renderUndergrowth(ctx, x, y, size, seed, trees);
+		}
+
+		calculateTreePositions(x, y, size, count, seed) {
+			const positions = [];
+			const minDistance = size * 0.2; // Minimaler Abstand zwischen Bäumen
+
+			for (let i = 0; i < count * 2 && positions.length < count; i++) {
+				const px = x + size * 0.1 + this.pseudoRandom(seed + i) * size * 0.8;
+				const py = y + size * 0.1 + this.pseudoRandom(seed + i + 1) * size * 0.8;
+
+				// Prüfe Abstand zu anderen Bäumen
+				const isTooClose = positions.some(pos => {
+					const dx = pos.x - px;
+					const dy = pos.y - py;
+					return Math.sqrt(dx * dx + dy * dy) < minDistance;
+				});
+
+				if (!isTooClose) {
+					positions.push({ x: px, y: py });
+				}
+			}
+
+			return positions;
+		}
+
+		renderForestGround(ctx, x, y, size, seed) {
+			// Grundfarbe des Waldbodens
+			ctx.fillStyle = '#2d3a1d';
+			ctx.fillRect(x, y, size, size);
+
+			// Verschiedene Bodentexturen
+			for (let i = 0; i < 15; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+
+				if (i % 3 === 0) {
+					// Gefallene Blätter
+					this.renderLeaf(ctx, px, py, size * 0.1, seed + i);
+				} else if (i % 3 === 1) {
+					// Kleine Steine
+					ctx.fillStyle = `rgba(80, 80, 80, ${0.1 + this.pseudoRandom(seed + i) * 0.1})`;
+					ctx.beginPath();
+					ctx.arc(px, py, size * 0.03, 0, Math.PI * 2);
+					ctx.fill();
+				} else {
+					// Moosflecken
+					const radius = size * 0.1 * this.pseudoRandom(seed + i + 2);
+					const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
+					gradient.addColorStop(0, 'rgba(50, 80, 30, 0.3)');
+					gradient.addColorStop(1, 'rgba(50, 80, 30, 0)');
+
+					ctx.fillStyle = gradient;
+					ctx.beginPath();
+					ctx.arc(px, py, radius, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+		}
+
+		renderTree(ctx, x, y, size, seed, isDense) {
+			const trunkWidth = size * (isDense ? 0.12 : 0.1);
+			const trunkHeight = size * (isDense ? 0.4 : 0.35);
+			const crownSize = size * (isDense ? 0.35 : 0.3);
+
+			// Schatten
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+			ctx.beginPath();
+			ctx.ellipse(x, y + trunkHeight, crownSize * 0.7, crownSize * 0.3, 0, 0, Math.PI * 2);
+			ctx.fill();
+
+			// Stamm
+			const trunkGradient = ctx.createLinearGradient(
+				x - trunkWidth/2, y,
+				x + trunkWidth/2, y
+			);
+			trunkGradient.addColorStop(0, '#3d2616');
+			trunkGradient.addColorStop(0.4, '#5c3a21');
+			trunkGradient.addColorStop(1, '#3d2616');
+
+			ctx.fillStyle = trunkGradient;
+			ctx.beginPath();
+			ctx.moveTo(x - trunkWidth/2, y);
+			ctx.lineTo(x + trunkWidth/2, y);
+			ctx.lineTo(x + trunkWidth/3, y + trunkHeight);
+			ctx.lineTo(x - trunkWidth/3, y + trunkHeight);
+			ctx.closePath();
+			ctx.fill();
+
+			// Baumkrone (mehrere Schichten)
+			const crownLayers = isDense ? 4 : 3;
+			for (let i = 0; i < crownLayers; i++) {
+				const layerY = y - (crownSize * 0.5 * i);
+				const layerSize = crownSize * (1 - i * 0.15);
+
+				this.renderCrownLayer(ctx, x, layerY, layerSize, seed + i, isDense);
+			}
+
+			// Details in der Krone (kleine Äste und Lichter)
+			this.renderCrownDetails(ctx, x, y - crownSize, crownSize * 2, crownSize, seed);
+		}
+
+		renderCrownLayer(ctx, x, y, size, seed, isDense) {
+			const color = isDense ? '#1a3d1a' : '#2d5a27';
+
+			// Basis-Form der Kronenschicht
+			ctx.fillStyle = color;
+			ctx.beginPath();
+
+			// Unregelmäßige Kronenform
+			ctx.moveTo(x, y - size);
+			for (let angle = 0; angle <= Math.PI * 2; angle += Math.PI / 8) {
+				const radius = size * (0.8 + this.pseudoRandom(seed + angle) * 0.4);
+				const px = x + Math.cos(angle) * radius;
+				const py = y + Math.sin(angle) * radius;
+
+				if (angle === 0) {
+					ctx.moveTo(px, py);
+				} else {
+					// Füge Kontrollpunkte für geschwungene Linien hinzu
+					const cpRadius = radius * (0.9 + this.pseudoRandom(seed + angle + 1) * 0.2);
+					const cp1x = x + Math.cos(angle - Math.PI/16) * cpRadius;
+					const cp1y = y + Math.sin(angle - Math.PI/16) * cpRadius;
+					const cp2x = x + Math.cos(angle + Math.PI/16) * cpRadius;
+					const cp2y = y + Math.sin(angle + Math.PI/16) * cpRadius;
+
+					ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, px, py);
+				}
+			}
+
+			ctx.closePath();
+			ctx.fill();
+
+			// Hellere Akzente
+			ctx.fillStyle = `rgba(255, 255, 255, 0.1)`;
+			for (let i = 0; i < 5; i++) {
+				const angle = this.pseudoRandom(seed + i) * Math.PI * 2;
+				const radius = size * 0.7 * this.pseudoRandom(seed + i + 1);
+				const px = x + Math.cos(angle) * radius;
+				const py = y + Math.sin(angle) * radius;
+
+				ctx.beginPath();
+				ctx.arc(px, py, size * 0.15, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderCrownDetails(ctx, x, y, width, height, seed) {
+			// Kleine Äste und Zweige
+			ctx.strokeStyle = '#2d3a1d';
+			ctx.lineWidth = 1;
+
+			for (let i = 0; i < 8; i++) {
+				const startX = x + (this.pseudoRandom(seed + i) - 0.5) * width * 0.8;
+				const startY = y + this.pseudoRandom(seed + i + 1) * height;
+
+				ctx.beginPath();
+				ctx.moveTo(startX, startY);
+
+				// Geschwungener Ast
+				const controlPoint1X = startX + (this.pseudoRandom(seed + i + 2) - 0.5) * width * 0.2;
+				const controlPoint1Y = startY + this.pseudoRandom(seed + i + 3) * height * 0.2;
+				const controlPoint2X = startX + (this.pseudoRandom(seed + i + 4) - 0.5) * width * 0.2;
+				const controlPoint2Y = startY + this.pseudoRandom(seed + i + 5) * height * 0.2;
+				const endX = startX + (this.pseudoRandom(seed + i + 6) - 0.5) * width * 0.2;
+				const endY = startY + this.pseudoRandom(seed + i + 7) * height * 0.2;
+
+				ctx.bezierCurveTo(controlPoint1X, controlPoint1Y, controlPoint2X, controlPoint2Y, endX, endY);
+				ctx.stroke();
+			}
+
+			// Lichteffekte (Sonnendurchbrüche)
+			for (let i = 0; i < 5; i++) {
+				const px = x + (this.pseudoRandom(seed + i + 8) - 0.5) * width * 0.8;
+				const py = y + this.pseudoRandom(seed + i + 9) * height;
+				const radius = Math.min(width, height) * 0.1 * this.pseudoRandom(seed + i + 10);
+
+				const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
+				gradient.addColorStop(0, 'rgba(255, 255, 200, 0.1)');
+				gradient.addColorStop(1, 'rgba(255, 255, 200, 0)');
+
+				ctx.fillStyle = gradient;
+				ctx.beginPath();
+				ctx.arc(px, py, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderLeaf(ctx, x, y, size, seed) {
+			ctx.save();
+			ctx.translate(x, y);
+			ctx.rotate(this.pseudoRandom(seed) * Math.PI * 2);
+
+			const color = this.pseudoRandom(seed + 1) > 0.5 ? '#4c6b1f' : '#5c4b1f';
+			ctx.fillStyle = color;
+
+			// Blattform
+			ctx.beginPath();
+			ctx.moveTo(0, -size/2);
+			ctx.bezierCurveTo(
+				size/2, -size/2,
+				size/2, size/2,
+				0, size/2
+			);
+			ctx.bezierCurveTo(
+				-size/2, size/2,
+				-size/2, -size/2,
+				0, -size/2
+			);
+
+			// Blattader
+			ctx.moveTo(0, -size/2);
+			ctx.lineTo(0, size/2);
+
+			ctx.fill();
+			ctx.strokeStyle = `rgba(0, 0, 0, 0.2)`;
+			ctx.stroke();
+
+			ctx.restore();
+		}
+
+		renderUndergrowth(ctx, x, y, size, seed, trees) {
+			// Zusätzliches Unterholz zwischen den Bäumen
+			const undergrowthCount = this.type === 'FOREST_DENSE' ? 8 : 5;
+
+			for (let i = 0; i < undergrowthCount; i++) {
+				const px = x + this.pseudoRandom(seed + i * 2) * size;
+				const py = y + this.pseudoRandom(seed + i * 2 + 1) * size;
+
+				// Prüfe Abstand zu Bäumen
+				const isClearSpace = trees.every(tree => {
+					const dx = tree.x - px;
+					const dy = tree.y - py;
+					return Math.sqrt(dx * dx + dy * dy) > size * 0.15;
+				});
+
+				if (isClearSpace) {
+					const bushSize = size * 0.15 * (0.8 + this.pseudoRandom(seed + i) * 0.4);
+					this.renderBush(ctx, px, py, bushSize, seed + i);
+				}
+			}
+		}
+
+		renderBush(ctx, x, y, size, seed) {
+			// Busch-Basis (Schatten)
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+			ctx.beginPath();
+			ctx.ellipse(x, y + size * 0.1, size * 0.7, size * 0.3, 0, 0, Math.PI * 2);
+			ctx.fill();
+
+			// Busch-Blätter (mehrere Schichten)
+			const layers = 3;
+			for (let i = 0; i < layers; i++) {
+				const layerSize = size * (1 - i * 0.2);
+				const layerY = y - (i * size * 0.1);
+
+				ctx.fillStyle = this.type === 'FOREST_DENSE' ? '#1a3d1a' : '#2d5a27';
+				ctx.beginPath();
+
+				// Unregelmäßige Buschform
+				for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+					const radius = layerSize * (0.7 + this.pseudoRandom(seed + angle + i) * 0.6);
+					const px = x + Math.cos(angle) * radius;
+					const py = layerY + Math.sin(angle) * radius;
+
+					if (angle === 0) {
+						ctx.moveTo(px, py);
+					} else {
+						ctx.lineTo(px, py);
+					}
+				}
+
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+
+		renderDefaultTile(ctx, x, y, size) {
+			// Basis-Füllung
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Terrain-spezifische Details
+			switch (this.type) {
+				case 'DIRT':
+					this.renderDirtTexture(ctx, x, y, size);
+					break;
+				case 'GRASS':
+					this.renderGrassTexture(ctx, x, y, size);
+					break;
+				case 'HIGH_GRASS':
+					this.renderHighGrassTexture(ctx, x, y, size);
+					break;
+				case 'MOUNTAIN':
+					this.renderMountainTexture(ctx, x, y, size);
+					break;
+				case 'SNOW':
+					this.renderSnowTexture(ctx, x, y, size);
+					break;
+				case 'BEACH':
+					this.renderBeachTexture(ctx, x, y, size);
+					break;
+				case 'WALL':
+					this.renderWallTexture(ctx, x, y, size);
+					break;
+				case 'HOUSE':
+					this.renderHouseTexture(ctx, x, y, size);
+					break;
+			}
+
+			// Variations basierend auf Position für natürlicheres Aussehen
+			this.addPositionalVariation(ctx, x, y, size);
+		}
+
+		renderAsphaltTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+
+			// Grundtextur des Asphalts
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Kleine Unebenheiten und Risse im Asphalt
+			for (let i = 0; i < 15; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+
+				// Verschiedene Arten von Asphaltdetails
+				if (i % 3 === 0) {
+					// Kleine Risse
+					ctx.strokeStyle = `rgba(0, 0, 0, ${0.1 + this.pseudoRandom(seed + i) * 0.1})`;
+					ctx.lineWidth = 1;
+					ctx.beginPath();
+					ctx.moveTo(px, py);
+					ctx.lineTo(
+						px + (this.pseudoRandom(seed + i + 2) - 0.5) * size * 0.2,
+						py + (this.pseudoRandom(seed + i + 3) - 0.5) * size * 0.2
+					);
+					ctx.stroke();
+				} else if (i % 3 === 1) {
+					// Kleine Steinchen im Asphalt
+					ctx.fillStyle = `rgba(128, 128, 128, ${0.1 + this.pseudoRandom(seed + i) * 0.15})`;
+					ctx.beginPath();
+					ctx.arc(px, py, size * 0.02, 0, Math.PI * 2);
+					ctx.fill();
+				} else {
+					// Flecken und Verfärbungen
+					const radius = size * 0.1 * this.pseudoRandom(seed + i + 2);
+					const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
+					gradient.addColorStop(0, `rgba(40, 40, 40, ${0.1 + this.pseudoRandom(seed + i) * 0.1})`);
+					gradient.addColorStop(1, 'rgba(40, 40, 40, 0)');
+
+					ctx.fillStyle = gradient;
+					ctx.beginPath();
+					ctx.arc(px, py, radius, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+
+			// Abnutzungsspuren an den Rändern
+			const neighbors = this.getNeighbors();
+			Object.entries(neighbors).forEach(([direction, neighbor]) => {
+				if (!neighbor || neighbor.type !== 'ROAD') {
+					this.renderAsphaltWear(ctx, x, y, size, direction);
+				}
+			});
+		}
+
+		renderAsphaltWear(ctx, x, y, size, direction) {
+			const wearWidth = size * 0.1;
+			const seed = parseInt(this.tileId || '0');
+
+			ctx.strokeStyle = `rgba(102, 102, 102, 0.4)`;
+			ctx.lineWidth = 2;
+
+			// Position für Abnutzungseffekte
+			let startX, startY, endX, endY;
+			switch(direction) {
+				case 'n':
+					startX = x; endX = x + size;
+					startY = endY = y + wearWidth;
+					break;
+				case 's':
+					startX = x; endX = x + size;
+					startY = endY = y + size - wearWidth;
+					break;
+				case 'e':
+					startX = endX = x + size - wearWidth;
+					startY = y; endY = y + size;
+					break;
+				case 'w':
+					startX = endX = x + wearWidth;
+					startY = y; endY = y + size;
+					break;
+				default:
+					return;
+			}
+
+			// Unregelmäßige Abnutzungslinie
+			ctx.beginPath();
+			ctx.moveTo(startX, startY);
+
+			const points = 5;
+			for (let i = 1; i <= points; i++) {
+				const t = i / points;
+				const offsetX = (this.pseudoRandom(seed + i) - 0.5) * wearWidth;
+				const offsetY = (this.pseudoRandom(seed + i + 1) - 0.5) * wearWidth;
+
+				const px = startX + (endX - startX) * t + offsetX;
+				const py = startY + (endY - startY) * t + offsetY;
+
+				ctx.lineTo(px, py);
+			}
+
+			ctx.stroke();
+		}
+
+		renderPathTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+
+			// Grundfarbe des Pfades
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Fußspuren und ausgetretene Bereiche
+			const pathCenter = size * 0.5;
+			const pathWidth = size * 0.6;
+
+			// Hauptpfad-Verlauf
+			const gradient = ctx.createLinearGradient(x, y, x + size, y + size);
+			gradient.addColorStop(0, `rgba(139, 69, 19, 0.7)`);
+			gradient.addColorStop(0.2, `rgba(139, 69, 19, 0.4)`);
+			gradient.addColorStop(0.8, `rgba(139, 69, 19, 0.4)`);
+			gradient.addColorStop(1, `rgba(139, 69, 19, 0.7)`);
+
+			ctx.fillStyle = gradient;
+
+			// Pfadverlauf basierend auf Nachbarn
+			const neighbors = this.getNeighbors();
+			this.renderPathDirection(ctx, x, y, size, neighbors);
+
+			// Details auf dem Pfad
+			for (let i = 0; i < 20; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+
+				// Verschiedene Arten von Pfaddetails
+				if (i % 4 === 0) {
+					// Kleine Steine
+					ctx.fillStyle = `rgba(101, 67, 33, ${0.2 + this.pseudoRandom(seed + i) * 0.2})`;
+					const stoneSize = size * 0.05 * this.pseudoRandom(seed + i + 2);
+					ctx.beginPath();
+					ctx.arc(px, py, stoneSize, 0, Math.PI * 2);
+					ctx.fill();
+				} else if (i % 4 === 1) {
+					// Fußspuren
+					this.renderFootprint(ctx, px, py, size * 0.15, this.pseudoRandom(seed + i) * Math.PI * 2);
+				} else if (i % 4 === 2) {
+					// Erdflecken
+					const radius = size * 0.08 * this.pseudoRandom(seed + i + 2);
+					const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
+					gradient.addColorStop(0, 'rgba(101, 67, 33, 0.3)');
+					gradient.addColorStop(1, 'rgba(101, 67, 33, 0)');
+
+					ctx.fillStyle = gradient;
+					ctx.beginPath();
+					ctx.arc(px, py, radius, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+
+			// Gras das in den Pfad hineinwächst
+			this.renderPathGrass(ctx, x, y, size);
+		}
+
+		renderPathDirection(ctx, x, y, size, neighbors) {
+			const hasNS = neighbors.n?.type === 'PATH' && neighbors.s?.type === 'PATH';
+			const hasEW = neighbors.e?.type === 'PATH' && neighbors.w?.type === 'PATH';
+
+			ctx.beginPath();
+
+			if (hasNS && !hasEW) {
+				// Vertikaler Pfad
+				ctx.moveTo(x + size * 0.3, y);
+				ctx.lineTo(x + size * 0.7, y);
+				ctx.lineTo(x + size * 0.7, y + size);
+				ctx.lineTo(x + size * 0.3, y + size);
+			} else if (hasEW && !hasNS) {
+				// Horizontaler Pfad
+				ctx.moveTo(x, y + size * 0.3);
+				ctx.lineTo(x + size, y + size * 0.3);
+				ctx.lineTo(x + size, y + size * 0.7);
+				ctx.lineTo(x, y + size * 0.7);
+			} else {
+				// Kreuzung oder einzelnes Tile
+				ctx.rect(x + size * 0.2, y + size * 0.2, size * 0.6, size * 0.6);
+			}
+
+			ctx.fill();
+		}
+
+		renderFootprint(ctx, x, y, size, angle) {
+			ctx.save();
+			ctx.translate(x, y);
+			ctx.rotate(angle);
+
+			// Vereinfachte Fußspur
+			ctx.fillStyle = 'rgba(101, 67, 33, 0.2)';
+			ctx.beginPath();
+			ctx.ellipse(0, 0, size * 0.4, size, 0, 0, Math.PI * 2);
+			ctx.fill();
+
+			ctx.restore();
+		}
+
+		renderPathGrass(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+
+			// Gras am Rand des Pfades
+			for (let i = 0; i < 10; i++) {
+				const isLeft = this.pseudoRandom(seed + i) > 0.5;
+				const px = x + (isLeft ? size * 0.2 : size * 0.8);
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+
+				const length = size * 0.15 * this.pseudoRandom(seed + i + 2);
+				const angle = (isLeft ? 0 : Math.PI) +
+					(this.pseudoRandom(seed + i + 3) - 0.5) * Math.PI * 0.5;
+
+				ctx.strokeStyle = `rgba(76, 154, 0, 0.5)`;
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(px, py);
+				ctx.lineTo(
+					px + Math.cos(angle) * length,
+					py + Math.sin(angle) * length
+				);
+				ctx.stroke();
+			}
+		}
+
+		renderDirtTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			// Kleine Steine und Unregelmäßigkeiten
+			for (let i = 0; i < 8; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const radius = this.pseudoRandom(seed + i + 2) * size * 0.1;
+
+				ctx.fillStyle = `rgba(101, 67, 33, ${0.1 + this.pseudoRandom(seed + i) * 0.2})`;
+				ctx.beginPath();
+				ctx.arc(px, py, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderGrassTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			// Grashalme
+			for (let i = 0; i < 12; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const length = size * 0.15 * this.pseudoRandom(seed + i + 2);
+				const angle = this.pseudoRandom(seed + i + 3) * Math.PI;
+
+				ctx.strokeStyle = `rgba(76, 154, 0, 0.6)`;
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(px, py);
+				ctx.lineTo(
+					px + Math.cos(angle) * length,
+					py + Math.sin(angle) * length
+				);
+				ctx.stroke();
+			}
+		}
+
+		renderHighGrassTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+			// Höhere und dichtere Grashalme
+			for (let i = 0; i < 18; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const length = size * 0.25 * this.pseudoRandom(seed + i + 2);
+				const angle = this.pseudoRandom(seed + i + 3) * Math.PI * 0.5 - Math.PI * 0.25;
+
+				ctx.strokeStyle = `rgba(51, 153, 0, 0.7)`;
+				ctx.lineWidth = 1.5;
+				ctx.beginPath();
+				ctx.moveTo(px, py);
+				ctx.lineTo(
+					px + Math.cos(angle) * length,
+					py + Math.sin(angle) * length
+				);
+				ctx.stroke();
+			}
+		}
+
+		renderMountainTexture(ctx, x, y, size) {
+			// Felsstruktur
+			const neighbors = this.getNeighbors();
+
+			// Basis-Gesteinsstruktur
+			ctx.fillStyle = this.config.color;
+			ctx.beginPath();
+			ctx.moveTo(x, y + size);
+
+			// Felsspitzen basierend auf Nachbarn
+			if (!neighbors.n?.type === 'MOUNTAIN') {
+				// Wenn oben kein Berg ist, zeichne Spitzen
+				const peakCount = 3;
+				for (let i = 0; i <= peakCount; i++) {
+					const px = x + (size * i) / peakCount;
+					const py = y + (i % 2 === 0 ? size * 0.3 : size * 0.5);
+					ctx.lineTo(px, py);
+				}
+			}
+
+			ctx.lineTo(x + size, y + size);
+			ctx.closePath();
+			ctx.fill();
+
+			// Gesteinsdetails
+			const seed = parseInt(this.tileId || '0');
+			for (let i = 0; i < 6; i++) {
+				ctx.fillStyle = `rgba(77, 77, 77, ${0.2 + this.pseudoRandom(seed + i) * 0.3})`;
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + size * 0.5 + this.pseudoRandom(seed + i + 1) * size * 0.5;
+				const width = size * 0.2 * this.pseudoRandom(seed + i + 2);
+				const height = size * 0.3 * this.pseudoRandom(seed + i + 3);
+
+				ctx.beginPath();
+				ctx.moveTo(px, py + height);
+				ctx.lineTo(px + width, py + height);
+				ctx.lineTo(px + width/2, py);
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+
+		renderSnowTexture(ctx, x, y, size) {
+			// Schneeverwehungen
+			const seed = parseInt(this.tileId || '0');
+
+			// Basis-Schneedecke
+			ctx.fillStyle = '#ffffff';
+			ctx.fillRect(x, y, size, size);
+
+			// Glanzeffekte
+			for (let i = 0; i < 5; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const radius = size * 0.2 * this.pseudoRandom(seed + i + 2);
+
+				const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius);
+				gradient.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+				gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+				ctx.fillStyle = gradient;
+				ctx.beginPath();
+				ctx.arc(px, py, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderBeachTexture(ctx, x, y, size) {
+			const seed = parseInt(this.tileId || '0');
+
+			// Sandbasis
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y, size, size);
+
+			// Sandkörner und kleine Steine
+			for (let i = 0; i < 20; i++) {
+				const px = x + this.pseudoRandom(seed + i) * size;
+				const py = y + this.pseudoRandom(seed + i + 1) * size;
+				const radius = size * 0.02 * this.pseudoRandom(seed + i + 2);
+
+				ctx.fillStyle = `rgba(210, 180, 140, ${0.3 + this.pseudoRandom(seed + i) * 0.2})`;
+				ctx.beginPath();
+				ctx.arc(px, py, radius, 0, Math.PI * 2);
+				ctx.fill();
+			}
+
+			// Wellenspuren im Sand
+			for (let i = 0; i < 3; i++) {
+				const waveY = y + this.pseudoRandom(seed + i) * size;
+				ctx.strokeStyle = `rgba(255, 204, 153, 0.3)`;
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(x, waveY);
+
+				// Wellenförmige Linie
+				for (let wx = 0; wx <= size; wx += size/10) {
+					const wave = Math.sin(wx/size * Math.PI * 2) * size * 0.05;
+					ctx.lineTo(x + wx, waveY + wave);
+				}
+
+				ctx.stroke();
+			}
+		}
+
+		renderWallTexture(ctx, x, y, size) {
+			// Steinmuster für Wände
+			const brickHeight = size / 4;
+			const brickWidth = size / 2;
+
+			ctx.strokeStyle = '#666666';
+			ctx.lineWidth = 1;
+
+			// Horizontale Steinreihen
+			for (let row = 0; row < 4; row++) {
+				const offsetX = row % 2 === 0 ? 0 : -brickWidth/2;
+
+				for (let col = -1; col < 3; col++) {
+					const bx = x + offsetX + col * brickWidth;
+					const by = y + row * brickHeight;
+
+					// Nur zeichnen wenn innerhalb der Tile-Grenzen
+					if (bx >= x && bx + brickWidth <= x + size) {
+						ctx.strokeRect(bx, by, brickWidth, brickHeight);
+
+						// Steinstruktur
+						const seed = parseInt(this.tileId || '0') + row * 10 + col;
+						ctx.fillStyle = `rgba(128, 128, 128, ${0.1 + this.pseudoRandom(seed) * 0.1})`;
+						ctx.fillRect(bx, by, brickWidth, brickHeight);
+					}
+				}
+			}
+		}
+
+		renderHouseTexture(ctx, x, y, size) {
+			// Basis-Hausstruktur
+			ctx.fillStyle = this.config.color;
+			ctx.fillRect(x, y + size * 0.3, size, size * 0.7); // Hauptgebäude
+
+			// Dach
+			ctx.fillStyle = '#8B4513';
+			ctx.beginPath();
+			ctx.moveTo(x - size * 0.1, y + size * 0.3);
+			ctx.lineTo(x + size * 0.5, y);
+			ctx.lineTo(x + size * 1.1, y + size * 0.3);
+			ctx.closePath();
+			ctx.fill();
+
+			// Fenster
+			ctx.fillStyle = '#FFF8DC';
+			const windowSize = size * 0.2;
+			ctx.fillRect(x + size * 0.2, y + size * 0.4, windowSize, windowSize);
+			ctx.fillRect(x + size * 0.6, y + size * 0.4, windowSize, windowSize);
+
+			// Tür
+			ctx.fillStyle = '#8B4513';
+			ctx.fillRect(x + size * 0.4, y + size * 0.6, size * 0.2, size * 0.4);
+		}
+
+		addPositionalVariation(ctx, x, y, size) {
+			// Fügt subtile Variationen basierend auf der Position hinzu
+			const seed = parseInt(this.tileId || '0');
+
+			// Leichte Farbvariation
+			ctx.fillStyle = `rgba(0, 0, 0, ${0.05 * this.pseudoRandom(seed)})`;
+			ctx.fillRect(x, y, size, size);
+
+			// Optionale zusätzliche Texturen oder Details
+			if (this.pseudoRandom(seed) > 0.8) {
+				const detailSize = size * 0.1;
+				const px = x + this.pseudoRandom(seed + 1) * (size - detailSize);
+				const py = y + this.pseudoRandom(seed + 2) * (size - detailSize);
+
+				ctx.fillStyle = `rgba(0, 0, 0, 0.1)`;
+				ctx.beginPath();
+				ctx.arc(px, py, detailSize/2, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		renderHeightEffect(ctx, x, y, size) {
+			// Schatten basierend auf Höhe
+			const shadowHeight = this.height * 5;
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+			ctx.fillRect(x + 2, y + 2, size, shadowHeight);
+
+			// Highlight auf der "oberen" Seite
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+			ctx.fillRect(x, y - shadowHeight, size, 2);
+		}
+
+		renderWeatherEffect(ctx, x, y, size, currentTime) {
+			switch (this.weatherEffect) {
+				case 'rain':
+					this.renderRain(ctx, x, y, size, currentTime);
+					break;
+				case 'snow':
+					this.renderSnow(ctx, x, y, size, currentTime);
+					break;
+			}
+		}
+
+		renderRain(ctx, x, y, size, currentTime) {
+			const rainCount = 5;
+			ctx.strokeStyle = 'rgba(155, 155, 255, 0.3)';
+			ctx.lineWidth = 1;
+
+			for (let i = 0; i < rainCount; i++) {
+				const offset = ((currentTime + this.animationOffset + i * 1000) % 2000) / 2000;
+				const rx = x + (this.pseudoRandom(parseInt(this.tileId || '0') + i) * size);
+				const ry = y + offset * size;
+
+				ctx.beginPath();
+				ctx.moveTo(rx, ry);
+				ctx.lineTo(rx - 2, ry + 10);
+				ctx.stroke();
+			}
+		}
+
+		shouldDrawRoadMarking() {
+			// Prüfe Nachbar-Tiles für konsistente Straßenmarkierungen
+			// Diese Methode muss noch implementiert werden basierend auf der Map-Struktur
+			return true;
+		}
+
+		pseudoRandom(seed) {
+			const x = Math.sin(seed) * 10000;
+			return x - Math.floor(x);
+		}
+
+		addEntity(entity) {
+			this.entities.add(entity);
+			this.updateProperties();
+		}
+
+		removeEntity(entity) {
+			this.entities.delete(entity);
+			this.updateProperties();
+		}
+
+		updateProperties() {
+			// Aktualisiert Tile-Eigenschaften basierend auf Entities
+			this.currentNoise = this.config.noise;
+			this.currentVisibility = 1.0;
+
+			this.entities.forEach(entity => {
+				if (entity.affects) {
+					if (entity.affects.noise) this.currentNoise *= entity.affects.noise;
+					if (entity.affects.visibility) this.currentVisibility *= entity.affects.visibility;
+				}
+			});
+		}
+
+		isWalkable() {
+			return this.config.walkable &&
+				!Array.from(this.entities).some(e => e.blocksMovement);
+		}
+
+		isVehiclePassable() {
+			return this.config.vehiclePassable &&
+				!Array.from(this.entities).some(e => e.blocksVehicles);
+		}
+
+		providesCover() {
+			return this.config.provides &&
+				(this.config.provides.includes('cover') ||
+					this.config.provides.includes('stealth'));
+		}
+
+		getSpeedModifier() {
+			let modifier = this.config.speedModifier || 1;
+			this.entities.forEach(entity => {
+				if (entity.affects && entity.affects.speed) {
+					modifier *= entity.affects.speed;
+				}
+			});
+			return modifier;
+		}
+
+		getColor() {
+			// Basisfarbe mit Varianten und Wettereffekten
+			let color = TILE_COLORS[this.type] || '#FFFFFF';
+			if (this.weatherEffect) {
+				// Hier Wettereffekte auf die Farbe anwenden
+				color = this.applyWeatherEffect(color);
+			}
+			return color;
+		}
+
+		darkenColor(color, factor) {
+			// Helfer-Funktion zum Verdunkeln einer Farbe
+			let r = parseInt(color.substr(1, 2), 16);
+			let g = parseInt(color.substr(3, 2), 16);
+			let b = parseInt(color.substr(5, 2), 16);
+
+			r = Math.floor(r * (1 - factor));
+			g = Math.floor(g * (1 - factor));
+			b = Math.floor(b * (1 - factor));
+
+			return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+		}
+
+		blendColors(color1, color2, factor) {
+			// Helfer-Funktion zum Mischen zweier Farben
+			let r1 = parseInt(color1.substr(1, 2), 16);
+			let g1 = parseInt(color1.substr(3, 2), 16);
+			let b1 = parseInt(color1.substr(5, 2), 16);
+
+			let r2 = parseInt(color2.substr(1, 2), 16);
+			let g2 = parseInt(color2.substr(3, 2), 16);
+			let b2 = parseInt(color2.substr(5, 2), 16);
+
+			let r = Math.floor(r1 * (1 - factor) + r2 * factor);
+			let g = Math.floor(g1 * (1 - factor) + g2 * factor);
+			let b = Math.floor(b1 * (1 - factor) + b2 * factor);
+
+			return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+		}
 	}
 
 	class GameMap {
-	    constructor(width, height) {
-	        this.width = width;
-	        this.height = height;
-	        this.tileSize = 32; // Setze die Tile-Größe in Pixeln
-	        this.tiles = Array(height).fill().map(() => Array(width).fill(null));
-	        this.structures = new Set();
-	        this.regions = new Map();
-	    }
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.tileSize = 32; // Setze die Tile-Größe in Pixeln
+			this.tiles = Array(height).fill().map(() => Array(width).fill(null));
+			this.structures = new Set();
+			this.regions = new Map();
+		}
 
-	    setTile(x, y, tileType, variant = 0) {
-	        if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-	            this.tiles[y][x] = new Tile(tileType, variant);
-	            return true;
-	        }
-	        return false;
-	    }
+		setTile(x, y, tileType, variant = 0) {
+			if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+				this.tiles[y][x] = new Tile(this, x, y, TILE_SIZE, tileType, variant);
+				return true;
+			}
+			return false;
+		}
 
-	    getTile(x, y) {
-	        if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
-	            return this.tiles[y][x];
-	        }
-	        return null;
-	    }
+		getTile(x, y) {
+			if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+				return this.tiles[y][x];
+			}
+			return null;
+		}
 
-	    findTilesByType(type) {
-	        const tiles = [];
-	        for (let y = 0; y < this.height; y++) {
-	            for (let x = 0; x < this.width; x++) {
-	                const tile = this.getTile(x, y);
-	                if (tile && tile.type === type) {
-	                    tiles.push({x, y});
-	                }
-	            }
-	        }
-	        return tiles;
-	    }
+		findTilesByType(type) {
+			const tiles = [];
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const tile = this.getTile(x, y);
+					if (tile && tile.type === type) {
+						tiles.push({x, y});
+					}
+				}
+			}
+			return tiles;
+		}
 
-	    addStructure(structure) {
-	        this.structures.add(structure);
-	        // Struktur-Tiles zur Map hinzufügen
-	        structure.tiles.forEach(({x, y, type}) => {
-	            this.setTile(x, y, type);
-	        });
-	    }
+		addStructure(structure) {
+			this.structures.add(structure);
+			// Struktur-Tiles zur Map hinzufügen
+			structure.tiles.forEach(({x, y, type}) => {
+				this.setTile(x, y, type);
+			});
+		}
 
-	    defineRegion(name, tiles) {
-	        this.regions.set(name, new Set(tiles));
-	    }
+		defineRegion(name, tiles) {
+			this.regions.set(name, new Set(tiles));
+		}
 
-	    isInRegion(name, x, y) {
-	        const region = this.regions.get(name);
-	        return region && region.has(`${x},${y}`);
-	    }
+		isInRegion(name, x, y) {
+			const region = this.regions.get(name);
+			return region && region.has(`${x},${y}`);
+		}
 
-	    isPassable(x, y, forVehicle = false) {
-	        const tile = this.getTile(x, y);
-	        if (!tile) return false;
-	        return forVehicle ? tile.isVehiclePassable() : tile.isWalkable();
-	    }
+		isPassable(x, y, forVehicle = false) {
+			const tile = this.getTile(x, y);
+			if (!tile) return false;
+			return forVehicle ? tile.isVehiclePassable() : tile.isWalkable();
+		}
 
-	    // Optimierte Rendering-Methode
-	    render(ctx, viewport) {
-	        const startX = Math.max(0, Math.floor(viewport.left / this.tileSize));
-	        const endX = Math.min(this.width, Math.ceil(viewport.right / this.tileSize));
-	        const startY = Math.max(0, Math.floor(viewport.top / this.tileSize));
-	        const endY = Math.min(this.height, Math.ceil(viewport.bottom / this.tileSize));
+		// Optimierte Rendering-Methode
+		render(ctx, viewport) {
+			const startX = Math.max(0, Math.floor(viewport.left / this.tileSize));
+			const endX = Math.min(this.width, Math.ceil(viewport.right / this.tileSize));
+			const startY = Math.max(0, Math.floor(viewport.top / this.tileSize));
+			const endY = Math.min(this.height, Math.ceil(viewport.bottom / this.tileSize));
 
-	        // Erste Ebene: Grund-Tiles
-	        for (let y = startY; y < endY; y++) {
-	            for (let x = startX; x < endX; x++) {
-	                const tile = this.tiles[y][x];
-	                if (!tile) continue;
+			// Erste Ebene: Grund-Tiles
+			for (let y = startY; y < endY; y++) {
+				for (let x = startX; x < endX; x++) {
+					const tile = this.tiles[y][x];
+					if (!tile) continue;
 
-	                const screenX = x * this.tileSize;
-	                const screenY = y * this.tileSize;
+					const screenX = x * this.tileSize;
+					const screenY = y * this.tileSize;
 
-	                // Basis-Tile zeichnen
-	                this.renderTile(ctx, tile, screenX, screenY, 0);
-	            }
-	        }
+					// Basis-Tile zeichnen
+					this.renderTile(ctx, tile, screenX, screenY, 0);
+				}
+			}
 
-	        // Zweite Ebene: Erhöhte Tiles
-	        for (let y = startY; y < endY; y++) {
-	            for (let x = startX; x < endX; x++) {
-	                const tile = this.tiles[y][x];
-	                if (!tile || tile.height <= 0) continue;
+			// Zweite Ebene: Erhöhte Tiles
+			for (let y = startY; y < endY; y++) {
+				for (let x = startX; x < endX; x++) {
+					const tile = this.tiles[y][x];
+					if (!tile || tile.height <= 0) continue;
 
-	                const screenX = x * this.tileSize;
-	                const screenY = y * this.tileSize;
+					const screenX = x * this.tileSize;
+					const screenY = y * this.tileSize;
 
-	                // Schatten für erhöhte Tiles
-	                if (tile.height > 0) {
-	                    this.renderShadow(ctx, screenX, screenY, tile.height);
-	                }
+					// Schatten für erhöhte Tiles
+					if (tile.height > 0) {
+						this.renderShadow(ctx, screenX, screenY, tile.height);
+					}
 
-	                // Erhöhtes Tile mit Offset zeichnen
-	                this.renderTile(ctx, tile, screenX, screenY - tile.height * 8);
-	            }
-	        }
-	    }
+					// Erhöhtes Tile mit Offset zeichnen
+					this.renderTile(ctx, tile, screenX, screenY - tile.height * 8);
+				}
+			}
+		}
 
-	    renderTile(ctx, tile, x, y, heightOffset = 0) {
-	        const color = this.getTileColor(tile);
-	        ctx.fillStyle = color;
-	        ctx.fillRect(x, y - heightOffset, this.tileSize, this.tileSize);
+		renderTile(ctx, tile, x, y, heightOffset = 0) {
+			const color = this.getTileColor(tile);
+			ctx.fillStyle = color;
+			ctx.fillRect(x, y - heightOffset, this.tileSize, this.tileSize);
 
-	        // Gerenderte Details basierend auf dem Tile-Typ
-	        if(tile.type === 'FOREST_LIGHT' || tile.type === 'FOREST_DENSE') {
-	            this.renderTree(ctx, x, y - heightOffset, tile.type);
-	        } else if(tile.type === 'HOUSE') {
-	            this.renderHouse(ctx, x, y - heightOffset);
-	        } else if(tile.type === 'ROAD' || tile.type === 'PATH') {
-	            this.renderRoadDetails(ctx, x, y - heightOffset);
-	        }
-	        // Füge weitere Details nach Bedarf hinzu
-	    }
+			// Gerenderte Details basierend auf dem Tile-Typ
+			if (tile.type === 'FOREST_LIGHT' || tile.type === 'FOREST_DENSE') {
+				this.renderTree(ctx, x, y - heightOffset, tile.type);
+			} else if (tile.type === 'HOUSE') {
+				this.renderHouse(ctx, x, y - heightOffset);
+			} else if (tile.type === 'ROAD' || tile.type === 'PATH') {
+				this.renderRoadDetails(ctx, x, y - heightOffset);
+			}
+			// Füge weitere Details nach Bedarf hinzu
+		}
 
-	    renderShadow(ctx, x, y, height) {
-	        ctx.save();
-	        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-	        ctx.fillRect(x + 4, y + 4, this.tileSize, this.tileSize);
-	        ctx.restore();
-	    }
+		renderShadow(ctx, x, y, height) {
+			ctx.save();
+			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+			ctx.fillRect(x + 4, y + 4, this.tileSize, this.tileSize);
+			ctx.restore();
+		}
 
-	    // Hilfsmethode für die Farbdarstellung (bis Sprites implementiert sind)
-	    getTileColor(tile) {
-	        return tile.getColor();
-	    }
+		// Hilfsmethode für die Farbdarstellung (bis Sprites implementiert sind)
+		getTileColor(tile) {
+			return tile.getColor();
+		}
 
-	    // Detail-Rendering-Methoden
-	    renderTree(ctx, x, y, type) {
-	        // Einfache Darstellung: grüner Kreis oder dichter Kreis für dichte Wälder
-	        ctx.fillStyle = (type === 'FOREST_DENSE') ? '#006400' : '#228B22';
-	        ctx.beginPath();
-	        ctx.arc(x + this.tileSize / 2, y + this.tileSize / 2, this.tileSize / 3, 0, 2 * Math.PI);
-	        ctx.fill();
-	    }
+		// Detail-Rendering-Methoden
+		renderTree(ctx, x, y, type) {
+			// Einfache Darstellung: grüner Kreis oder dichter Kreis für dichte Wälder
+			ctx.fillStyle = (type === 'FOREST_DENSE') ? '#006400' : '#228B22';
+			ctx.beginPath();
+			ctx.arc(x + this.tileSize / 2, y + this.tileSize / 2, this.tileSize / 3, 0, 2 * Math.PI);
+			ctx.fill();
+		}
 
-	    renderHouse(ctx, x, y) {
-	        // Einfache Darstellung: braunes Quadrat
-	        ctx.fillStyle = '#8B4513';
-	        ctx.fillRect(x + this.tileSize / 4, y + this.tileSize / 4, this.tileSize / 2, this.tileSize / 2);
+		renderHouse(ctx, x, y) {
+			// Einfache Darstellung: braunes Quadrat
+			ctx.fillStyle = '#8B4513';
+			ctx.fillRect(x + this.tileSize / 4, y + this.tileSize / 4, this.tileSize / 2, this.tileSize / 2);
 
-	        // Optional: Fenster und Türen hinzufügen
-	        ctx.fillStyle = '#FFFFFF';
-	        ctx.fillRect(x + this.tileSize / 3, y + this.tileSize / 3, this.tileSize / 10, this.tileSize / 10); // Fenster
-	        ctx.fillRect(x + (2 * this.tileSize) / 3, y + (2 * this.tileSize) / 3, this.tileSize / 12, this.tileSize / 6); // Tür
-	    }
+			// Optional: Fenster und Türen hinzufügen
+			ctx.fillStyle = '#FFFFFF';
+			ctx.fillRect(x + this.tileSize / 3, y + this.tileSize / 3, this.tileSize / 10, this.tileSize / 10); // Fenster
+			ctx.fillRect(x + (2 * this.tileSize) / 3, y + (2 * this.tileSize) / 3, this.tileSize / 12, this.tileSize / 6); // Tür
+		}
 
-	    renderRoadDetails(ctx, x, y) {
-	        // Zeichne Straßenlinien oder Markierungen
-	        ctx.strokeStyle = '#FFFFFF';
-	        ctx.lineWidth = 2;
-	        // Mittellinie
-	        ctx.beginPath();
-	        ctx.moveTo(x + this.tileSize / 2, y);
-	        ctx.lineTo(x + this.tileSize / 2, y + this.tileSize);
-	        ctx.stroke();
+		renderRoadDetails(ctx, x, y) {
+			// Zeichne Straßenlinien oder Markierungen
+			ctx.strokeStyle = '#FFFFFF';
+			ctx.lineWidth = 2;
+			// Mittellinie
+			ctx.beginPath();
+			ctx.moveTo(x + this.tileSize / 2, y);
+			ctx.lineTo(x + this.tileSize / 2, y + this.tileSize);
+			ctx.stroke();
 
-	        // Seitenmarkierungen (optional)
-	        ctx.beginPath();
-	        ctx.moveTo(x + 4, y);
-	        ctx.lineTo(x + 4, y + this.tileSize);
-	        ctx.moveTo(x + this.tileSize - 4, y);
-	        ctx.lineTo(x + this.tileSize - 4, y + this.tileSize);
-	        ctx.stroke();
-	    }
+			// Seitenmarkierungen (optional)
+			ctx.beginPath();
+			ctx.moveTo(x + 4, y);
+			ctx.lineTo(x + 4, y + this.tileSize);
+			ctx.moveTo(x + this.tileSize - 4, y);
+			ctx.lineTo(x + this.tileSize - 4, y + this.tileSize);
+			ctx.stroke();
+		}
 
-	    // Pathfinding-Unterstützung
-	    getNeighbors(x, y) {
-	        const neighbors = [];
-	        const directions = [
-	            {dx: -1, dy: 0}, {dx: 1, dy: 0},
-	            {dx: 0, dy: -1}, {dx: 0, dy: 1}
-	        ];
+		// Pathfinding-Unterstützung
+		getNeighbors(x, y) {
+			const neighbors = [];
+			const directions = [
+				{dx: -1, dy: 0}, {dx: 1, dy: 0},
+				{dx: 0, dy: -1}, {dx: 0, dy: 1}
+			];
 
-	        directions.forEach(({dx, dy}) => {
-	            const newX = x + dx;
-	            const newY = y + dy;
-	            const tile = this.getTile(newX, newY);
-	            if (tile && tile.isWalkable()) {
-	                neighbors.push({
-	                    x: newX,
-	                    y: newY,
-	                    cost: tile.getSpeedModifier()
-	                });
-	            }
-	        });
+			directions.forEach(({dx, dy}) => {
+				const newX = x + dx;
+				const newY = y + dy;
+				const tile = this.getTile(newX, newY);
+				if (tile && tile.isWalkable()) {
+					neighbors.push({
+						x: newX,
+						y: newY,
+						cost: tile.getSpeedModifier()
+					});
+				}
+			});
 
-	        return neighbors;
-	    }
+			return neighbors;
+		}
 
-	    findPath(startX, startY, endX, endY) {
-	        // A* Pathfinding
-	        const open = new Set();
-	        open.add(`${startX},${startY}`);
-	        const closed = new Set();
-	        const cameFrom = new Map();
-	        const gScore = new Map();
-	        const fScore = new Map();
+		findPath(startX, startY, endX, endY) {
+			// A* Pathfinding
+			const open = new Set();
+			open.add(`${startX},${startY}`);
+			const closed = new Set();
+			const cameFrom = new Map();
+			const gScore = new Map();
+			const fScore = new Map();
 
-	        gScore.set(`${startX},${startY}`, 0);
-	        fScore.set(`${startX},${startY}`, this.heuristic(startX, startY, endX, endY));
+			gScore.set(`${startX},${startY}`, 0);
+			fScore.set(`${startX},${startY}`, this.heuristic(startX, startY, endX, endY));
 
-	        while (open.size > 0) {
-	            // Finde das Element in open mit dem niedrigsten fScore
-	            let current = null;
-	            let lowestF = Infinity;
-	            open.forEach(coord => {
-	                const score = fScore.get(coord) || Infinity;
-	                if (score < lowestF) {
-	                    lowestF = score;
-	                    current = coord;
-	                }
-	            });
+			while (open.size > 0) {
+				// Finde das Element in open mit dem niedrigsten fScore
+				let current = null;
+				let lowestF = Infinity;
+				open.forEach(coord => {
+					const score = fScore.get(coord) || Infinity;
+					if (score < lowestF) {
+						lowestF = score;
+						current = coord;
+					}
+				});
 
-	            if (!current) break;
+				if (!current) break;
 
-	            const [currentX, currentY] = current.split(',').map(Number);
-	            if (currentX === endX && currentY === endY) {
-	                return this.reconstructPath(cameFrom, current);
-	            }
+				const [currentX, currentY] = current.split(',').map(Number);
+				if (currentX === endX && currentY === endY) {
+					return this.reconstructPath(cameFrom, current);
+				}
 
-	            open.delete(current);
-	            closed.add(current);
+				open.delete(current);
+				closed.add(current);
 
-	            this.getNeighbors(currentX, currentY).forEach(({x, y, cost}) => {
-	                const neighborCoord = `${x},${y}`;
-	                if (closed.has(neighborCoord)) return;
+				this.getNeighbors(currentX, currentY).forEach(({x, y, cost}) => {
+					const neighborCoord = `${x},${y}`;
+					if (closed.has(neighborCoord)) return;
 
-	                const tentativeGScore = (gScore.get(current) || Infinity) + cost;
+					const tentativeGScore = (gScore.get(current) || Infinity) + cost;
 
-	                if (!open.has(neighborCoord)) {
-	                    open.add(neighborCoord);
-	                } else if (tentativeGScore >= (gScore.get(neighborCoord) || Infinity)) {
-	                    return;
-	                }
+					if (!open.has(neighborCoord)) {
+						open.add(neighborCoord);
+					} else if (tentativeGScore >= (gScore.get(neighborCoord) || Infinity)) {
+						return;
+					}
 
-	                cameFrom.set(neighborCoord, current);
-	                gScore.set(neighborCoord, tentativeGScore);
-	                fScore.set(neighborCoord, tentativeGScore + this.heuristic(x, y, endX, endY));
-	            });
-	        }
+					cameFrom.set(neighborCoord, current);
+					gScore.set(neighborCoord, tentativeGScore);
+					fScore.set(neighborCoord, tentativeGScore + this.heuristic(x, y, endX, endY));
+				});
+			}
 
-	        return null; // Kein Pfad gefunden
-	    }
+			return null; // Kein Pfad gefunden
+		}
 
-	    heuristic(x1, y1, x2, y2) {
-	        // Manhattan-Distanz
-	        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-	    }
+		heuristic(x1, y1, x2, y2) {
+			// Manhattan-Distanz
+			return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+		}
 
-	    reconstructPath(cameFrom, current) {
-	        const path = [current];
-	        while (cameFrom.has(current)) {
-	            current = cameFrom.get(current);
-	            path.unshift(current);
-	        }
-	        return path.map(coord => {
-	            const [x, y] = coord.split(',').map(Number);
-	            return {x, y};
-	        });
-	    }
+		reconstructPath(cameFrom, current) {
+			const path = [current];
+			while (cameFrom.has(current)) {
+				current = cameFrom.get(current);
+				path.unshift(current);
+			}
+			return path.map(coord => {
+				const [x, y] = coord.split(',').map(Number);
+				return {x, y};
+			});
+		}
 
 		findSafeSpawnPosition() {
 			const validTileTypes = ['GRASS', 'PATH', 'DIRT', 'BEACH'];
 			let attempts = 0;
 			const maxAttempts = 100;
-			
+
 			while (attempts < maxAttempts) {
 				const x = Math.floor(Math.random() * this.width);
 				const y = Math.floor(Math.random() * this.height);
 				const tile = this.map.getTile(x, y);
-				
+
 				if (tile && validTileTypes.includes(tile.type)) {
 					// Prüfe ob genug Platz für Fahrzeuge/Spieler
 					let hasEnoughSpace = true;
@@ -1021,343 +2443,343 @@
 	}
 
 	class MapGenerator {
-	    constructor(width, height) {
-	        this.width = width;
-	        this.height = height;
-	        this.map = new GameMap(width, height);
+		constructor(width, height) {
+			this.width = width;
+			this.height = height;
+			this.map = new GameMap(width, height);
 
-	        // Biom-Verteilung
-	        this.biomeWeights = {
-	            FOREST: 0.3,    // 30% Waldgebiete
-	            GRASSLAND: 0.4, // 40% Grasland/Wiesen
-	            WATER: 0.15,    // 15% Gewässer
-	            MOUNTAIN: 0.15  // 15% Bergregionen
-	        };
+			// Biom-Verteilung
+			this.biomeWeights = {
+				FOREST: 0.3,    // 30% Waldgebiete
+				GRASSLAND: 0.4, // 40% Grasland/Wiesen
+				WATER: 0.15,    // 15% Gewässer
+				MOUNTAIN: 0.15  // 15% Bergregionen
+			};
 
-	        // Minimale Größe für zusammenhängende Gebiete
-	        this.minRegionSize = 10;
+			// Minimale Größe für zusammenhängende Gebiete
+			this.minRegionSize = 10;
 
-	        // Parameter für das Rauschen
-	        this.heightScale = 0.05;
-	        this.biomeScale = 0.1;
-	    }
+			// Parameter für das Rauschen
+			this.heightScale = 0.05;
+			this.biomeScale = 0.1;
+		}
 
-	    generate() {
-	        // 1. Basis-Heightmap generieren
-	        this.generateHeightmap();
+		generate() {
+			// 1. Basis-Heightmap generieren
+			this.generateHeightmap();
 
-	        // 2. Biome platzieren
-	        this.placeBiomes();
+			// 2. Biome platzieren
+			this.placeBiomes();
 
-	        // 3. Straßen und Wege
-	        this.generateRoads();
+			// 3. Straßen und Wege
+			this.generateRoads();
 
-	        // 4. Strukturen (Häuser, etc.)
-	        this.placeStructures();
+			// 4. Strukturen (Häuser, etc.)
+			this.placeStructures();
 
-	        // 5. Details hinzufügen
-	        this.addDetails();
+			// 5. Details hinzufügen
+			this.addDetails();
 
-	        return this.map;
-	    }
+			return this.map;
+		}
 
 		generateHeightmap() {
-	        const scale = this.heightScale;
-	        const waterThreshold = 0.3;
-	        const beachThreshold = 0.35;
+			const scale = this.heightScale;
+			const waterThreshold = 0.3;
+			const beachThreshold = 0.35;
 
-	        // Erste Phase: Basis-Heightmap generieren
-	        let heightMap = Array(this.height).fill().map(() => Array(this.width).fill(0));
-	        
-	        for(let y = 0; y < this.height; y++) {
-	            for(let x = 0; x < this.width; x++) {
-	                const heightValue = noise.perlin2(x * scale, y * scale);
-	                const normalizedHeight = (heightValue + 1) / 2;
-	                
-	                const distanceToEdge = Math.min(
-	                    x, y, this.width - x - 1, this.height - y - 1
-	                ) / Math.min(this.width, this.height);
-	                
-	                heightMap[y][x] = normalizedHeight * (0.5 + 0.5 * distanceToEdge);
-	            }
-	        }
+			// Erste Phase: Basis-Heightmap generieren
+			let heightMap = Array(this.height).fill().map(() => Array(this.width).fill(0));
 
-	        // Zweite Phase: Ensure minimum land width
-	        heightMap = this.ensureMinimumLandWidth(heightMap, waterThreshold, 3);
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const heightValue = noise.perlin2(x * scale, y * scale);
+					const normalizedHeight = (heightValue + 1) / 2;
 
-	        // Dritte Phase: Terrain setzen
-	        for(let y = 0; y < this.height; y++) {
-	            for(let x = 0; x < this.width; x++) {
-	                const finalHeight = heightMap[y][x];
-	                
-	                if(finalHeight < waterThreshold) {
-	                    this.map.setTile(x, y, 'DEEP_WATER');
-	                } else if(finalHeight < beachThreshold) {
-	                    this.map.setTile(x, y, 'SHALLOW_WATER');
-	                } else if(finalHeight < beachThreshold + 0.05) {
-	                    this.map.setTile(x, y, 'BEACH');
-	                } else if(finalHeight > 0.8) {
-	                    this.map.setTile(x, y, 'MOUNTAIN');
-	                } else if(finalHeight > 0.6) {
-	                    this.map.setTile(x, y, 'HILL');
-	                } else {
-	                    this.map.setTile(x, y, 'GRASS');
-	                }
-	            }
-	        }
-	    }
+					const distanceToEdge = Math.min(
+						x, y, this.width - x - 1, this.height - y - 1
+					) / Math.min(this.width, this.height);
 
-	    ensureMinimumLandWidth(heightMap, waterThreshold, minWidth) {
-	        const result = heightMap.map(row => [...row]);
-	        
-	        // Horizontale Prüfung und Korrektur
-	        for(let y = 0; y < this.height; y++) {
-	            for(let x = 0; x < this.width - minWidth; x++) {
-	                if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'horizontal')) {
-	                    this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'horizontal');
-	                }
-	            }
-	        }
-	        
-	        // Vertikale Prüfung und Korrektur
-	        for(let x = 0; x < this.width; x++) {
-	            for(let y = 0; y < this.height - minWidth; y++) {
-	                if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'vertical')) {
-	                    this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'vertical');
-	                }
-	            }
-	        }
-	        
-	        return result;
-	    }
+					heightMap[y][x] = normalizedHeight * (0.5 + 0.5 * distanceToEdge);
+				}
+			}
 
-	    isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
-	        let landCount = 0;
-	        
-	        if (direction === 'horizontal') {
-	            for(let i = 0; i < minWidth; i++) {
-	                if (heightMap[y][x + i] >= waterThreshold) landCount++;
-	            }
-	        } else {
-	            for(let i = 0; i < minWidth; i++) {
-	                if (heightMap[y + i][x] >= waterThreshold) landCount++;
-	            }
-	        }
-	        
-	        return landCount > 0 && landCount < minWidth;
-	    }
+			// Zweite Phase: Ensure minimum land width
+			heightMap = this.ensureMinimumLandWidth(heightMap, waterThreshold, 3);
 
-	    fixNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
-	        // Entscheide ob zu Land oder Wasser konvertiert wird
-	        let convertToLand = false;
-	        let surroundingLand = 0;
-	        
-	        // Prüfe Umgebung
-	        for(let dy = -1; dy <= 1; dy++) {
-	            for(let dx = -1; dx <= 1; dx++) {
-	                const checkY = y + dy;
-	                const checkX = x + dx;
-	                if (checkY >= 0 && checkY < this.height && 
-	                    checkX >= 0 && checkX < this.width) {
-	                    if (heightMap[checkY][checkX] >= waterThreshold) {
-	                        surroundingLand++;
-	                    }
-	                }
-	            }
-	        }
-	        
-	        convertToLand = surroundingLand >= 4; // Mehr Land als Wasser in der Umgebung
-	        
-	        // Konvertiere den schmalen Streifen
-	        const newHeight = convertToLand ? waterThreshold + 0.1 : waterThreshold - 0.1;
-	        
-	        if (direction === 'horizontal') {
-	            for(let i = 0; i < minWidth; i++) {
-	                heightMap[y][x + i] = newHeight;
-	            }
-	        } else {
-	            for(let i = 0; i < minWidth; i++) {
-	                heightMap[y + i][x] = newHeight;
-	            }
-	        }
-	    }
+			// Dritte Phase: Terrain setzen
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const finalHeight = heightMap[y][x];
 
-	    placeBiomes() {
-	        const scale = this.biomeScale;
+					if (finalHeight < waterThreshold) {
+						this.map.setTile(x, y, 'DEEP_WATER');
+					} else if (finalHeight < beachThreshold) {
+						this.map.setTile(x, y, 'SHALLOW_WATER');
+					} else if (finalHeight < beachThreshold + 0.05) {
+						this.map.setTile(x, y, 'BEACH');
+					} else if (finalHeight > 0.8) {
+						this.map.setTile(x, y, 'MOUNTAIN');
+					} else if (finalHeight > 0.6) {
+						this.map.setTile(x, y, 'HILL');
+					} else {
+						this.map.setTile(x, y, 'GRASS');
+					}
+				}
+			}
+		}
 
-	        for(let y = 0; y < this.height; y++) {
-	            for(let x = 0; x < this.width; x++) {
-	                const tile = this.map.getTile(x, y);
-	                if(!tile || tile.type === 'DEEP_WATER' || tile.type === 'MOUNTAIN') continue;
+		ensureMinimumLandWidth(heightMap, waterThreshold, minWidth) {
+			const result = heightMap.map(row => [...row]);
 
-	                const biomeNoise = noise.simplex2(x * scale + 1000, y * scale + 1000); // Nutzung der simplex2 Methode
+			// Horizontale Prüfung und Korrektur
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width - minWidth; x++) {
+					if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'horizontal')) {
+						this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'horizontal');
+					}
+				}
+			}
 
-	                if(tile.type === 'GRASS') {
-	                    if(biomeNoise > 0.3) {
-	                        this.map.setTile(x, y, 'FOREST_LIGHT');
-	                    } else if(biomeNoise > 0.1) {
-	                        this.map.setTile(x, y, 'HIGH_GRASS');
-	                    }
+			// Vertikale Prüfung und Korrektur
+			for (let x = 0; x < this.width; x++) {
+				for (let y = 0; y < this.height - minWidth; y++) {
+					if (this.isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, 'vertical')) {
+						this.fixNarrowLandBridge(result, x, y, minWidth, waterThreshold, 'vertical');
+					}
+				}
+			}
 
-	                    // Zufällig Büsche platzieren
-	                    if(Math.random() < 0.05) {
-	                        this.map.setTile(x, y, 'BUSH');
-	                    }
-	                }
+			return result;
+		}
 
-	                if(tile.type === 'HILL') {
-	                    if(biomeNoise > 0.5) {
-	                        this.map.setTile(x, y, 'FOREST_DENSE');
-	                    }
-	                }
-	            }
-	        }
-	    }
+		isNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
+			let landCount = 0;
 
-	    generateRoads() {
-	        // Hauptstraße durch die Karte
-	        const mainRoadY = Math.floor(this.height * 0.4);
+			if (direction === 'horizontal') {
+				for (let i = 0; i < minWidth; i++) {
+					if (heightMap[y][x + i] >= waterThreshold) landCount++;
+				}
+			} else {
+				for (let i = 0; i < minWidth; i++) {
+					if (heightMap[y + i][x] >= waterThreshold) landCount++;
+				}
+			}
 
-	        for(let x = 0; x < this.width; x++) {
-	            const offset = Math.floor(noise.perlin2(x * 0.05, mainRoadY * 0.05) * 3); // Leichte Kurven mit perlin2
-	            let y = mainRoadY + offset;
+			return landCount > 0 && landCount < minWidth;
+		}
 
-	            if(y >= 0 && y < this.height) {
-	                this.map.setTile(x, y, 'ROAD');
+		fixNarrowLandBridge(heightMap, x, y, minWidth, waterThreshold, direction) {
+			// Entscheide ob zu Land oder Wasser konvertiert wird
+			let convertToLand = false;
+			let surroundingLand = 0;
 
-	                // Straßenränder
-	                if(y - 1 >= 0) this.ensureWalkableTile(x, y - 1);
-	                if(y + 1 < this.height) this.ensureWalkableTile(x, y + 1);
-	            }
-	        }
+			// Prüfe Umgebung
+			for (let dy = -1; dy <= 1; dy++) {
+				for (let dx = -1; dx <= 1; dx++) {
+					const checkY = y + dy;
+					const checkX = x + dx;
+					if (checkY >= 0 && checkY < this.height &&
+						checkX >= 0 && checkX < this.width) {
+						if (heightMap[checkY][checkX] >= waterThreshold) {
+							surroundingLand++;
+						}
+					}
+				}
+			}
 
-	        // Nebenwege
-	        this.generatePaths();
-	    }
+			convertToLand = surroundingLand >= 4; // Mehr Land als Wasser in der Umgebung
 
-	    generatePaths() {
-	        const pathCount = Math.floor(Math.min(this.width, this.height) * 0.1);
+			// Konvertiere den schmalen Streifen
+			const newHeight = convertToLand ? waterThreshold + 0.1 : waterThreshold - 0.1;
 
-	        for(let i = 0; i < pathCount; i++) {
-	            const startX = Math.floor(Math.random() * this.width);
-	            const startY = Math.floor(Math.random() * this.height);
+			if (direction === 'horizontal') {
+				for (let i = 0; i < minWidth; i++) {
+					heightMap[y][x + i] = newHeight;
+				}
+			} else {
+				for (let i = 0; i < minWidth; i++) {
+					heightMap[y + i][x] = newHeight;
+				}
+			}
+		}
 
-	            const startTile = this.map.getTile(startX, startY);
-	            if(!startTile || !startTile.isWalkable()) continue;
+		placeBiomes() {
+			const scale = this.biomeScale;
 
-	            let x = startX;
-	            let y = startY;
-	            const pathLength = 20 + Math.floor(Math.random() * 30);
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const tile = this.map.getTile(x, y);
+					if (!tile || tile.type === 'DEEP_WATER' || tile.type === 'MOUNTAIN') continue;
 
-	            for(let j = 0; j < pathLength; j++) {
-	                if(x >= 0 && x < this.width && y >= 0 && y < this.height) {
-	                    const currentTile = this.map.getTile(x, y);
-	                    if(currentTile.type !== 'DEEP_WATER' &&
-	                       currentTile.type !== 'MOUNTAIN' &&
-	                       currentTile.type !== 'ROAD') {
-	                        this.map.setTile(x, y, 'PATH');
-	                    }
-	                }
+					const biomeNoise = noise.simplex2(x * scale + 1000, y * scale + 1000); // Nutzung der simplex2 Methode
 
-	                // Zufällige Richtungsänderung mit Perlin-Rauschen für geschmeidigere Wege
-	                const angle = noise.perlin2(x * 0.1, y * 0.1) * Math.PI * 2;
-	                x += Math.round(Math.cos(angle));
-	                y += Math.round(Math.sin(angle));
-	            }
-	        }
-	    }
+					if (tile.type === 'GRASS') {
+						if (biomeNoise > 0.3) {
+							this.map.setTile(x, y, 'FOREST_LIGHT');
+						} else if (biomeNoise > 0.1) {
+							this.map.setTile(x, y, 'HIGH_GRASS');
+						}
 
-	    placeStructures() {
-	        // Häuser entlang der Hauptstraße
-	        for(let x = 0; x < this.width; x += 12) { // Erhöhte Abstände für bessere Platzierung
-	            for(let y = 0; y < this.height; y++) {
-	                const tile = this.map.getTile(x, y);
-	                if(tile && tile.type === 'ROAD' && Math.random() < 0.3) {
-	                    // Haus neben der Straße platzieren
-	                    const side = Math.random() < 0.5 ? -2 : 2;
-	                    const houseY = y + side;
+						// Zufällig Büsche platzieren
+						if (Math.random() < 0.05) {
+							this.map.setTile(x, y, 'BUSH');
+						}
+					}
 
-	                    this.placeHouse(x, houseY);
-	                }
-	            }
-	        }
-	    }
+					if (tile.type === 'HILL') {
+						if (biomeNoise > 0.5) {
+							this.map.setTile(x, y, 'FOREST_DENSE');
+						}
+					}
+				}
+			}
+		}
 
-	    placeHouse(x, y) {
-	        if(x < 0 || x >= this.width - 2 || y < 0 || y >= this.height - 2) return;
+		generateRoads() {
+			// Hauptstraße durch die Karte
+			const mainRoadY = Math.floor(this.height * 0.4);
 
-	        // Prüfe ob Platz für Haus
-	        for(let dx = 0; dx < 2; dx++) {
-	            for(let dy = 0; dy < 2; dy++) {
-	                const tile = this.map.getTile(x + dx, y + dy);
-	                if(!tile || !tile.isWalkable()) return;
-	            }
-	        }
+			for (let x = 0; x < this.width; x++) {
+				const offset = Math.floor(noise.perlin2(x * 0.05, mainRoadY * 0.05) * 3); // Leichte Kurven mit perlin2
+				let y = mainRoadY + offset;
 
-	        // Haus platzieren
-	        this.map.setTile(x, y, 'HOUSE');
-	        this.map.setTile(x + 1, y, 'HOUSE');
-	        this.map.setTile(x, y + 1, 'HOUSE');
-	        this.map.setTile(x + 1, y + 1, 'HOUSE');
+				if (y >= 0 && y < this.height) {
+					this.map.setTile(x, y, 'ROAD');
 
-	        // Optional: Wand um das Haus herum platzieren
-	        this.map.setTile(x -1, y, 'WALL');
-	        this.map.setTile(x + 2, y, 'WALL');
-	        this.map.setTile(x -1, y +1, 'WALL');
-	        this.map.setTile(x + 2, y +1, 'WALL');
-	        this.map.setTile(x -1, y +2, 'WALL');
-	        this.map.setTile(x, y +2, 'WALL');
-	        this.map.setTile(x +1, y +2, 'WALL');
-	        this.map.setTile(x +2, y +2, 'WALL');
-	    }
+					// Straßenränder
+					if (y - 1 >= 0) this.ensureWalkableTile(x, y - 1);
+					if (y + 1 < this.height) this.ensureWalkableTile(x, y + 1);
+				}
+			}
 
-	    addDetails() {
-	        for(let y = 0; y < this.height; y++) {
-	            for(let x = 0; x < this.width; x++) {
-	                const tile = this.map.getTile(x, y);
-	                if(!tile) continue;
+			// Nebenwege
+			this.generatePaths();
+		}
 
-	                // Einzelne Bäume im Grasland
-	                if(tile.type === 'GRASS' && Math.random() < 0.02) {
-	                    this.map.setTile(x, y, 'FOREST_LIGHT');
-	                }
+		generatePaths() {
+			const pathCount = Math.floor(Math.min(this.width, this.height) * 0.1);
 
-	                // Dichte Wälder neben bestehenden Wäldern
-	                if(tile.type === 'FOREST_LIGHT' && this.countNeighborsOfType(x, y, 'FOREST_LIGHT') > 3) {
-	                    this.map.setTile(x, y, 'FOREST_DENSE');
-	                }
+			for (let i = 0; i < pathCount; i++) {
+				const startX = Math.floor(Math.random() * this.width);
+				const startY = Math.floor(Math.random() * this.height);
 
-	                // Schnee auf Bergen
-	                if(tile.type === 'MOUNTAIN' && Math.random() < 0.3) {
-	                    this.map.setTile(x, y, 'SNOW');
-	                }
-	            }
-	        }
+				const startTile = this.map.getTile(startX, startY);
+				if (!startTile || !startTile.isWalkable()) continue;
 
-	        // Optional: Weitere Details wie Flüsse, Seen etc. hinzufügen
-	    }
+				let x = startX;
+				let y = startY;
+				const pathLength = 20 + Math.floor(Math.random() * 30);
 
-	    ensureWalkableTile(x, y) {
-	        const tile = this.map.getTile(x, y);
-	        if(tile && !tile.isWalkable()) {
-	            this.map.setTile(x, y, 'GRASS');
-	        }
-	    }
+				for (let j = 0; j < pathLength; j++) {
+					if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+						const currentTile = this.map.getTile(x, y);
+						if (currentTile.type !== 'DEEP_WATER' &&
+							currentTile.type !== 'MOUNTAIN' &&
+							currentTile.type !== 'ROAD') {
+							this.map.setTile(x, y, 'PATH');
+						}
+					}
 
-	    countNeighborsOfType(x, y, type) {
-	        let count = 0;
-	        for(let dx = -1; dx <= 1; dx++) {
-	            for(let dy = -1; dy <= 1; dy++) {
-	                if(dx === 0 && dy === 0) continue;
+					// Zufällige Richtungsänderung mit Perlin-Rauschen für geschmeidigere Wege
+					const angle = noise.perlin2(x * 0.1, y * 0.1) * Math.PI * 2;
+					x += Math.round(Math.cos(angle));
+					y += Math.round(Math.sin(angle));
+				}
+			}
+		}
 
-	                const neighbor = this.map.getTile(x + dx, y + dy);
-	                if(neighbor && neighbor.type === type) count++;
-	            }
-	        }
-	        return count;
-	    }
+		placeStructures() {
+			// Häuser entlang der Hauptstraße
+			for (let x = 0; x < this.width; x += 12) { // Erhöhte Abstände für bessere Platzierung
+				for (let y = 0; y < this.height; y++) {
+					const tile = this.map.getTile(x, y);
+					if (tile && tile.type === 'ROAD' && Math.random() < 0.3) {
+						// Haus neben der Straße platzieren
+						const side = Math.random() < 0.5 ? -2 : 2;
+						const houseY = y + side;
+
+						this.placeHouse(x, houseY);
+					}
+				}
+			}
+		}
+
+		placeHouse(x, y) {
+			if (x < 0 || x >= this.width - 2 || y < 0 || y >= this.height - 2) return;
+
+			// Prüfe ob Platz für Haus
+			for (let dx = 0; dx < 2; dx++) {
+				for (let dy = 0; dy < 2; dy++) {
+					const tile = this.map.getTile(x + dx, y + dy);
+					if (!tile || !tile.isWalkable()) return;
+				}
+			}
+
+			// Haus platzieren
+			this.map.setTile(x, y, 'HOUSE');
+			this.map.setTile(x + 1, y, 'HOUSE');
+			this.map.setTile(x, y + 1, 'HOUSE');
+			this.map.setTile(x + 1, y + 1, 'HOUSE');
+
+			// Optional: Wand um das Haus herum platzieren
+			this.map.setTile(x - 1, y, 'WALL');
+			this.map.setTile(x + 2, y, 'WALL');
+			this.map.setTile(x - 1, y + 1, 'WALL');
+			this.map.setTile(x + 2, y + 1, 'WALL');
+			this.map.setTile(x - 1, y + 2, 'WALL');
+			this.map.setTile(x, y + 2, 'WALL');
+			this.map.setTile(x + 1, y + 2, 'WALL');
+			this.map.setTile(x + 2, y + 2, 'WALL');
+		}
+
+		addDetails() {
+			for (let y = 0; y < this.height; y++) {
+				for (let x = 0; x < this.width; x++) {
+					const tile = this.map.getTile(x, y);
+					if (!tile) continue;
+
+					// Einzelne Bäume im Grasland
+					if (tile.type === 'GRASS' && Math.random() < 0.02) {
+						this.map.setTile(x, y, 'FOREST_LIGHT');
+					}
+
+					// Dichte Wälder neben bestehenden Wäldern
+					if (tile.type === 'FOREST_LIGHT' && this.countNeighborsOfType(x, y, 'FOREST_LIGHT') > 3) {
+						this.map.setTile(x, y, 'FOREST_DENSE');
+					}
+
+					// Schnee auf Bergen
+					if (tile.type === 'MOUNTAIN' && Math.random() < 0.3) {
+						this.map.setTile(x, y, 'SNOW');
+					}
+				}
+			}
+
+			// Optional: Weitere Details wie Flüsse, Seen etc. hinzufügen
+		}
+
+		ensureWalkableTile(x, y) {
+			const tile = this.map.getTile(x, y);
+			if (tile && !tile.isWalkable()) {
+				this.map.setTile(x, y, 'GRASS');
+			}
+		}
+
+		countNeighborsOfType(x, y, type) {
+			let count = 0;
+			for (let dx = -1; dx <= 1; dx++) {
+				for (let dy = -1; dy <= 1; dy++) {
+					if (dx === 0 && dy === 0) continue;
+
+					const neighbor = this.map.getTile(x + dx, y + dy);
+					if (neighbor && neighbor.type === type) count++;
+				}
+			}
+			return count;
+		}
 	}
-	
+
 	class EnemySpawner {
 		constructor() {
 			this.lastSpawnTime = Date.now();
@@ -1408,42 +2830,42 @@
 		}
 
 		findValidSpawnPosition(player) {
-	        let attempts = 0;
-	        const maxAttempts = 50;
-	        
-	        while (attempts < maxAttempts) {
-	            const angle = Math.random() * Math.PI * 2;
-	            const distance = this.spawnRadius.min +
-	                Math.random() * (this.spawnRadius.max - this.spawnRadius.min);
-	            
-	            const x = player.x + Math.cos(angle) * distance;
-	            const y = player.y + Math.sin(angle) * distance;
-	            
-	            const tileX = Math.floor(x / TILE_SIZE);
-	            const tileY = Math.floor(y / TILE_SIZE);
-	            const tile = map.getTile(tileX, tileY);
-	            
-	            if (tile && 
-	                this.validSpawnTileTypes.includes(tile.type) &&
-	                !isColliding(x, y) && 
-	                !isInPlayerSight(x, y)) {
-	                return {x, y};
-	            }
-	            attempts++;
-	        }
-	        return null;
-	    }
-    
-	    spawnEnemyNearPlayer(player) {
-	        const position = this.findValidSpawnPosition(player);
-	        if (position) {
-	            const isCommander = Math.random() < this.commanderChance;
-	            const enemy = new Enemy(position.x, position.y, isCommander);
-	            enemies.push(enemy);
-	            return true;
-	        }
-	        return false;
-	    }
+			let attempts = 0;
+			const maxAttempts = 50;
+
+			while (attempts < maxAttempts) {
+				const angle = Math.random() * Math.PI * 2;
+				const distance = this.spawnRadius.min +
+					Math.random() * (this.spawnRadius.max - this.spawnRadius.min);
+
+				const x = player.x + Math.cos(angle) * distance;
+				const y = player.y + Math.sin(angle) * distance;
+
+				const tileX = Math.floor(x / TILE_SIZE);
+				const tileY = Math.floor(y / TILE_SIZE);
+				const tile = map.getTile(tileX, tileY);
+
+				if (tile &&
+					this.validSpawnTileTypes.includes(tile.type) &&
+					!isColliding(x, y) &&
+					!isInPlayerSight(x, y)) {
+					return {x, y};
+				}
+				attempts++;
+			}
+			return null;
+		}
+
+		spawnEnemyNearPlayer(player) {
+			const position = this.findValidSpawnPosition(player);
+			if (position) {
+				const isCommander = Math.random() < this.commanderChance;
+				const enemy = new Enemy(position.x, position.y, isCommander);
+				enemies.push(enemy);
+				return true;
+			}
+			return false;
+		}
 
 		cleanupDistantEnemies() {
 			// Entferne nur lebende Gegner die zu weit weg sind
@@ -1818,7 +3240,7 @@
 			let x, y, type;
 
 			// Position finden
-            let tile;
+			let tile;
 			do {
 				x = Math.floor(Math.random() * (MAP_WIDTH - 4)) + 2;
 				y = Math.floor(Math.random() * (MAP_HEIGHT - 4)) + 2;
@@ -1885,13 +3307,13 @@
 	}
 
 	const WATER_MECHANICS = {
-	    SWIM_SPEED: 1.2,           // Schwimmgeschwindigkeit (multiplier)
-	    MAX_SWIM_TIME: 60000,      // 1 Minute maximale Schwimmzeit
-	    VEHICLE_SINK_TIME: 15000,  // 15 Sekunden bis Fahrzeug versinkt
-	    VEHICLE_SINK_DAMAGE: 1,    // Schaden pro Frame im tiefen Wasser
-	    STAMINA_DRAIN: 0.5,        // Ausdauerverlust pro Frame beim Schwimmen
-	    STAMINA_REGEN: 0.2,        // Ausdauer-Regeneration pro Frame an Land
-	    DROWNING_DAMAGE: 1         // Schaden pro Frame wenn Ausdauer leer
+		SWIM_SPEED: 1.2,           // Schwimmgeschwindigkeit (multiplier)
+		MAX_SWIM_TIME: 60000,      // 1 Minute maximale Schwimmzeit
+		VEHICLE_SINK_TIME: 15000,  // 15 Sekunden bis Fahrzeug versinkt
+		VEHICLE_SINK_DAMAGE: 1,    // Schaden pro Frame im tiefen Wasser
+		STAMINA_DRAIN: 0.5,        // Ausdauerverlust pro Frame beim Schwimmen
+		STAMINA_REGEN: 0.2,        // Ausdauer-Regeneration pro Frame an Land
+		DROWNING_DAMAGE: 1         // Schaden pro Frame wenn Ausdauer leer
 	};
 
 	// Klassen
@@ -1908,26 +3330,26 @@
 			this.mass = size * size * 0.1; // Basis-Masse basierend auf Größe
 			this.momentum = {x: 0, y: 0};
 			this.elasticity = 0.3; // Wie elastisch Kollisionen sind
-			
-	        this.swimming = false;
-	        this.stamina = 100;
-	        this.swimStartTime = 0;
+
+			this.swimming = false;
+			this.stamina = 100;
+			this.swimStartTime = 0;
 		}
 
 		updateWaterPhysics() {
 			const currentTile = map.getTile(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE));
 			const wasSwimming = this.swimming;
-			
+
 			if (currentTile) {
 				this.swimming = currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER';
-				
+
 				if (this.swimming && !wasSwimming) {
 					this.swimStartTime = Date.now();
 					this.onEnterWater();
 				} else if (!this.swimming && wasSwimming) {
 					this.onExitWater();
 				}
-				
+
 				if (this.swimming) {
 					this.handleSwimming(currentTile.type);
 				} else {
@@ -1939,7 +3361,7 @@
 		handleSwimming(waterType) {
 			// Ausdauer verringern
 			this.stamina = Math.max(0, this.stamina - WATER_MECHANICS.STAMINA_DRAIN);
-			
+
 			// Wenn Ausdauer leer, Schaden nehmen
 			if (this.stamina <= 0) {
 				this.health -= WATER_MECHANICS.DROWNING_DAMAGE;
@@ -1947,7 +3369,7 @@
 					this.isAlive = false;
 				}
 			}
-			
+
 			// Geschwindigkeit im Wasser anpassen
 			if (waterType === 'DEEP_WATER') {
 				this.speed = this.baseSpeed * WATER_MECHANICS.SWIM_SPEED * 0.7;
@@ -1973,21 +3395,21 @@
 				this.size
 			);
 
-	        if (this.swimming) {
-	            this.drawSwimmingEffect();
-	        }
+			if (this.swimming) {
+				this.drawSwimmingEffect();
+			}
 		}
 
-	    drawSwimmingEffect() {
-	        ctx.save();
-	        // Welleneffekt um die Einheit
-	        ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
-	        ctx.beginPath();
-	        const waveOffset = Math.sin(Date.now() * 0.005) * 3;
-	        ctx.arc(this.x, this.y + waveOffset, this.size * 0.6, 0, Math.PI * 2);
-	        ctx.stroke();
-	        ctx.restore();
-	    }
+		drawSwimmingEffect() {
+			ctx.save();
+			// Welleneffekt um die Einheit
+			ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
+			ctx.beginPath();
+			const waveOffset = Math.sin(Date.now() * 0.005) * 3;
+			ctx.arc(this.x, this.y + waveOffset, this.size * 0.6, 0, Math.PI * 2);
+			ctx.stroke();
+			ctx.restore();
+		}
 	}
 
 	class Inventory {
@@ -2206,23 +3628,23 @@
 			if (keys[this.controls.down]) dy += 1;
 			if (keys[this.controls.left]) dx -= 1;
 			if (keys[this.controls.right]) dx += 1;
-			
+
 			if (dx !== 0 || dy !== 0) {
-		        const length = Math.hypot(dx, dy);
-		        dx /= length;
-		        dy /= length;
+				const length = Math.hypot(dx, dy);
+				dx /= length;
+				dy /= length;
 
-		        const adjustedSpeed = this.speed * speedMultiplier;
-		        const newX = this.x + dx * adjustedSpeed;
-		        const newY = this.y + dy * adjustedSpeed;
+				const adjustedSpeed = this.speed * speedMultiplier;
+				const newX = this.x + dx * adjustedSpeed;
+				const newY = this.y + dy * adjustedSpeed;
 
-		        if (!isColliding(newX, newY, this)) {
-		            this.x = newX;
-		            this.y = newY;
-		        }
+				if (!isColliding(newX, newY, this)) {
+					this.x = newX;
+					this.y = newY;
+				}
 
-		        this.angle = Math.atan2(dy, dx);
-		    }
+				this.angle = Math.atan2(dy, dx);
+			}
 
 			// Auto-Aim Targets innerhalb der Waffenreichweite und Sichtbarkeit
 			const weaponRange = currentWeapon ? currentWeapon.range : 100;
@@ -2249,7 +3671,7 @@
 			// Prüfen ob der Spieler sich auf Gras befindet
 			const isMoving = dx != 0 || dy != 0;
 
-            // Tarneffekt nur auf Gras und mit Tarnanzug
+			// Tarneffekt nur auf Gras und mit Tarnanzug
 			if (this.equipment.has('tarnanzug')) {
 				if (currentTile && (currentTile.type === 'GRASS' || currentTile.type === 'HIGH_GRASS')) {
 					this.stealthStatus.isCamouflaged = true;
@@ -2521,20 +3943,20 @@
 		draw() {
 			if (this.vehicle) return; // Spieler nicht rendern, wenn in Fahrzeug
 
-		    const tileX = Math.floor(this.x / TILE_SIZE);
-		    const tileY = Math.floor(this.y / TILE_SIZE);
-		    const currentTile = map.getTile(tileX, tileY);
-		    const isInWater = currentTile && 
-		        (currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER');
+			const tileX = Math.floor(this.x / TILE_SIZE);
+			const tileY = Math.floor(this.y / TILE_SIZE);
+			const currentTile = map.getTile(tileX, tileY);
+			const isInWater = currentTile &&
+				(currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER');
 
 			if (isInWater) {
 				// Wasser-Effekt
 				ctx.save();
-				
+
 				// Welleneffekt
 				const waveHeight = Math.sin(Date.now() * 0.005) * 3;
 				const waterLine = this.y + waveHeight;
-				
+
 				// Wasserlinien
 				ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
 				ctx.lineWidth = 2;
@@ -2745,9 +4167,9 @@
 
 			// Waffe
 			this.weapon = this.getRandomWeapon();
-        
-	        // Erweitere pathfinding um Wassermeidung
-	        this.waterAvoidance = 0.8; // 80% Chance Wasser zu meiden
+
+			// Erweitere pathfinding um Wassermeidung
+			this.waterAvoidance = 0.8; // 80% Chance Wasser zu meiden
 		}
 
 		getRandomWeapon() {
@@ -2812,7 +4234,7 @@
 
 			// Fahrzeug-Management
 			this.updateVehicleBehavior();
-			
+
 			this.speed = originalSpeed;
 		}
 
@@ -3934,17 +5356,17 @@
 			const tileX = Math.floor(this.x / TILE_SIZE);
 			const tileY = Math.floor(this.y / TILE_SIZE);
 			const currentTile = map.getTile(tileX, tileY);
-			const isInWater = currentTile && 
+			const isInWater = currentTile &&
 				(currentTile.type === 'DEEP_WATER' || currentTile.type === 'SHALLOW_WATER');
 
 			if (isInWater) {
 				// Wasser-Effekt
 				ctx.save();
-				
+
 				// Welleneffekt
 				const waveHeight = Math.sin(Date.now() * 0.005) * 3;
 				const waterLine = this.y + waveHeight;
-				
+
 				// Wasserlinien
 				ctx.strokeStyle = 'rgba(135, 206, 235, 0.5)';
 				ctx.lineWidth = 2;
@@ -4781,37 +6203,37 @@
 			this.wreckHeight = 0; // Für Rendering-Ordnung
 			this.lastCollisionTime = 0;
 			this.collisionCooldown = 100; // ms zwischen Kollisionsschäden
-	        this.baseSpeed = this.maxSpeed; // Ursprüngliche Geschwindigkeit speichern
-	        this.sinkProgress = 0;
-	        this.waterDamage = 0;
-	        this.distanceToShore = 0;
+			this.baseSpeed = this.maxSpeed; // Ursprüngliche Geschwindigkeit speichern
+			this.sinkProgress = 0;
+			this.waterDamage = 0;
+			this.distanceToShore = 0;
 		}
 
 		updateWaterPhysics() {
 			super.updateWaterPhysics();
-			
+
 			if (this.swimming) {
 				const tile = map.getTile(Math.floor(this.x / TILE_SIZE), Math.floor(this.y / TILE_SIZE));
-				
+
 				if (tile.type === 'DEEP_WATER') {
 					// Berechne Abstand zum nächsten Ufer
 					this.distanceToShore = this.calculateDistanceToShore();
-					
+
 					// Schnelleres Sinken je weiter vom Ufer entfernt
 					const sinkMultiplier = Math.min(2, 1 + (this.distanceToShore / 500));
 					this.sinkProgress += (1000 / 60) * sinkMultiplier; // Fortschritt pro Frame
-					
+
 					// Erhöhter Schaden weiter vom Ufer entfernt
 					this.waterDamage = WATER_MECHANICS.VEHICLE_SINK_DAMAGE * sinkMultiplier;
-					
+
 					if (this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
 						this.destroy();
 						return;
 					}
-					
+
 					// Geschwindigkeit basierend auf Sink-Fortschritt reduzieren
 					this.maxSpeed = this.baseSpeed * (1 - this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME);
-					
+
 					// Warnung für Passagiere
 					if (this.sinkProgress > WATER_MECHANICS.VEHICLE_SINK_TIME * 0.7) {
 						this.warnPassengers();
@@ -4820,7 +6242,7 @@
 					// Reduzierte Geschwindigkeit in flachem Wasser
 					this.maxSpeed = this.baseSpeed * 0.5;
 				}
-				
+
 				// Kontinuierlicher Schaden im Wasser
 				this.health -= this.waterDamage;
 				if (this.health <= 0) {
@@ -4838,13 +6260,13 @@
 			const maxSearchRadius = 20; // Maximaler Suchradius in Tiles
 			const currentTileX = Math.floor(this.x / TILE_SIZE);
 			const currentTileY = Math.floor(this.y / TILE_SIZE);
-			
+
 			for (let radius = 1; radius <= maxSearchRadius; radius++) {
 				// Suche in einem Kreis
 				for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
 					const checkX = currentTileX + Math.round(Math.cos(angle) * radius);
 					const checkY = currentTileY + Math.round(Math.sin(angle) * radius);
-					
+
 					const tile = map.getTile(checkX, checkY);
 					if (tile && (tile.type === 'BEACH' || tile.type === 'GRASS' || tile.type === 'DIRT')) {
 						return radius * TILE_SIZE;
@@ -4858,7 +6280,7 @@
 			this.passengers.forEach(passenger => {
 				const warningInterval = 2000; // 2 Sekunden zwischen Warnungen
 				const currentTime = Date.now();
-				
+
 				if (!this.lastWarningTime || currentTime - this.lastWarningTime > warningInterval) {
 					showMessage("WARNUNG: Fahrzeug sinkt! Sofort verlassen!", 1000);
 					this.lastWarningTime = currentTime;
@@ -4954,31 +6376,31 @@
 
 				this.removePassenger(passenger);
 			});
-        
-	        // Spezielle Effekte beim Versinken
-	        if (this.swimming && this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
-	            // Große Luftblasen beim endgültigen Versinken
-	            for (let i = 0; i < 10; i++) {
-	                setTimeout(() => {
-	                    const bubble = {
-	                        x: this.x + (Math.random() - 0.5) * this.size,
-	                        y: this.y,
-	                        size: 5 + Math.random() * 10,
-	                        speed: 1 + Math.random() * 2
-	                    };
-	                    
-	                    // Animiere die Luftblasen
-	                    const bubbleInterval = setInterval(() => {
-	                        bubble.y -= bubble.speed;
-	                        bubble.size *= 0.95;
-	                        
-	                        if (bubble.size < 1) {
-	                            clearInterval(bubbleInterval);
-	                        }
-	                    }, 50);
-	                }, i * 200);
-	            }
-	        }
+
+			// Spezielle Effekte beim Versinken
+			if (this.swimming && this.sinkProgress >= WATER_MECHANICS.VEHICLE_SINK_TIME) {
+				// Große Luftblasen beim endgültigen Versinken
+				for (let i = 0; i < 10; i++) {
+					setTimeout(() => {
+						const bubble = {
+							x: this.x + (Math.random() - 0.5) * this.size,
+							y: this.y,
+							size: 5 + Math.random() * 10,
+							speed: 1 + Math.random() * 2
+						};
+
+						// Animiere die Luftblasen
+						const bubbleInterval = setInterval(() => {
+							bubble.y -= bubble.speed;
+							bubble.size *= 0.95;
+
+							if (bubble.size < 1) {
+								clearInterval(bubbleInterval);
+							}
+						}, 50);
+					}, i * 200);
+				}
+			}
 		}
 
 		switchRole(player) {
@@ -5053,7 +6475,7 @@
 
 			// Bewegung
 			if (Math.abs(this.speed) > 0.1) {
-		        const adjustedSpeed = this.speed * speedMultiplier;
+				const adjustedSpeed = this.speed * speedMultiplier;
 				const newX = this.x + Math.cos(this.angle) * adjustedSpeed;
 				const newY = this.y + Math.sin(this.angle) * adjustedSpeed;
 
@@ -5306,9 +6728,9 @@
 		}
 
 		draw() {
-	        if (this.swimming) {
-	            this.drawSinkingEffect();
-	        }
+			if (this.swimming) {
+				this.drawSinkingEffect();
+			}
 
 			if (this.isDestroyed) {
 				this.drawDestroyedVehicle();
@@ -5339,41 +6761,41 @@
 		}
 
 		drawSinkingEffect() {
-	        ctx.save();
-	        // Wasserlinien um das Fahrzeug
-	        const sinkRatio = this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME;
-	        
-	        // Wasserlinien-Effekt
-	        ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
-	        ctx.lineWidth = 2;
-	        ctx.beginPath();
-	        const waterLine = this.y - this.size / 2 + (this.size * sinkRatio);
-	        
-	        // Wellenmuster
-	        for (let i = -this.size/2; i < this.size/2; i += 20) {
-	            const waveOffset = Math.sin(Date.now() * 0.005 + i * 0.1) * 5;
-	            ctx.moveTo(this.x + i, waterLine + waveOffset);
-	            ctx.lineTo(this.x + i + 15, waterLine + waveOffset);
-	        }
-	        ctx.stroke();
-	        
-	        // Luftblasen-Effekt
-	        if (sinkRatio > 0.5) {
-	            const bubbleCount = Math.floor(sinkRatio * 5);
-	            for (let i = 0; i < bubbleCount; i++) {
-	                const bubbleX = this.x + (Math.random() - 0.5) * this.size;
-	                const bubbleY = waterLine - Math.random() * 20;
-	                const bubbleSize = 2 + Math.random() * 3;
-	                
-	                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-	                ctx.beginPath();
-	                ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
-	                ctx.fill();
-	            }
-	        }
-	        
-	        ctx.restore();
-	    }
+			ctx.save();
+			// Wasserlinien um das Fahrzeug
+			const sinkRatio = this.sinkProgress / WATER_MECHANICS.VEHICLE_SINK_TIME;
+
+			// Wasserlinien-Effekt
+			ctx.strokeStyle = 'rgba(0, 0, 255, 0.3)';
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			const waterLine = this.y - this.size / 2 + (this.size * sinkRatio);
+
+			// Wellenmuster
+			for (let i = -this.size / 2; i < this.size / 2; i += 20) {
+				const waveOffset = Math.sin(Date.now() * 0.005 + i * 0.1) * 5;
+				ctx.moveTo(this.x + i, waterLine + waveOffset);
+				ctx.lineTo(this.x + i + 15, waterLine + waveOffset);
+			}
+			ctx.stroke();
+
+			// Luftblasen-Effekt
+			if (sinkRatio > 0.5) {
+				const bubbleCount = Math.floor(sinkRatio * 5);
+				for (let i = 0; i < bubbleCount; i++) {
+					const bubbleX = this.x + (Math.random() - 0.5) * this.size;
+					const bubbleY = waterLine - Math.random() * 20;
+					const bubbleSize = 2 + Math.random() * 3;
+
+					ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+					ctx.beginPath();
+					ctx.arc(bubbleX, bubbleY, bubbleSize, 0, Math.PI * 2);
+					ctx.fill();
+				}
+			}
+
+			ctx.restore();
+		}
 
 		drawVehicleBody() {
 			// Fahrzeugspezifische Details
@@ -5951,35 +7373,35 @@
 		}
 
 		spawnSinglePowerUp(type, mapWidth, mapHeight) {
-	        let attempts = 0;
-	        const maxAttempts = 50;
+			let attempts = 0;
+			const maxAttempts = 50;
 
-	        while (attempts < maxAttempts) {
-	            const x = Math.floor(Math.random() * mapWidth);
-	            const y = Math.floor(Math.random() * mapHeight);
-	            
-	            // Prüfe ob Position valid ist und genug Platz drumherum
-	            if (this.isValidSpawnLocation(x, y)) {
-	                if (type === 'weapon') {
-	                    const rareWeapons = [WEAPONS.ASSAULT_RIFLE, WEAPONS.SHOTGUN, WEAPONS.SILENCED_PISTOL];
-	                    const weapon = rareWeapons[Math.floor(Math.random() * rareWeapons.length)];
-	                    const powerUp = new PowerUp(x, y, type);
-	                    powerUp.weapon = weapon;
-	                    powerUps.push(powerUp);
-	                } else {
-	                    powerUps.push(new PowerUp(x, y, type));
-	                }
-	                return true;
-	            }
-	            attempts++;
-	        }
-	        return false;
-	    }
+			while (attempts < maxAttempts) {
+				const x = Math.floor(Math.random() * mapWidth);
+				const y = Math.floor(Math.random() * mapHeight);
+
+				// Prüfe ob Position valid ist und genug Platz drumherum
+				if (this.isValidSpawnLocation(x, y)) {
+					if (type === 'weapon') {
+						const rareWeapons = [WEAPONS.ASSAULT_RIFLE, WEAPONS.SHOTGUN, WEAPONS.SILENCED_PISTOL];
+						const weapon = rareWeapons[Math.floor(Math.random() * rareWeapons.length)];
+						const powerUp = new PowerUp(x, y, type);
+						powerUp.weapon = weapon;
+						powerUps.push(powerUp);
+					} else {
+						powerUps.push(new PowerUp(x, y, type));
+					}
+					return true;
+				}
+				attempts++;
+			}
+			return false;
+		}
 
 		isValidSpawnLocation(x, y) {
 			const tileX = Math.floor(x / TILE_SIZE);
 			const tileY = Math.floor(y / TILE_SIZE);
-			
+
 			// Prüfe 3x3 Bereich um die Spawn-Position
 			for (let dy = -1; dy <= 1; dy++) {
 				for (let dx = -1; dx <= 1; dx++) {
@@ -6339,35 +7761,37 @@
 
 		// Spawn players at safe positions near each other
 		players = [];
-		
+
 		const initialSpawn = findValidPlayerSpawn();
-	    if (!initialSpawn) {
-	        console.error("Konnte keine valide Spawn-Position finden!");
-	        return;
-	    }
-	    const spawnX = initialSpawn.x;
-	    const spawnY = initialSpawn.y;
+		if (!initialSpawn) {
+			console.error("Konnte keine valide Spawn-Position finden!");
+			return;
+		}
+		const spawnX = initialSpawn.x;
+		const spawnY = initialSpawn.y;
 
-	    players = [];
-	    const spawnDistance = 50;
-	    let playerPositions = [];
+		players = [];
+		const spawnDistance = 50;
+		let playerPositions = [];
 
-	    for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
+		for (let i = 0; i < (singlePlayer ? 1 : 2); i++) {
 			const playerSpawn = isValidPlayerSpawnArea(
-	            Math.floor(spawnX/TILE_SIZE), 
-	            Math.floor(spawnY/TILE_SIZE), 
-	            ['GRASS', 'DIRT', 'ROAD', 'PATH']
-	        ) ? { x: spawnX + (Math.random() - 0.5) * 100, 
-	             y: spawnY + (Math.random() - 0.5) * 100 }
-	          : findValidPlayerSpawn();
+				Math.floor(spawnX / TILE_SIZE),
+				Math.floor(spawnY / TILE_SIZE),
+				['GRASS', 'DIRT', 'ROAD', 'PATH']
+			) ? {
+					x: spawnX + (Math.random() - 0.5) * 100,
+					y: spawnY + (Math.random() - 0.5) * 100
+				}
+				: findValidPlayerSpawn();
 
-	        if (!playerSpawn) {
-	            console.error("Konnte keine valide Spieler-Position finden!");
-	            continue;
-	        }
+			if (!playerSpawn) {
+				console.error("Konnte keine valide Spieler-Position finden!");
+				continue;
+			}
 
-	        const x = playerSpawn.x;
-	        const y = playerSpawn.y;
+			const x = playerSpawn.x;
+			const y = playerSpawn.y;
 
 			// Speichere die Position des aktuellen Spielers
 			playerPositions.push([x, y]);
@@ -6446,108 +7870,108 @@
 	}
 
 	function findValidPlayerSpawn() {
-	    const validTiles = ['GRASS', 'DIRT', 'ROAD', 'PATH'];
-	    
-	    // 1. Erste Phase: Schneller Zufallsversuch
-	    let attempts = 0;
-	    const quickAttempts = 100;
-	    
-	    while (attempts < quickAttempts) {
-	        const x = Math.floor(Math.random() * MAP_WIDTH);
-	        const y = Math.floor(Math.random() * MAP_HEIGHT);
-	        
-	        if (isValidPlayerSpawnArea(x, y, validTiles)) {
-	            return {
-	                x: x * TILE_SIZE + TILE_SIZE / 2,
-	                y: y * TILE_SIZE + TILE_SIZE / 2
-	            };
-	        }
-	        attempts++;
-	    }
-	    
-	    // 2. Phase: Systematische Suche
-	    console.log("Schnelle Suche fehlgeschlagen, starte systematische Suche...");
-	    
-	    // Spiralförmige Suche von der Kartenmitte aus
-	    const centerX = Math.floor(MAP_WIDTH / 2);
-	    const centerY = Math.floor(MAP_HEIGHT / 2);
-	    const spiral = generateSpiralPattern(Math.max(MAP_WIDTH, MAP_HEIGHT));
-	    
-	    for (const [dx, dy] of spiral) {
-	        const x = centerX + dx;
-	        const y = centerY + dy;
-	        
-	        // Prüfe ob Position innerhalb der Karte
-	        if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
-	            if (isValidPlayerSpawnArea(x, y, validTiles)) {
-	                console.log(`Spawn-Position gefunden bei ${x},${y}`);
-	                return {
-	                    x: x * TILE_SIZE + TILE_SIZE / 2,
-	                    y: y * TILE_SIZE + TILE_SIZE / 2
-	                };
-	            }
-	        }
-	    }
-	    
-	    // 3. Phase: Absolute Notlösung - Akzeptiere auch einzelne valide Tiles
-	    console.log("Systematische Suche fehlgeschlagen, suche einzelne valide Tiles...");
-	    
-	    for (let y = 0; y < MAP_HEIGHT; y++) {
-	        for (let x = 0; x < MAP_WIDTH; x++) {
-	            const tile = map.getTile(x, y);
-	            if (tile && validTiles.includes(tile.type)) {
-	                console.log(`Notfall-Spawn-Position gefunden bei ${x},${y}`);
-	                return {
-	                    x: x * TILE_SIZE + TILE_SIZE / 2,
-	                    y: y * TILE_SIZE + TILE_SIZE / 2
-	                };
-	            }
-	        }
-	    }
-	    
-	    // Wenn wirklich gar nichts gefunden wurde
-	    console.error("Keine valide Spawn-Position gefunden!");
-	    return null;
+		const validTiles = ['GRASS', 'DIRT', 'ROAD', 'PATH'];
+
+		// 1. Erste Phase: Schneller Zufallsversuch
+		let attempts = 0;
+		const quickAttempts = 100;
+
+		while (attempts < quickAttempts) {
+			const x = Math.floor(Math.random() * MAP_WIDTH);
+			const y = Math.floor(Math.random() * MAP_HEIGHT);
+
+			if (isValidPlayerSpawnArea(x, y, validTiles)) {
+				return {
+					x: x * TILE_SIZE + TILE_SIZE / 2,
+					y: y * TILE_SIZE + TILE_SIZE / 2
+				};
+			}
+			attempts++;
+		}
+
+		// 2. Phase: Systematische Suche
+		console.log("Schnelle Suche fehlgeschlagen, starte systematische Suche...");
+
+		// Spiralförmige Suche von der Kartenmitte aus
+		const centerX = Math.floor(MAP_WIDTH / 2);
+		const centerY = Math.floor(MAP_HEIGHT / 2);
+		const spiral = generateSpiralPattern(Math.max(MAP_WIDTH, MAP_HEIGHT));
+
+		for (const [dx, dy] of spiral) {
+			const x = centerX + dx;
+			const y = centerY + dy;
+
+			// Prüfe ob Position innerhalb der Karte
+			if (x >= 0 && x < MAP_WIDTH && y >= 0 && y < MAP_HEIGHT) {
+				if (isValidPlayerSpawnArea(x, y, validTiles)) {
+					console.log(`Spawn-Position gefunden bei ${x},${y}`);
+					return {
+						x: x * TILE_SIZE + TILE_SIZE / 2,
+						y: y * TILE_SIZE + TILE_SIZE / 2
+					};
+				}
+			}
+		}
+
+		// 3. Phase: Absolute Notlösung - Akzeptiere auch einzelne valide Tiles
+		console.log("Systematische Suche fehlgeschlagen, suche einzelne valide Tiles...");
+
+		for (let y = 0; y < MAP_HEIGHT; y++) {
+			for (let x = 0; x < MAP_WIDTH; x++) {
+				const tile = map.getTile(x, y);
+				if (tile && validTiles.includes(tile.type)) {
+					console.log(`Notfall-Spawn-Position gefunden bei ${x},${y}`);
+					return {
+						x: x * TILE_SIZE + TILE_SIZE / 2,
+						y: y * TILE_SIZE + TILE_SIZE / 2
+					};
+				}
+			}
+		}
+
+		// Wenn wirklich gar nichts gefunden wurde
+		console.error("Keine valide Spawn-Position gefunden!");
+		return null;
 	}
 
 	// Hilfsfunktion zur Generierung eines Spiralmusters
 	function* generateSpiralPattern(size) {
-	    let x = 0;
-	    let y = 0;
-	    let dx = 0;
-	    let dy = -1;
-	    let maxSteps = size * size;
-	    let steps = 0;
-	    
-	    while (steps < maxSteps) {
-	        if ((-size/2 <= x && x <= size/2) && (-size/2 <= y && y <= size/2)) {
-	            yield [x, y];
-	            steps++;
-	        }
-	        
-	        if (x === y || (x < 0 && x === -y) || (x > 0 && x === 1-y)) {
-	            // Richtungswechsel
-	            [dx, dy] = [-dy, dx];
-	        }
-	        
-	        x += dx;
-	        y += dy;
-	    }
+		let x = 0;
+		let y = 0;
+		let dx = 0;
+		let dy = -1;
+		let maxSteps = size * size;
+		let steps = 0;
+
+		while (steps < maxSteps) {
+			if ((-size / 2 <= x && x <= size / 2) && (-size / 2 <= y && y <= size / 2)) {
+				yield [x, y];
+				steps++;
+			}
+
+			if (x === y || (x < 0 && x === -y) || (x > 0 && x === 1 - y)) {
+				// Richtungswechsel
+				[dx, dy] = [-dy, dx];
+			}
+
+			x += dx;
+			y += dy;
+		}
 	}
 
 	function isValidPlayerSpawnArea(x, y, validTiles) {
-	    // Prüfe 5x5 Bereich für sicheren Spieler-Spawn
-	    for (let dy = -2; dy <= 2; dy++) {
-	        for (let dx = -2; dx <= 2; dx++) {
-	            const tile = map.getTile(x + dx, y + dy);
-	            if (!tile || !validTiles.includes(tile.type)) {
-	                return false;
-	            }
-	        }
-	    }
-	    
-	    // Prüfe ob keine Feinde in der Nähe sind
-	    return !isEnemyNearby(x * TILE_SIZE, y * TILE_SIZE);
+		// Prüfe 5x5 Bereich für sicheren Spieler-Spawn
+		for (let dy = -2; dy <= 2; dy++) {
+			for (let dx = -2; dx <= 2; dx++) {
+				const tile = map.getTile(x + dx, y + dy);
+				if (!tile || !validTiles.includes(tile.type)) {
+					return false;
+				}
+			}
+		}
+
+		// Prüfe ob keine Feinde in der Nähe sind
+		return !isEnemyNearby(x * TILE_SIZE, y * TILE_SIZE);
 	}
 
 	// Funktion, um Feinde in der Nähe zu überprüfen
@@ -6569,125 +7993,125 @@
 
 	// Überarbeitetes Fahrzeug-Spawning
 	function spawnVehicles() {
-	    vehicles = [];
-	    const roadTiles = map.findTilesByType('ROAD');
-	    const validTileTypes = ['GRASS', 'DIRT', 'ROAD', 'PATH'];
-	    
-	    // Fahrzeug-Spawn-Konfiguration
-	    const vehicleSpawnConfig = [
-	        {
-	            type: 'Panzer',
-	            count: 2,
-	            radius: 3,
-	            preferredTiles: ['ROAD', 'DIRT'],
-	            minDistanceToOthers: 400,
-	            strategic: true // Bei true wird versucht, das Fahrzeug an strategisch wichtigen Punkten zu platzieren
-	        },
-	        {
-	            type: 'Jeep',
-	            count: 6,
-	            radius: 2,
-	            preferredTiles: ['ROAD', 'DIRT', 'GRASS'],
-	            minDistanceToOthers: 200,
-	            strategic: true
-	        },
-	        {
-	            type: 'LKW',
-	            count: 4,
-	            radius: 3,
-	            preferredTiles: ['ROAD'],
-	            minDistanceToOthers: 300,
-	            strategic: false
-	        },
-	        {
-	            type: 'PKW',
-	            count: 8,
-	            radius: 2,
-	            preferredTiles: ['ROAD', 'DIRT', 'GRASS', 'PATH'],
-	            minDistanceToOthers: 150,
-	            strategic: false
-	        },
-	        {
-	            type: 'Pickup',
-	            count: 5,
-	            radius: 2,
-	            preferredTiles: ['ROAD', 'DIRT', 'GRASS'],
-	            minDistanceToOthers: 200,
-	            strategic: true
-	        }
-	    ];
+		vehicles = [];
+		const roadTiles = map.findTilesByType('ROAD');
+		const validTileTypes = ['GRASS', 'DIRT', 'ROAD', 'PATH'];
 
-	    // Strategische Positionen finden (z.B. Kreuzungen, wichtige Punkte)
-	    const strategicPositions = findStrategicPositions();
+		// Fahrzeug-Spawn-Konfiguration
+		const vehicleSpawnConfig = [
+			{
+				type: 'Panzer',
+				count: 2,
+				radius: 3,
+				preferredTiles: ['ROAD', 'DIRT'],
+				minDistanceToOthers: 400,
+				strategic: true // Bei true wird versucht, das Fahrzeug an strategisch wichtigen Punkten zu platzieren
+			},
+			{
+				type: 'Jeep',
+				count: 6,
+				radius: 2,
+				preferredTiles: ['ROAD', 'DIRT', 'GRASS'],
+				minDistanceToOthers: 200,
+				strategic: true
+			},
+			{
+				type: 'LKW',
+				count: 4,
+				radius: 3,
+				preferredTiles: ['ROAD'],
+				minDistanceToOthers: 300,
+				strategic: false
+			},
+			{
+				type: 'PKW',
+				count: 8,
+				radius: 2,
+				preferredTiles: ['ROAD', 'DIRT', 'GRASS', 'PATH'],
+				minDistanceToOthers: 150,
+				strategic: false
+			},
+			{
+				type: 'Pickup',
+				count: 5,
+				radius: 2,
+				preferredTiles: ['ROAD', 'DIRT', 'GRASS'],
+				minDistanceToOthers: 200,
+				strategic: true
+			}
+		];
 
-	    // Fahrzeuge spawnen
-	    vehicleSpawnConfig.forEach(config => {
-	        let spawnedCount = 0;
-	        let attempts = 0;
-	        const maxAttempts = 50;
+		// Strategische Positionen finden (z.B. Kreuzungen, wichtige Punkte)
+		const strategicPositions = findStrategicPositions();
 
-	        while (spawnedCount < config.count && attempts < maxAttempts) {
-	            let spawnPos;
-	            
-	            if (config.strategic && strategicPositions.length > 0) {
-	                // Strategische Position verwenden
-	                const stratIndex = Math.floor(Math.random() * strategicPositions.length);
-	                spawnPos = findSafeVehicleSpawnNear(
-	                    strategicPositions[stratIndex],
-	                    config.preferredTiles,
-	                    config.radius,
-	                    config.minDistanceToOthers
-	                );
-	                // Verwendete Position entfernen
-	                if (spawnPos) strategicPositions.splice(stratIndex, 1);
-	            } else {
-	                // Normale Position finden
-	                spawnPos = findSafeVehicleSpawn(
-	                    config.preferredTiles,
-	                    config.radius,
-	                    config.minDistanceToOthers
-	                );
-	            }
+		// Fahrzeuge spawnen
+		vehicleSpawnConfig.forEach(config => {
+			let spawnedCount = 0;
+			let attempts = 0;
+			const maxAttempts = 50;
 
-	            if (spawnPos) {
-	                vehicles.push(new Vehicle(spawnPos.x, spawnPos.y, config.type));
-	                spawnedCount++;
-	            }
-	            attempts++;
-	        }
-	    });
+			while (spawnedCount < config.count && attempts < maxAttempts) {
+				let spawnPos;
+
+				if (config.strategic && strategicPositions.length > 0) {
+					// Strategische Position verwenden
+					const stratIndex = Math.floor(Math.random() * strategicPositions.length);
+					spawnPos = findSafeVehicleSpawnNear(
+						strategicPositions[stratIndex],
+						config.preferredTiles,
+						config.radius,
+						config.minDistanceToOthers
+					);
+					// Verwendete Position entfernen
+					if (spawnPos) strategicPositions.splice(stratIndex, 1);
+				} else {
+					// Normale Position finden
+					spawnPos = findSafeVehicleSpawn(
+						config.preferredTiles,
+						config.radius,
+						config.minDistanceToOthers
+					);
+				}
+
+				if (spawnPos) {
+					vehicles.push(new Vehicle(spawnPos.x, spawnPos.y, config.type));
+					spawnedCount++;
+				}
+				attempts++;
+			}
+		});
 	}
 
 	function findSafeVehicleSpawn(validTileTypes, radius) {
-	    let attempts = 0;
-	    const maxAttempts = 50;
-	    
-	    while (attempts < maxAttempts) {
-	        const x = Math.floor(Math.random() * MAP_WIDTH);
-	        const y = Math.floor(Math.random() * MAP_HEIGHT);
-	        let isValid = true;
-	        
-	        // Prüfe Bereich um die Position
-	        for (let dy = -radius; dy <= radius; dy++) {
-	            for (let dx = -radius; dx <= radius; dx++) {
-	                const tile = map.getTile(x + dx, y + dy);
-	                if (!tile || !validTileTypes.includes(tile.type)) {
-	                    isValid = false;
-	                    break;
-	                }
-	            }
-	            if (!isValid) break;
-	        }
-	        
-	        if (isValid) {
-	            return {
-	                x: x * TILE_SIZE + TILE_SIZE / 2,
-	                y: y * TILE_SIZE + TILE_SIZE / 2
-	            };
-	        }
-	        attempts++;
-	    }
-	    return null;
+		let attempts = 0;
+		const maxAttempts = 50;
+
+		while (attempts < maxAttempts) {
+			const x = Math.floor(Math.random() * MAP_WIDTH);
+			const y = Math.floor(Math.random() * MAP_HEIGHT);
+			let isValid = true;
+
+			// Prüfe Bereich um die Position
+			for (let dy = -radius; dy <= radius; dy++) {
+				for (let dx = -radius; dx <= radius; dx++) {
+					const tile = map.getTile(x + dx, y + dy);
+					if (!tile || !validTileTypes.includes(tile.type)) {
+						isValid = false;
+						break;
+					}
+				}
+				if (!isValid) break;
+			}
+
+			if (isValid) {
+				return {
+					x: x * TILE_SIZE + TILE_SIZE / 2,
+					y: y * TILE_SIZE + TILE_SIZE / 2
+				};
+			}
+			attempts++;
+		}
+		return null;
 	}
 
 	function updateVehicleCollisions() {
@@ -6707,113 +8131,113 @@
 	}
 
 	function findStrategicPositions() {
-	    const positions = [];
-	    
-	    // Straßenkreuzungen finden
-	    for (let y = 1; y < MAP_HEIGHT - 1; y++) {
-	        for (let x = 1; x < MAP_WIDTH - 1; x++) {
-	            if (isRoadIntersection(x, y)) {
-	                positions.push({
-	                    x: x * TILE_SIZE + TILE_SIZE / 2,
-	                    y: y * TILE_SIZE + TILE_SIZE / 2,
-	                    type: 'intersection'
-	                });
-	            }
-	        }
-	    }
-	    
-	    // Wichtige Gebäude/Bereiche finden
-	    const buildings = map.findTilesByType('HOUSE');
-	    buildings.forEach(building => {
-	        positions.push({
-	            x: building.x * TILE_SIZE + TILE_SIZE / 2,
-	            y: building.y * TILE_SIZE + TILE_SIZE / 2,
-	            type: 'building'
-	        });
-	    });
+		const positions = [];
 
-	    return positions;
+		// Straßenkreuzungen finden
+		for (let y = 1; y < MAP_HEIGHT - 1; y++) {
+			for (let x = 1; x < MAP_WIDTH - 1; x++) {
+				if (isRoadIntersection(x, y)) {
+					positions.push({
+						x: x * TILE_SIZE + TILE_SIZE / 2,
+						y: y * TILE_SIZE + TILE_SIZE / 2,
+						type: 'intersection'
+					});
+				}
+			}
+		}
+
+		// Wichtige Gebäude/Bereiche finden
+		const buildings = map.findTilesByType('HOUSE');
+		buildings.forEach(building => {
+			positions.push({
+				x: building.x * TILE_SIZE + TILE_SIZE / 2,
+				y: building.y * TILE_SIZE + TILE_SIZE / 2,
+				type: 'building'
+			});
+		});
+
+		return positions;
 	}
 
 	function isRoadIntersection(x, y) {
-	    if (map.getTile(x, y)?.type !== 'ROAD') return false;
-	    
-	    // Zähle angrenzende Straßen
-	    let roadCount = 0;
-	    const directions = [
-	        {dx: -1, dy: 0},
-	        {dx: 1, dy: 0},
-	        {dx: 0, dy: -1},
-	        {dx: 0, dy: 1}
-	    ];
-	    
-	    directions.forEach(dir => {
-	        if (map.getTile(x + dir.dx, y + dir.dy)?.type === 'ROAD') {
-	            roadCount++;
-	        }
-	    });
-	    
-	    return roadCount > 2; // Mehr als 2 angrenzende Straßen = Kreuzung
+		if (map.getTile(x, y)?.type !== 'ROAD') return false;
+
+		// Zähle angrenzende Straßen
+		let roadCount = 0;
+		const directions = [
+			{dx: -1, dy: 0},
+			{dx: 1, dy: 0},
+			{dx: 0, dy: -1},
+			{dx: 0, dy: 1}
+		];
+
+		directions.forEach(dir => {
+			if (map.getTile(x + dir.dx, y + dir.dy)?.type === 'ROAD') {
+				roadCount++;
+			}
+		});
+
+		return roadCount > 2; // Mehr als 2 angrenzende Straßen = Kreuzung
 	}
 
 	function findSafeVehicleSpawnNear(position, preferredTiles, radius, minDistanceToOthers) {
-	    const searchRadius = 5; // Suchradius um die strategische Position
-	    
-	    for (let attempts = 0; attempts < 20; attempts++) {
-	        const angle = Math.random() * Math.PI * 2;
-	        const distance = Math.random() * (searchRadius * TILE_SIZE);
-	        const testX = position.x + Math.cos(angle) * distance;
-	        const testY = position.y + Math.sin(angle) * distance;
-	        
-	        if (isSafeVehiclePosition(testX, testY, preferredTiles, radius, minDistanceToOthers)) {
-	            return {x: testX, y: testY};
-	        }
-	    }
-	    return null;
+		const searchRadius = 5; // Suchradius um die strategische Position
+
+		for (let attempts = 0; attempts < 20; attempts++) {
+			const angle = Math.random() * Math.PI * 2;
+			const distance = Math.random() * (searchRadius * TILE_SIZE);
+			const testX = position.x + Math.cos(angle) * distance;
+			const testY = position.y + Math.sin(angle) * distance;
+
+			if (isSafeVehiclePosition(testX, testY, preferredTiles, radius, minDistanceToOthers)) {
+				return {x: testX, y: testY};
+			}
+		}
+		return null;
 	}
 
 	function findSafeVehicleSpawn(preferredTiles, radius, minDistanceToOthers) {
-	    let attempts = 0;
-	    const maxAttempts = 50;
-	    
-	    while (attempts < maxAttempts) {
-	        const x = Math.floor(Math.random() * MAP_WIDTH);
-	        const y = Math.floor(Math.random() * MAP_HEIGHT);
-	        const testX = x * TILE_SIZE + TILE_SIZE / 2;
-	        const testY = y * TILE_SIZE + TILE_SIZE / 2;
-	        
-	        if (isSafeVehiclePosition(testX, testY, preferredTiles, radius, minDistanceToOthers)) {
-	            return {x: testX, y: testY};
-	        }
-	        attempts++;
-	    }
-	    return null;
+		let attempts = 0;
+		const maxAttempts = 50;
+
+		while (attempts < maxAttempts) {
+			const x = Math.floor(Math.random() * MAP_WIDTH);
+			const y = Math.floor(Math.random() * MAP_HEIGHT);
+			const testX = x * TILE_SIZE + TILE_SIZE / 2;
+			const testY = y * TILE_SIZE + TILE_SIZE / 2;
+
+			if (isSafeVehiclePosition(testX, testY, preferredTiles, radius, minDistanceToOthers)) {
+				return {x: testX, y: testY};
+			}
+			attempts++;
+		}
+		return null;
 	}
 
 	function isSafeVehiclePosition(x, y, preferredTiles, radius, minDistanceToOthers) {
-	    // Prüfe Terrain
-	    const tileX = Math.floor(x / TILE_SIZE);
-	    const tileY = Math.floor(y / TILE_SIZE);
-	    
-	    // Prüfe Umgebung
-	    for (let dy = -radius; dy <= radius; dy++) {
-	        for (let dx = -radius; dx <= radius; dx++) {
-	            const tile = map.getTile(tileX + dx, tileY + dy);
-	            if (!tile || !preferredTiles.includes(tile.type)) {
-	                return false;
-	            }
-	        }
-	    }
-	    
-	    // Prüfe Mindestabstand zu anderen Fahrzeugen
-	    for (const vehicle of vehicles) {
-	        const dist = Math.hypot(vehicle.x - x, vehicle.y - y);
-	        if (dist < minDistanceToOthers) {
-	            return false;
-	        }
-	    }
-	    
-	    return true;
+		// Prüfe Terrain
+		const tileX = Math.floor(x / TILE_SIZE);
+		const tileY = Math.floor(y / TILE_SIZE);
+
+		// Prüfe Umgebung
+		for (let dy = -radius; dy <= radius; dy++) {
+			for (let dx = -radius; dx <= radius; dx++) {
+				const tile = map.getTile(tileX + dx, tileY + dy);
+				if (!tile || !preferredTiles.includes(tile.type)) {
+					return false;
+				}
+			}
+		}
+
+		// Prüfe Mindestabstand zu anderen Fahrzeugen
+		for (const vehicle of vehicles) {
+			const dist = Math.hypot(vehicle.x - x, vehicle.y - y);
+			if (dist < minDistanceToOthers) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	// Hauptupdate-Funktion
@@ -6892,8 +8316,12 @@
 			for (let x = startTileX; x < endTileX; x++) {
 				const tile = map.getTile(x, y);
 				if (tile) {
-					ctx.fillStyle = tile.getColor();
-					ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+					tile.render(
+						ctx,
+						x * TILE_SIZE,
+						y * TILE_SIZE,
+						TILE_SIZE
+					);
 				}
 			}
 		}

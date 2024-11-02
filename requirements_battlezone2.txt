@@ -157,6 +157,9 @@
 [ ] Waffen sollten eine eigene render-Methode haben um am Spieler oder Gegner gerendert zu werden, sodass das Rendering durch die Waffe vom Spieler und Gegner aus erfolgt.
 
 [x] Umstellung der Map von int auf Tile-Map. Dazu wird eine Tile-Klasse benötigt, die dann z.B. isGras(), isStreet() usw. Methoden anbietet. Außerdem sollte jedem Tile eine reihe von Sprites an verschiedenen Offset-Positionen zugeordnet werden können. Die Map sollte dann aus einem Array von Tiles bestehen. Ein Tile soll isObstacle() anbieten und ggf. auch unterschiedliche Höhen haben. Z.B. für Wände. Wenn der Renderer optimiert wird, könnte die Tiles ggf. kleiner und dafür im Verhältnis mehr sein.
+[ ] Tiles als Hindernisse z.B. Wände scheinen nicht mehr zu funktionieren.
+[x] Ich brauche hier deutlich detailliertere Tiles. Dazu muss das rendering angepasst werden. Die Tiles mit ihren Farben sollten über die Tile-Klasse gerendert werden. Wasser mit Animationen ähnlich wie die Wasser-Animation am Spieler und mit einem Algo-Offset pro Tile anhand der eindeutigen id (x,y) wäre super.
+[x] Die Tiles sollten in Abhängigkeit von ihren Nachbarn gerendet werden. Da das eine Top-Down Ansicht ist, sieht man alles von oben. ein Spieler ist ca. ein Tile groß. Der Maßstab muss passen. Score-Lines, Straßenränder, der Verlauf einer Straße usw. muss beim rendern beachtet werden.
 [ ] Alle Objekte müssen von der map aus gerendert werden und zwar direkt aus der Tile-Klasse. TODO Prüfen wie man das mit großen Objekten macht, die über mehrere Tiles gehen.
 [ ] Liebevolle Tile-Sets die beim Rendern unter berücksichtigungen der Nachbarn gerendert werden, was Ränder und Verbindung angeht. Jedes Tile sollte eine render-Methode haben und die einzelnen Tiles sollten einfach abgeleitete Klassen von Tile sein.
 
