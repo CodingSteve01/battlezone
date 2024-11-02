@@ -609,18 +609,60 @@
 	        this.chunkSize = 16;
 	        this.staticCache = new Map();
 	        this.effectsCache = new Map();
-	        this.effectsUpdateInterval = 100;
+	        this.effectsUpdateInterval = 16; // Häufigere Updates für flüssige Animation
 	        this.lastEffectsUpdate = 0;
 	        this.initialized = false;
 	        this.initQueue = [];
-	        this.isInitializing = false;
+	        this.lastViewport = null;
+	        this.movementDirection = { x: 0, y: 0 };
+	        this.lastChunkUpdate = 0;
+	        this.chunkUpdateInterval = 100; // Chunk-Updates alle 100ms
 	        
-	        // Vorbereiteter Effects-Canvas für Wiederverwendung
+	        // Pre-render einen einzelnen Effects-Canvas für Wiederverwendung
 	        this.effectsCanvas = document.createElement('canvas');
 	        this.effectsCanvas.width = this.tileSize * this.chunkSize;
 	        this.effectsCanvas.height = this.tileSize * this.chunkSize;
 	        this.effectsCtx = this.effectsCanvas.getContext('2d', { alpha: true });
 	    }
+
+		updateMovementDirection(viewport) {
+			if (!this.lastViewport) {
+				this.lastViewport = viewport;
+				return;
+			}
+
+			// Bewegungsrichtung aus Viewport-Änderung berechnen
+			this.movementDirection = {
+				x: viewport.left - this.lastViewport.left,
+				y: viewport.top - this.lastViewport.top
+			};
+
+			this.lastViewport = { ...viewport };
+		}
+
+		prioritizeChunks(visibleChunks) {
+			const currentTime = Date.now();
+			if (currentTime - this.lastChunkUpdate < this.chunkUpdateInterval) {
+				return Array.from(visibleChunks);
+			}
+			this.lastChunkUpdate = currentTime;
+
+			// Chunks in Bewegungsrichtung höher priorisieren
+			const chunks = Array.from(visibleChunks);
+			const dirX = Math.sign(this.movementDirection.x);
+			const dirY = Math.sign(this.movementDirection.y);
+
+			return chunks.sort((a, b) => {
+				const [ax, ay] = a.split(',').map(Number);
+				const [bx, by] = b.split(',').map(Number);
+				
+				// Priorität basierend auf Bewegungsrichtung
+				const aPriority = ax * dirX + ay * dirY;
+				const bPriority = bx * dirX + by * dirY;
+				
+				return bPriority - aPriority;
+			});
+		}
 
 	    getChunkKey(x, y) {
 	        const chunkX = Math.floor(x / (this.tileSize * this.chunkSize));
@@ -649,37 +691,24 @@
 	    }
 
 	    async initializeAroundViewport(map, viewport) {
-	        const centerChunkX = Math.floor((viewport.left + viewport.right) / 2 / (this.tileSize * this.chunkSize));
-	        const centerChunkY = Math.floor((viewport.top + viewport.bottom) / 2 / (this.tileSize * this.chunkSize));
-	        
-	        // Sofort sichtbare Chunks synchron laden
-	        const visibleChunks = this.getVisibleChunks(viewport);
-	        for (const chunkKey of visibleChunks) {
-	            if (!this.staticCache.has(chunkKey)) {
-	                const {x, y} = this.getChunkCoords(chunkKey);
-	                this.renderStaticChunk(map, x, y);
-	            }
-	        }
+            this.updateMovementDirection(viewport);
+            
+            // Nur die wichtigsten sichtbaren Chunks sofort laden
+            const visibleChunks = this.getVisibleChunks(viewport);
+            const prioritizedChunks = this.prioritizeChunks(visibleChunks);
+            
+            // Die ersten 4 Chunks sofort laden
+            const immediateChunks = prioritizedChunks.slice(0, 4);
+            for (const chunkKey of immediateChunks) {
+                if (!this.staticCache.has(chunkKey)) {
+                    const {x, y} = this.getChunkCoords(chunkKey);
+                    this.renderStaticChunk(map, x, y);
+                }
+            }
 
-	        // Weitere Chunks in spiralförmigem Muster zur Queue hinzufügen
-	        this.initQueue = [];
-	        const range = 5; // Lädt 5 Chunks in jede Richtung
-	        for (let r = 1; r <= range; r++) {
-	            for (let dx = -r; dx <= r; dx++) {
-	                for (let dy = -r; dy <= r; dy++) {
-	                    if (Math.abs(dx) === r || Math.abs(dy) === r) {
-	                        const chunkKey = `${centerChunkX + dx},${centerChunkY + dy}`;
-	                        if (!visibleChunks.has(chunkKey) && !this.staticCache.has(chunkKey)) {
-	                            this.initQueue.push(chunkKey);
-	                        }
-	                    }
-	                }
-	            }
-	        }
-
-	        // Starte Hintergrund-Initialisierung
-	        this.processInitQueue(map);
-	    }
+            // Rest der Chunks in die Queue
+            this.initQueue = prioritizedChunks.slice(4);
+        }
 
 	    async processInitQueue(map) {
 	        if (this.isInitializing || this.initQueue.length === 0) return;
@@ -737,86 +766,146 @@
 	    }
 
 	    renderEffects(ctx, map, viewport, currentTime) {
-	        const visibleChunks = this.getVisibleChunks(viewport);
-	        
-	        for (const chunkKey of visibleChunks) {
-	            const chunk = this.staticCache.get(chunkKey);
-	            if (!chunk) continue;
+            const visibleChunks = this.getVisibleChunks(viewport);
+            
+            for (const chunkKey of visibleChunks) {
+                const chunk = this.staticCache.get(chunkKey);
+                if (!chunk) continue;
 
-	            const startTileX = Math.floor(chunk.x / this.tileSize);
-	            const startTileY = Math.floor(chunk.y / this.tileSize);
+                // Hole oder erstelle Effects-Cache für diesen Chunk
+                let effects = this.effectsCache.get(chunkKey);
+                if (!effects) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = this.tileSize * this.chunkSize;
+                    canvas.height = this.tileSize * this.chunkSize;
+                    effects = {
+                        canvas,
+                        ctx: canvas.getContext('2d', { alpha: true }),
+                        lastUpdate: 0
+                    };
+                    this.effectsCache.set(chunkKey, effects);
+                }
 
-	            for (let y = 0; y < this.chunkSize; y++) {
-	                for (let x = 0; x < this.chunkSize; x++) {
-	                    const mapX = startTileX + x;
-	                    const mapY = startTileY + y;
-	                    const tile = map.getTile(mapX, mapY);
+                // Aktualisiere Effects nur wenn nötig
+                if (currentTime - effects.lastUpdate >= this.effectsUpdateInterval) {
+                    effects.ctx.clearRect(0, 0, effects.canvas.width, effects.canvas.height);
+                    
+                    const startTileX = Math.floor(chunk.x / this.tileSize);
+                    const startTileY = Math.floor(chunk.y / this.tileSize);
 
-	                    if (tile && this.isDynamicTile(tile.type)) {
-	                        const screenX = chunk.x + x * this.tileSize;
-	                        const screenY = chunk.y + y * this.tileSize;
-	                        const tileInstance = new Tile(map, mapX, mapY, this.tileSize, tile.type);
-	                        tileInstance.renderEffects(ctx, screenX, screenY, this.tileSize, currentTime);
-	                    }
-	                }
-	            }
-	        }
-	    }
+                    for (let y = 0; y < this.chunkSize; y++) {
+                        for (let x = 0; x < this.chunkSize; x++) {
+                            const mapX = startTileX + x;
+                            const mapY = startTileY + y;
+                            const tile = map.getTile(mapX, mapY);
+
+                            if (tile && this.isDynamicTile(tile.type)) {
+                                const screenX = x * this.tileSize;
+                                const screenY = y * this.tileSize;
+                                const tileInstance = new Tile(map, mapX, mapY, this.tileSize, tile.type);
+                                tileInstance.renderEffects(effects.ctx, screenX, screenY, this.tileSize, currentTime);
+                            }
+                        }
+                    }
+
+                    effects.lastUpdate = currentTime;
+                }
+
+                // Zeichne gecachte Effekte
+                ctx.drawImage(effects.canvas, chunk.x, chunk.y);
+            }
+        }
 
 	    render(ctx, map, viewport) {
-	        const currentTime = Date.now();
-	        
-	        // Erste Initialisierung
-	        if (!this.initialized) {
-	            this.initializeAroundViewport(map, viewport);
-	            this.initialized = true;
-	        }
+            const currentTime = Date.now();
+            
+            if (!this.initialized) {
+                this.initializeAroundViewport(map, viewport);
+                this.initialized = true;
+            } else {
+                // Update Bewegungsrichtung während des Spiels
+                this.updateMovementDirection(viewport);
+            }
 
-	        // Rendere sichtbare statische Chunks
-	        const visibleChunks = this.getVisibleChunks(viewport);
-	        for (const chunkKey of visibleChunks) {
-	            // Prüfe ob Chunk existiert, wenn nicht, erstelle ihn sofort
-	            if (!this.staticCache.has(chunkKey)) {
-	                const {x, y} = this.getChunkCoords(chunkKey);
-	                this.renderStaticChunk(map, x, y);
-	            }
+            // Rendere statische Chunks
+            const visibleChunks = this.getVisibleChunks(viewport);
+            const prioritizedChunks = this.prioritizeChunks(visibleChunks);
 
-	            const chunk = this.staticCache.get(chunkKey);
-	            ctx.drawImage(
-	                chunk.canvas,
-	                0, 0,
-	                chunk.width, chunk.height,
-	                chunk.x, chunk.y,
-	                chunk.width, chunk.height
-	            );
-	        }
+            for (const chunkKey of prioritizedChunks) {
+                if (!this.staticCache.has(chunkKey)) {
+                    const {x, y} = this.getChunkCoords(chunkKey);
+                    this.renderStaticChunk(map, x, y);
+                }
 
-	        // Rendere Effekte wenn nötig
-	        if (currentTime - this.lastEffectsUpdate > this.effectsUpdateInterval) {
-	            this.renderEffects(ctx, map, viewport, currentTime);
-	            this.lastEffectsUpdate = currentTime;
-	        }
+                const chunk = this.staticCache.get(chunkKey);
+                ctx.drawImage(
+                    chunk.canvas,
+                    0, 0,
+                    chunk.width, chunk.height,
+                    chunk.x, chunk.y,
+                    chunk.width, chunk.height
+                );
+            }
 
-	        // Prüfe auf neue zu ladende Chunks
-	        if (this.initQueue.length === 0) {
-	            this.initializeAroundViewport(map, viewport);
-	        }
-	    }
+            // Rendere Effekte (jetzt häufiger)
+            this.renderEffects(ctx, map, viewport, currentTime);
+
+            // Queue Management
+            if (this.initQueue.length === 0 && currentTime - this.lastChunkUpdate > this.chunkUpdateInterval) {
+                this.initializeAroundViewport(map, viewport);
+            }
+
+            // Cleanup
+            this.cleanup(visibleChunks);
+        }
 
 	    isDynamicTile(tileType) {
 	        return ['OCEAN', 'DEEP_WATER', 'SHALLOW_WATER'].includes(tileType);
 	    }
 
-	    cleanup() {
-	        const maxCacheAge = 30000;
-	        const currentTime = Date.now();
+	    cleanup(currentVisibleChunks) {
+            const maxCacheAge = 5000; // Reduzierte Cache-Zeit
+            const currentTime = Date.now();
+            const chunksToKeep = new Set(currentVisibleChunks);
 
-	        for (const [key, chunk] of this.staticCache.entries()) {
-	            if (currentTime - chunk.lastUpdate > maxCacheAge) {
-	                this.staticCache.delete(key);
-	            }
-	        }
-	    }
+            // Erweitere chunksToKeep um Chunks in Bewegungsrichtung
+            if (this.movementDirection.x !== 0 || this.movementDirection.y !== 0) {
+                const extraChunks = this.predictFutureChunks(chunksToKeep);
+                extraChunks.forEach(chunk => chunksToKeep.add(chunk));
+            }
+
+            // Cleanup static cache
+            for (const [key, chunk] of this.staticCache.entries()) {
+                if (!chunksToKeep.has(key) && currentTime - chunk.lastUpdate > maxCacheAge) {
+                    this.staticCache.delete(key);
+                }
+            }
+
+            // Cleanup effects cache
+            for (const [key, effects] of this.effectsCache.entries()) {
+                if (!chunksToKeep.has(key)) {
+                    this.effectsCache.delete(key);
+                }
+            }
+        }
+
+		predictFutureChunks(currentChunks) {
+			const extraChunks = new Set();
+			const predictionSteps = 2;  // Wie weit voraus vorhersagen
+
+			for (const chunkKey of currentChunks) {
+				const [x, y] = chunkKey.split(',').map(Number);
+				const dirX = Math.sign(this.movementDirection.x);
+				const dirY = Math.sign(this.movementDirection.y);
+
+				// Chunks in Bewegungsrichtung hinzufügen
+				for (let i = 1; i <= predictionSteps; i++) {
+					extraChunks.add(`${x + dirX * i},${y + dirY * i}`);
+				}
+			}
+
+			return extraChunks;
+		}
 	}
 	
 	class Tile {
@@ -993,60 +1082,38 @@
 		}
 
 		renderWaterEffects(ctx, x, y, size, currentTime) {
-		    ctx.save();
+		    // Tile-Offset für unterschiedliche Effekte
+		    const tileOffset = parseInt(this.tileId || '0');
+		    const timeOffset = (currentTime + tileOffset * 400) % 20000;
 		    
-		    // Basis-Wasserfarbe mit leichter Transparenz
-		    ctx.fillStyle = 'rgba(0, 100, 255, 0.1)';
-		    ctx.fillRect(x, y, size, size);
+		    // Verwende Pseudozufall, um nur gelegentlich eine Welle erscheinen zu lassen
+		    const randomFactor = this.pseudoRandom(tileOffset + this.x * 37 + this.y * 41);
+		    const triggerThreshold = 0.85; // Threshold, um seltenere Effekte zu erzeugen
 
-		    // Welleneffekt
-		    const waveHeight = Math.sin(currentTime * 0.001) * 3;
-		    const waterLine = y + size/2 + waveHeight;
+		    // Nur bei bestimmten Tiles und wenn zufälliger Faktor über dem Threshold liegt
+		    if (randomFactor > triggerThreshold) {
+		        ctx.save();
+		        ctx.strokeStyle = 'rgba(135, 206, 235, 0.3)'; // Helles Blau für sanfte Welle
+		        ctx.lineWidth = 1;
 
-		    // Sanfte Wasserlinien
-		    ctx.strokeStyle = 'rgba(135, 206, 235, 0.3)';
-		    ctx.lineWidth = 1;
+		        // Berechne eine sanfte Auf- und Abwärtsbewegung für die Welle
+		        const waveAmplitude = size * 0.1; // Höhe der Welle
+		        const yOffset = Math.sin((timeOffset + tileOffset) * 0.001) * waveAmplitude;
 
-		    // Mehrere Wellenlinien für mehr Tiefenwirkung
-		    for (let i = -2; i <= 2; i++) {
-		        const lineY = waterLine + i * 8;
-		        const waveOffset = Math.sin((currentTime + i * 500) * 0.002) * 5;
-		        
+		        // Y-Position der Welle in der Mitte des Tiles plus dynamischer Offset
+		        const lineY = y + size / 2 + yOffset;
+
+		        // Zeichne eine sanfte Wellenlinie, die erscheint und verschwindet
+		        const fadeFactor = 0.5 * (1 - (timeOffset % 5000) / 5000); // Sanftes Ein- und Ausblenden
+		        ctx.globalAlpha = fadeFactor;
+
 		        ctx.beginPath();
-		        // Geschwungene Wellenlinie
-		        ctx.moveTo(x, lineY);
-		        for (let xOffset = 0; xOffset <= size; xOffset += 5) {
-		            const wave = Math.sin((currentTime + xOffset) * 0.003 + i) * 2;
-		            ctx.lineTo(x + xOffset, lineY + wave + waveOffset);
-		        }
+		        ctx.moveTo(x + size * 0.2, lineY);
+		        ctx.lineTo(x + size * 0.8, lineY);
 		        ctx.stroke();
+		        
+		        ctx.restore();
 		    }
-
-		    // Glanzeffekte
-		    const gradient = ctx.createRadialGradient(
-		        x + size/2, y + size/2, 0,
-		        x + size/2, y + size/2, size/2
-		    );
-		    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-		    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.05)');
-		    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-		    
-		    // Bewegter Glanzeffekt
-		    const shimmerX = x + size/2 + Math.cos(currentTime * 0.001) * size/4;
-		    const shimmerY = y + size/2 + Math.sin(currentTime * 0.001) * size/4;
-		    const shimmerGradient = ctx.createRadialGradient(
-		        shimmerX, shimmerY, 0,
-		        shimmerX, shimmerY, size/4
-		    );
-		    shimmerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-		    shimmerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-		    ctx.fillStyle = gradient;
-		    ctx.fillRect(x, y, size, size);
-		    ctx.fillStyle = shimmerGradient;
-		    ctx.fillRect(x, y, size, size);
-
-		    ctx.restore();
 		}
 
 		renderWaterWithShore(ctx, x, y, size, currentTime) {
@@ -2065,38 +2132,6 @@
 				ctx.beginPath();
 				ctx.arc(px, py, detailSize/2, 0, Math.PI * 2);
 				ctx.fill();
-			}
-		}
-
-		renderWeatherEffect(ctx, x, y, size, currentTime, effectsOnly = false) {
-			if (!effectsOnly) {
-				return;
-			}
-
-			switch (this.weatherEffect) {
-				case 'rain':
-					this.renderRain(ctx, x, y, size, currentTime);
-					break;
-				case 'snow':
-					this.renderSnow(ctx, x, y, size, currentTime);
-					break;
-			}
-		}
-
-		renderRain(ctx, x, y, size, currentTime, effectsOnly = false) {
-			const rainCount = 5;
-			ctx.strokeStyle = 'rgba(155, 155, 255, 0.3)';
-			ctx.lineWidth = 1;
-
-			for (let i = 0; i < rainCount; i++) {
-				const offset = ((currentTime + this.animationOffset + i * 1000) % 2000) / 2000;
-				const rx = x + (this.pseudoRandom(parseInt(this.tileId || '0') + i) * size);
-				const ry = y + offset * size;
-
-				ctx.beginPath();
-				ctx.moveTo(rx, ry);
-				ctx.lineTo(rx - 2, ry + 10);
-				ctx.stroke();
 			}
 		}
 
