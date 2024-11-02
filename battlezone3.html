@@ -5846,7 +5846,8 @@
 					if (this.checkVehicleCollision(player.vehicle)) return;
 				}
 				// Prüfe direkte Spieler-Kollision
-				else if (this.checkEntityCollision(player)) {
+				else if (this.checkEntityCollision(player) &&
+					this.owner instanceof Player) { // Verhinder friendly fire
 					player.health -= this.damage;
 					if (player.health <= 0) {
 						player.isAlive = false;
