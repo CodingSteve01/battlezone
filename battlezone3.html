@@ -884,11 +884,6 @@
 			// Details und Dekorationen
 			this.renderDetails(ctx, x, y, size);
 
-			// Höheneffekte
-			if (this.height > 0) {
-				this.renderHeightEffect(ctx, x, y, size);
-			}
-
 			ctx.restore();
 		}
 
@@ -997,55 +992,70 @@
 			ctx.setLineDash([]); // Reset dash pattern
 		}
 
-		renderWaterWithShore(ctx, x, y, size, currentTime) {
-			// Basis-Wasserfarbe
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
-
-			// Uferlinien
-			const neighbors = this.getNeighbors();
-			this.renderShoreLines(ctx, x, y, size, neighbors);
-		}
-
 		renderWaterEffects(ctx, x, y, size, currentTime) {
-		    const waveTime = (currentTime + this.animationOffset) * 0.001;
+		    ctx.save();
 		    
-		    // Vereinfachte Wellenbewegung
-		    const waveCount = this.type === 'OCEAN' ? 3 : 2;
-		    for (let i = 0; i < waveCount; i++) {
-		        const alpha = 0.1 - (i * 0.03);
-		        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-		        ctx.lineWidth = 1;
+		    // Basis-Wasserfarbe mit leichter Transparenz
+		    ctx.fillStyle = 'rgba(0, 100, 255, 0.1)';
+		    ctx.fillRect(x, y, size, size);
+
+		    // Welleneffekt
+		    const waveHeight = Math.sin(currentTime * 0.001) * 3;
+		    const waterLine = y + size/2 + waveHeight;
+
+		    // Sanfte Wasserlinien
+		    ctx.strokeStyle = 'rgba(135, 206, 235, 0.3)';
+		    ctx.lineWidth = 1;
+
+		    // Mehrere Wellenlinien für mehr Tiefenwirkung
+		    for (let i = -2; i <= 2; i++) {
+		        const lineY = waterLine + i * 8;
+		        const waveOffset = Math.sin((currentTime + i * 500) * 0.002) * 5;
 		        
 		        ctx.beginPath();
-		        for (let wx = 0; wx <= size; wx += size / 8) {
-		            const waveOffset = Math.sin(waveTime * 1.5 + (wx / size) * Math.PI * 2 + i);
-		            const wy = y + (size * 0.5) + (waveOffset * size * 0.1);
-		            
-		            if (wx === 0) {
-		                ctx.moveTo(x + wx, wy);
-		            } else {
-		                ctx.lineTo(x + wx, wy);
-		            }
+		        // Geschwungene Wellenlinie
+		        ctx.moveTo(x, lineY);
+		        for (let xOffset = 0; xOffset <= size; xOffset += 5) {
+		            const wave = Math.sin((currentTime + xOffset) * 0.003 + i) * 2;
+		            ctx.lineTo(x + xOffset, lineY + wave + waveOffset);
 		        }
 		        ctx.stroke();
 		    }
 
 		    // Glanzeffekte
-		    const highlightCount = this.type === 'OCEAN' ? 2 : 1;
-		    for (let i = 0; i < highlightCount; i++) {
-		        const hx = x + size * 0.5 + Math.cos(waveTime) * (size * 0.2);
-		        const hy = y + size * 0.5 + Math.sin(waveTime) * (size * 0.2);
-		        
-		        const gradient = ctx.createRadialGradient(hx, hy, 0, hx, hy, size * 0.2);
-		        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-		        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-		        
-		        ctx.fillStyle = gradient;
-		        ctx.beginPath();
-		        ctx.arc(hx, hy, size * 0.2, 0, Math.PI * 2);
-		        ctx.fill();
-		    }
+		    const gradient = ctx.createRadialGradient(
+		        x + size/2, y + size/2, 0,
+		        x + size/2, y + size/2, size/2
+		    );
+		    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+		    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.05)');
+		    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+		    
+		    // Bewegter Glanzeffekt
+		    const shimmerX = x + size/2 + Math.cos(currentTime * 0.001) * size/4;
+		    const shimmerY = y + size/2 + Math.sin(currentTime * 0.001) * size/4;
+		    const shimmerGradient = ctx.createRadialGradient(
+		        shimmerX, shimmerY, 0,
+		        shimmerX, shimmerY, size/4
+		    );
+		    shimmerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+		    shimmerGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+		    ctx.fillStyle = gradient;
+		    ctx.fillRect(x, y, size, size);
+		    ctx.fillStyle = shimmerGradient;
+		    ctx.fillRect(x, y, size, size);
+
+		    ctx.restore();
+		}
+
+		renderWaterWithShore(ctx, x, y, size, currentTime) {
+		    // Nur Basisfarbe und Uferlinien
+		    ctx.fillStyle = this.config.color;
+		    ctx.fillRect(x, y, size, size);
+
+		    const neighbors = this.getNeighbors();
+		    this.renderShoreLines(ctx, x, y, size, neighbors);
 		}
 
 		renderShoreLines(ctx, x, y, size, neighbors) {
@@ -2056,17 +2066,6 @@
 				ctx.arc(px, py, detailSize/2, 0, Math.PI * 2);
 				ctx.fill();
 			}
-		}
-
-		renderHeightEffect(ctx, x, y, size) {
-			// Schatten basierend auf Höhe
-			const shadowHeight = this.height * 5;
-			ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-			ctx.fillRect(x + 2, y + 2, size, shadowHeight);
-
-			// Highlight auf der "oberen" Seite
-			ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-			ctx.fillRect(x, y - shadowHeight, size, 2);
 		}
 
 		renderWeatherEffect(ctx, x, y, size, currentTime, effectsOnly = false) {
