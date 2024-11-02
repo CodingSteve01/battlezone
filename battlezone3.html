@@ -947,33 +947,32 @@
 			return neighbors;
 		}
 
-		render(ctx, x, y, size, effectsOnly = false) {
-			const currentTime = Date.now();
-			ctx.save();
+		render(ctx, x, y, size) {
+		    const currentTime = Date.now();
+		    ctx.save();
 
-			// Basis-Rendering basierend auf Typ
-			switch (this.type) {
-				case 'ROAD':
-				case 'PATH':
-					this.renderRoadOrPath(ctx, x, y, size, effectsOnly);
-					break;
-				case 'WATER':
-				case 'OCEAN':
-				case 'DEEP_WATER':
-				case 'SHALLOW_WATER':
-					this.renderWaterWithShore(ctx, x, y, size, currentTime);
-					break;
-				default:
-					this.renderDefaultTile(ctx, x, y, size);
-			}
+		    // 1. Zuerst den Untergrund mit Farbverläufen zeichnen
+		    this.renderBlendedBackground(ctx, x, y, size);
 
-			// Übergänge zu Nachbartiles
-			this.renderTransitions(ctx, x, y, size);
+		    // 2. Dann die spezifischen Details je nach Tile-Typ
+            this.renderTileDetails(ctx, x, y, size);
 
-			// Details und Dekorationen
-			this.renderDetails(ctx, x, y, size);
+		    ctx.restore();
+		}
 
-			ctx.restore();
+		renderBlendedBackground(ctx, x, y, size) {
+		    // 1. Grundfläche des Tiles
+		    ctx.fillStyle = this.config.color;
+		    ctx.fillRect(x, y, size, size);
+
+		    const neighbors = this.getNeighbors();
+		    const blendSize = Math.floor(size * 0.25);
+
+		    // 2. Kanten nur wenn nötig
+		    this.renderEdgeBlends(ctx, x, y, size, blendSize, neighbors);
+
+		    // 3. Ecken nur wenn nötig und Nachbarn unterschiedlich sind
+		    this.renderCornerBlends(ctx, x, y, size, blendSize, neighbors);
 		}
 
 		renderEffects(ctx, x, y, size, currentTime) {
@@ -997,10 +996,6 @@
 		renderRoadOrPath(ctx, x, y, size) {
 			const neighbors = this.getNeighbors();
 			const isRoad = this.type === 'ROAD';
-
-			// Grundfarbe
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
 
 			// Straßentextur
 			if (isRoad) {
@@ -1116,155 +1111,200 @@
 		    }
 		}
 
-		renderWaterWithShore(ctx, x, y, size, currentTime) {
-		    // Nur Basisfarbe und Uferlinien
-		    ctx.fillStyle = this.config.color;
-		    ctx.fillRect(x, y, size, size);
-
-		    const neighbors = this.getNeighbors();
-		    this.renderShoreLines(ctx, x, y, size, neighbors);
-		}
-
-		renderShoreLines(ctx, x, y, size, neighbors) {
-			ctx.strokeStyle = '#85acc9';
-			ctx.lineWidth = 2;
-
-			Object.entries(neighbors).forEach(([direction, neighbor]) => {
-				if (neighbor && !this.isWaterTile(neighbor.type)) {
-					this.drawShoreLine(ctx, x, y, size, direction);
-				}
-			});
-		}
-
 		isWaterTile(type) {
 			return ['OCEAN', 'DEEP_WATER', 'SHALLOW_WATER'].includes(type);
 		}
 
-		drawShoreLine(ctx, x, y, size, direction) {
-			const margin = size * 0.1;
-			ctx.beginPath();
-
-			switch (direction) {
-				case 'n':
-					ctx.moveTo(x, y + margin);
-					ctx.quadraticCurveTo(x + size / 2, y + margin * 2, x + size, y + margin);
-					break;
-				case 's':
-					ctx.moveTo(x, y + size - margin);
-					ctx.quadraticCurveTo(x + size / 2, y + size - margin * 2, x + size, y + size - margin);
-					break;
-				case 'e':
-					ctx.moveTo(x + size - margin, y);
-					ctx.quadraticCurveTo(x + size - margin * 2, y + size / 2, x + size - margin, y + size);
-					break;
-				case 'w':
-					ctx.moveTo(x + margin, y);
-					ctx.quadraticCurveTo(x + margin * 2, y + size / 2, x + margin, y + size);
-					break;
-			}
-
-			ctx.stroke();
+		isObstacle(type) {
+			return ['OCEAN', 'DEEP_WATER', 'WALL', 'HOUSE'].includes(type);
 		}
 
-		renderTransitions(ctx, x, y, size) {
-			const neighbors = this.getNeighbors();
+		renderEdgeBlends(ctx, x, y, size, blendSize, neighbors) {
+		    // Norden
+		    if (neighbors.n?.config?.color && neighbors.n.config.color !== this.config.color) {
+		        const gradient = ctx.createLinearGradient(x, y, x, y + blendSize);
+		        gradient.addColorStop(0, this.blendColors(neighbors.n.config.color, this.config.color, 0.5)); // Am Rand die Nachbarfarbe
+		        gradient.addColorStop(1, this.config.color);       // Nach innen die eigene Farbe
+		        ctx.fillStyle = gradient;
+		        ctx.fillRect(x, y, size, blendSize);
+		    }
 
-			// Übergangslogik für verschiedene Terrain-Typen
-			Object.entries(neighbors).forEach(([direction, neighbor]) => {
-				if (neighbor && neighbor.type !== this.type) {
-					this.renderTransition(ctx, x, y, size, direction, neighbor);
-				}
-			});
+		    // Süden
+		    if (neighbors.s?.config?.color && neighbors.s.config.color !== this.config.color) {
+		        const gradient = ctx.createLinearGradient(x, y + size - blendSize, x, y + size);
+		        gradient.addColorStop(0, this.config.color);        // Innen eigene Farbe
+		        gradient.addColorStop(1, this.blendColors(neighbors.s.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+		        ctx.fillStyle = gradient;
+		        ctx.fillRect(x, y + size - blendSize, size, blendSize);
+		    }
+
+		    // Osten
+		    if (neighbors.e?.config?.color && neighbors.e.config.color !== this.config.color) {
+		        const gradient = ctx.createLinearGradient(x + size - blendSize, y, x + size, y);
+		        gradient.addColorStop(0, this.config.color);        // Innen eigene Farbe
+		        gradient.addColorStop(1, this.blendColors(neighbors.e.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+		        ctx.fillStyle = gradient;
+		        ctx.fillRect(x + size - blendSize, y, blendSize, size);
+		    }
+
+		    // Westen
+		    if (neighbors.w?.config?.color && neighbors.w.config.color !== this.config.color) {
+		        const gradient = ctx.createLinearGradient(x, y, x + blendSize, y);
+		        gradient.addColorStop(0, this.blendColors(neighbors.w.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+		        gradient.addColorStop(1, this.config.color);       // Nach innen eigene Farbe
+		        ctx.fillStyle = gradient;
+		        ctx.fillRect(x, y, blendSize, size);
+		    }
 		}
 
-		renderTransition(ctx, x, y, size, direction, neighbor) {
-			const transitionSize = size * 0.15;
-			const gradient = ctx.createLinearGradient(
-				x + (direction.includes('e') ? size - transitionSize : 0),
-				y + (direction.includes('s') ? size - transitionSize : 0),
-				x + (direction.includes('w') ? transitionSize : size),
-				y + (direction.includes('n') ? transitionSize : size)
-			);
+		renderCornerBlends(ctx, x, y, size, blendSize, neighbors) {
+		    // Nordwest
+		    if (neighbors.nw?.config?.color && neighbors.nw.config.color !== this.config.color &&
+		        neighbors.n?.config?.color !== this.config.color && 
+		        neighbors.w?.config?.color !== this.config.color) {
+		        const gradient = ctx.createRadialGradient(
+		            x, y, 0,
+		            x, y, blendSize
+		        );
+		        gradient.addColorStop(0, this.blendColors(neighbors.nw.config.color, this.config.color, 0.5)); // Im Eckpunkt die Nachbarfarbe
+		        gradient.addColorStop(1, this.config.color);        // Nach innen die eigene Farbe
+		        ctx.fillStyle = gradient;
+		        ctx.beginPath();
+		        ctx.rect(x, y, blendSize, blendSize);
+		        ctx.fill();
+		    }
 
-			gradient.addColorStop(0, this.config.color);
-			gradient.addColorStop(1, neighbor.config.color);
+		    // Nordost
+		    if (neighbors.ne?.config?.color && neighbors.ne.config.color !== this.config.color &&
+		        neighbors.n?.config?.color !== this.config.color && 
+		        neighbors.e?.config?.color !== this.config.color) {
+		        const gradient = ctx.createRadialGradient(
+		            x + size, y, 0,
+		            x + size, y, blendSize
+		        );
+		        gradient.addColorStop(0, this.blendColors(neighbors.ne.config.color, this.config.color, 0.5));
+		        gradient.addColorStop(1, this.config.color);
+		        ctx.fillStyle = gradient;
+		        ctx.beginPath();
+		        ctx.rect(x + size - blendSize, y, blendSize, blendSize);
+		        ctx.fill();
+		    }
 
-			ctx.fillStyle = gradient;
+		    // Südwest
+		    if (neighbors.sw?.config?.color && neighbors.sw.config.color !== this.config.color &&
+		        neighbors.s?.config?.color !== this.config.color && 
+		        neighbors.w?.config?.color !== this.config.color) {
+		        const gradient = ctx.createRadialGradient(
+		            x, y + size, 0,
+		            x, y + size, blendSize
+		        );
+		        gradient.addColorStop(0, this.blendColors(neighbors.sw.config.color, this.config.color, 0.5));
+		        gradient.addColorStop(1, this.config.color);
+		        ctx.fillStyle = gradient;
+		        ctx.beginPath();
+		        ctx.rect(x, y + size - blendSize, blendSize, blendSize);
+		        ctx.fill();
+		    }
 
-			// Übergangsbereich zeichnen
-			this.drawTransitionArea(ctx, x, y, size, direction, transitionSize);
+		    // Südost
+		    if (neighbors.se?.config?.color && neighbors.se.config.color !== this.config.color &&
+		        neighbors.s?.config?.color !== this.config.color && 
+		        neighbors.e?.config?.color !== this.config.color) {
+		        const gradient = ctx.createRadialGradient(
+		            x + size, y + size, 0,
+		            x + size, y + size, blendSize
+		        );
+		        gradient.addColorStop(0, this.blendColors(neighbors.se.config.color, this.config.color, 0.5));
+		        gradient.addColorStop(1, this.config.color);
+		        ctx.fillStyle = gradient;
+		        ctx.beginPath();
+		        ctx.rect(x + size - blendSize, y + size - blendSize, blendSize, blendSize);
+		        ctx.fill();
+		    }
 		}
 
-		drawTransitionArea(ctx, x, y, size, direction, transitionSize) {
-			ctx.beginPath();
-
-			switch (direction) {
-				case 'n':
-					ctx.rect(x, y, size, transitionSize);
-					break;
-				case 's':
-					ctx.rect(x, y + size - transitionSize, size, transitionSize);
-					break;
-				case 'e':
-					ctx.rect(x + size - transitionSize, y, transitionSize, size);
-					break;
-				case 'w':
-					ctx.rect(x, y, transitionSize, size);
-					break;
-				case 'ne':
-					ctx.moveTo(x + size - transitionSize, y);
-					ctx.lineTo(x + size, y);
-					ctx.lineTo(x + size, y + transitionSize);
-					ctx.closePath();
-					break;
-				case 'nw':
-					ctx.moveTo(x, y);
-					ctx.lineTo(x + transitionSize, y);
-					ctx.lineTo(x, y + transitionSize);
-					ctx.closePath();
-					break;
-				case 'se':
-					ctx.moveTo(x + size, y + size - transitionSize);
-					ctx.lineTo(x + size, y + size);
-					ctx.lineTo(x + size - transitionSize, y + size);
-					ctx.closePath();
-					break;
-				case 'sw':
-					ctx.moveTo(x, y + size - transitionSize);
-					ctx.lineTo(x, y + size);
-					ctx.lineTo(x + transitionSize, y + size);
-					ctx.closePath();
-					break;
-			}
-
-			ctx.fill();
+		getRGBFromColor(color) {
+		    try {
+		        // Standardfarbe falls keine gültige Farbe übergeben wurde
+		        if (!color) return [128, 128, 128];
+		        
+		        // Behandle RGB-Format
+		        if (color.startsWith('rgb')) {
+		            const matches = color.match(/\d+/g);
+		            if (matches && matches.length >= 3) {
+		                return [
+		                    parseInt(matches[0]),
+		                    parseInt(matches[1]),
+		                    parseInt(matches[2])
+		                ];
+		            }
+		        }
+		        
+		        // Behandle Hex-Format
+		        const hex = color.charAt(0) === '#' ? color.substring(1) : color;
+		        
+		        // Prüfe ob gültiges Hex-Format
+		        if (!/^[0-9A-Fa-f]{6}$/.test(hex)) {
+		            return [128, 128, 128];
+		        }
+		        
+		        return [
+		            parseInt(hex.substring(0, 2), 16),
+		            parseInt(hex.substring(2, 4), 16),
+		            parseInt(hex.substring(4, 6), 16)
+		        ];
+		    } catch (e) {
+		        console.warn('Invalid color:', color);
+		        return [128, 128, 128]; // Fallback zu Grau
+		    }
 		}
 
-		renderDetails(ctx, x, y, size) {
-			// Details basierend auf Tile-Typ
-			switch (this.type) {
-				case 'GRASS':
-				case 'HIGH_GRASS':
-					this.renderGrassDetails(ctx, x, y, size);
-					break;
+		renderTileDetails(ctx, x, y, size) {
+		    switch (this.type) {
+		        case 'ROAD':
+		        case 'PATH':
+		            this.renderRoadOrPath(ctx, x, y, size);
+		            break;
+		        case 'WATER':
+		        case 'OCEAN':
+		        case 'DEEP_WATER':
+		        case 'SHALLOW_WATER':
+		            break;
+		        case 'DIRT':
+		            this.renderDirtTexture(ctx, x, y, size);
+		            break;
+		        case 'GRASS':
+		            this.renderGrassTexture(ctx, x, y, size);
+		            break;
+		        case 'HIGH_GRASS':
+		            this.renderHighGrassTexture(ctx, x, y, size);
+		            break;
+		        case 'MOUNTAIN':
+		            this.renderMountainTexture(ctx, x, y, size);
+		            break;
+		        case 'SNOW':
+		            this.renderSnowTexture(ctx, x, y, size);
+		            break;
+		        case 'BEACH':
+		            this.renderBeachTexture(ctx, x, y, size);
+		            break;
+		        case 'WALL':
+		            this.renderWallTexture(ctx, x, y, size);
+		            break;
+		        case 'HOUSE':
+		            this.renderHouseTexture(ctx, x, y, size);
+		            break;
 				case 'FOREST_LIGHT':
 				case 'FOREST_DENSE':
 					this.renderForestDetails(ctx, x, y, size);
 					break;
-				case 'MOUNTAIN':
-					this.renderMountainDetails(ctx, x, y, size);
-					break;
-			}
+		    }
 		}
 
 		renderGrassDetails(ctx, x, y, size) {
 			const seed = parseInt(this.tileId || '0');
 			const isHighGrass = this.type === 'HIGH_GRASS';
 			const grassCount = isHighGrass ? 25 : 15;
-
-			// Basis-Grasfläche
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
 
 			// Grashalme
 			for (let i = 0; i < grassCount; i++) {
@@ -1387,10 +1427,6 @@
 		}
 
 		renderForestGround(ctx, x, y, size, seed) {
-			// Grundfarbe des Waldbodens
-			ctx.fillStyle = '#2d3a1d';
-			ctx.fillRect(x, y, size, size);
-
 			// Verschiedene Bodentexturen
 			for (let i = 0; i < 15; i++) {
 				const px = x + this.pseudoRandom(seed + i) * size;
@@ -1637,49 +1673,8 @@
 			}
 		}
 
-		renderDefaultTile(ctx, x, y, size) {
-			// Basis-Füllung
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
-
-			// Terrain-spezifische Details
-			switch (this.type) {
-				case 'DIRT':
-					this.renderDirtTexture(ctx, x, y, size);
-					break;
-				case 'GRASS':
-					this.renderGrassTexture(ctx, x, y, size);
-					break;
-				case 'HIGH_GRASS':
-					this.renderHighGrassTexture(ctx, x, y, size);
-					break;
-				case 'MOUNTAIN':
-					this.renderMountainTexture(ctx, x, y, size);
-					break;
-				case 'SNOW':
-					this.renderSnowTexture(ctx, x, y, size);
-					break;
-				case 'BEACH':
-					this.renderBeachTexture(ctx, x, y, size);
-					break;
-				case 'WALL':
-					this.renderWallTexture(ctx, x, y, size);
-					break;
-				case 'HOUSE':
-					this.renderHouseTexture(ctx, x, y, size);
-					break;
-			}
-
-			// Variations basierend auf Position für natürlicheres Aussehen
-			this.addPositionalVariation(ctx, x, y, size);
-		}
-
 		renderAsphaltTexture(ctx, x, y, size) {
 			const seed = parseInt(this.tileId || '0');
-
-			// Grundtextur des Asphalts
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
 
 			// Kleine Unebenheiten und Risse im Asphalt
 			for (let i = 0; i < 15; i++) {
@@ -1778,10 +1773,6 @@
 
 		renderPathTexture(ctx, x, y, size) {
 			const seed = parseInt(this.tileId || '0');
-
-			// Grundfarbe des Pfades
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
 
 			// Fußspuren und ausgetretene Bereiche
 			const pathCenter = size * 0.5;
@@ -2002,10 +1993,6 @@
 			// Schneeverwehungen
 			const seed = parseInt(this.tileId || '0');
 
-			// Basis-Schneedecke
-			ctx.fillStyle = '#ffffff';
-			ctx.fillRect(x, y, size, size);
-
 			// Glanzeffekte
 			for (let i = 0; i < 5; i++) {
 				const px = x + this.pseudoRandom(seed + i) * size;
@@ -2025,10 +2012,6 @@
 
 		renderBeachTexture(ctx, x, y, size) {
 			const seed = parseInt(this.tileId || '0');
-
-			// Sandbasis
-			ctx.fillStyle = this.config.color;
-			ctx.fillRect(x, y, size, size);
 
 			// Sandkörner und kleine Steine
 			for (let i = 0; i < 20; i++) {
@@ -2114,27 +2097,6 @@
 			ctx.fillRect(x + size * 0.4, y + size * 0.6, size * 0.2, size * 0.4);
 		}
 
-		addPositionalVariation(ctx, x, y, size) {
-			// Fügt subtile Variationen basierend auf der Position hinzu
-			const seed = parseInt(this.tileId || '0');
-
-			// Leichte Farbvariation
-			ctx.fillStyle = `rgba(0, 0, 0, ${0.05 * this.pseudoRandom(seed)})`;
-			ctx.fillRect(x, y, size, size);
-
-			// Optionale zusätzliche Texturen oder Details
-			if (this.pseudoRandom(seed) > 0.8) {
-				const detailSize = size * 0.1;
-				const px = x + this.pseudoRandom(seed + 1) * (size - detailSize);
-				const py = y + this.pseudoRandom(seed + 2) * (size - detailSize);
-
-				ctx.fillStyle = `rgba(0, 0, 0, 0.1)`;
-				ctx.beginPath();
-				ctx.arc(px, py, detailSize/2, 0, Math.PI * 2);
-				ctx.fill();
-			}
-		}
-
 		shouldDrawRoadMarking() {
 			// Prüfe Nachbar-Tiles für konsistente Straßenmarkierungen
 			// Diese Methode muss noch implementiert werden basierend auf der Map-Struktur
@@ -2171,7 +2133,8 @@
 
 		isWalkable() {
 			return this.config.walkable &&
-				!Array.from(this.entities).some(e => e.blocksMovement);
+				!Array.from(this.entities).some(e => e.blocksMovement) &&
+				!this.isObstacle();
 		}
 
 		isVehiclePassable() {
@@ -2219,20 +2182,23 @@
 		}
 
 		blendColors(color1, color2, factor) {
-			// Helfer-Funktion zum Mischen zweier Farben
-			let r1 = parseInt(color1.substr(1, 2), 16);
-			let g1 = parseInt(color1.substr(3, 2), 16);
-			let b1 = parseInt(color1.substr(5, 2), 16);
-
-			let r2 = parseInt(color2.substr(1, 2), 16);
-			let g2 = parseInt(color2.substr(3, 2), 16);
-			let b2 = parseInt(color2.substr(5, 2), 16);
-
-			let r = Math.floor(r1 * (1 - factor) + r2 * factor);
-			let g = Math.floor(g1 * (1 - factor) + g2 * factor);
-			let b = Math.floor(b1 * (1 - factor) + b2 * factor);
-
-			return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+		    try {
+		        // Stelle sicher, dass beide Farben gültig sind
+		        color1 = color1 || this.config.color;
+		        color2 = color2 || this.config.color;
+		        
+		        const [r1, g1, b1] = this.getRGBFromColor(color1);
+		        const [r2, g2, b2] = this.getRGBFromColor(color2);
+		        
+		        const r = Math.round(r1 * (1 - factor) + r2 * factor);
+		        const g = Math.round(g1 * (1 - factor) + g2 * factor);
+		        const b = Math.round(b1 * (1 - factor) + b2 * factor);
+		        
+		        return `rgb(${r}, ${g}, ${b})`;
+		    } catch (e) {
+		        console.warn('Error blending colors:', e);
+		        return this.config.color;
+		    }
 		}
 	}
 
