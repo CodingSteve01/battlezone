@@ -961,18 +961,135 @@
 		}
 
 		renderBlendedBackground(ctx, x, y, size) {
-		    // 1. Grundfläche des Tiles
-		    ctx.fillStyle = this.config.color;
-		    ctx.fillRect(x, y, size, size);
-
 		    const neighbors = this.getNeighbors();
 		    const blendSize = Math.floor(size * 0.25);
+		    const radius = blendSize;
 
-		    // 2. Kanten nur wenn nötig
+		    // Bestimme, welche Ecken gerundet werden sollen
+		    const roundCorners = {
+		        tl: !neighbors.nw || this.getRGBBrightness(this.config.color) < this.getRGBBrightness(neighbors.nw.config.color),
+		        tr: !neighbors.ne || this.getRGBBrightness(this.config.color) < this.getRGBBrightness(neighbors.ne.config.color),
+		        br: !neighbors.se || this.getRGBBrightness(this.config.color) < this.getRGBBrightness(neighbors.se.config.color),
+		        bl: !neighbors.sw || this.getRGBBrightness(this.config.color) < this.getRGBBrightness(neighbors.sw.config.color)
+		    };
+
+		    ctx.save();
+
+		    // Zeichne das gerundete Rechteck
+		    ctx.fillStyle = this.config.color;
+		    this.drawConditionalRoundedRect(ctx, x, y, size, radius, roundCorners);
+		    ctx.fill();
+
+		    // Führe die bestehenden Kanten- und Eckenglättungen durch
 		    this.renderEdgeBlends(ctx, x, y, size, blendSize, neighbors);
+		    this.renderCornerBlends(ctx, x, y, size, blendSize, neighbors, roundCorners);
 
-		    // 3. Ecken nur wenn nötig und Nachbarn unterschiedlich sind
-		    this.renderCornerBlends(ctx, x, y, size, blendSize, neighbors);
+		    ctx.restore();
+		}
+
+		renderCornerBlends(ctx, x, y, size, blendSize, neighbors, roundCorners) {
+		    const radius = blendSize;
+
+		    // Helper-Funktion zum Zeichnen eines Viertelkreises
+		    const drawQuarterCircle = (cornerX, cornerY, startAngle, endAngle, gradient) => {
+		        ctx.save();
+		        ctx.beginPath();
+		        ctx.arc(cornerX, cornerY, radius, startAngle, endAngle, false);
+		        ctx.lineTo(cornerX, cornerY);
+		        ctx.closePath();
+		        ctx.clip();
+
+		        ctx.fillStyle = gradient;
+		        ctx.beginPath();
+		        ctx.arc(cornerX, cornerY, radius, startAngle, endAngle, false);
+		        ctx.fill();
+
+		        ctx.restore();
+		    };
+
+		    // Nordwestliche Ecke (NW)
+		    if (roundCorners.tl) {
+		        if (neighbors.nw?.config?.color) {
+		            const currentBrightness = this.getRGBBrightness(this.config.color);
+		            const neighborBrightness = this.getRGBBrightness(neighbors.nw.config.color);
+		            if (currentBrightness < neighborBrightness) {
+		                const gradient = ctx.createRadialGradient(x + blendSize, y + blendSize, 0, x + blendSize, y + blendSize, radius);
+		                gradient.addColorStop(0, this.blendColors(neighbors.nw.config.color, this.config.color, 0.5));
+		                gradient.addColorStop(1, this.config.color);
+
+		                drawQuarterCircle(
+		                    x + blendSize,
+		                    y + blendSize,
+		                    Math.PI,
+		                    1.5 * Math.PI,
+		                    gradient
+		                );
+		            }
+		        }
+		    }
+
+		    // Nordöstliche Ecke (NE)
+		    if (roundCorners.tr) {
+		        if (neighbors.ne?.config?.color) {
+		            const currentBrightness = this.getRGBBrightness(this.config.color);
+		            const neighborBrightness = this.getRGBBrightness(neighbors.ne.config.color);
+		            if (currentBrightness < neighborBrightness) {
+		                const gradient = ctx.createRadialGradient(x + size - blendSize, y + blendSize, 0, x + size - blendSize, y + blendSize, radius);
+		                gradient.addColorStop(0, this.blendColors(neighbors.ne.config.color, this.config.color, 0.5));
+		                gradient.addColorStop(1, this.config.color);
+
+		                drawQuarterCircle(
+		                    x + size - blendSize,
+		                    y + blendSize,
+		                    1.5 * Math.PI,
+		                    2 * Math.PI,
+		                    gradient
+		                );
+		            }
+		        }
+		    }
+
+		    // Südöstliche Ecke (SE)
+		    if (roundCorners.br) {
+		        if (neighbors.se?.config?.color) {
+		            const currentBrightness = this.getRGBBrightness(this.config.color);
+		            const neighborBrightness = this.getRGBBrightness(neighbors.se.config.color);
+		            if (currentBrightness < neighborBrightness) {
+		                const gradient = ctx.createRadialGradient(x + size - blendSize, y + size - blendSize, 0, x + size - blendSize, y + size - blendSize, radius);
+		                gradient.addColorStop(0, this.blendColors(neighbors.se.config.color, this.config.color, 0.5));
+		                gradient.addColorStop(1, this.config.color);
+
+		                drawQuarterCircle(
+		                    x + size - blendSize,
+		                    y + size - blendSize,
+		                    0,
+		                    0.5 * Math.PI,
+		                    gradient
+		                );
+		            }
+		        }
+		    }
+
+		    // Südwestliche Ecke (SW)
+		    if (roundCorners.bl) {
+		        if (neighbors.sw?.config?.color) {
+		            const currentBrightness = this.getRGBBrightness(this.config.color);
+		            const neighborBrightness = this.getRGBBrightness(neighbors.sw.config.color);
+		            if (currentBrightness < neighborBrightness) {
+		                const gradient = ctx.createRadialGradient(x + blendSize, y + size - blendSize, 0, x + blendSize, y + size - blendSize, radius);
+		                gradient.addColorStop(0, this.blendColors(neighbors.sw.config.color, this.config.color, 0.5));
+		                gradient.addColorStop(1, this.config.color);
+
+		                drawQuarterCircle(
+		                    x + blendSize,
+		                    y + size - blendSize,
+		                    0.5 * Math.PI,
+		                    Math.PI,
+		                    gradient
+		                );
+		            }
+		        }
+		    }
 		}
 
 		renderEffects(ctx, x, y, size, currentTime) {
@@ -1119,109 +1236,75 @@
 			return ['OCEAN', 'DEEP_WATER', 'WALL', 'HOUSE'].includes(type);
 		}
 
+		drawConditionalRoundedRect(ctx, x, y, size, radius, roundCorners) {
+	        ctx.beginPath();
+	        // Start oben links
+	        ctx.moveTo(x + (roundCorners.tl ? radius : 0), y);
+	        
+	        // Obere Kante
+	        ctx.lineTo(x + size - (roundCorners.tr ? radius : 0), y);
+	        if (roundCorners.tr) {
+	            ctx.quadraticCurveTo(x + size, y, x + size, y + (roundCorners.tr ? radius : 0));
+	        }
+	        
+	        // Rechte Kante
+	        ctx.lineTo(x + size, y + size - (roundCorners.br ? radius : 0));
+	        if (roundCorners.br) {
+	            ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+	        }
+	        
+	        // Untere Kante
+	        ctx.lineTo(x + (roundCorners.bl ? radius : 0), y + size);
+	        if (roundCorners.bl) {
+	            ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+	        }
+	        
+	        // Linke Kante
+	        ctx.lineTo(x, y + (roundCorners.tl ? radius : 0));
+	        if (roundCorners.tl) {
+	            ctx.quadraticCurveTo(x, y, x + (roundCorners.tl ? radius : 0), y);
+	        }
+	        
+	        ctx.closePath();
+	    }
+
 		renderEdgeBlends(ctx, x, y, size, blendSize, neighbors) {
-		    // Norden
-		    if (neighbors.n?.config?.color && neighbors.n.config.color !== this.config.color) {
-		        const gradient = ctx.createLinearGradient(x, y, x, y + blendSize);
-		        gradient.addColorStop(0, this.blendColors(neighbors.n.config.color, this.config.color, 0.5)); // Am Rand die Nachbarfarbe
-		        gradient.addColorStop(1, this.config.color);       // Nach innen die eigene Farbe
-		        ctx.fillStyle = gradient;
-		        ctx.fillRect(x, y, size, blendSize);
-		    }
+	        // Norden
+	        if (neighbors.n?.config?.color && neighbors.n.config.color !== this.config.color) {
+	            const gradient = ctx.createLinearGradient(x, y, x, y + blendSize);
+	            gradient.addColorStop(0, this.blendColors(neighbors.n.config.color, this.config.color, 0.5)); // Am Rand die Nachbarfarbe
+	            gradient.addColorStop(1, this.config.color); // Nach innen die eigene Farbe
+	            ctx.fillStyle = gradient;
+	            ctx.fillRect(x, y, size, blendSize);
+	        }
 
-		    // Süden
-		    if (neighbors.s?.config?.color && neighbors.s.config.color !== this.config.color) {
-		        const gradient = ctx.createLinearGradient(x, y + size - blendSize, x, y + size);
-		        gradient.addColorStop(0, this.config.color);        // Innen eigene Farbe
-		        gradient.addColorStop(1, this.blendColors(neighbors.s.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
-		        ctx.fillStyle = gradient;
-		        ctx.fillRect(x, y + size - blendSize, size, blendSize);
-		    }
+	        // Süden
+	        if (neighbors.s?.config?.color && neighbors.s.config.color !== this.config.color) {
+	            const gradient = ctx.createLinearGradient(x, y + size - blendSize, x, y + size);
+	            gradient.addColorStop(0, this.config.color); // Innen eigene Farbe
+	            gradient.addColorStop(1, this.blendColors(neighbors.s.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+	            ctx.fillStyle = gradient;
+	            ctx.fillRect(x, y + size - blendSize, size, blendSize);
+	        }
 
-		    // Osten
-		    if (neighbors.e?.config?.color && neighbors.e.config.color !== this.config.color) {
-		        const gradient = ctx.createLinearGradient(x + size - blendSize, y, x + size, y);
-		        gradient.addColorStop(0, this.config.color);        // Innen eigene Farbe
-		        gradient.addColorStop(1, this.blendColors(neighbors.e.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
-		        ctx.fillStyle = gradient;
-		        ctx.fillRect(x + size - blendSize, y, blendSize, size);
-		    }
+	        // Osten
+	        if (neighbors.e?.config?.color && neighbors.e.config.color !== this.config.color) {
+	            const gradient = ctx.createLinearGradient(x + size - blendSize, y, x + size, y);
+	            gradient.addColorStop(0, this.config.color); // Innen eigene Farbe
+	            gradient.addColorStop(1, this.blendColors(neighbors.e.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+	            ctx.fillStyle = gradient;
+	            ctx.fillRect(x + size - blendSize, y, blendSize, size);
+	        }
 
-		    // Westen
-		    if (neighbors.w?.config?.color && neighbors.w.config.color !== this.config.color) {
-		        const gradient = ctx.createLinearGradient(x, y, x + blendSize, y);
-		        gradient.addColorStop(0, this.blendColors(neighbors.w.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
-		        gradient.addColorStop(1, this.config.color);       // Nach innen eigene Farbe
-		        ctx.fillStyle = gradient;
-		        ctx.fillRect(x, y, blendSize, size);
-		    }
-		}
-
-		renderCornerBlends(ctx, x, y, size, blendSize, neighbors) {
-		    // Nordwest
-		    if (neighbors.nw?.config?.color && neighbors.nw.config.color !== this.config.color &&
-		        neighbors.n?.config?.color !== this.config.color && 
-		        neighbors.w?.config?.color !== this.config.color) {
-		        const gradient = ctx.createRadialGradient(
-		            x, y, 0,
-		            x, y, blendSize
-		        );
-		        gradient.addColorStop(0, this.blendColors(neighbors.nw.config.color, this.config.color, 0.5)); // Im Eckpunkt die Nachbarfarbe
-		        gradient.addColorStop(1, this.config.color);        // Nach innen die eigene Farbe
-		        ctx.fillStyle = gradient;
-		        ctx.beginPath();
-		        ctx.rect(x, y, blendSize, blendSize);
-		        ctx.fill();
-		    }
-
-		    // Nordost
-		    if (neighbors.ne?.config?.color && neighbors.ne.config.color !== this.config.color &&
-		        neighbors.n?.config?.color !== this.config.color && 
-		        neighbors.e?.config?.color !== this.config.color) {
-		        const gradient = ctx.createRadialGradient(
-		            x + size, y, 0,
-		            x + size, y, blendSize
-		        );
-		        gradient.addColorStop(0, this.blendColors(neighbors.ne.config.color, this.config.color, 0.5));
-		        gradient.addColorStop(1, this.config.color);
-		        ctx.fillStyle = gradient;
-		        ctx.beginPath();
-		        ctx.rect(x + size - blendSize, y, blendSize, blendSize);
-		        ctx.fill();
-		    }
-
-		    // Südwest
-		    if (neighbors.sw?.config?.color && neighbors.sw.config.color !== this.config.color &&
-		        neighbors.s?.config?.color !== this.config.color && 
-		        neighbors.w?.config?.color !== this.config.color) {
-		        const gradient = ctx.createRadialGradient(
-		            x, y + size, 0,
-		            x, y + size, blendSize
-		        );
-		        gradient.addColorStop(0, this.blendColors(neighbors.sw.config.color, this.config.color, 0.5));
-		        gradient.addColorStop(1, this.config.color);
-		        ctx.fillStyle = gradient;
-		        ctx.beginPath();
-		        ctx.rect(x, y + size - blendSize, blendSize, blendSize);
-		        ctx.fill();
-		    }
-
-		    // Südost
-		    if (neighbors.se?.config?.color && neighbors.se.config.color !== this.config.color &&
-		        neighbors.s?.config?.color !== this.config.color && 
-		        neighbors.e?.config?.color !== this.config.color) {
-		        const gradient = ctx.createRadialGradient(
-		            x + size, y + size, 0,
-		            x + size, y + size, blendSize
-		        );
-		        gradient.addColorStop(0, this.blendColors(neighbors.se.config.color, this.config.color, 0.5));
-		        gradient.addColorStop(1, this.config.color);
-		        ctx.fillStyle = gradient;
-		        ctx.beginPath();
-		        ctx.rect(x + size - blendSize, y + size - blendSize, blendSize, blendSize);
-		        ctx.fill();
-		    }
-		}
+	        // Westen
+	        if (neighbors.w?.config?.color && neighbors.w.config.color !== this.config.color) {
+	            const gradient = ctx.createLinearGradient(x, y, x + blendSize, y);
+	            gradient.addColorStop(0, this.blendColors(neighbors.w.config.color, this.config.color, 0.5)); // Am Rand Nachbarfarbe
+	            gradient.addColorStop(1, this.config.color); // Nach innen eigene Farbe
+	            ctx.fillStyle = gradient;
+	            ctx.fillRect(x, y, blendSize, size);
+	        }
+	    }
 
 		getRGBFromColor(color) {
 		    try {
@@ -1257,6 +1340,11 @@
 		        console.warn('Invalid color:', color);
 		        return [128, 128, 128]; // Fallback zu Grau
 		    }
+		}
+
+		getRGBBrightness(color) {
+		    const [r, g, b] = this.getRGBFromColor(color);
+		    return (r + g + b) / 3;
 		}
 
 		renderTileDetails(ctx, x, y, size) {
