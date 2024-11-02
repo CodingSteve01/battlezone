@@ -7725,53 +7725,66 @@
 	}
 
 	function isColliding(x, y, object) {
-		const tileX = Math.floor(x / TILE_SIZE);
-		const tileY = Math.floor(y / TILE_SIZE);
+	    const tileX = Math.floor(x / TILE_SIZE);
+	    const tileY = Math.floor(y / TILE_SIZE);
 
-		if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) return true;
+	    if (tileX < 0 || tileX >= MAP_WIDTH || tileY < 0 || tileY >= MAP_HEIGHT) {
+	        return true;
+	    }
 
-		const tile = map.getTile(tileX, tileY);
-		if (!tile) return true;
+	    const tile = map.getTile(tileX, tileY);
+	    if (!tile) {
+	        return true;
+	    }
 
-		if (!(object instanceof Vehicle ? !tile.isVehiclePassable() : !tile.isWalkable())) {
-			return false;
-		}
+	    // Überprüfe, ob das Tile als Hindernis gekennzeichnet ist
+	    if (tile.isObstacle()) {
+	        return true;
+	    }
 
-		// Keine weiteren Kollisionsprüfungen für Spieler direkt nach dem Aussteigen
-		if (object instanceof Player && object.lastVehicleExitTime &&
-			Date.now() - object.lastVehicleExitTime < 1000) {
-			return false;
-		}
+	    // Überprüfe, ob das Objekt das Tile betreten kann
+	    if (object instanceof Player || object instanceof Enemy) {
+	        if (!tile.isWalkable()) {
+	            return true;
+	        }
+	    } else if (object instanceof Vehicle) {
+	        if (!tile.isVehiclePassable()) {
+	            return true;
+	        }
+	    }
 
-		if (object) {
-			// Fahrzeug-Kollisionen
-			for (let vehicle of vehicles) {
-				if (vehicle !== object && !vehicle.isDestroyed) {
-					const dist = Math.hypot(x - vehicle.x, y - vehicle.y);
-					const combinedSize = (vehicle.size + (object.size || 30)) / 2;
+	    // Prüfe zusätzlich, ob der Spieler/Objekt gerade aus einem Fahrzeug aussteigt
+	    if (object instanceof Player && object.lastVehicleExitTime && Date.now() - object.lastVehicleExitTime < 1000) {
+	        return false;
+	    }
 
-					if (dist < combinedSize) {
-						// Panzer können andere Fahrzeuge überfahren
-						if (object instanceof Vehicle && object.type === 'Panzer') {
-							console.log('Panzer ran over another vehicle');
-							vehicle.health -= 200; // Massiver Schaden
-							if (vehicle.health <= 0) {
-								vehicle.destroy();
-							}
-							return false;
-						}
-						// Fahrzeuge können Spieler und Gegner überfahren
-						else if (object instanceof Vehicle &&
-							(vehicle instanceof Player || vehicle instanceof Enemy)) {
-							return false;
-						}
-						return true;
-					}
-				}
-			}
-		}
+	    // Fahrzeug-Kollisionen prüfen
+	    if (object instanceof Vehicle) {
+	        for (let vehicle of vehicles) {
+	            if (vehicle !== object && !vehicle.isDestroyed) {
+	                const dist = Math.hypot(x - vehicle.x, y - vehicle.y);
+	                const combinedSize = (vehicle.size + (object.size || 30)) / 2;
+	                if (dist < combinedSize) {
+	                    // Panzer können andere Fahrzeuge überfahren
+	                    if (object.type === 'Panzer') {
+	                        console.log('Panzer ran over another vehicle');
+	                        vehicle.health -= 200; // Massiver Schaden
+	                        if (vehicle.health <= 0) {
+	                            vehicle.destroy();
+	                        }
+	                        return false;
+	                    }
+	                    // Fahrzeuge können Spieler und Gegner überfahren
+	                    else if (vehicle instanceof Player || vehicle instanceof Enemy) {
+	                        return false;
+	                    }
+	                    return true;
+	                }
+	            }
+	        }
+	    }
 
-		return false;
+	    return false;
 	}
 
 	function pushOutOfObstacles(object) {
