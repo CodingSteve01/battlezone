@@ -581,28 +581,6 @@
 		}
 	};
 
-	// Farben für die Tiles
-	const TILE_COLORS = {
-		'OCEAN': '#001433',
-		'DEEP_WATER': '#002966',
-		'SHALLOW_WATER': '#0066ff',
-		'BEACH': '#ffcc99',
-		'GRASS': '#66cc00',
-		'HIGH_GRASS': '#339900',
-		'FOREST_LIGHT': '#2d5a27',
-		'FOREST_DENSE': '#1a3d1a',
-		'BUSH': '#29a329',
-		'HILL': '#666633',
-		'MOUNTAIN': '#4d4d4d',
-		'SNOW': '#ffffff',
-		'ROAD': '#666666',
-		'PATH': '#8B4513',
-		'HOUSE': '#cc6600',
-		'WALL': '#808080',
-		'DIRT': '#996633',
-		// Füge weitere Tiles nach Bedarf hinzu
-	};
-
 	class ViewportCache {
 	    constructor(tileSize = 32) {
 	        this.tileSize = tileSize;
@@ -2241,7 +2219,7 @@
 
 		getColor() {
 			// Basisfarbe mit Varianten und Wettereffekten
-			let color = TILE_COLORS[this.type] || '#FFFFFF';
+			let color = this.config.color || '#FFFFFF';
 			if (this.weatherEffect) {
 				// Hier Wettereffekte auf die Farbe anwenden
 				color = this.applyWeatherEffect(color);
