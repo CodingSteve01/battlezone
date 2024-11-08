@@ -703,7 +703,7 @@
 			rightHeadlight.position.set(-0.7, 1, 2.2);
 			group.add(rightHeadlight);
 
-			// Add wheels
+			// Create wheels with separate front wheel groups for steering
 			const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
 			const wheelMaterial = new THREE.MeshStandardMaterial({
 				color: 0x111111,
@@ -711,17 +711,44 @@
 				roughness: 0.7
 			});
 
-			const wheelPositions = [
-				[-1, 0.4, 1.5], [1, 0.4, 1.5],
-				[-1, 0.4, -1.5], [1, 0.4, -1.5]
-			];
+			// Front wheel groups for steering
+			const frontLeftWheelGroup = new THREE.Group();
+			const frontRightWheelGroup = new THREE.Group();
 
-			wheelPositions.forEach(pos => {
-				const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-				wheel.position.set(...pos);
-				wheel.rotation.z = Math.PI / 2;
-				group.add(wheel);
-			});
+			const frontLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			const frontRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			frontLeftWheel.rotation.z = Math.PI / 2;
+			frontRightWheel.rotation.z = Math.PI / 2;
+
+			frontLeftWheelGroup.add(frontLeftWheel);
+			frontRightWheelGroup.add(frontRightWheel);
+
+			frontLeftWheelGroup.position.set(-1, 0.4, 1.5);
+			frontRightWheelGroup.position.set(1, 0.4, 1.5);
+
+			group.add(frontLeftWheelGroup);
+			group.add(frontRightWheelGroup);
+
+			// Back wheels (no steering)
+			const backLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			const backRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+
+			backLeftWheel.rotation.z = Math.PI / 2;
+			backRightWheel.rotation.z = Math.PI / 2;
+
+			backLeftWheel.position.set(-1, 0.4, -1.5);
+			backRightWheel.position.set(1, 0.4, -1.5);
+
+			group.add(backLeftWheel);
+			group.add(backRightWheel);
+
+			// Store wheel references for animation
+			group.userData.wheels = {
+				frontLeft: frontLeftWheelGroup,
+				frontRight: frontRightWheelGroup,
+				backLeft: backLeftWheel,
+				backRight: backRightWheel
+			};
 
 			// Add collision data
 			group.userData.collider = new THREE.Box3(
@@ -982,65 +1009,101 @@
 		updateVehiclePhysics(deltaTime) {
 			const state = this.vehicleState;
 
-			// Get current forward direction
-			const forwardVector = new THREE.Vector3(0, 0, 1);
-			forwardVector.applyQuaternion(this.vehicle.quaternion);
+			// Get vehicle's current position and forward direction
+			const position = this.vehicle.position;
+			const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.vehicle.quaternion);
+			const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.vehicle.quaternion);
+
+			// Get exact ground height at current position
+			const groundHeight = this.terrain.generateHeight(position.x, position.z);
+			this.vehicle.position.y = groundHeight + 1.0; // Keep vehicle 1 unit above ground
+
+			// Handle steering
+			if (Math.abs(state.velocity.length()) > 0.1) {
+				const steeringAngle = state.steeringAngle;
+				if (this.controlState.keys['a']) {
+					state.steeringAngle = Math.min(state.steeringAngle + deltaTime * 2, state.maxSteerAngle);
+				} else if (this.controlState.keys['d']) {
+					state.steeringAngle = Math.max(state.steeringAngle - deltaTime * 2, -state.maxSteerAngle);
+				} else {
+					// Return steering to center
+					state.steeringAngle *= 0.9;
+				}
+
+				// Apply steering to vehicle rotation
+				this.vehicle.rotation.y += state.steeringAngle * state.velocity.length() * deltaTime;
+			}
+
+			// Update wheel rotations
+			const wheels = this.vehicle.userData.wheels;
+			wheels.frontLeft.rotation.y = state.steeringAngle;
+			wheels.frontRight.rotation.y = state.steeringAngle;
 
 			// Calculate forces
 			const engineForce = state.engineForce * 20000;
 			const dragForce = -state.drag * state.velocity.lengthSq();
 			const brakingForce = state.brakeForce * -state.velocity.length() * 5000;
 
-			// Apply forces along vehicle's forward direction
+			// Apply forces
 			const totalForce = engineForce + dragForce + brakingForce;
 			const acceleration = totalForce / state.mass;
 
-			// Update velocity in vehicle's local space
-			state.velocity.add(forwardVector.multiplyScalar(acceleration * deltaTime));
+			// Update velocity
+			state.velocity.add(forward.multiplyScalar(acceleration * deltaTime));
+			state.velocity.multiplyScalar(0.98); // Apply drag
 
-			// Apply drag to slow down
-			state.velocity.multiplyScalar(0.98);
-
-			// Clamp velocity to max speed
+			// Clamp to max speed
 			if (state.velocity.length() > state.maxSpeed) {
 				state.velocity.normalize().multiplyScalar(state.maxSpeed);
 			}
 
-			// Calculate movement on xz plane only
-			const movement = state.velocity.clone();
-			movement.y = 0;
-			movement.multiplyScalar(deltaTime);
+			// Calculate new position
+			const movement = state.velocity.clone().multiplyScalar(deltaTime);
+			const newPosition = position.clone().add(movement);
 
-			const newPosition = this.vehicle.position.clone().add(movement);
+			// Get ground height at new position
+			const newGroundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
+			newPosition.y = newGroundHeight + 1.0;
 
-			// Get exact ground height at new position using raycasting
-			const groundHeight = this.getHeightAtPosition(newPosition);
-			newPosition.y = groundHeight + 1.0; // Vehicle height above ground
+			// Calculate terrain normal for vehicle orientation
+			const forwardPoint = this.terrain.generateHeight(
+				newPosition.x + forward.x * 2,
+				newPosition.z + forward.z * 2
+			);
+			const backwardPoint = this.terrain.generateHeight(
+				newPosition.x - forward.x * 2,
+				newPosition.z - forward.z * 2
+			);
+			const rightPoint = this.terrain.generateHeight(
+				newPosition.x + right.x * 2,
+				newPosition.z + right.z * 2
+			);
+			const leftPoint = this.terrain.generateHeight(
+				newPosition.x - right.x * 2,
+				newPosition.z - right.z * 2
+			);
 
-			// Check collisions
+			// Update vehicle position and orientation
 			if (!this.checkCollisions(newPosition, this.vehicle.userData.collider)) {
 				this.vehicle.position.copy(newPosition);
 
-				// Calculate terrain normals for vehicle orientation
-				const forwardPos = newPosition.clone().add(forwardVector.multiplyScalar(2));
-				const backwardPos = newPosition.clone().sub(forwardVector.multiplyScalar(2));
-				const rightVector = new THREE.Vector3().crossVectors(forwardVector, new THREE.Vector3(0, 1, 0));
-				const rightPos = newPosition.clone().add(rightVector.multiplyScalar(2));
-				const leftPos = newPosition.clone().sub(rightVector.multiplyScalar(2));
-
-				const forwardHeight = this.getHeightAtPosition(forwardPos);
-				const backwardHeight = this.getHeightAtPosition(backwardPos);
-				const rightHeight = this.getHeightAtPosition(rightPos);
-				const leftHeight = this.getHeightAtPosition(leftPos);
-
-				// Calculate and apply pitch and roll
-				const pitchAngle = Math.atan2(forwardHeight - backwardHeight, 4);
-				const rollAngle = Math.atan2(rightHeight - leftHeight, 4);
+				// Calculate and apply pitch and roll based on terrain
+				const pitchAngle = Math.atan2(forwardPoint - backwardPoint, 4);
+				const rollAngle = Math.atan2(rightPoint - leftPoint, 4);
 
 				this.vehicle.rotation.x = pitchAngle;
 				this.vehicle.rotation.z = -rollAngle;
+
+				// Rotate wheels based on speed
+				const wheelRotationSpeed = state.velocity.length() * 2;
+				Object.values(wheels).forEach(wheel => {
+					if (wheel instanceof THREE.Mesh) {
+						wheel.rotation.x += wheelRotationSpeed * deltaTime;
+					} else if (wheel instanceof THREE.Group) {
+						wheel.children[0].rotation.x += wheelRotationSpeed * deltaTime;
+					}
+				});
 			} else {
-				// Collision response
 				state.velocity.multiplyScalar(-0.5);
 			}
 
@@ -1054,10 +1117,24 @@
 
 		updatePlayerPhysics(deltaTime) {
 			const state = this.playerState;
+			const position = this.player.position;
 
 			// Apply gravity if not grounded
 			if (!state.isGrounded) {
 				state.velocity.y += this.physics.gravity * deltaTime;
+			}
+
+			// Get current ground height
+			const groundHeight = this.terrain.generateHeight(position.x, position.z);
+			const heightAboveGround = position.y - groundHeight;
+
+			// Ground collision check
+			if (heightAboveGround <= 1.0 || position.y <= groundHeight + 1.0) {
+				position.y = groundHeight + 1.0;
+				state.velocity.y = 0;
+				state.isGrounded = true;
+			} else {
+				state.isGrounded = false;
 			}
 
 			// Apply friction to horizontal movement
@@ -1074,54 +1151,45 @@
 
 			// Calculate new position
 			const movement = state.velocity.clone().multiplyScalar(deltaTime);
-			const newPosition = this.player.position.clone().add(movement);
+			const newPosition = position.clone().add(movement);
 
-			// Get exact ground height at new position using raycasting
-			const groundHeight = this.getHeightAtPosition(newPosition);
-			const heightAboveGround = newPosition.y - groundHeight;
+			// Get ground height at new position
+			const newGroundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
+			newPosition.y = Math.max(newPosition.y, newGroundHeight + 1.0);
 
-			// Handle ground collision
-			if (heightAboveGround <= 1.0) { // Player height
-				newPosition.y = groundHeight + 1.0;
-				state.velocity.y = 0;
-				state.isGrounded = true;
-			} else {
-				state.isGrounded = false;
-			}
-
-			// Update collider position
+			// Update collider and check collisions
 			state.collider.center.copy(newPosition);
 
-			// Check other collisions (trees, etc.)
 			if (!this.checkCollisions(newPosition, state.collider)) {
 				this.player.position.copy(newPosition);
 
-				// Update player rotation to face movement direction
+				// Update player orientation based on movement
 				if (movement.length() > 0.0001) {
 					const targetRotation = Math.atan2(movement.x, movement.z);
 					this.player.rotation.y = targetRotation;
+
+					// Calculate and apply pitch based on terrain slope
+					const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.quaternion);
+					const forwardPoint = this.terrain.generateHeight(
+						newPosition.x + forward.x,
+						newPosition.z + forward.z
+					);
+					const backwardPoint = this.terrain.generateHeight(
+						newPosition.x - forward.x,
+						newPosition.z - forward.z
+					);
+
+					const pitchAngle = Math.atan2(forwardPoint - backwardPoint, 2);
+					this.player.rotation.x = pitchAngle * 0.5;
 				}
 
-				// Calculate and apply slope adjustment
-				const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.quaternion);
-				const forwardPos = newPosition.clone().add(forward);
-				const backwardPos = newPosition.clone().sub(forward);
-
-				const forwardHeight = this.getHeightAtPosition(forwardPos);
-				const backwardHeight = this.getHeightAtPosition(backwardPos);
-
-				// Adjust player pitch based on terrain slope
-				const pitchAngle = Math.atan2(forwardHeight - backwardHeight, 2);
-				this.player.rotation.x = pitchAngle * 0.5;
+				// Update animation
+				if (state.velocity.length() > 0.1) {
+					state.walkAnimation += deltaTime * state.walkSpeed;
+					this.animatePlayer(state.walkAnimation);
+				}
 			} else {
-				// Collision response
 				state.velocity.multiplyScalar(-0.5);
-			}
-
-			// Update animation if moving
-			if (state.velocity.length() > 0.1) {
-				state.walkAnimation += deltaTime * state.walkSpeed;
-				this.animatePlayer(state.walkAnimation);
 			}
 		}
 
