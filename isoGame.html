@@ -72,15 +72,15 @@
 	// Utility class for game settings and constants
 	class GameSettings {
 		static get CAMERA_BASE_DISTANCE() {
-			return 50;
+			return 30;
 		}
 
 		static get CAMERA_MAX_ZOOM() {
-			return 80;
+			return 45;
 		}
 
 		static get CAMERA_MIN_ZOOM() {
-			return 30;
+			return 25;
 		}
 
 		static get CAMERA_ZOOM_SPEED() {
@@ -427,6 +427,16 @@
 				1,
 				2000
 			);
+
+			// Set up minimap camera
+			this.minimapCamera = new THREE.OrthographicCamera(
+				-100, 100,
+				100, -100,
+				1, 1000
+			);
+			this.minimapCamera.position.set(0, 100, 0);
+			this.minimapCamera.lookAt(0, 0, 0);
+
 			this.currentZoom = GameSettings.CAMERA_BASE_DISTANCE;
 			this.targetZoom = GameSettings.CAMERA_BASE_DISTANCE;
 			this.camera.position.set(50, 50, 50);
@@ -728,14 +738,53 @@
 				friction: 0.98,
 				maxSpeed: 2,
 				jumpForce: 5,
-				groundedThreshold: 0.1
+				groundedThreshold: 0.1,
+				raycaster: new THREE.Raycaster()
 			};
+
+			// Create an invisible ground plane for raycasting
+			const groundGeometry = new THREE.PlaneGeometry(
+				GameSettings.WORLD_SIZE * 2,
+				GameSettings.WORLD_SIZE * 2,
+				200,
+				200
+			);
+			const vertices = groundGeometry.attributes.position.array;
+			for (let i = 0; i < vertices.length; i += 3) {
+				const x = vertices[i];
+				const z = vertices[i + 1];
+				vertices[i + 2] = this.terrain.generateHeight(x, z);
+			}
+			groundGeometry.computeVertexNormals();
+
+			const groundMaterial = new THREE.MeshBasicMaterial({visible: false});
+			this.groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+			this.groundMesh.rotation.x = -Math.PI / 2;
+			this.groundMesh.position.y = 0;
+			this.scene.add(this.groundMesh);
+		}
+
+		getHeightAtPosition(position) {
+			// Create ray starting from high above position
+			const rayStart = new THREE.Vector3(position.x, 1000, position.z);
+			this.physics.raycaster.ray.origin.copy(rayStart);
+			this.physics.raycaster.ray.direction.set(0, -1, 0);
+
+			// Intersect with ground mesh
+			const intersects = this.physics.raycaster.intersectObject(this.groundMesh);
+
+			if (intersects.length > 0) {
+				return intersects[0].point.y;
+			}
+
+			// Fallback to terrain height if no intersection
+			return this.terrain.generateHeight(position.x, position.z);
 		}
 
 		setupEntities() {
 			// Set up player
 			this.player = this.createHumanModel();
-			this.player.position.set(0, 1, 0);
+			this.player.position.set(0, 5, 0); // Start higher to avoid terrain intersection
 			this.scene.add(this.player);
 
 			// Player state
@@ -752,7 +801,11 @@
 
 			// Set up vehicle
 			this.vehicle = this.createCarModel();
-			this.vehicle.position.set(10, 0, 10);
+			// Start vehicle above ground
+			const startX = 10;
+			const startZ = 10;
+			const groundHeight = this.terrain.generateHeight(startX, startZ);
+			this.vehicle.position.set(startX, groundHeight + 2, startZ); // +2 to ensure it's above ground
 			this.scene.add(this.vehicle);
 
 			// Vehicle state
@@ -766,7 +819,8 @@
 				maxSteerAngle: Math.PI / 4,
 				wheelbase: 4,
 				mass: 1000,
-				drag: 0.3
+				drag: 0.3,
+				maxSpeed: 20 // Add maxSpeed for vehicle
 			};
 		}
 
@@ -933,7 +987,7 @@
 			forwardVector.applyQuaternion(this.vehicle.quaternion);
 
 			// Calculate forces
-			const engineForce = state.engineForce * 10000;
+			const engineForce = state.engineForce * 20000;
 			const dragForce = -state.drag * state.velocity.lengthSq();
 			const brakingForce = state.brakeForce * -state.velocity.length() * 5000;
 
@@ -945,34 +999,46 @@
 			state.velocity.add(forwardVector.multiplyScalar(acceleration * deltaTime));
 
 			// Apply drag to slow down
-			state.velocity.multiplyScalar(0.95);
+			state.velocity.multiplyScalar(0.98);
 
-			// Calculate movement
-			const movement = state.velocity.clone().multiplyScalar(deltaTime);
+			// Clamp velocity to max speed
+			if (state.velocity.length() > state.maxSpeed) {
+				state.velocity.normalize().multiplyScalar(state.maxSpeed);
+			}
+
+			// Calculate movement on xz plane only
+			const movement = state.velocity.clone();
+			movement.y = 0;
+			movement.multiplyScalar(deltaTime);
+
 			const newPosition = this.vehicle.position.clone().add(movement);
 
-			// Check collisions and terrain height
-			if (!this.checkCollisions(newPosition, this.vehicle.userData.collider)) {
-				// Get ground height at new position
-				const groundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
-				newPosition.y = groundHeight + 0.5; // Keep vehicle above ground
+			// Get exact ground height at new position using raycasting
+			const groundHeight = this.getHeightAtPosition(newPosition);
+			newPosition.y = groundHeight + 1.0; // Vehicle height above ground
 
-				// Update position
+			// Check collisions
+			if (!this.checkCollisions(newPosition, this.vehicle.userData.collider)) {
 				this.vehicle.position.copy(newPosition);
 
-				// Update rotation to face movement direction
-				if (movement.length() > 0.0001) {
-					const targetRotation = Math.atan2(movement.x, movement.z);
-					const currentRotation = this.vehicle.rotation.y;
-					let rotationDiff = targetRotation - currentRotation;
+				// Calculate terrain normals for vehicle orientation
+				const forwardPos = newPosition.clone().add(forwardVector.multiplyScalar(2));
+				const backwardPos = newPosition.clone().sub(forwardVector.multiplyScalar(2));
+				const rightVector = new THREE.Vector3().crossVectors(forwardVector, new THREE.Vector3(0, 1, 0));
+				const rightPos = newPosition.clone().add(rightVector.multiplyScalar(2));
+				const leftPos = newPosition.clone().sub(rightVector.multiplyScalar(2));
 
-					// Normalize rotation difference to [-PI, PI]
-					while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
-					while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+				const forwardHeight = this.getHeightAtPosition(forwardPos);
+				const backwardHeight = this.getHeightAtPosition(backwardPos);
+				const rightHeight = this.getHeightAtPosition(rightPos);
+				const leftHeight = this.getHeightAtPosition(leftPos);
 
-					// Smoothly rotate vehicle
-					this.vehicle.rotation.y += rotationDiff * 0.1;
-				}
+				// Calculate and apply pitch and roll
+				const pitchAngle = Math.atan2(forwardHeight - backwardHeight, 4);
+				const rollAngle = Math.atan2(rightHeight - leftHeight, 4);
+
+				this.vehicle.rotation.x = pitchAngle;
+				this.vehicle.rotation.z = -rollAngle;
 			} else {
 				// Collision response
 				state.velocity.multiplyScalar(-0.5);
@@ -982,7 +1048,7 @@
 			if (this.controlState.inVehicle) {
 				this.player.position.copy(this.vehicle.position);
 				this.player.position.y += 1;
-				this.player.rotation.copy(this.vehicle.rotation);
+				this.player.quaternion.copy(this.vehicle.quaternion);
 			}
 		}
 
@@ -994,7 +1060,7 @@
 				state.velocity.y += this.physics.gravity * deltaTime;
 			}
 
-			// Apply friction
+			// Apply friction to horizontal movement
 			state.velocity.x *= this.physics.friction;
 			state.velocity.z *= this.physics.friction;
 
@@ -1006,18 +1072,27 @@
 				state.velocity.z = horizontalVelocity.y;
 			}
 
-			// Update position
+			// Calculate new position
 			const movement = state.velocity.clone().multiplyScalar(deltaTime);
 			const newPosition = this.player.position.clone().add(movement);
 
-			// Get ground height at new position
-			const groundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
-			newPosition.y = Math.max(groundHeight + 1, newPosition.y);
+			// Get exact ground height at new position using raycasting
+			const groundHeight = this.getHeightAtPosition(newPosition);
+			const heightAboveGround = newPosition.y - groundHeight;
+
+			// Handle ground collision
+			if (heightAboveGround <= 1.0) { // Player height
+				newPosition.y = groundHeight + 1.0;
+				state.velocity.y = 0;
+				state.isGrounded = true;
+			} else {
+				state.isGrounded = false;
+			}
 
 			// Update collider position
 			state.collider.center.copy(newPosition);
 
-			// Check collisions
+			// Check other collisions (trees, etc.)
 			if (!this.checkCollisions(newPosition, state.collider)) {
 				this.player.position.copy(newPosition);
 
@@ -1026,19 +1101,24 @@
 					const targetRotation = Math.atan2(movement.x, movement.z);
 					this.player.rotation.y = targetRotation;
 				}
+
+				// Calculate and apply slope adjustment
+				const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.quaternion);
+				const forwardPos = newPosition.clone().add(forward);
+				const backwardPos = newPosition.clone().sub(forward);
+
+				const forwardHeight = this.getHeightAtPosition(forwardPos);
+				const backwardHeight = this.getHeightAtPosition(backwardPos);
+
+				// Adjust player pitch based on terrain slope
+				const pitchAngle = Math.atan2(forwardHeight - backwardHeight, 2);
+				this.player.rotation.x = pitchAngle * 0.5;
 			} else {
 				// Collision response
 				state.velocity.multiplyScalar(-0.5);
 			}
 
-			// Update ground contact
-			if (this.player.position.y <= groundHeight + this.physics.groundedThreshold) {
-				this.player.position.y = groundHeight + this.physics.groundedThreshold;
-				state.velocity.y = 0;
-				state.isGrounded = true;
-			}
-
-			// Update animation
+			// Update animation if moving
 			if (state.velocity.length() > 0.1) {
 				state.walkAnimation += deltaTime * state.walkSpeed;
 				this.animatePlayer(state.walkAnimation);
@@ -1093,25 +1173,67 @@
 
 		updateCamera() {
 			if (!this.controlState || !this.player || !this.vehicle) {
-				return; // Skip camera update if components aren't ready
+				return;
 			}
 
 			const target = this.controlState.inVehicle ? this.vehicle : this.player;
 			if (!target) {
-				return; // Skip if target is not available
+				return;
 			}
 
-			// Calculate camera position based on current zoom
+			// Calculate speed-based zoom factor (0 to 1)
+			const currentSpeed = this.controlState.inVehicle ?
+				this.vehicleState.velocity.length() :
+				this.playerState.velocity.length();
+
+			const maxSpeed = this.controlState.inVehicle ?
+				this.vehicleState.maxSpeed :
+				this.physics.maxSpeed;
+
+			const normalizedSpeed = Math.min(currentSpeed / maxSpeed, 1);
+			const zoomFactor = THREE.MathUtils.lerp(0, 0.7, normalizedSpeed); // Max zoom out is 70% of range
+
+			// Calculate target zoom
+			this.controlState.targetZoom = THREE.MathUtils.lerp(
+				GameSettings.CAMERA_MIN_ZOOM,
+				GameSettings.CAMERA_MAX_ZOOM,
+				zoomFactor
+			);
+
+			// Smooth zoom transition
+			this.controlState.currentZoom = THREE.MathUtils.lerp(
+				this.controlState.currentZoom,
+				this.controlState.targetZoom,
+				0.05
+			);
+
+			// Get ground height at camera position
+			const cameraTargetX = target.position.x + this.controlState.currentZoom;
+			const cameraTargetZ = target.position.z + this.controlState.currentZoom;
+			const terrainHeight = this.getHeightAtPosition(new THREE.Vector3(cameraTargetX, 0, cameraTargetZ));
+
+			// Ensure camera stays above terrain with minimum clearance
+			const minCameraHeight = terrainHeight + 20;
+
+			// Calculate camera position
 			const cameraOffset = new THREE.Vector3(
 				this.controlState.currentZoom,
-				this.controlState.currentZoom,
+				Math.max(this.controlState.currentZoom, minCameraHeight),
 				this.controlState.currentZoom
 			);
 
 			this.camera.position.copy(target.position).add(cameraOffset);
 			this.camera.lookAt(target.position);
 
-			// Update minimap
+			// Update camera frustum
+			const aspect = window.innerWidth / window.innerHeight;
+			this.camera.left = -this.controlState.currentZoom * aspect;
+			this.camera.right = this.controlState.currentZoom * aspect;
+			this.camera.top = this.controlState.currentZoom;
+			this.camera.bottom = -this.controlState.currentZoom;
+			this.camera.updateProjectionMatrix();
+
+			// Update minimap camera
 			if (this.minimapCamera) {
 				this.minimapCamera.position.set(
 					target.position.x,
