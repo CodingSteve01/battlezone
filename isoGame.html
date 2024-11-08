@@ -3,16 +3,23 @@
 <head>
     <title>Isometric Game Prototype</title>
     <style>
-        body { margin: 0; overflow: hidden; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
         #minimap {
             position: absolute;
             right: 20px;
             top: 20px;
             width: 200px;
             height: 200px;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             border: 2px solid white;
+            display: none;
         }
+
         #info {
             position: absolute;
             top: 10px;
@@ -21,398 +28,1132 @@
             font-family: Arial;
             font-size: 16px;
             text-shadow: 1px 1px 1px black;
+            display: none;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        #progress {
+            width: 300px;
+            height: 20px;
+            background: #333;
+            margin-top: 10px;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #0f0;
+            transition: width 0.3s;
         }
     </style>
 </head>
 <body>
-    <div id="minimap"></div>
-    <div id="info">WASD to move, E to enter/exit vehicle, Space to jump</div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        class Game {
-            constructor() {
-                this.scene = new THREE.Scene();
-                this.camera = new THREE.OrthographicCamera(
-                    window.innerWidth / -32,
-                    window.innerWidth / 32,
-                    window.innerHeight / 32,
-                    window.innerHeight / -32,
-                    1,
-                    2000
-                );
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
-                document.body.appendChild(this.renderer.domElement);
+<div id="minimap"></div>
+<div id="info">WASD to move, E to enter/exit vehicle, Space to jump</div>
+<div id="loading">
+    Loading Game...
+    <div id="progress">
+        <div id="progress-bar"></div>
+    </div>
+    <div id="loading-message"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+	// Utility class for game settings and constants
+	class GameSettings {
+		static get CAMERA_BASE_DISTANCE() {
+			return 50;
+		}
 
-                this.minimapCamera = new THREE.OrthographicCamera(-100, 100, 100, -100, 1, 1000);
-                this.minimapRenderer = new THREE.WebGLRenderer();
-                this.minimapRenderer.setSize(200, 200);
-                document.getElementById('minimap').appendChild(this.minimapRenderer.domElement);
+		static get CAMERA_MAX_ZOOM() {
+			return 80;
+		}
 
-                // Set isometric view
-                this.camera.position.set(50, 50, 50);
-                this.camera.lookAt(0, 0, 0);
+		static get CAMERA_MIN_ZOOM() {
+			return 30;
+		}
 
-                this.setupLighting();
-                this.createWorld();
-                this.setupPlayer();
-                this.setupVehicle();
-                this.setupControls();
+		static get CAMERA_ZOOM_SPEED() {
+			return 0.1;
+		}
 
-                window.addEventListener('resize', () => this.handleResize());
+		static get TREE_COUNT() {
+			return 200;
+		}
 
-                this.clock = new THREE.Clock();
-                this.animate();
-            }
+		static get WORLD_SIZE() {
+			return 2000;
+		}
 
-            handleResize() {
-                const aspect = window.innerWidth / window.innerHeight;
-                this.camera.left = window.innerWidth / -32;
-                this.camera.right = window.innerWidth / 32;
-                this.camera.top = window.innerHeight / 32;
-                this.camera.bottom = window.innerHeight / -32;
-                this.camera.updateProjectionMatrix();
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-            }
+		static get CHUNK_SIZE() {
+			return 100;
+		}
+	}
 
-            setupLighting() {
-                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-                this.scene.add(ambientLight);
+	// Class to handle object pooling for performance
+	class ObjectPool {
+		constructor(createFunc, initialSize = 100) {
+			this.createFunc = createFunc;
+			this.pool = Array(initialSize).fill(null).map(() => createFunc());
+			this.active = new Set();
+		}
 
-                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                directionalLight.position.set(50, 100, 50);
-                directionalLight.castShadow = true;
-                directionalLight.shadow.mapSize.width = 2048;
-                directionalLight.shadow.mapSize.height = 2048;
-                this.scene.add(directionalLight);
-            }
+		acquire() {
+			let object = this.pool.pop() || this.createFunc();
+			this.active.add(object);
+			return object;
+		}
 
-            createWorld() {
-                // Ground plane with varying heights
-                const groundGeometry = new THREE.PlaneGeometry(2000, 2000, 200, 200);
-                const vertices = groundGeometry.attributes.position.array;
-                for (let i = 0; i < vertices.length; i += 3) {
-                    vertices[i + 2] = Math.sin(vertices[i] / 30) * Math.cos(vertices[i + 1] / 30) * 3;
-                }
-                
-                // Create detailed ground material
-                const groundTexture = new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==');
-                groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-                groundTexture.repeat.set(2000, 2000);
-                
-                const groundMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x558822,
-                    map: groundTexture,
-                    roughness: 0.8,
-                    metalness: 0.2
-                });
-                
-                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-                ground.rotation.x = -Math.PI / 2;
-                ground.receiveShadow = true;
-                this.scene.add(ground);
+		release(object) {
+			this.active.delete(object);
+			this.pool.push(object);
+		}
+	}
 
-                // Add detailed trees
-                for (let i = 0; i < 100; i++) {
-                    const tree = this.createDetailedTree();
-                    tree.position.set(
-                        Math.random() * 1000 - 500,
-                        0,
-                        Math.random() * 1000 - 500
-                    );
-                    this.scene.add(tree);
-                }
-            }
+	// Spatial hash grid for efficient collision detection
+	class SpatialHashGrid {
+		constructor(cellSize) {
+			this.cellSize = cellSize;
+			this.grid = new Map();
+		}
 
-            createDetailedTree() {
-                const group = new THREE.Group();
-                
-                // Create detailed trunk
-                const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.5, 4, 8);
-                const trunkMaterial = new THREE.MeshStandardMaterial({ 
-                    color: 0x8B4513,
-                    roughness: 0.9
-                });
-                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-                trunk.castShadow = true;
-                trunk.position.y = 2;
-                group.add(trunk);
+		getKey(x, z) {
+			const cx = Math.floor(x / this.cellSize);
+			const cz = Math.floor(z / this.cellSize);
+			return `${cx},${cz}`;
+		}
 
-                // Create multiple layers of leaves
-                const createLeafLayer = (y, scale) => {
-                    const leafGeometry = new THREE.ConeGeometry(scale, 2, 8);
-                    const leafMaterial = new THREE.MeshStandardMaterial({ 
-                        color: 0x228B22,
-                        roughness: 0.7
-                    });
-                    const leaves = new THREE.Mesh(leafGeometry, leafMaterial);
-                    leaves.castShadow = true;
-                    leaves.position.y = y;
-                    return leaves;
-                };
+		insert(object) {
+			const key = this.getKey(object.position.x, object.position.z);
+			if (!this.grid.has(key)) {
+				this.grid.set(key, new Set());
+			}
+			this.grid.get(key).add(object);
+		}
 
-                group.add(createLeafLayer(4, 2));
-                group.add(createLeafLayer(5, 1.6));
-                group.add(createLeafLayer(6, 1.2));
+		query(x, z, radius) {
+			const results = new Set();
+			const minX = Math.floor((x - radius) / this.cellSize);
+			const maxX = Math.floor((x + radius) / this.cellSize);
+			const minZ = Math.floor((z - radius) / this.cellSize);
+			const maxZ = Math.floor((z + radius) / this.cellSize);
 
-                return group;
-            }
+			for (let ix = minX; ix <= maxX; ix++) {
+				for (let iz = minZ; iz <= maxZ; iz++) {
+					const key = `${ix},${iz}`;
+					const cell = this.grid.get(key);
+					if (cell) {
+						cell.forEach(obj => results.add(obj));
+					}
+				}
+			}
+			return Array.from(results);
+		}
 
-            createHumanModel() {
-                const group = new THREE.Group();
+		clear() {
+			this.grid.clear();
+		}
+	}
 
-                // Body
-                const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 1, 8);
-                const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2244aa });
-                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-                body.position.y = 0.5;
-                group.add(body);
+	// Terrain generator class
+	class TerrainGenerator {
+		constructor() {
+			this.roadNetwork = new Map();
+			this.roadCache = new Map();
+			this.cacheSize = 1000;
+		}
 
-                // Head
-                const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
-                const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
-                const head = new THREE.Mesh(headGeometry, headMaterial);
-                head.position.y = 1.25;
-                group.add(head);
+		generateHeight(x, z) {
+			const baseHeight = Math.sin(x / 30) * Math.cos(z / 30) * 3;
 
-                // Arms
-                const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
-                const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2244aa });
-                
-                const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-                leftArm.position.set(-0.35, 0.8, 0);
-                leftArm.rotation.z = Math.PI / 4;
-                group.add(leftArm);
+			// Check if point is near a road
+			const roadDistance = this.getDistanceToNearestRoad(x, z);
+			if (roadDistance < 5) {
+				return 0; // Road level
+			}
 
-                const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-                rightArm.position.set(0.35, 0.8, 0);
-                rightArm.rotation.z = -Math.PI / 4;
-                group.add(rightArm);
+			return baseHeight;
+		}
 
-                // Legs
-                const legGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.6, 8);
-                const legMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+		generateRoads() {
+			// Generate main road more efficiently
+			const roadPoints = [];
+			for (let x = -1000; x < 1000; x += 5) { // Increased step size
+				roadPoints.push([x, 0]);
+			}
 
-                const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-                leftLeg.position.set(-0.2, 0.1, 0);
-                group.add(leftLeg);
+			// Generate fewer branching roads
+			for (let z = -1000; z < 1000; z += 400) { // Increased spacing
+				for (let x = -100; x < 100; x += 5) { // Increased step size
+					roadPoints.push([x, z]);
+				}
+			}
 
-                const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-                rightLeg.position.set(0.2, 0.1, 0);
-                group.add(rightLeg);
+			// Store road points more efficiently
+			roadPoints.forEach(([x, z]) => {
+				const key = `${Math.floor(x / 10)},${Math.floor(z / 10)}`;
+				this.roadNetwork.set(key, true);
+			});
+		}
 
-                group.traverse((object) => {
-                    if (object instanceof THREE.Mesh) {
-                        object.castShadow = true;
-                    }
-                });
+		generateRoadsSegment(start, end) {
+			// Generate main road segment
+			for (let x = start; x < end; x += 5) {
+				this.addRoadPoint(x, 0);
+			}
 
-                return group;
-            }
+			// Generate branch roads for this segment
+			for (let z = -1000; z < 1000; z += 400) {
+				if (z >= start && z < end) {
+					for (let x = -100; x < 100; x += 5) {
+						this.addRoadPoint(x, z);
+					}
+				}
+			}
+		}
 
-            createCarModel() {
-                const group = new THREE.Group();
+		addRoadPoint(x, z) {
+			const key = `${Math.floor(x / 10)},${Math.floor(z / 10)}`;
+			this.roadNetwork.set(key, true);
+		}
 
-                // Car body
-                const bodyGeometry = new THREE.BoxGeometry(4, 1.5, 2);
-                const bodyMaterial = new THREE.MeshStandardMaterial({ 
-                    color: 0xff0000,
-                    metalness: 0.6,
-                    roughness: 0.4
-                });
-                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-                body.position.y = 1;
-                group.add(body);
+		getDistanceToNearestRoad(x, z) {
+			// Check cache first
+			const cacheKey = `${Math.floor(x)},${Math.floor(z)}`;
+			if (this.roadCache.has(cacheKey)) {
+				return this.roadCache.get(cacheKey);
+			}
 
-                // Roof
-                const roofGeometry = new THREE.BoxGeometry(2.5, 1, 2);
-                const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
-                roof.position.set(-0.5, 2, 0);
-                group.add(roof);
+			// Simplified distance calculation
+			const gridX = Math.floor(x / 10);
+			const gridZ = Math.floor(z / 10);
+			let minDist = Infinity;
 
-                // Wheels
-                const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
-                const wheelMaterial = new THREE.MeshStandardMaterial({ 
-                    color: 0x111111,
-                    metalness: 0.5,
-                    roughness: 0.7
-                });
+			// Check only nearby grid cells
+			for (let ix = -1; ix <= 1; ix++) {
+				for (let iz = -1; iz <= 1; iz++) {
+					const key = `${gridX + ix},${gridZ + iz}`;
+					if (this.roadNetwork.has(key)) {
+						const dist = Math.sqrt(ix * ix + iz * iz) * 10;
+						minDist = Math.min(minDist, dist);
+					}
+				}
+			}
 
-                const wheelPositions = [
-                    [-1.5, 0.4, 1], [-1.5, 0.4, -1],
-                    [1.5, 0.4, 1], [1.5, 0.4, -1]
-                ];
+			// Cache the result
+			if (this.roadCache.size > this.cacheSize) {
+				const firstKey = this.roadCache.keys().next().value;
+				this.roadCache.delete(firstKey);
+			}
+			this.roadCache.set(cacheKey, minDist);
 
-                wheelPositions.forEach(pos => {
-                    const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-                    wheel.position.set(...pos);
-                    wheel.rotation.z = Math.PI / 2;
-                    group.add(wheel);
-                });
+			return minDist;
+		}
 
-                // Windows
-                const windowMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x444444,
-                    metalness: 0.8,
-                    roughness: 0.2
-                });
+		getGroundType(x, z) {
+			const roadDistance = this.getDistanceToNearestRoad(x, z);
+			if (roadDistance < 5) {
+				return 'road';
+			}
+			const height = this.generateHeight(x, z);
+			if (height > 2) return 'mountain';
+			if (height > 1) return 'hill';
+			return 'grass';
+		}
+	}
 
-                const windshieldGeometry = new THREE.PlaneGeometry(1.5, 1);
-                const windshield = new THREE.Mesh(windshieldGeometry, windowMaterial);
-                windshield.position.set(0.5, 1.8, 0);
-                windshield.rotation.x = Math.PI / 4;
-                group.add(windshield);
+	class LoadingManager {
+		constructor() {
+			this.progressBar = document.getElementById('progress-bar');
+			this.loadingMessage = document.getElementById('loading-message');
+			this.loadingContainer = document.getElementById('loading');
+			this.minimap = document.getElementById('minimap');
+			this.info = document.getElementById('info');
 
-                group.traverse((object) => {
-                    if (object instanceof THREE.Mesh) {
-                        object.castShadow = true;
-                    }
-                });
+			// Ensure all elements exist
+			if (!this.progressBar || !this.loadingMessage || !this.loadingContainer) {
+				throw new Error('Required loading elements not found');
+			}
+		}
 
-                return group;
-            }
+		updateProgress(progress, message) {
+			this.progressBar.style.width = `${progress}%`;
+			this.loadingMessage.textContent = message;
+			return new Promise(resolve => setTimeout(resolve, 0));
+		}
 
-            setupPlayer() {
-                this.player = this.createHumanModel();
-                this.player.position.y = 1;
-                this.scene.add(this.player);
+		hideLoading() {
+			this.loadingContainer.style.display = 'none';
+			this.minimap.style.display = 'block';
+			this.info.style.display = 'block';
+		}
+	}
 
-                // Animation properties
-                this.playerState = {
-                    walkAnimation: 0,
-                    walkSpeed: 5
-                };
-            }
+	// Main game class
+	class Game {
+		constructor() {
+			// Ensure DOM is fully loaded
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', () => this.init());
+			} else {
+				this.init();
+			}
+		}
 
-            setupVehicle() {
-                this.vehicle = this.createCarModel();
-                this.vehicle.position.set(10, 0, 10);
-                this.scene.add(this.vehicle);
+		async init() {
+			try {
+				this.loadingManager = new LoadingManager();
+				await this.initializeAsync();
+			} catch (error) {
+				console.error('Game initialization failed:', error);
+				document.body.innerHTML = `
+                        <div style="color: white; padding: 20px;">
+                            Failed to initialize game. Please refresh the page.
+                            <br>Error: ${error.message}
+                        </div>
+                    `;
+			}
+		}
 
-                // Vehicle physics properties
-                this.vehicleState = {
-                    velocity: new THREE.Vector3(),
-                    rotation: 0,
-                    acceleration: 0
-                };
-            }
+		async initializeAsync() {
+			try {
+				await this.loadingManager.updateProgress(0, 'Initializing core systems...');
+				await this.setupCore();
 
-            setupControls() {
-                this.keys = {};
-                this.inVehicle = false;
-                this.moveSpeed = 0.5;
-                this.vehicleSpeed = 0.8;
-                this.maxVehicleSpeed = 2;
-                this.vehicleAcceleration = 0.05;
-                this.vehicleDrag = 0.98;
+				await this.loadingManager.updateProgress(20, 'Generating terrain...');
+				await this.setupWorld();
 
-                window.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
-                window.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
+				await this.loadingManager.updateProgress(60, 'Creating entities...');
+				await this.setupEntities();
 
-                window.addEventListener('keydown', (e) => {
-                    if (e.key.toLowerCase() === 'e') {
-                        const distance = this.player.position.distanceTo(this.vehicle.position);
-                        if (distance < 5) {
-                            this.inVehicle = !this.inVehicle;
-                            this.player.visible = !this.inVehicle;
-                        }
-                    }
-                });
-            }
+				await this.loadingManager.updateProgress(70, 'Setting up controls...');
+				this.setupControls();
 
-            updateMovement() {
-                const delta = this.clock.getDelta();
+				await this.loadingManager.updateProgress(80, 'Setting up physics...');
+				await this.setupPhysics();
 
-                if (this.inVehicle) {
-                    // Vehicle movement with momentum
-                    if (this.keys['w']) this.vehicleState.acceleration += this.vehicleAcceleration;
-                    if (this.keys['s']) this.vehicleState.acceleration -= this.vehicleAcceleration;
-                    if (this.keys['a']) this.vehicle.rotation.y += 0.03;
-                    if (this.keys['d']) this.vehicle.rotation.y -= 0.03;
+				await this.loadingManager.updateProgress(100, 'Starting game...');
+				await this.startGame();
+			} catch (error) {
+				console.error('Initialization failed:', error);
+				throw error;
+			}
+		}
 
-                    // Apply physics
-                    this.vehicleState.acceleration *= this.vehicleDrag;
-                    this.vehicleState.acceleration = THREE.MathUtils.clamp(
-                        this.vehicleState.acceleration,
-                        -this.maxVehicleSpeed,
-                        this.maxVehicleSpeed
-                    );
+		async startGame() {
+			// Ensure all critical game objects are initialized
+			if (!this.player || !this.vehicle || !this.scene || !this.camera) {
+				console.error('Critical game components not initialized');
+				throw new Error('Game initialization incomplete');
+			}
 
-                    // Update position
-                    const movement = new THREE.Vector3(0, 0, -this.vehicleState.acceleration);
-                    movement.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.vehicle.rotation.y);
-                    this.vehicle.position.add(movement);
-                    
-                    this.player.position.copy(this.vehicle.position);
-                } else {
-                    // Player movement with animation
-                    const movement = new THREE.Vector3();
-                    if (this.keys['w']) movement.z -= this.moveSpeed;
-                    if (this.keys['s']) movement.z += this.moveSpeed;
-                    if (this.keys['a']) movement.x -= this.moveSpeed;
-                    if (this.keys['d']) movement.x += this.moveSpeed;
+			this.loadingManager.hideLoading();
+			this.setupEventListeners();
 
-                    if (movement.length() > 0) {
-                        movement.normalize();
-                        movement.multiplyScalar(this.moveSpeed);
-                        
-                        // Calculate rotation based on movement direction
-                        this.player.rotation.y = Math.atan2(movement.x, movement.z);
-                        
-                        // Animate walking
-                        this.playerState.walkAnimation += delta * this.playerState.walkSpeed;
-                        
-                        // Leg animation
-                        this.player.children.forEach((child, index) => {
-                            if (index >= 4) { // Only animate legs
-                                child.position.y = 0.1 + Math.sin(this.playerState.walkAnimation + (index % 2) * Math.PI) * 0.1;
-                            }
-                        });
-                    }
+			// Initialize control state here to ensure it exists
+			this.controlState = {
+				inVehicle: false,
+				keys: {},
+				targetZoom: GameSettings.CAMERA_BASE_DISTANCE,
+				currentZoom: GameSettings.CAMERA_BASE_DISTANCE
+			};
 
-                    this.player.position.add(movement);
-                }
+			// Start animation loop
+			this.animate();
+		}
 
-                // Update camera to follow target while maintaining isometric angle
-                const target = this.inVehicle ? this.vehicle : this.player;
-                const cameraOffset = new THREE.Vector3(50, 50, 50);
-                this.camera.position.copy(target.position).add(cameraOffset);
-                this.camera.lookAt(target.position);
+		setupEventListeners() {
+			// Set up key event listeners
+			window.addEventListener('keydown', (e) => {
+				this.controlState.keys[e.key.toLowerCase()] = true;
 
-                // Ground height adjustment
-                const targetPosition = this.inVehicle ? this.vehicle.position : this.player.position;
-                const groundHeight = this.getGroundHeight(targetPosition.x, targetPosition.z);
-                if (!this.inVehicle) {
-                    this.player.position.y = groundHeight + 1;
-                } else {
-                    this.vehicle.position.y = groundHeight + 0.5;
-                }
+				// Vehicle entry/exit
+				if (e.key.toLowerCase() === 'e') {
+					const distance = this.player.position.distanceTo(this.vehicle.position);
+					if (distance < 5) {
+						this.controlState.inVehicle = !this.controlState.inVehicle;
+						this.player.visible = !this.controlState.inVehicle;
+					}
+				}
+			});
 
-                // Update minimap camera
-                this.minimapCamera.position.set(target.position.x, 100, target.position.z);
-                this.minimapCamera.lookAt(target.position);
-            }
+			window.addEventListener('keyup', (e) => {
+				this.controlState.keys[e.key.toLowerCase()] = false;
+			});
 
-            getGroundHeight(x, z) {
-                // Simplified ground height calculation based on sine waves
-                return Math.sin(x / 30) * Math.cos(z / 30) * 3;
-            }
+			// Handle window resize
+			window.addEventListener('resize', () => this.handleResize());
+		}
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                
-                this.updateMovement();
-                
-                this.renderer.render(this.scene, this.camera);
-                this.minimapRenderer.render(this.scene, this.minimapCamera);
-            }
-        }
+		handleResize() {
+			const aspect = window.innerWidth / window.innerHeight;
 
-        // Start the game when the page loads
-        window.onload = () => {
-            new Game();
-        };
-    </script>
+			// Update main camera
+			this.camera.left = -GameSettings.CAMERA_BASE_DISTANCE * aspect;
+			this.camera.right = GameSettings.CAMERA_BASE_DISTANCE * aspect;
+			this.camera.updateProjectionMatrix();
+
+			// Update renderer
+			this.renderer.setSize(window.innerWidth, window.innerHeight);
+		}
+
+		setupCore() {
+			this.scene = new THREE.Scene();
+			this.setupCamera();
+			this.setupRenderers();
+			this.setupLighting();
+			this.terrain = new TerrainGenerator();
+			this.spatialHash = new SpatialHashGrid(10);
+			this.clock = new THREE.Clock();
+		}
+
+		setupCamera() {
+			const aspect = window.innerWidth / window.innerHeight;
+			this.camera = new THREE.OrthographicCamera(
+				-GameSettings.CAMERA_BASE_DISTANCE * aspect,
+				GameSettings.CAMERA_BASE_DISTANCE * aspect,
+				GameSettings.CAMERA_BASE_DISTANCE,
+				-GameSettings.CAMERA_BASE_DISTANCE,
+				1,
+				2000
+			);
+			this.currentZoom = GameSettings.CAMERA_BASE_DISTANCE;
+			this.targetZoom = GameSettings.CAMERA_BASE_DISTANCE;
+			this.camera.position.set(50, 50, 50);
+			this.camera.lookAt(0, 0, 0);
+		}
+
+		setupRenderers() {
+			this.renderer = new THREE.WebGLRenderer({antialias: true});
+			this.renderer.setSize(window.innerWidth, window.innerHeight);
+			this.renderer.shadowMap.enabled = true;
+			document.body.appendChild(this.renderer.domElement);
+
+			this.minimapRenderer = new THREE.WebGLRenderer();
+			this.minimapRenderer.setSize(200, 200);
+			document.getElementById('minimap').appendChild(this.minimapRenderer.domElement);
+
+			window.addEventListener('resize', () => this.handleResize());
+		}
+
+		setupLighting() {
+			const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+			this.scene.add(ambientLight);
+
+			const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+			directionalLight.position.set(50, 100, 50);
+			directionalLight.castShadow = true;
+			directionalLight.shadow.mapSize.width = 2048;
+			directionalLight.shadow.mapSize.height = 2048;
+			this.scene.add(directionalLight);
+		}
+
+		createTerrainChunk(startX) {
+			const chunkSize = 400;
+			const segments = 20; // Resolution of the chunk
+
+			const geometry = new THREE.PlaneGeometry(
+				chunkSize,
+				chunkSize,
+				segments,
+				segments
+			);
+
+			// Update vertices
+			const vertices = geometry.attributes.position.array;
+			for (let i = 0; i < vertices.length; i += 3) {
+				const x = startX + (vertices[i] * chunkSize / segments);
+				const z = vertices[i + 1];
+				vertices[i + 2] = this.terrain.generateHeight(x, z);
+			}
+
+			// Create materials based on ground type
+			const materials = {
+				road: new THREE.MeshStandardMaterial({
+					color: 0x444444,
+					roughness: 0.8
+				}),
+				grass: new THREE.MeshStandardMaterial({
+					color: 0x558822,
+					roughness: 0.9
+				}),
+				hill: new THREE.MeshStandardMaterial({
+					color: 0x667733,
+					roughness: 0.9
+				}),
+				mountain: new THREE.MeshStandardMaterial({
+					color: 0x776655,
+					roughness: 0.95
+				})
+			};
+
+			const groundMesh = new THREE.Mesh(geometry, materials.grass);
+			groundMesh.rotation.x = -Math.PI / 2;
+			groundMesh.receiveShadow = true;
+			this.scene.add(groundMesh);
+		}
+
+		createTreeBatch(count) {
+			if (!this.treePool) {
+				this.treePool = new ObjectPool(() => this.createDetailedTree(), 300);
+			}
+
+			for (let i = 0; i < count; i++) {
+				const tree = this.treePool.acquire();
+				let x, z;
+				let attempts = 0;
+				const maxAttempts = 10;
+
+				// Try to find a valid position
+				do {
+					x = Math.random() * 1000 - 500;
+					z = Math.random() * 1000 - 500;
+					attempts++;
+				} while (
+					this.terrain.getDistanceToNearestRoad(x, z) < 10 &&
+					attempts < maxAttempts
+					);
+
+				if (attempts < maxAttempts) {
+					const y = this.terrain.generateHeight(x, z);
+					tree.position.set(x, y, z);
+					this.scene.add(tree);
+					this.spatialHash.insert(tree);
+				} else {
+					this.treePool.release(tree);
+				}
+			}
+		}
+
+		async setupWorld() {
+			// Generate roads in chunks
+			for (let i = 0; i < 5; i++) {
+				await new Promise(resolve => {
+					setTimeout(() => {
+						const start = -1000 + (i * 400);
+						const end = start + 400;
+						this.terrain.generateRoadsSegment(start, end);
+						resolve();
+					}, 0);
+				});
+				await this.loadingManager.updateProgress(20 + (i * 8), 'Generating roads...');
+			}
+
+			// Create ground in chunks
+			const chunkSize = 400;
+			const chunks = GameSettings.WORLD_SIZE / chunkSize;
+
+			for (let i = 0; i < chunks; i++) {
+				await new Promise(resolve => {
+					setTimeout(() => {
+						this.createTerrainChunk(i * chunkSize - GameSettings.WORLD_SIZE / 2);
+						resolve();
+					}, 0);
+				});
+				await this.loadingManager.updateProgress(40 + (i * 5), 'Creating terrain...');
+			}
+
+			// Create trees in batches
+			const treeBatchSize = 20;
+			const batches = GameSettings.TREE_COUNT / treeBatchSize;
+
+			for (let i = 0; i < batches; i++) {
+				await new Promise(resolve => {
+					setTimeout(() => {
+						this.createTreeBatch(treeBatchSize);
+						resolve();
+					}, 0);
+				});
+				await this.loadingManager.updateProgress(50 + (i * 2), 'Growing trees...');
+			}
+		}
+
+		createDetailedTree() {
+			const group = new THREE.Group();
+
+			// Create more detailed trunk with bark texture simulation
+			const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.5, 4, 8);
+			const trunkMaterial = new THREE.MeshStandardMaterial({
+				color: 0x8B4513,
+				roughness: 0.9,
+				bumpScale: 0.1
+			});
+			const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+			trunk.castShadow = true;
+			trunk.position.y = 2;
+			group.add(trunk);
+
+			// Create multiple layers of leaves with varying colors
+			const leafColors = [0x228B22, 0x32CD32, 0x90EE90];
+			const createLeafLayer = (y, scale, color) => {
+				const leafGeometry = new THREE.ConeGeometry(scale, 2, 8);
+				const leafMaterial = new THREE.MeshStandardMaterial({
+					color: color,
+					roughness: 0.7,
+					flatShading: true
+				});
+				const leaves = new THREE.Mesh(leafGeometry, leafMaterial);
+				leaves.castShadow = true;
+				leaves.position.y = y;
+				return leaves;
+			};
+
+			// Add multiple leaf layers with slight random variations
+			for (let i = 0; i < 3; i++) {
+				const y = 4 + i * 1.2;
+				const scale = 2 - i * 0.4;
+				const color = leafColors[i];
+				group.add(createLeafLayer(y, scale, color));
+			}
+
+			// Add collision data
+			group.userData.collider = new THREE.Sphere(
+				new THREE.Vector3(0, 2, 0),
+				2
+			);
+
+			return group;
+		}
+
+		createTrees() {
+			// Clear existing spatial hash
+			this.spatialHash.clear();
+
+			// Create trees with improved placement strategy
+			for (let i = 0; i < GameSettings.TREE_COUNT; i++) {
+				const tree = this.treePool.acquire();
+				let x, z;
+				let attempts = 0;
+				const maxAttempts = 10;
+
+				// Try to find a valid position
+				do {
+					x = Math.random() * 1000 - 500;
+					z = Math.random() * 1000 - 500;
+					attempts++;
+				} while (
+					this.terrain.getDistanceToNearestRoad(x, z) < 10 &&
+					attempts < maxAttempts
+					);
+
+				if (attempts < maxAttempts) {
+					const y = this.terrain.generateHeight(x, z);
+					tree.position.set(x, y, z);
+					this.scene.add(tree);
+					this.spatialHash.insert(tree);
+				} else {
+					this.treePool.release(tree);
+				}
+			}
+		}
+
+		createCarModel() {
+			const group = new THREE.Group();
+
+			// Enhanced car body with better proportions
+			const bodyGeometry = new THREE.BoxGeometry(2, 1.2, 4.5);
+			const bodyMaterial = new THREE.MeshStandardMaterial({
+				color: 0xff0000,
+				metalness: 0.6,
+				roughness: 0.4
+			});
+			const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+			body.position.y = 1;
+			group.add(body);
+
+			// Streamlined roof
+			const roofGeometry = new THREE.BoxGeometry(1.8, 1, 3);
+			const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
+			roof.position.set(0, 2, -0.2);
+			group.add(roof);
+
+			// Add headlights
+			const headlightGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+			const headlightMaterial = new THREE.MeshStandardMaterial({
+				color: 0xffffcc,
+				emissive: 0xffffcc,
+				emissiveIntensity: 0.5
+			});
+
+			const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
+			leftHeadlight.position.set(0.7, 1, 2.2);
+			group.add(leftHeadlight);
+
+			const rightHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
+			rightHeadlight.position.set(-0.7, 1, 2.2);
+			group.add(rightHeadlight);
+
+			// Add wheels
+			const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+			const wheelMaterial = new THREE.MeshStandardMaterial({
+				color: 0x111111,
+				metalness: 0.5,
+				roughness: 0.7
+			});
+
+			const wheelPositions = [
+				[-1, 0.4, 1.5], [1, 0.4, 1.5],
+				[-1, 0.4, -1.5], [1, 0.4, -1.5]
+			];
+
+			wheelPositions.forEach(pos => {
+				const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+				wheel.position.set(...pos);
+				wheel.rotation.z = Math.PI / 2;
+				group.add(wheel);
+			});
+
+			// Add collision data
+			group.userData.collider = new THREE.Box3(
+				new THREE.Vector3(-1, 0, -2.25),
+				new THREE.Vector3(1, 2, 2.25)
+			);
+
+			return group;
+		}
+
+		setupPhysics() {
+			this.physics = {
+				gravity: -9.81,
+				friction: 0.98,
+				maxSpeed: 2,
+				jumpForce: 5,
+				groundedThreshold: 0.1
+			};
+		}
+
+		setupEntities() {
+			// Set up player
+			this.player = this.createHumanModel();
+			this.player.position.set(0, 1, 0);
+			this.scene.add(this.player);
+
+			// Player state
+			this.playerState = {
+				velocity: new THREE.Vector3(),
+				isGrounded: true,
+				walkAnimation: 0,
+				walkSpeed: 5,
+				collider: new THREE.Sphere(
+					new THREE.Vector3(),
+					0.5
+				)
+			};
+
+			// Set up vehicle
+			this.vehicle = this.createCarModel();
+			this.vehicle.position.set(10, 0, 10);
+			this.scene.add(this.vehicle);
+
+			// Vehicle state
+			this.vehicleState = {
+				velocity: new THREE.Vector3(),
+				angularVelocity: 0,
+				acceleration: 0,
+				steeringAngle: 0,
+				engineForce: 0,
+				brakeForce: 0,
+				maxSteerAngle: Math.PI / 4,
+				wheelbase: 4,
+				mass: 1000,
+				drag: 0.3
+			};
+		}
+
+		setupControls() {
+			this.controlState = {
+				inVehicle: false,
+				keys: {},
+				targetZoom: GameSettings.CAMERA_BASE_DISTANCE,
+				currentZoom: GameSettings.CAMERA_BASE_DISTANCE
+			};
+		}
+
+		createHumanModel() {
+			const group = new THREE.Group();
+
+			// Enhanced human model with better proportions and details
+			const materials = {
+				skin: new THREE.MeshStandardMaterial({color: 0xffcc99}),
+				clothes: new THREE.MeshStandardMaterial({color: 0x2244aa}),
+				shoes: new THREE.MeshStandardMaterial({color: 0x111111})
+			};
+
+			// Body parts with improved geometries
+			const parts = [
+				{
+					name: 'torso',
+					geometry: new THREE.CylinderGeometry(0.25, 0.3, 1, 8),
+					material: materials.clothes,
+					position: [0, 0.5, 0]
+				},
+				{
+					name: 'head',
+					geometry: new THREE.SphereGeometry(0.25, 8, 8),
+					material: materials.skin,
+					position: [0, 1.25, 0]
+				},
+				// Arms with joints
+				{
+					name: 'leftArm',
+					geometry: new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8),
+					material: materials.clothes,
+					position: [-0.35, 0.8, 0]
+				},
+				{
+					name: 'rightArm',
+					geometry: new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8),
+					material: materials.clothes,
+					position: [0.35, 0.8, 0]
+				},
+				// Legs with joints
+				{
+					name: 'leftLeg',
+					geometry: new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8),
+					material: materials.clothes,
+					position: [-0.2, 0.1, 0]
+				},
+				{
+					name: 'rightLeg',
+					geometry: new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8),
+					material: materials.clothes,
+					position: [0.2, 0.1, 0]
+				}
+			];
+
+			parts.forEach(part => {
+				const mesh = new THREE.Mesh(part.geometry, part.material);
+				mesh.position.set(...part.position);
+				mesh.castShadow = true;
+				mesh.name = part.name;
+				group.add(mesh);
+			});
+
+			return group;
+		}
+
+		handleInput() {
+			const keys = this.controlState.keys;
+
+			if (this.controlState.inVehicle) {
+				this.handleVehicleInput(keys);
+			} else {
+				this.handlePlayerInput(keys);
+			}
+
+			// Update camera zoom based on speed
+			const speed = this.controlState.inVehicle ?
+				this.vehicleState.velocity.length() :
+				this.playerState.velocity.length();
+
+			this.controlState.targetZoom = THREE.MathUtils.lerp(
+				GameSettings.CAMERA_MIN_ZOOM,
+				GameSettings.CAMERA_MAX_ZOOM,
+				speed / this.physics.maxSpeed
+			);
+		}
+
+		handleVehicleInput(keys) {
+			const state = this.vehicleState;
+
+			// Forward/Backward
+			if (keys['w']) {
+				state.engineForce = 1;
+			} else if (keys['s']) {
+				state.engineForce = -0.5;
+			} else {
+				state.engineForce = 0;
+			}
+
+			// Turn vehicle based on forward motion
+			if (Math.abs(state.velocity.length()) > 0.1) {
+				if (keys['a']) {
+					this.vehicle.rotation.y += 0.03;
+				} else if (keys['d']) {
+					this.vehicle.rotation.y -= 0.03;
+				}
+			}
+
+			// Apply brakes
+			state.brakeForce = keys[' '] ? 1 : 0;
+		}
+
+		handlePlayerInput(keys) {
+			const movement = new THREE.Vector3();
+
+			if (keys['w']) movement.z -= 1;
+			if (keys['s']) movement.z += 1;
+			if (keys['a']) movement.x -= 1;
+			if (keys['d']) movement.x += 1;
+
+			if (movement.length() > 0) {
+				movement.normalize();
+				this.playerState.velocity.add(movement.multiplyScalar(0.1));
+			}
+
+			// Jump
+			if (keys[' '] && this.playerState.isGrounded) {
+				this.playerState.velocity.y = this.physics.jumpForce;
+				this.playerState.isGrounded = false;
+			}
+		}
+
+		updatePhysics(deltaTime) {
+			if (this.controlState.inVehicle) {
+				this.updateVehiclePhysics(deltaTime);
+			} else {
+				this.updatePlayerPhysics(deltaTime);
+			}
+
+			// Smooth camera zoom
+			this.controlState.currentZoom = THREE.MathUtils.lerp(
+				this.controlState.currentZoom,
+				this.controlState.targetZoom,
+				GameSettings.CAMERA_ZOOM_SPEED
+			);
+
+			this.updateCamera();
+		}
+
+		updateVehiclePhysics(deltaTime) {
+			const state = this.vehicleState;
+
+			// Get current forward direction
+			const forwardVector = new THREE.Vector3(0, 0, 1);
+			forwardVector.applyQuaternion(this.vehicle.quaternion);
+
+			// Calculate forces
+			const engineForce = state.engineForce * 10000;
+			const dragForce = -state.drag * state.velocity.lengthSq();
+			const brakingForce = state.brakeForce * -state.velocity.length() * 5000;
+
+			// Apply forces along vehicle's forward direction
+			const totalForce = engineForce + dragForce + brakingForce;
+			const acceleration = totalForce / state.mass;
+
+			// Update velocity in vehicle's local space
+			state.velocity.add(forwardVector.multiplyScalar(acceleration * deltaTime));
+
+			// Apply drag to slow down
+			state.velocity.multiplyScalar(0.95);
+
+			// Calculate movement
+			const movement = state.velocity.clone().multiplyScalar(deltaTime);
+			const newPosition = this.vehicle.position.clone().add(movement);
+
+			// Check collisions and terrain height
+			if (!this.checkCollisions(newPosition, this.vehicle.userData.collider)) {
+				// Get ground height at new position
+				const groundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
+				newPosition.y = groundHeight + 0.5; // Keep vehicle above ground
+
+				// Update position
+				this.vehicle.position.copy(newPosition);
+
+				// Update rotation to face movement direction
+				if (movement.length() > 0.0001) {
+					const targetRotation = Math.atan2(movement.x, movement.z);
+					const currentRotation = this.vehicle.rotation.y;
+					let rotationDiff = targetRotation - currentRotation;
+
+					// Normalize rotation difference to [-PI, PI]
+					while (rotationDiff > Math.PI) rotationDiff -= Math.PI * 2;
+					while (rotationDiff < -Math.PI) rotationDiff += Math.PI * 2;
+
+					// Smoothly rotate vehicle
+					this.vehicle.rotation.y += rotationDiff * 0.1;
+				}
+			} else {
+				// Collision response
+				state.velocity.multiplyScalar(-0.5);
+			}
+
+			// Update player position if in vehicle
+			if (this.controlState.inVehicle) {
+				this.player.position.copy(this.vehicle.position);
+				this.player.position.y += 1;
+				this.player.rotation.copy(this.vehicle.rotation);
+			}
+		}
+
+		updatePlayerPhysics(deltaTime) {
+			const state = this.playerState;
+
+			// Apply gravity if not grounded
+			if (!state.isGrounded) {
+				state.velocity.y += this.physics.gravity * deltaTime;
+			}
+
+			// Apply friction
+			state.velocity.x *= this.physics.friction;
+			state.velocity.z *= this.physics.friction;
+
+			// Clamp horizontal speed
+			const horizontalVelocity = new THREE.Vector2(state.velocity.x, state.velocity.z);
+			if (horizontalVelocity.length() > this.physics.maxSpeed) {
+				horizontalVelocity.normalize().multiplyScalar(this.physics.maxSpeed);
+				state.velocity.x = horizontalVelocity.x;
+				state.velocity.z = horizontalVelocity.y;
+			}
+
+			// Update position
+			const movement = state.velocity.clone().multiplyScalar(deltaTime);
+			const newPosition = this.player.position.clone().add(movement);
+
+			// Get ground height at new position
+			const groundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
+			newPosition.y = Math.max(groundHeight + 1, newPosition.y);
+
+			// Update collider position
+			state.collider.center.copy(newPosition);
+
+			// Check collisions
+			if (!this.checkCollisions(newPosition, state.collider)) {
+				this.player.position.copy(newPosition);
+
+				// Update player rotation to face movement direction
+				if (movement.length() > 0.0001) {
+					const targetRotation = Math.atan2(movement.x, movement.z);
+					this.player.rotation.y = targetRotation;
+				}
+			} else {
+				// Collision response
+				state.velocity.multiplyScalar(-0.5);
+			}
+
+			// Update ground contact
+			if (this.player.position.y <= groundHeight + this.physics.groundedThreshold) {
+				this.player.position.y = groundHeight + this.physics.groundedThreshold;
+				state.velocity.y = 0;
+				state.isGrounded = true;
+			}
+
+			// Update animation
+			if (state.velocity.length() > 0.1) {
+				state.walkAnimation += deltaTime * state.walkSpeed;
+				this.animatePlayer(state.walkAnimation);
+			}
+		}
+
+		animatePlayer(time) {
+			// Animate legs
+			const leftLeg = this.player.getObjectByName('leftLeg');
+			const rightLeg = this.player.getObjectByName('rightLeg');
+			if (leftLeg && rightLeg) {
+				leftLeg.position.z = Math.sin(time) * 0.2;
+				rightLeg.position.z = Math.sin(time + Math.PI) * 0.2;
+			}
+
+			// Animate arms
+			const leftArm = this.player.getObjectByName('leftArm');
+			const rightArm = this.player.getObjectByName('rightArm');
+			if (leftArm && rightArm) {
+				leftArm.position.z = Math.sin(time + Math.PI) * 0.15;
+				rightArm.position.z = Math.sin(time) * 0.15;
+			}
+		}
+
+		checkCollisions(position, collider) {
+			// Check collision with trees
+			const nearbyObjects = this.spatialHash.query(
+				position.x,
+				position.z,
+				5
+			);
+
+			for (const obj of nearbyObjects) {
+				if (obj.userData.collider) {
+					if (this.testCollision(collider, obj.userData.collider, obj.position)) {
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+
+		testCollision(collider1, collider2, position2) {
+			if (collider1 instanceof THREE.Sphere && collider2 instanceof THREE.Sphere) {
+				const distance = collider1.center.distanceTo(position2);
+				return distance < (collider1.radius + collider2.radius);
+			}
+			// Add more collision tests as needed
+			return false;
+		}
+
+		updateCamera() {
+			if (!this.controlState || !this.player || !this.vehicle) {
+				return; // Skip camera update if components aren't ready
+			}
+
+			const target = this.controlState.inVehicle ? this.vehicle : this.player;
+			if (!target) {
+				return; // Skip if target is not available
+			}
+
+			// Calculate camera position based on current zoom
+			const cameraOffset = new THREE.Vector3(
+				this.controlState.currentZoom,
+				this.controlState.currentZoom,
+				this.controlState.currentZoom
+			);
+
+			this.camera.position.copy(target.position).add(cameraOffset);
+			this.camera.lookAt(target.position);
+
+			// Update minimap
+			if (this.minimapCamera) {
+				this.minimapCamera.position.set(
+					target.position.x,
+					100,
+					target.position.z
+				);
+				this.minimapCamera.lookAt(target.position);
+			}
+		}
+
+		animate() {
+			try {
+				requestAnimationFrame(() => this.animate());
+
+				if (!this.clock || !this.controlState) {
+					return; // Skip frame if not fully initialized
+				}
+
+				const deltaTime = this.clock.getDelta();
+
+				this.handleInput();
+				this.updatePhysics(deltaTime);
+
+				if (this.renderer && this.scene && this.camera) {
+					this.renderer.render(this.scene, this.camera);
+				}
+
+				if (this.minimapRenderer && this.minimapCamera) {
+					this.minimapRenderer.render(this.scene, this.minimapCamera);
+				}
+			} catch (error) {
+				console.error('Animation error:', error);
+				// Optionally stop the animation loop on error
+				// this.stopAnimation = true;
+			}
+		}
+	}
+
+	// Initialize game only when window is fully loaded
+	window.addEventListener('load', () => {
+		new Game();
+	});
+</script>
 </body>
 </html>
