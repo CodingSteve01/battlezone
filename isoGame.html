@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Isometric Game Prototype</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #minimap {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            width: 200px;
+            height: 200px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid white;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            font-size: 16px;
+            text-shadow: 1px 1px 1px black;
+        }
+    </style>
+</head>
+<body>
+    <div id="minimap"></div>
+    <div id="info">WASD to move, E to enter/exit vehicle, Space to jump</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        class Game {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.OrthographicCamera(
+                    window.innerWidth / -32,
+                    window.innerWidth / 32,
+                    window.innerHeight / 32,
+                    window.innerHeight / -32,
+                    1,
+                    2000
+                );
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                document.body.appendChild(this.renderer.domElement);
+
+                this.minimapCamera = new THREE.OrthographicCamera(-100, 100, 100, -100, 1, 1000);
+                this.minimapRenderer = new THREE.WebGLRenderer();
+                this.minimapRenderer.setSize(200, 200);
+                document.getElementById('minimap').appendChild(this.minimapRenderer.domElement);
+
+                // Set isometric view
+                this.camera.position.set(50, 50, 50);
+                this.camera.lookAt(0, 0, 0);
+
+                this.setupLighting();
+                this.createWorld();
+                this.setupPlayer();
+                this.setupVehicle();
+                this.setupControls();
+
+                window.addEventListener('resize', () => this.handleResize());
+
+                this.clock = new THREE.Clock();
+                this.animate();
+            }
+
+            handleResize() {
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera.left = window.innerWidth / -32;
+                this.camera.right = window.innerWidth / 32;
+                this.camera.top = window.innerHeight / 32;
+                this.camera.bottom = window.innerHeight / -32;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            setupLighting() {
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(50, 100, 50);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(directionalLight);
+            }
+
+            createWorld() {
+                // Ground plane with varying heights
+                const groundGeometry = new THREE.PlaneGeometry(2000, 2000, 200, 200);
+                const vertices = groundGeometry.attributes.position.array;
+                for (let i = 0; i < vertices.length; i += 3) {
+                    vertices[i + 2] = Math.sin(vertices[i] / 30) * Math.cos(vertices[i + 1] / 30) * 3;
+                }
+                
+                // Create detailed ground material
+                const groundTexture = new THREE.TextureLoader().load('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==');
+                groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+                groundTexture.repeat.set(2000, 2000);
+                
+                const groundMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x558822,
+                    map: groundTexture,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                this.scene.add(ground);
+
+                // Add detailed trees
+                for (let i = 0; i < 100; i++) {
+                    const tree = this.createDetailedTree();
+                    tree.position.set(
+                        Math.random() * 1000 - 500,
+                        0,
+                        Math.random() * 1000 - 500
+                    );
+                    this.scene.add(tree);
+                }
+            }
+
+            createDetailedTree() {
+                const group = new THREE.Group();
+                
+                // Create detailed trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.5, 4, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x8B4513,
+                    roughness: 0.9
+                });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.castShadow = true;
+                trunk.position.y = 2;
+                group.add(trunk);
+
+                // Create multiple layers of leaves
+                const createLeafLayer = (y, scale) => {
+                    const leafGeometry = new THREE.ConeGeometry(scale, 2, 8);
+                    const leafMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x228B22,
+                        roughness: 0.7
+                    });
+                    const leaves = new THREE.Mesh(leafGeometry, leafMaterial);
+                    leaves.castShadow = true;
+                    leaves.position.y = y;
+                    return leaves;
+                };
+
+                group.add(createLeafLayer(4, 2));
+                group.add(createLeafLayer(5, 1.6));
+                group.add(createLeafLayer(6, 1.2));
+
+                return group;
+            }
+
+            createHumanModel() {
+                const group = new THREE.Group();
+
+                // Body
+                const bodyGeometry = new THREE.CylinderGeometry(0.25, 0.25, 1, 8);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x2244aa });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 0.5;
+                group.add(body);
+
+                // Head
+                const headGeometry = new THREE.SphereGeometry(0.25, 8, 8);
+                const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+                const head = new THREE.Mesh(headGeometry, headMaterial);
+                head.position.y = 1.25;
+                group.add(head);
+
+                // Arms
+                const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.6, 8);
+                const armMaterial = new THREE.MeshStandardMaterial({ color: 0x2244aa });
+                
+                const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+                leftArm.position.set(-0.35, 0.8, 0);
+                leftArm.rotation.z = Math.PI / 4;
+                group.add(leftArm);
+
+                const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+                rightArm.position.set(0.35, 0.8, 0);
+                rightArm.rotation.z = -Math.PI / 4;
+                group.add(rightArm);
+
+                // Legs
+                const legGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.6, 8);
+                const legMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+
+                const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+                leftLeg.position.set(-0.2, 0.1, 0);
+                group.add(leftLeg);
+
+                const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+                rightLeg.position.set(0.2, 0.1, 0);
+                group.add(rightLeg);
+
+                group.traverse((object) => {
+                    if (object instanceof THREE.Mesh) {
+                        object.castShadow = true;
+                    }
+                });
+
+                return group;
+            }
+
+            createCarModel() {
+                const group = new THREE.Group();
+
+                // Car body
+                const bodyGeometry = new THREE.BoxGeometry(4, 1.5, 2);
+                const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0xff0000,
+                    metalness: 0.6,
+                    roughness: 0.4
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 1;
+                group.add(body);
+
+                // Roof
+                const roofGeometry = new THREE.BoxGeometry(2.5, 1, 2);
+                const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
+                roof.position.set(-0.5, 2, 0);
+                group.add(roof);
+
+                // Wheels
+                const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+                const wheelMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x111111,
+                    metalness: 0.5,
+                    roughness: 0.7
+                });
+
+                const wheelPositions = [
+                    [-1.5, 0.4, 1], [-1.5, 0.4, -1],
+                    [1.5, 0.4, 1], [1.5, 0.4, -1]
+                ];
+
+                wheelPositions.forEach(pos => {
+                    const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                    wheel.position.set(...pos);
+                    wheel.rotation.z = Math.PI / 2;
+                    group.add(wheel);
+                });
+
+                // Windows
+                const windowMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x444444,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+
+                const windshieldGeometry = new THREE.PlaneGeometry(1.5, 1);
+                const windshield = new THREE.Mesh(windshieldGeometry, windowMaterial);
+                windshield.position.set(0.5, 1.8, 0);
+                windshield.rotation.x = Math.PI / 4;
+                group.add(windshield);
+
+                group.traverse((object) => {
+                    if (object instanceof THREE.Mesh) {
+                        object.castShadow = true;
+                    }
+                });
+
+                return group;
+            }
+
+            setupPlayer() {
+                this.player = this.createHumanModel();
+                this.player.position.y = 1;
+                this.scene.add(this.player);
+
+                // Animation properties
+                this.playerState = {
+                    walkAnimation: 0,
+                    walkSpeed: 5
+                };
+            }
+
+            setupVehicle() {
+                this.vehicle = this.createCarModel();
+                this.vehicle.position.set(10, 0, 10);
+                this.scene.add(this.vehicle);
+
+                // Vehicle physics properties
+                this.vehicleState = {
+                    velocity: new THREE.Vector3(),
+                    rotation: 0,
+                    acceleration: 0
+                };
+            }
+
+            setupControls() {
+                this.keys = {};
+                this.inVehicle = false;
+                this.moveSpeed = 0.5;
+                this.vehicleSpeed = 0.8;
+                this.maxVehicleSpeed = 2;
+                this.vehicleAcceleration = 0.05;
+                this.vehicleDrag = 0.98;
+
+                window.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
+                window.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.key.toLowerCase() === 'e') {
+                        const distance = this.player.position.distanceTo(this.vehicle.position);
+                        if (distance < 5) {
+                            this.inVehicle = !this.inVehicle;
+                            this.player.visible = !this.inVehicle;
+                        }
+                    }
+                });
+            }
+
+            updateMovement() {
+                const delta = this.clock.getDelta();
+
+                if (this.inVehicle) {
+                    // Vehicle movement with momentum
+                    if (this.keys['w']) this.vehicleState.acceleration += this.vehicleAcceleration;
+                    if (this.keys['s']) this.vehicleState.acceleration -= this.vehicleAcceleration;
+                    if (this.keys['a']) this.vehicle.rotation.y += 0.03;
+                    if (this.keys['d']) this.vehicle.rotation.y -= 0.03;
+
+                    // Apply physics
+                    this.vehicleState.acceleration *= this.vehicleDrag;
+                    this.vehicleState.acceleration = THREE.MathUtils.clamp(
+                        this.vehicleState.acceleration,
+                        -this.maxVehicleSpeed,
+                        this.maxVehicleSpeed
+                    );
+
+                    // Update position
+                    const movement = new THREE.Vector3(0, 0, -this.vehicleState.acceleration);
+                    movement.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.vehicle.rotation.y);
+                    this.vehicle.position.add(movement);
+                    
+                    this.player.position.copy(this.vehicle.position);
+                } else {
+                    // Player movement with animation
+                    const movement = new THREE.Vector3();
+                    if (this.keys['w']) movement.z -= this.moveSpeed;
+                    if (this.keys['s']) movement.z += this.moveSpeed;
+                    if (this.keys['a']) movement.x -= this.moveSpeed;
+                    if (this.keys['d']) movement.x += this.moveSpeed;
+
+                    if (movement.length() > 0) {
+                        movement.normalize();
+                        movement.multiplyScalar(this.moveSpeed);
+                        
+                        // Calculate rotation based on movement direction
+                        this.player.rotation.y = Math.atan2(movement.x, movement.z);
+                        
+                        // Animate walking
+                        this.playerState.walkAnimation += delta * this.playerState.walkSpeed;
+                        
+                        // Leg animation
+                        this.player.children.forEach((child, index) => {
+                            if (index >= 4) { // Only animate legs
+                                child.position.y = 0.1 + Math.sin(this.playerState.walkAnimation + (index % 2) * Math.PI) * 0.1;
+                            }
+                        });
+                    }
+
+                    this.player.position.add(movement);
+                }
+
+                // Update camera to follow target while maintaining isometric angle
+                const target = this.inVehicle ? this.vehicle : this.player;
+                const cameraOffset = new THREE.Vector3(50, 50, 50);
+                this.camera.position.copy(target.position).add(cameraOffset);
+                this.camera.lookAt(target.position);
+
+                // Ground height adjustment
+                const targetPosition = this.inVehicle ? this.vehicle.position : this.player.position;
+                const groundHeight = this.getGroundHeight(targetPosition.x, targetPosition.z);
+                if (!this.inVehicle) {
+                    this.player.position.y = groundHeight + 1;
+                } else {
+                    this.vehicle.position.y = groundHeight + 0.5;
+                }
+
+                // Update minimap camera
+                this.minimapCamera.position.set(target.position.x, 100, target.position.z);
+                this.minimapCamera.lookAt(target.position);
+            }
+
+            getGroundHeight(x, z) {
+                // Simplified ground height calculation based on sine waves
+                return Math.sin(x / 30) * Math.cos(z / 30) * 3;
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                this.updateMovement();
+                
+                this.renderer.render(this.scene, this.camera);
+                this.minimapRenderer.render(this.scene, this.minimapCamera);
+            }
+        }
+
+        // Start the game when the page loads
+        window.onload = () => {
+            new Game();
+        };
+    </script>
+</body>
+</html>
