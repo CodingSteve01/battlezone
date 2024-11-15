@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Isometric Game Prototype</title>
+    <title>Enhanced Isometric Game</title>
     <style>
+        /* Previous styles remain unchanged */
         body {
             margin: 0;
             overflow: hidden;
@@ -42,6 +43,16 @@
             text-align: center;
         }
 
+        #vehicle-select {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            color: white;
+            font-family: Arial;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px;
+        }
+
         #progress {
             width: 300px;
             height: 20px;
@@ -59,7 +70,8 @@
 </head>
 <body>
 <div id="minimap"></div>
-<div id="info">WASD to move, E to enter/exit vehicle, Space to jump</div>
+<div id="info">WASD to move, E to enter/exit vehicle, Space to jump, V to switch vehicles</div>
+<div id="vehicle-select">Current Vehicle: Car</div>
 <div id="loading">
     Loading Game...
     <div id="progress">
@@ -299,6 +311,536 @@
 		}
 	}
 
+	// ChunkManager class for dynamic terrain loading
+	class ChunkManager {
+		constructor(scene, terrainGenerator, treePool) {
+			this.scene = scene;
+			this.terrainGenerator = terrainGenerator;
+			this.treePool = treePool;
+			this.chunks = new Map();
+			this.chunkSize = GameSettings.CHUNK_SIZE;
+			this.viewDistance = 3; // Number of chunks visible in each direction
+			this.grassGeometry = new THREE.PlaneGeometry(1, 1);
+			this.grassMaterial = new THREE.MeshStandardMaterial({
+				color: 0x33aa33,
+				transparent: true,
+				alphaTest: 0.5
+			});
+			this.grassPool = new ObjectPool(() => this.createGrass(), 1000);
+		}
+
+		createGrass() {
+			const grass = new THREE.Mesh(this.grassGeometry, this.grassMaterial);
+			grass.rotation.x = -Math.PI / 2;
+			return grass;
+		}
+
+		getChunkKey(x, z) {
+			const chunkX = Math.floor(x / this.chunkSize);
+			const chunkZ = Math.floor(z / this.chunkSize);
+			return `${chunkX},${chunkZ}`;
+		}
+
+		updateChunks(cameraPosition) {
+			const centerChunkX = Math.floor(cameraPosition.x / this.chunkSize);
+			const centerChunkZ = Math.floor(cameraPosition.z / this.chunkSize);
+
+			// Track which chunks should be kept
+			const activeChunks = new Set();
+
+			// Load visible chunks
+			for (let x = -this.viewDistance; x <= this.viewDistance; x++) {
+				for (let z = -this.viewDistance; z <= this.viewDistance; z++) {
+					const chunkX = centerChunkX + x;
+					const chunkZ = centerChunkZ + z;
+					const key = `${chunkX},${chunkZ}`;
+					activeChunks.add(key);
+
+					if (!this.chunks.has(key)) {
+						this.loadChunk(chunkX, chunkZ);
+					}
+				}
+			}
+
+			// Unload distant chunks
+			for (const [key, chunk] of this.chunks) {
+				if (!activeChunks.has(key)) {
+					this.unloadChunk(key);
+				}
+			}
+		}
+
+		loadChunk(chunkX, chunkZ) {
+			const key = `${chunkX},${chunkZ}`;
+			const chunk = {
+				terrain: this.createTerrainChunk(chunkX, chunkZ),
+				grass: this.createGrassForChunk(chunkX, chunkZ),
+				trees: this.createTreesForChunk(chunkX, chunkZ)
+			};
+			this.chunks.set(key, chunk);
+		}
+
+		unloadChunk(key) {
+			const chunk = this.chunks.get(key);
+			if (chunk) {
+				this.scene.remove(chunk.terrain);
+				chunk.grass.forEach(grass => {
+					this.scene.remove(grass);
+					this.grassPool.release(grass);
+				});
+				chunk.trees.forEach(tree => {
+					this.scene.remove(tree);
+					this.treePool.release(tree);
+				});
+				this.chunks.delete(key);
+			}
+		}
+
+		createTerrainChunk(chunkX, chunkZ) {
+			const geometry = new THREE.PlaneGeometry(
+				this.chunkSize,
+				this.chunkSize,
+				20,
+				20
+			);
+
+			const startX = chunkX * this.chunkSize;
+			const startZ = chunkZ * this.chunkSize;
+
+			const vertices = geometry.attributes.position.array;
+			for (let i = 0; i < vertices.length; i += 3) {
+				const x = startX + vertices[i];
+				const z = startZ + vertices[i + 1];
+				vertices[i + 2] = this.terrainGenerator.generateHeight(x, z);
+			}
+
+			geometry.computeVertexNormals();
+
+			const material = new THREE.MeshStandardMaterial({
+				color: 0x558822,
+				roughness: 0.9
+			});
+
+			const mesh = new THREE.Mesh(geometry, material);
+			mesh.rotation.x = -Math.PI / 2;
+			mesh.position.set(
+				startX + this.chunkSize / 2,
+				0,
+				startZ + this.chunkSize / 2
+			);
+
+			this.scene.add(mesh);
+			return mesh;
+		}
+
+		createGrassForChunk(chunkX, chunkZ) {
+			const grass = [];
+			const grassCount = 1000; // Adjust based on performance
+			const startX = chunkX * this.chunkSize;
+			const startZ = chunkZ * this.chunkSize;
+
+			for (let i = 0; i < grassCount; i++) {
+				const x = startX + Math.random() * this.chunkSize;
+				const z = startZ + Math.random() * this.chunkSize;
+
+				// Don't place grass on roads
+				if (this.terrainGenerator.getDistanceToNearestRoad(x, z) < 5) {
+					continue;
+				}
+
+				const grassBlade = this.grassPool.acquire();
+				const y = this.terrainGenerator.generateHeight(x, z);
+				grassBlade.position.set(x, y, z);
+				grassBlade.rotation.y = Math.random() * Math.PI;
+				grassBlade.scale.set(0.5, Math.random() * 0.5 + 0.5, 0.5);
+				this.scene.add(grassBlade);
+				grass.push(grassBlade);
+			}
+
+			return grass;
+		}
+
+		createTreesForChunk(chunkX, chunkZ) {
+			const trees = [];
+			const treeCount = 20;
+			const startX = chunkX * this.chunkSize;
+			const startZ = chunkZ * this.chunkSize;
+
+			for (let i = 0; i < treeCount; i++) {
+				const x = startX + Math.random() * this.chunkSize;
+				const z = startZ + Math.random() * this.chunkSize;
+
+				if (this.terrainGenerator.getDistanceToNearestRoad(x, z) < 10) {
+					continue;
+				}
+
+				const tree = this.treePool.acquire();  // Use the stored treePool
+				const y = this.terrainGenerator.generateHeight(x, z);
+				tree.position.set(x, y, z);
+				this.scene.add(tree);
+				trees.push(tree);
+			}
+
+			return trees;
+		}
+	}
+
+	class VehiclePhysics {
+		constructor(game, vehicle, terrain) {
+			this.game = game;
+			this.vehicle = vehicle;
+			this.terrain = terrain;
+			this.state = {
+				velocity: new THREE.Vector3(),
+				angularVelocity: 0,
+				steeringAngle: 0,
+				engineForce: 0,
+				brakeForce: 0,
+				wheelbase: 4,
+				maxSteerAngle: Math.PI / 4,
+				mass: 1000,
+				drag: 0.3,
+				maxSpeed: 20,
+				rearWheelPosition: new THREE.Vector3(0, 0, -2),
+				frontWheelPosition: new THREE.Vector3(0, 0, 2)
+			};
+		}
+
+		update(deltaTime) {
+			const state = this.state;
+			const position = this.vehicle.position;
+
+			// Calculate forces
+			const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.vehicle.quaternion);
+
+			// Apply engine force
+			const engineForce = forward.clone().multiplyScalar(state.engineForce * 20000);
+			const dragForce = state.velocity.clone().multiplyScalar(-state.drag * state.velocity.length());
+			const totalForce = engineForce.add(dragForce);
+
+			// Calculate acceleration
+			const acceleration = totalForce.divideScalar(state.mass);
+
+			// Update velocity
+			state.velocity.add(acceleration.multiplyScalar(deltaTime));
+
+			// Apply steering using bicycle model
+			if (state.velocity.length() > 0.1) {
+				const steeringAngle = state.steeringAngle;
+				const wheelbase = state.wheelbase;
+
+				if (Math.abs(steeringAngle) > 0.001) {
+					const turningRadius = wheelbase / Math.sin(Math.abs(steeringAngle));
+					const angularVelocity = (state.velocity.length() / turningRadius) * Math.sign(steeringAngle);
+
+					// Apply rotation around rear axle
+					this.vehicle.position.sub(state.rearWheelPosition);
+					this.vehicle.rotateY(angularVelocity * deltaTime);
+					this.vehicle.position.add(state.rearWheelPosition);
+
+					// Update forward direction after rotation
+					forward.set(0, 0, 1).applyQuaternion(this.vehicle.quaternion);
+				}
+			}
+
+			// Update position
+			const movement = state.velocity.clone().multiplyScalar(deltaTime);
+			const newPosition = position.clone().add(movement);
+
+			// Ground height and collision detection
+			const groundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
+			newPosition.y = groundHeight + 1.0;
+
+			// Update vehicle position if no collision
+			if (!this.checkCollisions(newPosition)) {
+				this.vehicle.position.copy(newPosition);
+
+				// Update wheel visuals
+				if (this.vehicle.userData.wheels) {
+					const wheels = this.vehicle.userData.wheels;
+					wheels.frontLeft.rotation.y = state.steeringAngle;
+					wheels.frontRight.rotation.y = state.steeringAngle;
+
+					// Rotate wheels based on speed
+					const wheelRotationSpeed = state.velocity.length() * 2;
+					Object.values(wheels).forEach(wheel => {
+						if (wheel instanceof THREE.Mesh) {
+							wheel.rotation.x += wheelRotationSpeed * deltaTime;
+						} else if (wheel instanceof THREE.Group) {
+							wheel.children[0].rotation.x += wheelRotationSpeed * deltaTime;
+						}
+					});
+				}
+			} else {
+				state.velocity.multiplyScalar(-0.5);
+			}
+		}
+
+		checkCollisions(position) {
+			// Check terrain slope
+			const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.vehicle.quaternion);
+			const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.vehicle.quaternion);
+
+			const forwardPoint = this.terrain.generateHeight(
+				position.x + forward.x * 2,
+				position.z + forward.z * 2
+			);
+			const backwardPoint = this.terrain.generateHeight(
+				position.x - forward.x * 2,
+				position.z - forward.z * 2
+			);
+
+			const slope = Math.abs(forwardPoint - backwardPoint) / 4;
+			if (slope > 0.5) { // Max slope threshold
+				return true;
+			}
+
+			// Check tree collisions
+			const nearbyObjects = this.game.spatialHash.query(
+				position.x,
+				position.z,
+				5
+			);
+
+			for (const obj of nearbyObjects) {
+				if (obj.userData.collider) {
+					const distance = position.distanceTo(obj.position);
+					if (distance < 3) { // Simple radius check
+						return true;
+					}
+				}
+			}
+
+			return false;
+		}
+	}
+
+	// VehicleFactory class to create different vehicle types
+	class VehicleFactory {
+		static createVehicle(type, position) {
+			switch (type.toLowerCase()) {
+				case 'car':
+					return this.createCar(position);
+				case 'truck':
+					return this.createTruck(position);
+				case 'motorcycle':
+					return this.createMotorcycle(position);
+				default:
+					return this.createCar(position);
+			}
+		}
+
+		static createCar(position) {
+			const group = new THREE.Group();
+
+			// Enhanced car body
+			const bodyGeometry = new THREE.BoxGeometry(2, 1.2, 4.5);
+			const bodyMaterial = new THREE.MeshStandardMaterial({
+				color: 0xff0000,
+				metalness: 0.6,
+				roughness: 0.4
+			});
+			const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+			body.position.y = 1;
+			group.add(body);
+
+			// Add wheels
+			const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+			const wheelMaterial = new THREE.MeshStandardMaterial({
+				color: 0x111111,
+				metalness: 0.5,
+				roughness: 0.7
+			});
+
+			// Front wheel groups for steering
+			const frontLeftWheelGroup = new THREE.Group();
+			const frontRightWheelGroup = new THREE.Group();
+
+			const frontLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			const frontRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			frontLeftWheel.rotation.z = Math.PI / 2;
+			frontRightWheel.rotation.z = Math.PI / 2;
+
+			frontLeftWheelGroup.add(frontLeftWheel);
+			frontRightWheelGroup.add(frontRightWheel);
+
+			frontLeftWheelGroup.position.set(-1, 0.4, 1.5);
+			frontRightWheelGroup.position.set(1, 0.4, 1.5);
+
+			group.add(frontLeftWheelGroup);
+			group.add(frontRightWheelGroup);
+
+			// Back wheels
+			const backLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			const backRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+
+			backLeftWheel.rotation.z = Math.PI / 2;
+			backRightWheel.rotation.z = Math.PI / 2;
+
+			backLeftWheel.position.set(-1, 0.4, -1.5);
+			backRightWheel.position.set(1, 0.4, -1.5);
+
+			group.add(backLeftWheel);
+			group.add(backRightWheel);
+
+			// Store wheel references
+			group.userData.wheels = {
+				frontLeft: frontLeftWheelGroup,
+				frontRight: frontRightWheelGroup,
+				backLeft: backLeftWheel,
+				backRight: backRightWheel
+			};
+
+			// Add vehicle type and physics properties
+			group.userData.vehicleType = 'Car';
+			group.userData.properties = {
+				maxSpeed: 20,
+				acceleration: 1.0,
+				handling: 1.0,
+				mass: 1000
+			};
+
+			// Position the vehicle
+			group.position.copy(position);
+
+			return group;
+		}
+
+		static createTruck(position) {
+			const group = new THREE.Group();
+
+			// Truck body
+			const bodyGeometry = new THREE.BoxGeometry(2.5, 2, 6);
+			const bodyMaterial = new THREE.MeshStandardMaterial({
+				color: 0x4444ff,
+				metalness: 0.6,
+				roughness: 0.4
+			});
+			const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+			body.position.y = 1.5;
+			group.add(body);
+
+			// Cargo container
+			const cargoGeometry = new THREE.BoxGeometry(2.4, 2, 3);
+			const cargoMaterial = new THREE.MeshStandardMaterial({
+				color: 0x666666,
+				metalness: 0.4,
+				roughness: 0.6
+			});
+			const cargo = new THREE.Mesh(cargoGeometry, cargoMaterial);
+			cargo.position.set(0, 2.5, -1);
+			group.add(cargo);
+
+			// Add wheels (larger than car wheels)
+			const wheelGeometry = new THREE.CylinderGeometry(0.6, 0.6, 0.4, 16);
+			const wheelMaterial = new THREE.MeshStandardMaterial({
+				color: 0x111111,
+				metalness: 0.5,
+				roughness: 0.7
+			});
+
+			// Add 6 wheels (3 on each side)
+			const wheelPositions = [
+				[-1.2, 0.6, 2],    // Front left
+				[1.2, 0.6, 2],     // Front right
+				[-1.2, 0.6, 0],    // Middle left
+				[1.2, 0.6, 0],     // Middle right
+				[-1.2, 0.6, -2],   // Rear left
+				[1.2, 0.6, -2]     // Rear right
+			];
+
+			const wheels = {};
+			wheelPositions.forEach((pos, index) => {
+				const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+				wheel.rotation.z = Math.PI / 2;
+				wheel.position.set(...pos);
+
+				if (index < 2) {
+					// Front wheels in steering groups
+					const wheelGroup = new THREE.Group();
+					wheelGroup.add(wheel);
+					wheelGroup.position.copy(wheel.position);
+					wheel.position.set(0, 0, 0);
+					group.add(wheelGroup);
+					wheels[index === 0 ? 'frontLeft' : 'frontRight'] = wheelGroup;
+				} else {
+					group.add(wheel);
+					wheels[`wheel${index}`] = wheel;
+				}
+			});
+
+			group.userData.wheels = wheels;
+			group.userData.vehicleType = 'Truck';
+			group.userData.properties = {
+				maxSpeed: 15,
+				acceleration: 0.7,
+				handling: 0.6,
+				mass: 2500
+			};
+
+			// Position the vehicle
+			group.position.copy(position);
+
+			return group;
+		}
+
+		static createMotorcycle(position) {
+			const group = new THREE.Group();
+
+			// Motorcycle body
+			const bodyGeometry = new THREE.BoxGeometry(0.8, 1, 2);
+			const bodyMaterial = new THREE.MeshStandardMaterial({
+				color: 0x000000,
+				metalness: 0.8,
+				roughness: 0.2
+			});
+			const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+			body.position.y = 0.7;
+			group.add(body);
+
+			// Wheel creation
+			const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.2, 16);
+			const wheelMaterial = new THREE.MeshStandardMaterial({
+				color: 0x111111,
+				metalness: 0.5,
+				roughness: 0.7
+			});
+
+			// Front wheel group for steering
+			const frontWheelGroup = new THREE.Group();
+			const frontWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			frontWheel.rotation.z = Math.PI / 2;
+			frontWheelGroup.add(frontWheel);
+			frontWheelGroup.position.set(0, 0.4, 0.8);
+			group.add(frontWheelGroup);
+
+			// Back wheel
+			const backWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+			backWheel.rotation.z = Math.PI / 2;
+			backWheel.position.set(0, 0.4, -0.8);
+			group.add(backWheel);
+
+			// Store wheel references
+			group.userData.wheels = {
+				front: frontWheelGroup,
+				back: backWheel
+			};
+
+			group.userData.vehicleType = 'Motorcycle';
+			group.userData.properties = {
+				maxSpeed: 25,
+				acceleration: 1.3,
+				handling: 1.4,
+				mass: 400
+			};
+
+			// Position the vehicle
+			group.position.copy(position);
+
+			return group;
+		}
+	}
+
 	// Main game class
 	class Game {
 		constructor() {
@@ -328,13 +870,13 @@
 		async initializeAsync() {
 			try {
 				await this.loadingManager.updateProgress(0, 'Initializing core systems...');
-				await this.setupCore();
+				this.setupCore();
 
 				await this.loadingManager.updateProgress(20, 'Generating terrain...');
 				await this.setupWorld();
 
 				await this.loadingManager.updateProgress(60, 'Creating entities...');
-				await this.setupEntities();
+				this.setupEntities();
 
 				await this.loadingManager.updateProgress(70, 'Setting up controls...');
 				this.setupControls();
@@ -385,6 +927,11 @@
 						this.player.visible = !this.controlState.inVehicle;
 					}
 				}
+
+				// Vehicle switching
+				if (e.key.toLowerCase() === 'v' && this.controlState.inVehicle) {
+					this.switchVehicle();
+				}
 			});
 
 			window.addEventListener('keyup', (e) => {
@@ -399,8 +946,10 @@
 			const aspect = window.innerWidth / window.innerHeight;
 
 			// Update main camera
-			this.camera.left = -GameSettings.CAMERA_BASE_DISTANCE * aspect;
-			this.camera.right = GameSettings.CAMERA_BASE_DISTANCE * aspect;
+			this.camera.left = -this.controlState.currentZoom * aspect;
+			this.camera.right = this.controlState.currentZoom * aspect;
+			this.camera.top = this.controlState.currentZoom;
+			this.camera.bottom = -this.controlState.currentZoom;
 			this.camera.updateProjectionMatrix();
 
 			// Update renderer
@@ -667,98 +1216,6 @@
 			}
 		}
 
-		createCarModel() {
-			const group = new THREE.Group();
-
-			// Enhanced car body with better proportions
-			const bodyGeometry = new THREE.BoxGeometry(2, 1.2, 4.5);
-			const bodyMaterial = new THREE.MeshStandardMaterial({
-				color: 0xff0000,
-				metalness: 0.6,
-				roughness: 0.4
-			});
-			const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-			body.position.y = 1;
-			group.add(body);
-
-			// Streamlined roof
-			const roofGeometry = new THREE.BoxGeometry(1.8, 1, 3);
-			const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
-			roof.position.set(0, 2, -0.2);
-			group.add(roof);
-
-			// Add headlights
-			const headlightGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-			const headlightMaterial = new THREE.MeshStandardMaterial({
-				color: 0xffffcc,
-				emissive: 0xffffcc,
-				emissiveIntensity: 0.5
-			});
-
-			const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
-			leftHeadlight.position.set(0.7, 1, 2.2);
-			group.add(leftHeadlight);
-
-			const rightHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
-			rightHeadlight.position.set(-0.7, 1, 2.2);
-			group.add(rightHeadlight);
-
-			// Create wheels with separate front wheel groups for steering
-			const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
-			const wheelMaterial = new THREE.MeshStandardMaterial({
-				color: 0x111111,
-				metalness: 0.5,
-				roughness: 0.7
-			});
-
-			// Front wheel groups for steering
-			const frontLeftWheelGroup = new THREE.Group();
-			const frontRightWheelGroup = new THREE.Group();
-
-			const frontLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-			const frontRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-			frontLeftWheel.rotation.z = Math.PI / 2;
-			frontRightWheel.rotation.z = Math.PI / 2;
-
-			frontLeftWheelGroup.add(frontLeftWheel);
-			frontRightWheelGroup.add(frontRightWheel);
-
-			frontLeftWheelGroup.position.set(-1, 0.4, 1.5);
-			frontRightWheelGroup.position.set(1, 0.4, 1.5);
-
-			group.add(frontLeftWheelGroup);
-			group.add(frontRightWheelGroup);
-
-			// Back wheels (no steering)
-			const backLeftWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-			const backRightWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
-
-			backLeftWheel.rotation.z = Math.PI / 2;
-			backRightWheel.rotation.z = Math.PI / 2;
-
-			backLeftWheel.position.set(-1, 0.4, -1.5);
-			backRightWheel.position.set(1, 0.4, -1.5);
-
-			group.add(backLeftWheel);
-			group.add(backRightWheel);
-
-			// Store wheel references for animation
-			group.userData.wheels = {
-				frontLeft: frontLeftWheelGroup,
-				frontRight: frontRightWheelGroup,
-				backLeft: backLeftWheel,
-				backRight: backRightWheel
-			};
-
-			// Add collision data
-			group.userData.collider = new THREE.Box3(
-				new THREE.Vector3(-1, 0, -2.25),
-				new THREE.Vector3(1, 2, 2.25)
-			);
-
-			return group;
-		}
-
 		setupPhysics() {
 			this.physics = {
 				gravity: -9.81,
@@ -809,12 +1266,38 @@
 		}
 
 		setupEntities() {
+			// Create tree pool first
+			this.treePool = new ObjectPool(() => this.createDetailedTree(), 300);
+
 			// Set up player
 			this.player = this.createHumanModel();
-			this.player.position.set(0, 5, 0); // Start higher to avoid terrain intersection
+			this.player.position.set(0, 5, 0);
 			this.scene.add(this.player);
 
-			// Player state
+			// Initialize vehicle array
+			this.vehicles = [
+				VehicleFactory.createVehicle('car', new THREE.Vector3(0, 0, 5)),
+				VehicleFactory.createVehicle('truck', new THREE.Vector3(5, 0, 5)),
+				VehicleFactory.createVehicle('motorcycle', new THREE.Vector3(-5, 0, 5))
+			];
+
+			this.currentVehicleIndex = 0;
+			this.vehicles.forEach(vehicle => {
+				this.scene.add(vehicle);
+				vehicle.visible = false;
+			});
+
+			// Set initial vehicle
+			this.vehicle = this.vehicles[0];
+			this.vehicle.visible = true;
+
+			// Initialize vehicle physics
+			this.vehiclePhysics = new VehiclePhysics(this, this.vehicle, this.terrain);
+
+			// Initialize chunk manager with treePool
+			this.chunkManager = new ChunkManager(this.scene, this.terrain, this.treePool);
+
+			// Player state initialization remains the same
 			this.playerState = {
 				velocity: new THREE.Vector3(),
 				isGrounded: true,
@@ -825,30 +1308,20 @@
 					0.5
 				)
 			};
+		}
 
-			// Set up vehicle
-			this.vehicle = this.createCarModel();
-			// Start vehicle above ground
-			const startX = 10;
-			const startZ = 10;
-			const groundHeight = this.terrain.generateHeight(startX, startZ);
-			this.vehicle.position.set(startX, groundHeight + 2, startZ); // +2 to ensure it's above ground
-			this.scene.add(this.vehicle);
+		switchVehicle() {
+			this.vehicle.visible = false;
+			this.currentVehicleIndex = (this.currentVehicleIndex + 1) % this.vehicles.length;
+			this.vehicle = this.vehicles[this.currentVehicleIndex];
+			this.vehicle.visible = true;
+			this.vehiclePhysics = new VehiclePhysics(this.vehicle, this.terrain);
 
-			// Vehicle state
-			this.vehicleState = {
-				velocity: new THREE.Vector3(),
-				angularVelocity: 0,
-				acceleration: 0,
-				steeringAngle: 0,
-				engineForce: 0,
-				brakeForce: 0,
-				maxSteerAngle: Math.PI / 4,
-				wheelbase: 4,
-				mass: 1000,
-				drag: 0.3,
-				maxSpeed: 20 // Add maxSpeed for vehicle
-			};
+			// Update vehicle selection display
+			const vehicleSelect = document.getElementById('vehicle-select');
+			if (vehicleSelect) {
+				vehicleSelect.textContent = `Current Vehicle: ${this.vehicle.userData.vehicleType}`;
+			}
 		}
 
 		setupControls() {
@@ -934,7 +1407,7 @@
 
 			// Update camera zoom based on speed
 			const speed = this.controlState.inVehicle ?
-				this.vehicleState.velocity.length() :
+				this.vehiclePhysics.state.velocity.length() :
 				this.playerState.velocity.length();
 
 			this.controlState.targetZoom = THREE.MathUtils.lerp(
@@ -945,7 +1418,7 @@
 		}
 
 		handleVehicleInput(keys) {
-			const state = this.vehicleState;
+			const state = this.vehiclePhysics.state;
 
 			// Forward/Backward
 			if (keys['w']) {
@@ -957,11 +1430,14 @@
 			}
 
 			// Turn vehicle based on forward motion
-			if (Math.abs(state.velocity.length()) > 0.1) {
+			if (state.velocity.length() > 0.1) {
 				if (keys['a']) {
-					this.vehicle.rotation.y += 0.03;
+					state.steeringAngle = Math.min(state.steeringAngle + 0.03, state.maxSteerAngle);
 				} else if (keys['d']) {
-					this.vehicle.rotation.y -= 0.03;
+					state.steeringAngle = Math.max(state.steeringAngle - 0.03, -state.maxSteerAngle);
+				} else {
+					// Return steering to center
+					state.steeringAngle *= 0.9;
 				}
 			}
 
@@ -991,7 +1467,7 @@
 
 		updatePhysics(deltaTime) {
 			if (this.controlState.inVehicle) {
-				this.updateVehiclePhysics(deltaTime);
+				this.vehiclePhysics.update(deltaTime);
 			} else {
 				this.updatePlayerPhysics(deltaTime);
 			}
@@ -1004,115 +1480,6 @@
 			);
 
 			this.updateCamera();
-		}
-
-		updateVehiclePhysics(deltaTime) {
-			const state = this.vehicleState;
-
-			// Get vehicle's current position and forward direction
-			const position = this.vehicle.position;
-			const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.vehicle.quaternion);
-			const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.vehicle.quaternion);
-
-			// Get exact ground height at current position
-			const groundHeight = this.terrain.generateHeight(position.x, position.z);
-			this.vehicle.position.y = groundHeight + 1.0; // Keep vehicle 1 unit above ground
-
-			// Handle steering
-			if (Math.abs(state.velocity.length()) > 0.1) {
-				const steeringAngle = state.steeringAngle;
-				if (this.controlState.keys['a']) {
-					state.steeringAngle = Math.min(state.steeringAngle + deltaTime * 2, state.maxSteerAngle);
-				} else if (this.controlState.keys['d']) {
-					state.steeringAngle = Math.max(state.steeringAngle - deltaTime * 2, -state.maxSteerAngle);
-				} else {
-					// Return steering to center
-					state.steeringAngle *= 0.9;
-				}
-
-				// Apply steering to vehicle rotation
-				this.vehicle.rotation.y += state.steeringAngle * state.velocity.length() * deltaTime;
-			}
-
-			// Update wheel rotations
-			const wheels = this.vehicle.userData.wheels;
-			wheels.frontLeft.rotation.y = state.steeringAngle;
-			wheels.frontRight.rotation.y = state.steeringAngle;
-
-			// Calculate forces
-			const engineForce = state.engineForce * 20000;
-			const dragForce = -state.drag * state.velocity.lengthSq();
-			const brakingForce = state.brakeForce * -state.velocity.length() * 5000;
-
-			// Apply forces
-			const totalForce = engineForce + dragForce + brakingForce;
-			const acceleration = totalForce / state.mass;
-
-			// Update velocity
-			state.velocity.add(forward.multiplyScalar(acceleration * deltaTime));
-			state.velocity.multiplyScalar(0.98); // Apply drag
-
-			// Clamp to max speed
-			if (state.velocity.length() > state.maxSpeed) {
-				state.velocity.normalize().multiplyScalar(state.maxSpeed);
-			}
-
-			// Calculate new position
-			const movement = state.velocity.clone().multiplyScalar(deltaTime);
-			const newPosition = position.clone().add(movement);
-
-			// Get ground height at new position
-			const newGroundHeight = this.terrain.generateHeight(newPosition.x, newPosition.z);
-			newPosition.y = newGroundHeight + 1.0;
-
-			// Calculate terrain normal for vehicle orientation
-			const forwardPoint = this.terrain.generateHeight(
-				newPosition.x + forward.x * 2,
-				newPosition.z + forward.z * 2
-			);
-			const backwardPoint = this.terrain.generateHeight(
-				newPosition.x - forward.x * 2,
-				newPosition.z - forward.z * 2
-			);
-			const rightPoint = this.terrain.generateHeight(
-				newPosition.x + right.x * 2,
-				newPosition.z + right.z * 2
-			);
-			const leftPoint = this.terrain.generateHeight(
-				newPosition.x - right.x * 2,
-				newPosition.z - right.z * 2
-			);
-
-			// Update vehicle position and orientation
-			if (!this.checkCollisions(newPosition, this.vehicle.userData.collider)) {
-				this.vehicle.position.copy(newPosition);
-
-				// Calculate and apply pitch and roll based on terrain
-				const pitchAngle = Math.atan2(forwardPoint - backwardPoint, 4);
-				const rollAngle = Math.atan2(rightPoint - leftPoint, 4);
-
-				this.vehicle.rotation.x = pitchAngle;
-				this.vehicle.rotation.z = -rollAngle;
-
-				// Rotate wheels based on speed
-				const wheelRotationSpeed = state.velocity.length() * 2;
-				Object.values(wheels).forEach(wheel => {
-					if (wheel instanceof THREE.Mesh) {
-						wheel.rotation.x += wheelRotationSpeed * deltaTime;
-					} else if (wheel instanceof THREE.Group) {
-						wheel.children[0].rotation.x += wheelRotationSpeed * deltaTime;
-					}
-				});
-			} else {
-				state.velocity.multiplyScalar(-0.5);
-			}
-
-			// Update player position if in vehicle
-			if (this.controlState.inVehicle) {
-				this.player.position.copy(this.vehicle.position);
-				this.player.position.y += 1;
-				this.player.quaternion.copy(this.vehicle.quaternion);
-			}
 		}
 
 		updatePlayerPhysics(deltaTime) {
@@ -1251,11 +1618,11 @@
 
 			// Calculate speed-based zoom factor (0 to 1)
 			const currentSpeed = this.controlState.inVehicle ?
-				this.vehicleState.velocity.length() :
+				this.vehiclePhysics.state.velocity.length() :
 				this.playerState.velocity.length();
 
 			const maxSpeed = this.controlState.inVehicle ?
-				this.vehicleState.maxSpeed :
+				this.vehiclePhysics.state.maxSpeed :
 				this.physics.maxSpeed;
 
 			const normalizedSpeed = Math.min(currentSpeed / maxSpeed, 1);
@@ -1321,6 +1688,9 @@
 				}
 
 				const deltaTime = this.clock.getDelta();
+
+				// Update chunks based on camera position
+				this.chunkManager.updateChunks(this.camera.position);
 
 				this.handleInput();
 				this.updatePhysics(deltaTime);
