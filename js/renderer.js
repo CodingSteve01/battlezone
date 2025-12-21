@@ -7,6 +7,9 @@ import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
+import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
+import { getCurrentEvent } from './events.js';
+import { getRankName } from './progression.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -316,6 +319,42 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
     ctx.textBaseline = 'middle';
     ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
 
+    // Level badge (left side)
+    const level = unit.level || 1;
+    if (level > 1) {
+        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
+        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
+
+        ctx.fillStyle = levelColor;
+        ctx.beginPath();
+        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
+        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
+    }
+
+    // Shield indicator (if unit has shield from power-up)
+    if (unit.shield) {
+        ctx.shadowColor = '#3b82f6';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
+        ctx.fillText('🛡️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Damage boost indicator
+    if (unit.damageBoost && unit.damageBoost > 0) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
+    }
+
     // HP bar with gradient
     const hpPct = unit.currentHp / unit.maxHp;
     const barWidth = size * 1.6;
@@ -554,6 +593,14 @@ export function render() {
             ctx.textBaseline = 'middle';
             ctx.fillText('🛡', sx, sy);
         }
+
+        // Draw power-up if present
+        if (fogLevel === 'visible') {
+            const powerup = getPowerupAt(hex.q, hex.r);
+            if (powerup) {
+                drawPowerup(sx, sy, powerup, state.hexSize);
+            }
+        }
     });
 
     // Draw path preview with range visualization
@@ -736,6 +783,9 @@ export function render() {
 
     // Draw scroll hint if map is larger than viewport
     drawScrollHint(w, h);
+
+    // Draw event indicator
+    drawEventIndicator(w, h);
 }
 
 /**
@@ -777,6 +827,67 @@ function drawScrollHint(w, h) {
         ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
         ctx.fillText('▼', w / 2, h - 20);
     }
+
+    ctx.restore();
+}
+
+/**
+ * Draw a power-up on the map
+ */
+function drawPowerup(cx, cy, powerup, size) {
+    const powerupType = POWERUP_TYPES[powerup.type];
+    if (!powerupType) return;
+
+    ctx.save();
+
+    // Floating animation offset
+    const floatOffset = Math.sin(Date.now() / 400 + powerup.q + powerup.r) * 3;
+
+    // Glow effect
+    ctx.shadowColor = powerupType.color;
+    ctx.shadowBlur = 15;
+
+    // Background circle
+    ctx.fillStyle = powerupType.color + '40';
+    ctx.beginPath();
+    ctx.arc(cx, cy + floatOffset, size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = powerupType.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Icon
+    ctx.shadowBlur = 0;
+    ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(powerupType.icon, cx, cy + floatOffset);
+
+    ctx.restore();
+}
+
+/**
+ * Draw active event indicator
+ */
+function drawEventIndicator(w, h) {
+    const event = getCurrentEvent();
+    if (!event) return;
+
+    ctx.save();
+
+    // Small indicator in corner
+    ctx.fillStyle = event.color + 'cc';
+    ctx.beginPath();
+    ctx.roundRect(w - 100, 10, 90, 30, 8);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${event.icon} Aktiv`, w - 55, 25);
 
     ctx.restore();
 }

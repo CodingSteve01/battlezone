@@ -7,9 +7,10 @@ import { getAttackableUnits, moveUnit } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility } from './fogOfWar.js';
-import { updateUI, selectAction, showScreen } from './ui.js';
+import { updateUI, selectAction, showScreen, showToast, showPowerupPickup } from './ui.js';
 import { render, resizeCanvas } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
+import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 
 let canvas;
 
@@ -365,6 +366,13 @@ function handleMoveClick(unit, hex) {
     if (pathData) {
         moveUnit(unit, pathData.hex, pathData.cost);
         state.currentPath = null;
+
+        // Check for power-up pickup
+        const pickup = checkPowerupPickup(unit);
+        if (pickup) {
+            showPowerupPickup(pickup.powerup, pickup.result);
+        }
+
         updateVisibility();
         render();
         updateUI();
@@ -398,6 +406,13 @@ function handleMoveClick(unit, hex) {
             if (targetHex && targetCost > 0) {
                 moveUnit(unit, targetHex, targetCost);
                 state.currentPath = null;
+
+                // Check for power-up pickup
+                const pickup = checkPowerupPickup(unit);
+                if (pickup) {
+                    showPowerupPickup(pickup.powerup, pickup.result);
+                }
+
                 updateVisibility();
                 render();
                 updateUI();

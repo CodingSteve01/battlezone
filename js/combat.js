@@ -5,6 +5,8 @@ import { UNIT_CLASSES } from './config.js';
 import { hexDistance } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast } from './ui.js';
+import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
+import { checkEventMiss } from './events.js';
 
 /**
  * Calculate hit chance for an attack
@@ -40,36 +42,76 @@ export function calculateHitChance(attacker, defender) {
 export function executeAttack(attacker, defender) {
     const hitChance = calculateHitChance(attacker, defender);
     const roll = Math.random() * 100;
-    const hit = roll < hitChance;
+    let hit = roll < hitChance;
+
+    // Check for event-based miss (storm)
+    if (hit && checkEventMiss()) {
+        hit = false;
+        showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
+        attacker.ap -= 1;
+        return { hit: false, damage: 0, killed: false, eventMiss: true };
+    }
 
     // Consume AP
     attacker.ap -= 1;
 
     if (hit) {
-        // Calculate damage
-        let damage = attacker.damage;
+        // Check for shield (from power-up)
+        if (defender.shield) {
+            defender.shield = false;
+            showToast('🛡️ Schild blockiert Angriff!', 'special');
+            return { hit: true, damage: 0, killed: false, blocked: true };
+        }
+
+        // Calculate base damage with all bonuses
+        let damage = getEffectiveDamage(attacker);
 
         // Assault has damage variance
         if (attacker.class === 'assault') {
             damage += Math.floor(Math.random() * 15);
         }
 
+        // Calculate critical hit
+        const crit = calculateCritical(attacker, defender);
+        if (crit.isCrit) {
+            damage = Math.floor(damage * crit.multiplier);
+        }
+
         // Apply damage
         defender.currentHp -= damage;
 
-        showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
+        // Track damage for XP and assists
+        trackDamage(attacker, defender, damage);
+
+        // Show appropriate message
+        if (crit.isCrit) {
+            showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
+        } else {
+            showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
+        }
 
         // Check for kill
         if (defender.currentHp <= 0) {
             killUnit(defender);
+
+            // Award XP for kill and assists
+            const levelUps = awardKillXP(attacker, defender);
+
             setTimeout(() => {
                 showToast(`☠️ ${UNIT_CLASSES[defender.class].name} eliminiert!`, 'hit');
             }, 800);
 
-            return { hit: true, damage, killed: true };
+            // Show level up notifications
+            levelUps.forEach((levelUp, i) => {
+                setTimeout(() => {
+                    showToast(`⭐ ${UNIT_CLASSES[levelUp.unit.class].name} → ${levelUp.rank}!`, 'levelup');
+                }, 1600 + i * 800);
+            });
+
+            return { hit: true, damage, killed: true, crit: crit.isCrit, levelUps };
         }
 
-        return { hit: true, damage, killed: false };
+        return { hit: true, damage, killed: false, crit: crit.isCrit };
     } else {
         showToast('💨 Verfehlt!', 'miss');
         return { hit: false, damage: 0, killed: false };
@@ -116,6 +158,11 @@ function useMedicSpecial(unit) {
             totalHealed += healAmount;
         }
     });
+
+    // Award XP for healing
+    if (totalHealed > 0) {
+        awardXP(unit, XP_REWARDS.HEAL, 'heal');
+    }
 
     showToast(`💚 ${totalHealed} HP geheilt!`, 'special');
     return true;
