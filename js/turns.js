@@ -32,6 +32,7 @@ export function startTurn() {
     state.selectedAction = 'move';
     state.targetedUnit = null;
     state.currentPath = null;
+    state.pendingMoveDestination = null;
 
     // Update fog of war
     updateVisibility();

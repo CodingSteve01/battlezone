@@ -13,6 +13,7 @@ import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 
 let canvas;
+let pendingMoveAnimationId = null;
 
 // Scrolling/panning state
 let isDragging = false;
@@ -356,7 +357,7 @@ function handlePathPreview(clientX, clientY) {
 }
 
 /**
- * Handle move action click
+ * Handle move action click - tap-to-confirm system
  */
 function handleMoveClick(unit, hex) {
     // Don't allow movement during animation
@@ -367,6 +368,10 @@ function handleMoveClick(unit, hex) {
     const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        // Clear pending destination if tapping on invalid hex
+        state.pendingMoveDestination = null;
+        state.currentPath = null;
+        render();
         return;
     }
 
@@ -391,26 +396,81 @@ function handleMoveClick(unit, hex) {
         }
     }
 
-    // Only move if we can reach at least one hex
+    // Only proceed if we can reach at least one hex
     if (reachablePath.length < 2 || totalCost === 0) {
         showToast('❌ Ziel nicht erreichbar!', 'warning');
+        state.pendingMoveDestination = null;
+        state.currentPath = null;
+        render();
         return;
     }
 
-    state.currentPath = null;
+    // Get the final reachable destination
+    const finalDest = reachablePath[reachablePath.length - 1];
 
-    // Animate the movement
-    animateUnitMovement(unit, reachablePath, totalCost, () => {
-        // Check for power-up pickup after animation
-        const pickup = checkPowerupPickup(unit);
-        if (pickup) {
-            showPowerupPickup(pickup.powerup, pickup.result);
+    // Check if tapping on already pending destination (confirm move)
+    if (state.pendingMoveDestination &&
+        state.pendingMoveDestination.q === finalDest.q &&
+        state.pendingMoveDestination.r === finalDest.r) {
+
+        // Second tap - execute the movement
+        state.pendingMoveDestination = null;
+        state.currentPath = null;
+
+        // Animate the movement
+        animateUnitMovement(unit, reachablePath, totalCost, () => {
+            // Check for power-up pickup after animation
+            const pickup = checkPowerupPickup(unit);
+            if (pickup) {
+                showPowerupPickup(pickup.powerup, pickup.result);
+            }
+
+            updateVisibility();
+            render();
+            updateUI();
+        }, render);
+    } else {
+        // First tap - show path preview and set pending destination
+        state.pendingMoveDestination = { q: finalDest.q, r: finalDest.r };
+        state.currentPath = pathResult.path;
+        render();
+
+        // Start animation loop for pulsing effect
+        startPendingMoveAnimation();
+    }
+}
+
+/**
+ * Start animation loop for pending move indicator
+ */
+function startPendingMoveAnimation() {
+    // Cancel any existing animation
+    if (pendingMoveAnimationId) {
+        cancelAnimationFrame(pendingMoveAnimationId);
+    }
+
+    function animate() {
+        // Stop if no longer pending
+        if (!state.pendingMoveDestination) {
+            pendingMoveAnimationId = null;
+            return;
         }
 
-        updateVisibility();
         render();
-        updateUI();
-    }, render);
+        pendingMoveAnimationId = requestAnimationFrame(animate);
+    }
+
+    pendingMoveAnimationId = requestAnimationFrame(animate);
+}
+
+/**
+ * Stop pending move animation
+ */
+function stopPendingMoveAnimation() {
+    if (pendingMoveAnimationId) {
+        cancelAnimationFrame(pendingMoveAnimationId);
+        pendingMoveAnimationId = null;
+    }
 }
 
 /**

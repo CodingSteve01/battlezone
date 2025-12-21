@@ -589,11 +589,12 @@ button:focus:not(:focus-visible),
     50% { opacity: 1; }
 }
 
-/* Unit Panel */
+/* Unit Panel - Compact */
 .unit-panel {
-    background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.4) 100%);
+    background: linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.5) 100%);
     border-top: 1px solid var(--border-subtle);
-    padding: 16px;
+    padding: 8px 12px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
     flex-shrink: 0;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -601,19 +602,19 @@ button:focus:not(:focus-visible),
 
 .unit-tabs {
     display: flex;
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 6px;
+    margin-bottom: 8px;
 }
 
 .unit-tab {
     flex: 1;
-    padding: 14px 10px;
+    padding: 8px 6px;
     background: var(--bg-glass);
     border: 2px solid var(--border-subtle);
-    border-radius: 16px;
+    border-radius: 12px;
     cursor: pointer;
     text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
 }
@@ -664,18 +665,13 @@ button:focus:not(:focus-visible),
 }
 
 .unit-tab .class-icon {
-    font-size: 32px;
-    margin-bottom: 6px;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    font-size: 24px;
+    margin-bottom: 4px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
 }
 
 .unit-tab .class-name {
-    font-size: 10px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 8px;
-    font-weight: 600;
+    display: none;  /* Hide on mobile for space */
 }
 
 .unit-tab .hp-bar {
@@ -714,8 +710,8 @@ button:focus:not(:focus-visible),
 .unit-tab .ap-bar-container {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 6px;
+    gap: 4px;
+    margin-top: 4px;
 }
 
 .unit-tab .ap-bar {
@@ -767,22 +763,22 @@ button:focus:not(:focus-visible),
 /* Actions */
 .action-row {
     display: flex;
-    gap: 10px;
+    gap: 6px;
 }
 
 .action-btn {
     flex: 1;
-    padding: 14px;
+    padding: 10px;
     background: var(--bg-glass);
     border: 2px solid var(--border-subtle);
-    border-radius: 14px;
+    border-radius: 12px;
     color: var(--text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     overflow: hidden;
 }
 
@@ -795,9 +791,9 @@ button:focus:not(:focus-visible),
 }
 
 .action-btn .icon {
-    font-size: 26px;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-    transition: transform 0.3s ease;
+    font-size: 22px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+    transition: transform 0.2s ease;
 }
 
 .action-btn:hover .icon {
