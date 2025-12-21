@@ -136,11 +136,11 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.fill();
     }
 
-    // Inner highlight for depth
+    // Inner highlight for depth - hexagon shape
     if (terrain) {
         ctx.save();
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 6; i++) {
             const angle = Math.PI / 3 * i;
             const px = cx + size * 0.85 * Math.cos(angle);
             const py = cy + size * 0.85 * Math.sin(angle);

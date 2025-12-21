@@ -189,8 +189,72 @@ export function showToast(message, type = '') {
     toast.textContent = message;
     document.body.appendChild(toast);
 
+    // Screen shake on hit/crit
+    if (type === 'hit' || type === 'crit') {
+        triggerScreenShake(type === 'crit' ? 'heavy' : 'light');
+    }
+
     // Auto remove
     setTimeout(() => toast.remove(), 1800);
+}
+
+/**
+ * Trigger screen shake effect
+ */
+export function triggerScreenShake(intensity = 'light') {
+    const gameArea = document.getElementById('game-area');
+    if (!gameArea) return;
+
+    // Remove existing shake class
+    gameArea.classList.remove('shake-light', 'shake-heavy');
+
+    // Force reflow
+    void gameArea.offsetWidth;
+
+    // Add shake class
+    gameArea.classList.add(`shake-${intensity}`);
+
+    // Also show hit flash
+    showHitFlash();
+
+    // Remove after animation
+    setTimeout(() => {
+        gameArea.classList.remove('shake-light', 'shake-heavy');
+    }, intensity === 'heavy' ? 400 : 200);
+}
+
+/**
+ * Show hit flash overlay
+ */
+function showHitFlash() {
+    // Remove existing flash
+    const existing = document.querySelector('.hit-flash');
+    if (existing) existing.remove();
+
+    const flash = document.createElement('div');
+    flash.className = 'hit-flash';
+    document.body.appendChild(flash);
+
+    setTimeout(() => flash.remove(), 300);
+}
+
+/**
+ * Show floating damage number at position
+ */
+export function showFloatingDamage(x, y, damage, isCrit = false, isHeal = false) {
+    const floater = document.createElement('div');
+    floater.className = 'floating-damage';
+    if (isCrit) floater.classList.add('crit');
+    if (isHeal) floater.classList.add('heal');
+
+    floater.textContent = (isHeal ? '+' : '-') + damage;
+    floater.style.left = x + 'px';
+    floater.style.top = y + 'px';
+
+    document.body.appendChild(floater);
+
+    // Remove after animation
+    setTimeout(() => floater.remove(), 1000);
 }
 
 /**

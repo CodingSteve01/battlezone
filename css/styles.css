@@ -96,7 +96,7 @@ html, body {
 #menu {
     padding: 20px;
     padding-top: max(20px, env(safe-area-inset-top));
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 20px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     background:
@@ -107,8 +107,14 @@ html, body {
 
 .menu-header {
     text-align: center;
-    padding: 50px 0 40px;
+    padding: 30px 0 25px;
     position: relative;
+}
+
+@media (min-height: 700px) {
+    .menu-header {
+        padding: 50px 0 40px;
+    }
 }
 
 .menu-title {
@@ -204,7 +210,7 @@ html, body {
 
 .start-btn {
     width: 100%;
-    padding: 20px;
+    padding: 22px;
     background: linear-gradient(135deg, var(--green) 0%, #059669 100%);
     border: none;
     border-radius: 20px;
@@ -212,13 +218,15 @@ html, body {
     font-size: 18px;
     font-weight: 700;
     cursor: pointer;
-    margin-top: 16px;
+    margin-top: 20px;
+    margin-bottom: 10px;
     box-shadow: 0 8px 30px var(--green-glow), inset 0 1px 0 rgba(255,255,255,0.2);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
     text-transform: uppercase;
     letter-spacing: 2px;
+    flex-shrink: 0;
 }
 
 .start-btn::before {
@@ -990,4 +998,114 @@ html, body {
 @keyframes shieldPulse {
     0%, 100% { opacity: 0.8; }
     50% { opacity: 1; }
+}
+
+/* ===== SCREEN SHAKE ===== */
+.shake-light {
+    animation: shakeLight 0.2s ease-out;
+}
+
+.shake-heavy {
+    animation: shakeHeavy 0.4s ease-out;
+}
+
+@keyframes shakeLight {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px) rotate(-0.5deg); }
+    40% { transform: translateX(4px) rotate(0.5deg); }
+    60% { transform: translateX(-3px) rotate(-0.3deg); }
+    80% { transform: translateX(2px) rotate(0.2deg); }
+}
+
+@keyframes shakeHeavy {
+    0%, 100% { transform: translateX(0); }
+    10% { transform: translateX(-8px) rotate(-1deg); }
+    20% { transform: translateX(8px) rotate(1deg); }
+    30% { transform: translateX(-7px) rotate(-0.8deg); }
+    40% { transform: translateX(7px) rotate(0.8deg); }
+    50% { transform: translateX(-5px) rotate(-0.5deg); }
+    60% { transform: translateX(5px) rotate(0.5deg); }
+    70% { transform: translateX(-3px) rotate(-0.3deg); }
+    80% { transform: translateX(3px) rotate(0.3deg); }
+    90% { transform: translateX(-1px); }
+}
+
+/* ===== FLOATING DAMAGE NUMBERS ===== */
+.floating-damage {
+    position: fixed;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--red);
+    text-shadow:
+        0 0 10px rgba(244, 63, 94, 0.8),
+        2px 2px 0 rgba(0,0,0,0.5);
+    z-index: 300;
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    transform: translate(-50%, -50%);
+}
+
+.floating-damage.crit {
+    font-size: 36px;
+    color: var(--yellow);
+    text-shadow:
+        0 0 15px rgba(245, 158, 11, 0.9),
+        0 0 30px rgba(245, 158, 11, 0.5),
+        2px 2px 0 rgba(0,0,0,0.5);
+    animation: floatUpCrit 1s ease-out forwards;
+}
+
+.floating-damage.heal {
+    color: var(--green);
+    text-shadow:
+        0 0 10px rgba(16, 185, 129, 0.8),
+        2px 2px 0 rgba(0,0,0,0.5);
+}
+
+@keyframes floatUp {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+    20% {
+        opacity: 1;
+        transform: translate(-50%, -70%) scale(1.2);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -150%) scale(0.8);
+    }
+}
+
+@keyframes floatUpCrit {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
+    }
+    15% {
+        opacity: 1;
+        transform: translate(-50%, -60%) scale(1.5) rotate(5deg);
+    }
+    30% {
+        transform: translate(-50%, -70%) scale(1.2) rotate(-3deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -180%) scale(0.7) rotate(0deg);
+    }
+}
+
+/* ===== HIT FLASH OVERLAY ===== */
+.hit-flash {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(244, 63, 94, 0.3) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 250;
+    animation: hitFlash 0.3s ease-out forwards;
+}
+
+@keyframes hitFlash {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
 }

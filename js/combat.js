@@ -2,9 +2,9 @@
 
 import { state, getHex, getPlayerUnits } from './state.js';
 import { UNIT_CLASSES } from './config.js';
-import { hexDistance } from './hexMath.js';
+import { hexDistance, hexToPixel } from './hexMath.js';
 import { killUnit } from './units.js';
-import { showToast } from './ui.js';
+import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
 import { checkEventMiss } from './events.js';
 
@@ -83,6 +83,16 @@ export function executeAttack(attacker, defender) {
         // Track damage for XP and assists
         trackDamage(attacker, defender, damage);
 
+        // Calculate screen position for floating damage
+        const defenderPos = hexToPixel(defender.q, defender.r, state.hexSize);
+        const canvas = document.getElementById('game-canvas');
+        if (canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const screenX = rect.left + state.offsetX + defenderPos.x;
+            const screenY = rect.top + state.offsetY + defenderPos.y - 20;
+            showFloatingDamage(screenX, screenY, damage, crit.isCrit);
+        }
+
         // Show appropriate message
         if (crit.isCrit) {
             showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
@@ -154,8 +164,20 @@ function useMedicSpecial(unit) {
 
         if (dist <= 3) {
             const healAmount = Math.min(30, ally.maxHp - ally.currentHp);
-            ally.currentHp += healAmount;
-            totalHealed += healAmount;
+            if (healAmount > 0) {
+                ally.currentHp += healAmount;
+                totalHealed += healAmount;
+
+                // Show floating heal number
+                const allyPos = hexToPixel(ally.q, ally.r, state.hexSize);
+                const canvas = document.getElementById('game-canvas');
+                if (canvas) {
+                    const rect = canvas.getBoundingClientRect();
+                    const screenX = rect.left + state.offsetX + allyPos.x;
+                    const screenY = rect.top + state.offsetY + allyPos.y - 20;
+                    showFloatingDamage(screenX, screenY, healAmount, false, true);
+                }
+            }
         }
     });
 
