@@ -3,212 +3,1212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
-    <title>Shadow Tactics - Taktischer Stealth Shooter</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Shadow Squad - Taktisches Teamspiel</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
 
-    <!-- External Libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+        :root {
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --yellow: #eab308;
+            --dark: #0f172a;
+            --darker: #020617;
+            --light: #e2e8f0;
+            --dim: #64748b;
+        }
 
-    <!-- Game Styles -->
-    <link rel="stylesheet" href="css/styles.css">
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--darker);
+            color: var(--light);
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* ===== GAME CONTAINER ===== */
+        #app {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== SCREENS ===== */
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            background: var(--darker);
+            z-index: 100;
+        }
+        .screen.active { display: flex; }
+
+        /* ===== MENU ===== */
+        #menu {
+            padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .menu-header {
+            text-align: center;
+            padding: 30px 0;
+        }
+
+        .menu-title {
+            font-size: clamp(28px, 8vw, 48px);
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--green), var(--blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .menu-subtitle {
+            color: var(--dim);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .menu-section {
+            background: var(--dark);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .menu-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dim);
+            margin-bottom: 12px;
+        }
+
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .option-btn {
+            padding: 16px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            color: var(--light);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .option-btn.selected {
+            border-color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .start-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, var(--green), #16a34a);
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .how-to-play {
+            text-align: center;
+            padding: 20px;
+            color: var(--dim);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .how-to-play h4 {
+            color: var(--light);
+            margin-bottom: 10px;
+        }
+
+        /* ===== TURN SCREEN ===== */
+        #turn-screen {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .turn-badge {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .turn-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .turn-hint {
+            color: var(--dim);
+            margin-bottom: 30px;
+        }
+
+        .ready-btn {
+            padding: 16px 60px;
+            background: transparent;
+            border: 2px solid var(--green);
+            border-radius: 12px;
+            color: var(--green);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* ===== GAME AREA ===== */
+        #game-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            padding-top: max(8px, env(safe-area-inset-top));
+            background: var(--dark);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
+        }
+
+        .player-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .player-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .round-info {
+            font-size: 12px;
+            color: var(--dim);
+        }
+
+        /* Canvas Container */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        #game-canvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        /* Unit Panel */
+        .unit-panel {
+            background: var(--dark);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding: 10px;
+            flex-shrink: 0;
+        }
+
+        .unit-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .unit-tab {
+            flex: 1;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .unit-tab.selected {
+            border-color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .unit-tab.dead {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .unit-tab .class-icon {
+            font-size: 20px;
+        }
+
+        .unit-tab .class-name {
+            font-size: 10px;
+            color: var(--dim);
+            margin-top: 2px;
+        }
+
+        .unit-tab .hp-bar {
+            height: 3px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .unit-tab .hp-fill {
+            height: 100%;
+            background: var(--green);
+            transition: width 0.3s;
+        }
+
+        /* Actions */
+        .action-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 12px 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: var(--light);
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            position: relative;
+        }
+
+        .action-btn .icon {
+            font-size: 18px;
+        }
+
+        .action-btn.selected {
+            border-color: var(--green);
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--green);
+        }
+
+        .action-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .action-btn .ap-cost {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 18px;
+            height: 18px;
+            background: var(--yellow);
+            color: black;
+            font-size: 10px;
+            font-weight: 700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .end-turn-btn {
+            padding: 12px 20px;
+            background: var(--red);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Bottom Safe Area */
+        .bottom-safe {
+            height: env(safe-area-inset-bottom);
+            background: var(--dark);
+            flex-shrink: 0;
+        }
+
+        /* ===== GAME OVER ===== */
+        #gameover {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .winner-icon { font-size: 60px; margin-bottom: 20px; }
+        .winner-text { font-size: 28px; font-weight: 700; margin-bottom: 30px; }
+
+        .go-btn {
+            padding: 14px 40px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px;
+        }
+
+        .go-btn.primary { background: var(--green); border: none; color: white; }
+        .go-btn.secondary { background: transparent; border: 1px solid var(--dim); color: var(--light); }
+
+        /* ===== TARGETING OVERLAY ===== */
+        .target-info {
+            position: absolute;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            display: none;
+            text-align: center;
+            z-index: 50;
+        }
+
+        .target-info.visible { display: block; }
+        .target-info .hit-chance { color: var(--green); font-weight: 700; font-size: 18px; }
+        .target-info .damage { color: var(--red); }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-weight: 600;
+            z-index: 200;
+            animation: toastAnim 1.8s forwards;
+        }
+
+        @keyframes toastAnim {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            15%, 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Loading Screen -->
-    <div id="loading">
-        <div class="loader"></div>
-        <p class="load-text">Lade Spiel...</p>
-    </div>
+    <div id="app">
+        <!-- MENU SCREEN -->
+        <div id="menu" class="screen active">
+            <div class="menu-header">
+                <h1 class="menu-title">SHADOW SQUAD</h1>
+                <p class="menu-subtitle">Taktisches Team-Strategiespiel</p>
+            </div>
 
-    <!-- Game Container (PixiJS renders here) -->
-    <div id="game-container"></div>
-
-    <!-- UI Overlays -->
-    <div id="top-hud" class="ui-overlay">
-        <div class="player-badge">
-            <div class="player-color" id="player-color"></div>
-            <span class="player-name" id="player-name">Spieler 1</span>
-        </div>
-        <div class="turn-info">
-            <div class="round-text">Runde <span id="round-num">1</span>/<span id="max-rounds">15</span></div>
-            <div class="ap-display" id="ap-display"></div>
-        </div>
-        <div id="mode-indicator" style="font-size: 0.8rem; color: var(--text-dim);"></div>
-    </div>
-
-    <div id="stats-panel" class="ui-overlay">
-        <div class="stat-row">
-            <span class="stat-label">Leben</span>
-            <span class="stat-value" id="health-val">100</span>
-        </div>
-        <div class="health-bar">
-            <div class="health-fill" id="health-bar" style="width: 100%"></div>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Munition</span>
-            <span class="stat-value" id="ammo-val">8/8</span>
-        </div>
-        <div class="stat-row">
-            <span class="stat-label">Granaten</span>
-            <span class="stat-value" id="grenade-val">2</span>
-        </div>
-    </div>
-
-    <div id="action-bar" class="ui-overlay">
-        <button class="action-btn selected" data-action="move">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
-            <span>Bewegen</span>
-            <span class="cost">1</span>
-        </button>
-        <button class="action-btn" data-action="shoot">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
-            </svg>
-            <span>Schuss</span>
-            <span class="cost">1</span>
-        </button>
-        <button class="action-btn" data-action="grenade">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="14" r="6"/>
-                <path d="M12 8V4M9 4h6"/>
-            </svg>
-            <span>Granate</span>
-            <span class="cost">2</span>
-        </button>
-        <button class="action-btn" data-action="overwatch">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-            </svg>
-            <span>Wache</span>
-            <span class="cost">2</span>
-        </button>
-        <button class="action-btn" data-action="reload">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 4v6h6M23 20v-6h-6"/>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-            </svg>
-            <span>Laden</span>
-            <span class="cost">1</span>
-        </button>
-        <button class="action-btn" data-action="sneak">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-            </svg>
-            <span>Ducken</span>
-            <span class="cost">0</span>
-        </button>
-        <button class="end-turn-btn" id="end-turn">Zug Ende</button>
-    </div>
-
-    <!-- Menu Screen -->
-    <div id="menu-screen" class="screen-overlay active">
-        <h1 class="menu-title">SHADOW TACTICS</h1>
-        <p class="menu-subtitle">Taktischer Stealth Shooter</p>
-
-        <div class="menu-container">
             <div class="menu-section">
                 <h3>Spieler</h3>
-                <div class="player-select">
-                    <button class="player-btn selected" data-players="2">2</button>
-                    <button class="player-btn" data-players="3">3</button>
-                    <button class="player-btn" data-players="4">4</button>
+                <div class="option-grid">
+                    <button class="option-btn selected" data-players="2">2 Spieler</button>
+                    <button class="option-btn" data-players="3">3 Spieler</button>
+                    <button class="option-btn" data-players="4">4 Spieler</button>
                 </div>
             </div>
 
             <div class="menu-section">
-                <h3>Kartengröße</h3>
-                <div class="map-slider">
-                    <input type="range" id="map-size-slider" min="8" max="16" value="10">
-                    <p class="map-label" id="map-size-label">Mittel (10x10)</p>
+                <h3>Spielfeld</h3>
+                <div class="option-grid">
+                    <button class="option-btn" data-size="small">Klein</button>
+                    <button class="option-btn selected" data-size="medium">Mittel</button>
+                    <button class="option-btn" data-size="large">Groß</button>
                 </div>
             </div>
 
-            <div class="menu-section">
-                <h3>Spielmodus</h3>
-                <div class="mode-select">
-                    <button class="mode-btn selected" data-mode="deathmatch">
-                        <div class="mode-name">Deathmatch</div>
-                        <div class="mode-desc">Letzter Überlebender gewinnt</div>
-                    </button>
-                    <button class="mode-btn" data-mode="tactical">
-                        <div class="mode-name">Taktisch</div>
-                        <div class="mode-desc">Mehr AP, strategischer Fokus</div>
-                    </button>
+            <div class="menu-section how-to-play">
+                <h4>So wird gespielt</h4>
+                <p>
+                    Jeder Spieler führt ein Squad aus 3 Einheiten:<br>
+                    <strong>🎯 Scout</strong> - Schnell, sieht weit<br>
+                    <strong>🔫 Assault</strong> - Hoher Schaden<br>
+                    <strong>💊 Medic</strong> - Heilt Verbündete<br><br>
+                    Tippe auf Hex-Felder zum Bewegen.<br>
+                    Tippe auf Gegner zum Angreifen.<br>
+                    Eliminiere alle feindlichen Einheiten!
+                </p>
+            </div>
+
+            <button class="start-btn" id="start-btn">Spiel Starten</button>
+        </div>
+
+        <!-- TURN SCREEN -->
+        <div id="turn-screen" class="screen">
+            <div class="turn-badge" id="turn-badge">1</div>
+            <h2 class="turn-title">Spieler <span id="turn-num">1</span></h2>
+            <p class="turn-hint">Gerät weitergeben!</p>
+            <button class="ready-btn" id="ready-btn">Bereit</button>
+        </div>
+
+        <!-- GAME AREA -->
+        <div id="game-area">
+            <div class="top-bar">
+                <div class="player-indicator">
+                    <div class="player-dot" id="current-dot"></div>
+                    <span class="player-name" id="current-name">Spieler 1</span>
+                </div>
+                <div class="round-info">Runde <span id="round-num">1</span></div>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="game-canvas"></canvas>
+                <div class="target-info" id="target-info">
+                    <div class="hit-chance" id="hit-chance">75%</div>
+                    <div class="damage" id="damage-info">~25 Schaden</div>
                 </div>
             </div>
 
-            <button class="start-btn" id="start-btn">Mission Starten</button>
-        </div>
-
-        <button class="rules-btn" id="rules-btn">?</button>
-    </div>
-
-    <!-- Turn Screen -->
-    <div id="turn-screen" class="screen-overlay">
-        <div class="turn-indicator" id="turn-indicator">1</div>
-        <h2 class="turn-text">Spieler <span id="turn-player">1</span></h2>
-        <p class="turn-hint">Gib das Gerät weiter!<br>Stelle sicher, dass niemand zusieht.</p>
-        <button class="ready-btn" id="ready-btn">Bereit</button>
-    </div>
-
-    <!-- Game Over Screen -->
-    <div id="gameover-screen" class="screen-overlay">
-        <div class="winner-crown">👑</div>
-        <h1 class="winner-text" id="winner-text">Spieler 1 gewinnt!</h1>
-        <div class="game-stats">
-            <div class="game-stat-row">
-                <span>Runden</span>
-                <span id="final-rounds">--</span>
+            <div class="unit-panel">
+                <div class="unit-tabs" id="unit-tabs"></div>
+                <div class="action-row">
+                    <button class="action-btn selected" data-action="move">
+                        <span class="icon">👟</span>
+                        <span>Bewegen</span>
+                        <span class="ap-cost">1</span>
+                    </button>
+                    <button class="action-btn" data-action="attack">
+                        <span class="icon">⚔️</span>
+                        <span>Angriff</span>
+                        <span class="ap-cost">1</span>
+                    </button>
+                    <button class="action-btn" data-action="special">
+                        <span class="icon">✨</span>
+                        <span>Spezial</span>
+                        <span class="ap-cost">2</span>
+                    </button>
+                    <button class="end-turn-btn" id="end-turn-btn">Zug Ende</button>
+                </div>
             </div>
-            <div class="game-stat-row">
-                <span>Eliminierungen</span>
-                <span id="final-kills">--</span>
-            </div>
+            <div class="bottom-safe"></div>
         </div>
-        <div class="btn-group">
-            <button class="rematch-btn" id="rematch-btn">Nochmal</button>
-            <button class="menu-return-btn" id="menu-return-btn">Menü</button>
-        </div>
-    </div>
 
-    <!-- Rules Modal -->
-    <div id="rules-modal">
-        <div class="rules-content">
-            <h2>Spielregeln</h2>
-
-            <h4>Ziel</h4>
-            <p>Eliminiere alle Gegner durch taktisches Vorgehen. Nutze Deckung und überrasche deine Feinde!</p>
-
-            <h4>Aktionspunkte (AP)</h4>
-            <ul>
-                <li><b>Bewegen:</b> 1 AP pro Feld</li>
-                <li><b>Schießen:</b> 1 AP (aus Deckung +20% Treffer)</li>
-                <li><b>Granate:</b> 2 AP, Flächenschaden</li>
-                <li><b>Überwatch:</b> 2 AP, automatischer Schuss auf Bewegung</li>
-                <li><b>Nachladen:</b> 1 AP</li>
-                <li><b>Ducken:</b> 0 AP, reduziert Sichtbarkeit</li>
-            </ul>
-
-            <h4>Taktik-System</h4>
-            <ul>
-                <li><b>Deckung:</b> Hinter Objekten: 50% weniger Schaden</li>
-                <li><b>Flanken:</b> Von der Seite: +25% Schaden</li>
-                <li><b>Rücken:</b> Von hinten: +50% Schaden</li>
-                <li><b>Höhe:</b> Erhöhte Position: +15% Treffer</li>
-            </ul>
-
-            <h4>Hot-Seat</h4>
-            <p>Alle spielen am selben Gerät. Zwischen den Zügen wird gewechselt - nicht spicken!</p>
-
-            <button class="close-rules" id="close-rules">Verstanden</button>
+        <!-- GAME OVER -->
+        <div id="gameover" class="screen">
+            <div class="winner-icon">🏆</div>
+            <h2 class="winner-text" id="winner-text">Spieler 1 gewinnt!</h2>
+            <button class="go-btn primary" id="rematch-btn">Nochmal</button>
+            <button class="go-btn secondary" id="menu-btn">Menü</button>
         </div>
     </div>
 
-    <!-- Game Script (ES6 Modules) -->
-    <script type="module" src="js/main.js"></script>
+    <script>
+    // ===== CONFIGURATION =====
+    const CONFIG = {
+        HEX_SIZE: 36,
+        PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308'],
+        UNITS_PER_PLAYER: 3,
+        AP_PER_TURN: 3,
+        MAX_ROUNDS: 20
+    };
+
+    const UNIT_CLASSES = {
+        scout: { name: 'Scout', icon: '🎯', hp: 60, damage: 15, range: 4, move: 4, special: 'Spähen' },
+        assault: { name: 'Assault', icon: '🔫', hp: 80, damage: 30, range: 2, move: 2, special: 'Sturm' },
+        medic: { name: 'Medic', icon: '💊', hp: 70, damage: 12, range: 2, move: 3, special: 'Heilen' }
+    };
+
+    // ===== GAME STATE =====
+    const state = {
+        screen: 'menu',
+        settings: { players: 2, size: 'medium' },
+        hexes: [],
+        players: [],
+        units: [],
+        currentPlayer: 0,
+        selectedUnit: null,
+        selectedAction: 'move',
+        round: 1,
+        gameOver: false
+    };
+
+    // ===== HEX UTILITIES =====
+    function hexToPixel(q, r) {
+        const size = CONFIG.HEX_SIZE;
+        const x = size * (3/2 * q);
+        const y = size * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+        return { x, y };
+    }
+
+    function pixelToHex(x, y) {
+        const size = CONFIG.HEX_SIZE;
+        const q = (2/3 * x) / size;
+        const r = (-1/3 * x + Math.sqrt(3)/3 * y) / size;
+        return hexRound(q, r);
+    }
+
+    function hexRound(q, r) {
+        const s = -q - r;
+        let rq = Math.round(q);
+        let rr = Math.round(r);
+        let rs = Math.round(s);
+        const qDiff = Math.abs(rq - q);
+        const rDiff = Math.abs(rr - r);
+        const sDiff = Math.abs(rs - s);
+        if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
+        else if (rDiff > sDiff) rr = -rq - rs;
+        return { q: rq, r: rr };
+    }
+
+    function hexDistance(a, b) {
+        return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
+    }
+
+    function hexNeighbors(q, r) {
+        const dirs = [[1,0], [1,-1], [0,-1], [-1,0], [-1,1], [0,1]];
+        return dirs.map(([dq, dr]) => ({ q: q + dq, r: r + dr }));
+    }
+
+    function getHex(q, r) {
+        return state.hexes.find(h => h.q === q && h.r === r);
+    }
+
+    // ===== MAP GENERATION =====
+    function generateMap() {
+        state.hexes = [];
+        const sizes = { small: 4, medium: 5, large: 6 };
+        const radius = sizes[state.settings.size];
+
+        for (let q = -radius; q <= radius; q++) {
+            for (let r = -radius; r <= radius; r++) {
+                if (Math.abs(q + r) <= radius) {
+                    const rand = Math.random();
+                    let type = 'grass';
+                    if (rand < 0.12) type = 'tree';
+                    else if (rand < 0.20) type = 'rock';
+                    else if (rand < 0.28) type = 'bush';
+                    else if (rand < 0.32) type = 'water';
+
+                    state.hexes.push({
+                        q, r,
+                        type,
+                        walkable: type !== 'water' && type !== 'rock',
+                        cover: type === 'tree' || type === 'bush',
+                        unit: null
+                    });
+                }
+            }
+        }
+
+        // Clear spawn areas
+        const spawns = getSpawnPositions();
+        spawns.flat().forEach(pos => {
+            const hex = getHex(pos.q, pos.r);
+            if (hex) {
+                hex.type = 'grass';
+                hex.walkable = true;
+                hex.cover = false;
+            }
+        });
+    }
+
+    function getSpawnPositions() {
+        const sizes = { small: 3, medium: 4, large: 5 };
+        const r = sizes[state.settings.size];
+        return [
+            [{ q: -r, r: 0 }, { q: -r, r: 1 }, { q: -r+1, r: 0 }],
+            [{ q: r, r: 0 }, { q: r, r: -1 }, { q: r-1, r: 0 }],
+            [{ q: 0, r: -r }, { q: 1, r: -r }, { q: 0, r: -r+1 }],
+            [{ q: 0, r: r }, { q: -1, r: r }, { q: 0, r: r-1 }]
+        ];
+    }
+
+    // ===== UNIT SYSTEM =====
+    function createUnits() {
+        state.units = [];
+        const classes = ['scout', 'assault', 'medic'];
+        const spawns = getSpawnPositions();
+
+        for (let p = 0; p < state.settings.players; p++) {
+            for (let u = 0; u < CONFIG.UNITS_PER_PLAYER; u++) {
+                const classType = classes[u];
+                const classData = UNIT_CLASSES[classType];
+                const spawn = spawns[p][u];
+
+                const unit = {
+                    id: `${p}-${u}`,
+                    player: p,
+                    class: classType,
+                    ...classData,
+                    currentHp: classData.hp,
+                    q: spawn.q,
+                    r: spawn.r,
+                    ap: CONFIG.AP_PER_TURN,
+                    alive: true,
+                    usedSpecial: false
+                };
+
+                const hex = getHex(spawn.q, spawn.r);
+                if (hex) hex.unit = unit;
+                state.units.push(unit);
+            }
+        }
+    }
+
+    function getPlayerUnits(player) {
+        return state.units.filter(u => u.player === player && u.alive);
+    }
+
+    function getCurrentUnit() {
+        if (state.selectedUnit === null) return null;
+        const units = getPlayerUnits(state.currentPlayer);
+        return units[state.selectedUnit] || null;
+    }
+
+    // ===== ACTIONS =====
+    function canMove(unit, hex) {
+        if (!hex || !hex.walkable || hex.unit) return false;
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: hex.q, r: hex.r });
+        return dist <= unit.ap && dist <= unit.move;
+    }
+
+    function moveUnit(unit, hex) {
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: hex.q, r: hex.r });
+        const oldHex = getHex(unit.q, unit.r);
+        if (oldHex) oldHex.unit = null;
+        unit.q = hex.q;
+        unit.r = hex.r;
+        hex.unit = unit;
+        unit.ap -= dist;
+        render();
+        updateUI();
+    }
+
+    function canAttack(unit, target) {
+        if (!target || target.player === unit.player || !target.alive) return false;
+        if (unit.ap < 1) return false;
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: target.q, r: target.r });
+        return dist <= unit.range;
+    }
+
+    function calculateHitChance(attacker, defender) {
+        let chance = 75;
+        const defHex = getHex(defender.q, defender.r);
+        if (defHex && defHex.cover) chance -= 20;
+        if (attacker.class === 'scout') chance += 10;
+        return Math.min(95, Math.max(30, chance));
+    }
+
+    function attackUnit(attacker, defender) {
+        const hitChance = calculateHitChance(attacker, defender);
+        const hit = Math.random() * 100 < hitChance;
+
+        attacker.ap -= 1;
+
+        if (hit) {
+            let damage = attacker.damage;
+            if (attacker.class === 'assault') damage += Math.floor(Math.random() * 10);
+            defender.currentHp -= damage;
+            showToast(`Treffer! ${damage} Schaden`);
+
+            if (defender.currentHp <= 0) {
+                defender.alive = false;
+                defender.currentHp = 0;
+                const hex = getHex(defender.q, defender.r);
+                if (hex) hex.unit = null;
+                showToast(`${UNIT_CLASSES[defender.class].icon} eliminiert!`);
+                checkWin();
+            }
+        } else {
+            showToast('Verfehlt!');
+        }
+
+        render();
+        updateUI();
+    }
+
+    function useSpecial(unit) {
+        if (unit.ap < 2 || unit.usedSpecial) return;
+
+        unit.ap -= 2;
+        unit.usedSpecial = true;
+
+        if (unit.class === 'medic') {
+            // Heal nearby allies
+            const allies = getPlayerUnits(unit.player);
+            allies.forEach(ally => {
+                if (ally.id === unit.id) return;
+                const dist = hexDistance({ q: unit.q, r: unit.r }, { q: ally.q, r: ally.r });
+                if (dist <= 2) {
+                    ally.currentHp = Math.min(ally.hp, ally.currentHp + 25);
+                }
+            });
+            showToast('💊 Team geheilt!');
+        } else if (unit.class === 'scout') {
+            // Extra move
+            unit.move += 2;
+            showToast('🎯 Schneller Späher!');
+        } else if (unit.class === 'assault') {
+            // Power shot next attack
+            unit.damage += 15;
+            showToast('🔫 Verstärkter Angriff!');
+        }
+
+        render();
+        updateUI();
+    }
+
+    // ===== TURN MANAGEMENT =====
+    function startTurn() {
+        const units = getPlayerUnits(state.currentPlayer);
+        if (units.length === 0) {
+            nextPlayer();
+            return;
+        }
+
+        units.forEach(u => {
+            u.ap = CONFIG.AP_PER_TURN;
+            // Reset assault damage boost
+            if (u.class === 'assault') u.damage = UNIT_CLASSES.assault.damage;
+            if (u.class === 'scout') u.move = UNIT_CLASSES.scout.move;
+        });
+
+        state.selectedUnit = 0;
+        state.selectedAction = 'move';
+
+        // Show turn screen
+        document.getElementById('turn-badge').style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
+        document.getElementById('turn-badge').textContent = state.currentPlayer + 1;
+        document.getElementById('turn-num').textContent = state.currentPlayer + 1;
+        showScreen('turn-screen');
+    }
+
+    function endTurn() {
+        nextPlayer();
+    }
+
+    function nextPlayer() {
+        state.currentPlayer = (state.currentPlayer + 1) % state.settings.players;
+
+        if (state.currentPlayer === 0) {
+            state.round++;
+            state.units.forEach(u => u.usedSpecial = false);
+            if (state.round > CONFIG.MAX_ROUNDS) {
+                endGame(null);
+                return;
+            }
+        }
+
+        // Skip dead players
+        if (getPlayerUnits(state.currentPlayer).length === 0) {
+            const alive = [];
+            for (let p = 0; p < state.settings.players; p++) {
+                if (getPlayerUnits(p).length > 0) alive.push(p);
+            }
+            if (alive.length <= 1) {
+                endGame(alive[0] ?? null);
+                return;
+            }
+            nextPlayer();
+            return;
+        }
+
+        startTurn();
+    }
+
+    function checkWin() {
+        const alive = [];
+        for (let p = 0; p < state.settings.players; p++) {
+            if (getPlayerUnits(p).length > 0) alive.push(p);
+        }
+        if (alive.length <= 1) {
+            endGame(alive[0] ?? null);
+        }
+    }
+
+    function endGame(winner) {
+        state.gameOver = true;
+        const text = winner !== null ? `Spieler ${winner + 1} gewinnt!` : 'Unentschieden!';
+        document.getElementById('winner-text').textContent = text;
+        if (winner !== null) {
+            document.getElementById('winner-text').style.color = CONFIG.PLAYER_COLORS[winner];
+        }
+        showScreen('gameover');
+    }
+
+    // ===== RENDERING =====
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let offsetX = 0, offsetY = 0;
+
+    function resizeCanvas() {
+        const container = canvas.parentElement;
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.height * window.devicePixelRatio;
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+        offsetX = rect.width / 2;
+        offsetY = rect.height / 2;
+        render();
+    }
+
+    function render() {
+        const w = canvas.width / window.devicePixelRatio;
+        const h = canvas.height / window.devicePixelRatio;
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+
+        const unit = getCurrentUnit();
+
+        // Draw hexes
+        state.hexes.forEach(hex => {
+            const pos = hexToPixel(hex.q, hex.r);
+            const sx = offsetX + pos.x;
+            const sy = offsetY + pos.y;
+
+            // Hex shape
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i - Math.PI / 6;
+                const px = sx + CONFIG.HEX_SIZE * Math.cos(angle);
+                const py = sy + CONFIG.HEX_SIZE * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+
+            // Fill based on type
+            const colors = {
+                grass: '#22543d',
+                tree: '#14532d',
+                bush: '#166534',
+                rock: '#374151',
+                water: '#1e3a5f'
+            };
+            ctx.fillStyle = colors[hex.type] || '#22543d';
+            ctx.fill();
+
+            // Highlight valid moves/targets
+            if (unit && state.selectedAction === 'move' && canMove(unit, hex)) {
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+                ctx.fill();
+            }
+
+            // Border
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Draw terrain features
+            if (hex.type === 'tree') {
+                ctx.fillStyle = '#15803d';
+                ctx.beginPath();
+                ctx.arc(sx, sy - 8, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#422006';
+                ctx.fillRect(sx - 3, sy, 6, 10);
+            } else if (hex.type === 'rock') {
+                ctx.fillStyle = '#6b7280';
+                ctx.beginPath();
+                ctx.ellipse(sx, sy, 14, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (hex.type === 'bush') {
+                ctx.fillStyle = '#16a34a';
+                ctx.beginPath();
+                ctx.arc(sx - 6, sy, 8, 0, Math.PI * 2);
+                ctx.arc(sx + 6, sy, 8, 0, Math.PI * 2);
+                ctx.arc(sx, sy - 5, 8, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (hex.type === 'water') {
+                ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(sx, sy, 10, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+
+        // Draw units
+        state.units.forEach(u => {
+            if (!u.alive) return;
+
+            const pos = hexToPixel(u.q, u.r);
+            const sx = offsetX + pos.x;
+            const sy = offsetY + pos.y;
+
+            // Selection ring
+            if (unit && u.id === unit.id) {
+                ctx.strokeStyle = CONFIG.PLAYER_COLORS[u.player];
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // Unit body
+            ctx.fillStyle = CONFIG.PLAYER_COLORS[u.player];
+            ctx.beginPath();
+            ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Class icon
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(UNIT_CLASSES[u.class].icon, sx, sy);
+
+            // HP bar
+            const hpPct = u.currentHp / u.hp;
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(sx - 14, sy + 18, 28, 4);
+            ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : (hpPct > 0.25 ? '#eab308' : '#ef4444');
+            ctx.fillRect(sx - 14, sy + 18, 28 * hpPct, 4);
+
+            // Highlight attackable
+            if (unit && state.selectedAction === 'attack' && canAttack(unit, u)) {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        });
+    }
+
+    // ===== UI =====
+    function updateUI() {
+        const units = getPlayerUnits(state.currentPlayer);
+        const unit = getCurrentUnit();
+
+        // Top bar
+        document.getElementById('current-dot').style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
+        document.getElementById('current-name').textContent = `Spieler ${state.currentPlayer + 1}`;
+        document.getElementById('round-num').textContent = state.round;
+
+        // Unit tabs
+        const tabsEl = document.getElementById('unit-tabs');
+        tabsEl.innerHTML = '';
+        units.forEach((u, i) => {
+            const tab = document.createElement('div');
+            tab.className = 'unit-tab' + (i === state.selectedUnit ? ' selected' : '') + (!u.alive ? ' dead' : '');
+            tab.innerHTML = `
+                <div class="class-icon">${UNIT_CLASSES[u.class].icon}</div>
+                <div class="class-name">${u.class.toUpperCase()}</div>
+                <div class="hp-bar"><div class="hp-fill" style="width: ${(u.currentHp/u.hp)*100}%"></div></div>
+            `;
+            tab.onclick = () => {
+                if (u.alive) {
+                    state.selectedUnit = i;
+                    updateUI();
+                    render();
+                }
+            };
+            tabsEl.appendChild(tab);
+        });
+
+        // Action buttons
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.classList.remove('selected', 'disabled');
+            const action = btn.dataset.action;
+            if (action === state.selectedAction) btn.classList.add('selected');
+            if (!unit) {
+                btn.classList.add('disabled');
+            } else {
+                if (action === 'move' && unit.ap < 1) btn.classList.add('disabled');
+                if (action === 'attack' && unit.ap < 1) btn.classList.add('disabled');
+                if (action === 'special' && (unit.ap < 2 || unit.usedSpecial)) btn.classList.add('disabled');
+            }
+        });
+
+        // Hide target info
+        document.getElementById('target-info').classList.remove('visible');
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        if (id) document.getElementById(id).classList.add('active');
+    }
+
+    function showToast(msg) {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 1800);
+    }
+
+    // ===== INPUT =====
+    function handleCanvasClick(e) {
+        if (state.gameOver) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left - offsetX;
+        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top - offsetY;
+
+        const hexCoord = pixelToHex(x, y);
+        const hex = getHex(hexCoord.q, hexCoord.r);
+        if (!hex) return;
+
+        const unit = getCurrentUnit();
+        if (!unit) return;
+
+        if (state.selectedAction === 'move') {
+            if (canMove(unit, hex)) {
+                moveUnit(unit, hex);
+            }
+        } else if (state.selectedAction === 'attack') {
+            if (hex.unit && canAttack(unit, hex.unit)) {
+                attackUnit(unit, hex.unit);
+            }
+        }
+    }
+
+    function handleCanvasMove(e) {
+        if (state.selectedAction !== 'attack') {
+            document.getElementById('target-info').classList.remove('visible');
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left - offsetX;
+        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top - offsetY;
+
+        const hexCoord = pixelToHex(x, y);
+        const hex = getHex(hexCoord.q, hexCoord.r);
+        const unit = getCurrentUnit();
+
+        if (hex?.unit && unit && canAttack(unit, hex.unit)) {
+            const chance = calculateHitChance(unit, hex.unit);
+            document.getElementById('hit-chance').textContent = chance + '% Treffer';
+            document.getElementById('damage-info').textContent = `~${unit.damage} Schaden`;
+            document.getElementById('target-info').classList.add('visible');
+        } else {
+            document.getElementById('target-info').classList.remove('visible');
+        }
+    }
+
+    // ===== GAME INIT =====
+    function startGame() {
+        state.gameOver = false;
+        state.round = 1;
+        state.currentPlayer = 0;
+        state.selectedUnit = 0;
+        state.selectedAction = 'move';
+
+        generateMap();
+        createUnits();
+
+        showScreen(null);
+        resizeCanvas();
+        startTurn();
+    }
+
+    function setupEvents() {
+        // Menu
+        document.querySelectorAll('[data-players]').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('[data-players]').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                state.settings.players = parseInt(btn.dataset.players);
+            };
+        });
+
+        document.querySelectorAll('[data-size]').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('[data-size]').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                state.settings.size = btn.dataset.size;
+            };
+        });
+
+        document.getElementById('start-btn').onclick = startGame;
+        document.getElementById('ready-btn').onclick = () => {
+            showScreen(null);
+            resizeCanvas();
+            updateUI();
+            render();
+        };
+
+        // Actions
+        document.querySelectorAll('.action-btn').forEach(btn => {
+            btn.onclick = () => {
+                const action = btn.dataset.action;
+                if (action === 'special') {
+                    const unit = getCurrentUnit();
+                    if (unit) useSpecial(unit);
+                } else {
+                    state.selectedAction = action;
+                    updateUI();
+                    render();
+                }
+            };
+        });
+
+        document.getElementById('end-turn-btn').onclick = endTurn;
+
+        // Game over
+        document.getElementById('rematch-btn').onclick = startGame;
+        document.getElementById('menu-btn').onclick = () => showScreen('menu');
+
+        // Canvas
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchend', e => { e.preventDefault(); handleCanvasClick(e); });
+        canvas.addEventListener('mousemove', handleCanvasMove);
+
+        // Resize
+        window.addEventListener('resize', () => {
+            if (state.screen !== 'menu') resizeCanvas();
+        });
+    }
+
+    // ===== START =====
+    setupEvents();
+    showScreen('menu');
+    </script>
 </body>
 </html>
