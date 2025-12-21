@@ -309,7 +309,10 @@ html, body {
     justify-content: center;
     text-align: center;
     padding: 20px;
-    background: radial-gradient(circle at center, rgba(34, 197, 94, 0.1) 0%, var(--darker) 70%);
+    /* Fully opaque background to hide previous player's positions */
+    background:
+        radial-gradient(circle at center, rgba(34, 197, 94, 0.15) 0%, transparent 50%),
+        linear-gradient(180deg, #0f0f1a 0%, #0a0a12 100%);
 }
 
 .turn-badge {
@@ -629,6 +632,60 @@ html, body {
 @keyframes lowHpPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
+}
+
+/* AP Bar in Unit Tabs */
+.unit-tab .ap-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.unit-tab .ap-bar {
+    flex: 1;
+    height: 5px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.unit-tab .ap-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--yellow) 0%, var(--yellow-light) 100%);
+    transition: width 0.3s ease;
+    border-radius: 3px;
+    box-shadow: 0 0 8px var(--yellow-glow);
+}
+
+.unit-tab .ap-fill.medium {
+    background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
+.unit-tab .ap-fill.low {
+    background: linear-gradient(90deg, var(--red) 0%, var(--red-light) 100%);
+    box-shadow: 0 0 8px var(--red-glow);
+    animation: lowApPulse 0.8s infinite;
+}
+
+@keyframes lowApPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.unit-tab .ap-number {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--yellow-light);
+    min-width: 28px;
+    text-align: right;
+}
+
+.unit-tab .ap-number:has(+ .ap-fill.low),
+.unit-tab.selected .ap-fill.low + .ap-number {
+    color: var(--red-light);
 }
 
 /* Actions */

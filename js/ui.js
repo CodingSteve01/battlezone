@@ -83,12 +83,24 @@ function updateUnitTabs(units) {
         const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
         const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
 
+        // AP info
+        const apPct = (unit.ap / CONFIG.AP_PER_TURN) * 100;
+        let apClass = '';
+        if (unit.ap <= 1) apClass = ' low';
+        else if (unit.ap <= 2) apClass = ' medium';
+
         tab.innerHTML = `
             <div class="class-icon">${UNIT_CLASSES[unit.class].icon}</div>
             <div class="class-name">${UNIT_CLASSES[unit.class].name}</div>
             <div class="unit-level" style="background: ${levelColor}">Lv.${level}</div>
             <div class="hp-bar">
                 <div class="hp-fill${hpClass}" style="width: ${hpPct * 100}%"></div>
+            </div>
+            <div class="ap-bar-container">
+                <div class="ap-bar">
+                    <div class="ap-fill${apClass}" style="width: ${apPct}%"></div>
+                </div>
+                <div class="ap-number">${unit.ap}⚡</div>
             </div>
             ${!xpProgress.maxLevel ? `
                 <div class="xp-bar">
