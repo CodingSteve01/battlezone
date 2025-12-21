@@ -1275,14 +1275,14 @@ export function render() {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && fogLevel === 'visible' && !hex.unit) {
-                // Draw movement range highlight - use explicit fill
+                // Draw movement range highlight - use explicit fill (green)
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.85);
-                ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
                 ctx.fill();
 
-                // Draw border to make it clearer
-                ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
+                // Draw border to make it clearer (green)
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
@@ -1294,7 +1294,7 @@ export function render() {
                     ctx.arc(sx + state.hexSize * 0.3, sy - state.hexSize * 0.3, 11, 0, Math.PI * 2);
                     ctx.fill();
 
-                    ctx.fillStyle = cost <= currentUnit.ap ? '#fbbf24' : '#ef4444';
+                    ctx.fillStyle = cost <= currentUnit.ap ? '#22c55e' : '#ef4444';
                     ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -1304,7 +1304,7 @@ export function render() {
         }
     });
 
-    // Draw path preview - show full path with color coding (yellow=reachable, red=too far)
+    // Draw path preview - show full path with color coding (green=reachable, red=too far)
     if (state.currentPath && state.selectedAction === 'move' && currentUnit) {
         const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
@@ -1385,10 +1385,10 @@ export function render() {
             ctx.stroke();
         }
 
-        // Draw the REACHABLE portion (yellow, solid)
+        // Draw the REACHABLE portion (green, solid)
         if (lastReachableIndex > 0) {
-            // Draw the path line (yellow)
-            ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+            // Draw the path line (green)
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
             ctx.lineWidth = 5;
             ctx.setLineDash([]);
             ctx.beginPath();
@@ -1411,14 +1411,14 @@ export function render() {
                 const sx = state.offsetX + pos.x;
                 const sy = state.offsetY + pos.y;
 
-                // Yellow/green circle
-                ctx.fillStyle = i === lastReachableIndex ? '#22c55e' : 'rgba(250, 204, 21, 0.95)';
+                // Green circle (darker for destination)
+                ctx.fillStyle = i === lastReachableIndex ? '#16a34a' : 'rgba(34, 197, 94, 0.95)';
                 ctx.beginPath();
                 ctx.arc(sx, sy, 14, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Cost number
-                ctx.fillStyle = i === lastReachableIndex ? '#ffffff' : '#000000';
+                ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -1440,37 +1440,55 @@ export function render() {
                 // Pulsing effect for tap-to-confirm
                 const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
 
-                // Large pulsing circle behind flag
-                ctx.fillStyle = `rgba(34, 197, 94, ${0.3 * pulse})`;
+                // Large pulsing glow circle
+                ctx.fillStyle = `rgba(34, 197, 94, ${0.25 * pulse})`;
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, state.hexSize * 0.7 * pulse, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Pulsing ring
-                ctx.strokeStyle = `rgba(34, 197, 94, ${0.8 * pulse})`;
+                // Green checkmark button circle
+                const btnSize = state.hexSize * 0.55;
+                ctx.fillStyle = `rgba(22, 163, 74, ${0.9 + 0.1 * pulse})`;
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pulsing ring around button
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * pulse})`;
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.5, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, btnSize + 4, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Flag icon - larger and pulsing
-                ctx.font = `${Math.round(22 * pulse)}px sans-serif`;
-                ctx.fillText('🚩', endSx, endSy - 25);
+                // Draw checkmark ✓
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                const checkSize = btnSize * 0.5;
+                ctx.moveTo(endSx - checkSize * 0.5, endSy);
+                ctx.lineTo(endSx - checkSize * 0.1, endSy + checkSize * 0.4);
+                ctx.lineTo(endSx + checkSize * 0.5, endSy - checkSize * 0.4);
+                ctx.stroke();
 
-                // "Tippen zum Laufen" hint
+                // "Bestätigen" hint below
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
                 ctx.beginPath();
-                ctx.roundRect(endSx - 55, endSy + state.hexSize * 0.4, 110, 24, 6);
+                ctx.roundRect(endSx - 45, endSy + btnSize + 10, 90, 22, 6);
                 ctx.fill();
 
                 ctx.fillStyle = '#22c55e';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('⬆ Tippen zum Laufen', endSx, endSy + state.hexSize * 0.4 + 13);
+                ctx.textBaseline = 'middle';
+                ctx.fillText('✓ Bestätigen', endSx, endSy + btnSize + 21);
             } else {
-                // Normal flag icon
-                ctx.font = '16px sans-serif';
-                ctx.fillText('🚩', endSx, endSy - 22);
+                // Small destination marker (not yet confirmed)
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, 8, 0, Math.PI * 2);
+                ctx.fill();
             }
 
             // Show remaining AP after move
