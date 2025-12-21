@@ -40,6 +40,12 @@ export function calculateHitChance(attacker, defender) {
  * Execute an attack
  */
 export function executeAttack(attacker, defender) {
+    // Remove cloak when attacking
+    if (attacker.cloaked) {
+        attacker.cloaked = false;
+        showToast('🔫 Tarnung aufgehoben!', 'special');
+    }
+
     const hitChance = calculateHitChance(attacker, defender);
     const roll = Math.random() * 100;
     let hit = roll < hitChance;
@@ -144,6 +150,8 @@ export function useSpecialAbility(unit) {
             return useScoutSpecial(unit);
         case 'assault':
             return useAssaultSpecial(unit);
+        case 'sniper':
+            return useSniperSpecial(unit);
         default:
             return false;
     }
@@ -205,6 +213,15 @@ function useScoutSpecial(unit) {
 function useAssaultSpecial(unit) {
     unit.damage += 20;
     showToast('💥 Powershot bereit!', 'special');
+    return true;
+}
+
+/**
+ * Sniper cloak ability
+ */
+function useSniperSpecial(unit) {
+    unit.cloaked = true;
+    showToast('🔫 Getarnt! Unsichtbar bis zum Angriff', 'special');
     return true;
 }
 

@@ -33,9 +33,13 @@ export const state = {
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }
 
-    // Fog of War
-    visibleHexes: new Set(),  // Set of "q,r" keys for visible hexes
-    exploredHexes: new Set(), // Set of "q,r" keys for previously seen hexes
+    // Fog of War (per player)
+    visibleHexes: new Set(),  // Set of "q,r" keys for currently visible hexes
+    exploredHexes: new Set(), // Current player's explored hexes
+    playerExploredHexes: [],  // Array of Sets, one per player - stores explored hexes per player
+
+    // Team selection
+    teamSelections: [],       // Array of arrays - each player's selected unit classes
 
     // Rendering
     hexSize: CONFIG.BASE_HEX_SIZE,
@@ -93,6 +97,31 @@ export function resetState() {
     state.exploredHexes.clear();
     state.cameraX = 0;
     state.cameraY = 0;
+
+    // Initialize per-player explored hexes
+    state.playerExploredHexes = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        state.playerExploredHexes.push(new Set());
+    }
+}
+
+/**
+ * Switch fog of war to current player's view
+ */
+export function switchPlayerFog() {
+    // Save current player's explored hexes before switching
+    const prevPlayer = (state.currentPlayer - 1 + state.settings.players) % state.settings.players;
+    if (state.playerExploredHexes[prevPlayer]) {
+        // Already saved in updateVisibility
+    }
+
+    // Load current player's explored hexes
+    if (state.playerExploredHexes[state.currentPlayer]) {
+        state.exploredHexes = state.playerExploredHexes[state.currentPlayer];
+    } else {
+        state.exploredHexes = new Set();
+        state.playerExploredHexes[state.currentPlayer] = state.exploredHexes;
+    }
 }
 
 /**
