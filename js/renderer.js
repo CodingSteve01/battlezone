@@ -90,9 +90,9 @@ export function resizeCanvas() {
 }
 
 /**
- * Draw a hexagon with optional texture
+ * Draw a hexagon with optional texture and 3D effect
  */
-function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null) {
+function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null, terrain = null) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = Math.PI / 3 * i;
@@ -103,8 +103,15 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     }
     ctx.closePath();
 
-    // Fill with texture or color
-    if (texture) {
+    // Fill with gradient for 3D effect
+    if (terrain && terrain.colorLight && terrain.colorDark) {
+        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
+        gradient.addColorStop(0, terrain.colorLight);
+        gradient.addColorStop(0.5, terrain.color);
+        gradient.addColorStop(1, terrain.colorDark);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    } else if (texture) {
         ctx.save();
         ctx.clip();
         const pattern = ctx.createPattern(texture, 'repeat');
@@ -125,6 +132,24 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     } else {
         ctx.fillStyle = fillColor;
         ctx.fill();
+    }
+
+    // Inner highlight for depth
+    if (terrain) {
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * 0.85 * Math.cos(angle);
+            const py = cy + size * 0.85 * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
     }
 
     if (strokeColor) {
@@ -484,12 +509,23 @@ export function render() {
     const w = canvas.width / window.devicePixelRatio;
     const h = canvas.height / window.devicePixelRatio;
 
-    // Background with gradient
-    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h));
-    bgGradient.addColorStop(0, '#1f1f35');
-    bgGradient.addColorStop(1, '#0a0a15');
+    // Background with modern gradient
+    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
+    bgGradient.addColorStop(0, '#1a1a3e');
+    bgGradient.addColorStop(0.5, '#12122b');
+    bgGradient.addColorStop(1, '#0c0c1d');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, w, h);
+
+    // Subtle ambient glow
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
+    ambientGlow.addColorStop(0, '#10b981');
+    ambientGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = ambientGlow;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
 
     const currentUnit = getCurrentUnit();
     const reachableHexes = currentUnit && state.selectedAction === 'move'
@@ -548,9 +584,10 @@ export function render() {
             }
         }
 
-        // Draw hex with texture
-        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
-        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture);
+        // Draw hex with texture and 3D effect
+        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.03)';
+        const terrainData = fogLevel === 'visible' && !isReachable ? terrain : null;
+        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
 
         // Draw terrain details (only if visible)
         if (fogLevel === 'visible' && !isReachable) {
