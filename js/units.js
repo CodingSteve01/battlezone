@@ -65,9 +65,9 @@ export function getAttackableUnits(unit) {
 }
 
 /**
- * Move a unit to a new hex
+ * Move a unit to a new hex (instant, used internally)
  */
-export function moveUnit(unit, targetHex, cost) {
+export function moveUnitInstant(unit, targetHex) {
     // Clear old position
     const oldHex = getHex(unit.q, unit.r);
     if (oldHex) oldHex.unit = null;
@@ -76,9 +76,68 @@ export function moveUnit(unit, targetHex, cost) {
     unit.q = targetHex.q;
     unit.r = targetHex.r;
     targetHex.unit = unit;
+}
 
+/**
+ * Move a unit to a new hex with cost deduction
+ */
+export function moveUnit(unit, targetHex, cost) {
+    moveUnitInstant(unit, targetHex);
     // Deduct AP
     unit.ap -= cost;
+}
+
+/**
+ * Animate unit movement along a path
+ * @param {Object} unit - The unit to move
+ * @param {Array} path - Array of {q, r} positions
+ * @param {number} totalCost - Total AP cost
+ * @param {Function} onComplete - Callback when animation finishes
+ * @param {Function} render - Render function to call each frame
+ */
+export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
+    if (!path || path.length < 2) {
+        if (onComplete) onComplete();
+        return;
+    }
+
+    state.animating = true;
+    state.movementAnimation = {
+        unit,
+        path,
+        currentStep: 0,
+        totalCost
+    };
+
+    const stepDelay = 150; // ms per step
+    let currentStep = 0;
+
+    function nextStep() {
+        currentStep++;
+
+        if (currentStep >= path.length) {
+            // Animation complete
+            state.animating = false;
+            state.movementAnimation = null;
+            unit.ap -= totalCost;
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const nextPos = path[currentStep];
+        const nextHex = getHex(nextPos.q, nextPos.r);
+
+        if (nextHex) {
+            moveUnitInstant(unit, nextHex);
+            state.movementAnimation.currentStep = currentStep;
+            render();
+        }
+
+        setTimeout(nextStep, stepDelay);
+    }
+
+    // Start animation
+    setTimeout(nextStep, stepDelay);
 }
 
 /**
