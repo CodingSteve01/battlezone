@@ -9,12 +9,17 @@ import { getSpawnPositions } from './map.js';
  */
 export function createUnits() {
     state.units = [];
-    const classes = ['scout', 'assault', 'medic'];
+    const defaultClasses = ['scout', 'assault', 'medic'];
     const spawns = getSpawnPositions();
 
     for (let p = 0; p < state.settings.players; p++) {
+        // Use team selection if available, otherwise default
+        const playerClasses = (state.teamSelections && state.teamSelections[p] && state.teamSelections[p].length === CONFIG.UNITS_PER_PLAYER)
+            ? state.teamSelections[p]
+            : defaultClasses;
+
         for (let u = 0; u < CONFIG.UNITS_PER_PLAYER; u++) {
-            const classType = classes[u];
+            const classType = playerClasses[u];
             const classData = UNIT_CLASSES[classType];
             const spawn = spawns[p][u];
 
@@ -36,7 +41,9 @@ export function createUnits() {
                 r: spawn.r,
                 ap: CONFIG.AP_PER_TURN,
                 alive: true,
-                usedSpecial: false
+                usedSpecial: false,
+                cloaked: false,           // Sniper stealth
+                stealthActive: true       // Sniper passive stealth detection reduction
             };
 
             const hex = getHex(spawn.q, spawn.r);
@@ -156,6 +163,19 @@ export function resetUnitsForTurn(player) {
         if (unit.class === 'scout') {
             unit.move = UNIT_CLASSES.scout.move;
         }
+        if (unit.class === 'sniper') {
+            unit.damage = UNIT_CLASSES.sniper.damage;
+            // Cloak expires at end of round (handled in resetSpecialAbilities)
+        }
+    });
+}
+
+/**
+ * Reset cloak for all units (at round start)
+ */
+export function resetCloaks() {
+    state.units.forEach(unit => {
+        unit.cloaked = false;
     });
 }
 

@@ -114,5 +114,17 @@ export const UNIT_CLASSES = {
         vision: 5,
         special: 'Heilung',
         specialDesc: 'Heilt Team +30 HP'
+    },
+    sniper: {
+        name: 'Sniper',
+        icon: '🔫',
+        hp: 50,
+        damage: 45,
+        range: 6,
+        move: 2,
+        vision: 7,
+        special: 'Tarnung',
+        specialDesc: 'Unsichtbar für 1 Runde',
+        stealthDetectionRange: 2  // Gegner müssen sehr nah sein um ihn zu sehen
     }
 };

@@ -83,12 +83,24 @@ function updateUnitTabs(units) {
         const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
         const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
 
+        // AP info
+        const apPct = (unit.ap / CONFIG.AP_PER_TURN) * 100;
+        let apClass = '';
+        if (unit.ap <= 1) apClass = ' low';
+        else if (unit.ap <= 2) apClass = ' medium';
+
         tab.innerHTML = `
             <div class="class-icon">${UNIT_CLASSES[unit.class].icon}</div>
             <div class="class-name">${UNIT_CLASSES[unit.class].name}</div>
             <div class="unit-level" style="background: ${levelColor}">Lv.${level}</div>
             <div class="hp-bar">
                 <div class="hp-fill${hpClass}" style="width: ${hpPct * 100}%"></div>
+            </div>
+            <div class="ap-bar-container">
+                <div class="ap-bar">
+                    <div class="ap-fill${apClass}" style="width: ${apPct}%"></div>
+                </div>
+                <div class="ap-number">${unit.ap}⚡</div>
             </div>
             ${!xpProgress.maxLevel ? `
                 <div class="xp-bar">
@@ -189,8 +201,72 @@ export function showToast(message, type = '') {
     toast.textContent = message;
     document.body.appendChild(toast);
 
+    // Screen shake on hit/crit
+    if (type === 'hit' || type === 'crit') {
+        triggerScreenShake(type === 'crit' ? 'heavy' : 'light');
+    }
+
     // Auto remove
     setTimeout(() => toast.remove(), 1800);
+}
+
+/**
+ * Trigger screen shake effect
+ */
+export function triggerScreenShake(intensity = 'light') {
+    const gameArea = document.getElementById('game-area');
+    if (!gameArea) return;
+
+    // Remove existing shake class
+    gameArea.classList.remove('shake-light', 'shake-heavy');
+
+    // Force reflow
+    void gameArea.offsetWidth;
+
+    // Add shake class
+    gameArea.classList.add(`shake-${intensity}`);
+
+    // Also show hit flash
+    showHitFlash();
+
+    // Remove after animation
+    setTimeout(() => {
+        gameArea.classList.remove('shake-light', 'shake-heavy');
+    }, intensity === 'heavy' ? 400 : 200);
+}
+
+/**
+ * Show hit flash overlay
+ */
+function showHitFlash() {
+    // Remove existing flash
+    const existing = document.querySelector('.hit-flash');
+    if (existing) existing.remove();
+
+    const flash = document.createElement('div');
+    flash.className = 'hit-flash';
+    document.body.appendChild(flash);
+
+    setTimeout(() => flash.remove(), 300);
+}
+
+/**
+ * Show floating damage number at position
+ */
+export function showFloatingDamage(x, y, damage, isCrit = false, isHeal = false) {
+    const floater = document.createElement('div');
+    floater.className = 'floating-damage';
+    if (isCrit) floater.classList.add('crit');
+    if (isHeal) floater.classList.add('heal');
+
+    floater.textContent = (isHeal ? '+' : '-') + damage;
+    floater.style.left = x + 'px';
+    floater.style.top = y + 'px';
+
+    document.body.appendChild(floater);
+
+    // Remove after animation
+    setTimeout(() => floater.remove(), 1000);
 }
 
 /**

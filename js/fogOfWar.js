@@ -2,7 +2,7 @@
 
 import { hexDistance, getHexesInRange, hexLine } from './hexMath.js';
 import { state, getHex, getPlayerUnits, isHexVisible } from './state.js';
-import { CONFIG } from './config.js';
+import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 
 /**
@@ -75,13 +75,21 @@ export function hasLineOfSight(fromQ, fromR, toQ, toR) {
 export function updateVisibility() {
     state.visibleHexes.clear();
 
+    // Ensure playerExploredHexes array exists
+    if (!state.playerExploredHexes[state.currentPlayer]) {
+        state.playerExploredHexes[state.currentPlayer] = new Set();
+    }
+
+    // Set current player's explored set as active
+    state.exploredHexes = state.playerExploredHexes[state.currentPlayer];
+
     const playerUnits = getPlayerUnits(state.currentPlayer);
 
     for (const unit of playerUnits) {
         const unitVisible = getUnitVisibleHexes(unit);
         unitVisible.forEach(key => {
             state.visibleHexes.add(key);
-            state.exploredHexes.add(key); // Mark as explored
+            state.exploredHexes.add(key); // Mark as explored for THIS player only
         });
     }
 }
@@ -95,8 +103,34 @@ export function isUnitVisible(unit) {
         return true;
     }
 
+    // Cloaked units are invisible
+    if (unit.cloaked) {
+        return false;
+    }
+
     // Enemy units only visible if in visible hex
-    return isHexVisible(unit.q, unit.r);
+    if (!isHexVisible(unit.q, unit.r)) {
+        return false;
+    }
+
+    // Sniper stealth: harder to detect at range
+    if (unit.class === 'sniper' && unit.stealthActive !== false) {
+        const playerUnits = getPlayerUnits(state.currentPlayer);
+        const detectionRange = UNIT_CLASSES.sniper.stealthDetectionRange || 2;
+
+        // Check if any friendly unit is close enough to detect
+        const detected = playerUnits.some(friendlyUnit => {
+            const dist = hexDistance(
+                { q: friendlyUnit.q, r: friendlyUnit.r },
+                { q: unit.q, r: unit.r }
+            );
+            return dist <= detectionRange;
+        });
+
+        return detected;
+    }
+
+    return true;
 }
 
 /**

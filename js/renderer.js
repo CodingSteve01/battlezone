@@ -136,11 +136,11 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.fill();
     }
 
-    // Inner highlight for depth
+    // Inner highlight for depth - hexagon shape
     if (terrain) {
         ctx.save();
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 6; i++) {
             const angle = Math.PI / 3 * i;
             const px = cx + size * 0.85 * Math.cos(angle);
             const py = cy + size * 0.85 * Math.sin(angle);
@@ -642,7 +642,7 @@ export function render() {
         }
     });
 
-    // Draw path preview - only show reachable portion
+    // Draw path preview - show full path with color coding (yellow=reachable, red=too far)
     if (state.currentPath && state.selectedAction === 'move' && currentUnit) {
         const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
@@ -655,23 +655,78 @@ export function render() {
                     cumulativeCost += TERRAIN[hex.type].moveCost;
                 }
             }
-            return { ...point, totalCost: cumulativeCost };
+            return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
         });
 
-        // Find where the path exceeds AP - only show reachable portion
+        // Find where the path exceeds AP
         let lastReachableIndex = 0;
         for (let i = 1; i < pathWithCosts.length; i++) {
             if (pathWithCosts[i].totalCost <= maxCost) {
                 lastReachableIndex = i;
-            } else {
-                break;
             }
         }
 
-        // Only draw if there's a reachable path
+        // Draw the UNREACHABLE portion first (red, dashed)
+        if (pathWithCosts.length > lastReachableIndex + 1) {
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+
+            // Start from last reachable point
+            const startPoint = pathWithCosts[Math.max(0, lastReachableIndex)];
+            const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
+            ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
+
+            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw red dots for unreachable hexes with cost
+            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                const sx = state.offsetX + pos.x;
+                const sy = state.offsetY + pos.y;
+
+                // Red circle with cost
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+                ctx.beginPath();
+                ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cost number in red circle
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(point.totalCost, sx, sy);
+            }
+
+            // X mark at final unreachable destination
+            const finalPoint = pathWithCosts[pathWithCosts.length - 1];
+            const finalPos = hexToPixel(finalPoint.q, finalPoint.r, state.hexSize);
+            const finalSx = state.offsetX + finalPos.x;
+            const finalSy = state.offsetY + finalPos.y;
+
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(finalSx - 5, finalSy - 24);
+            ctx.lineTo(finalSx + 5, finalSy - 14);
+            ctx.moveTo(finalSx + 5, finalSy - 24);
+            ctx.lineTo(finalSx - 5, finalSy - 14);
+            ctx.stroke();
+        }
+
+        // Draw the REACHABLE portion (yellow, solid)
         if (lastReachableIndex > 0) {
-            // Draw the path line (green)
-            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+            // Draw the path line (yellow)
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
             ctx.lineWidth = 5;
             ctx.setLineDash([]);
             ctx.beginPath();
@@ -687,17 +742,25 @@ export function render() {
             }
             ctx.stroke();
 
-            // Draw dots at each step
-            for (let i = 0; i <= lastReachableIndex; i++) {
+            // Draw dots at each step with cost
+            for (let i = 1; i <= lastReachableIndex; i++) {
                 const point = pathWithCosts[i];
                 const pos = hexToPixel(point.q, point.r, state.hexSize);
                 const sx = state.offsetX + pos.x;
                 const sy = state.offsetY + pos.y;
 
-                ctx.fillStyle = i === lastReachableIndex ? '#22c55e' : 'rgba(34, 197, 94, 0.7)';
+                // Yellow/green circle
+                ctx.fillStyle = i === lastReachableIndex ? '#22c55e' : 'rgba(250, 204, 21, 0.95)';
                 ctx.beginPath();
-                ctx.arc(sx, sy, i === lastReachableIndex ? 8 : 5, 0, Math.PI * 2);
+                ctx.arc(sx, sy, 14, 0, Math.PI * 2);
                 ctx.fill();
+
+                // Cost number
+                ctx.fillStyle = i === lastReachableIndex ? '#ffffff' : '#000000';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(point.totalCost, sx, sy);
             }
 
             // Draw endpoint marker at the last reachable position
@@ -706,17 +769,23 @@ export function render() {
             const endSx = state.offsetX + endPos.x;
             const endSy = state.offsetY + endPos.y;
 
-            ctx.fillStyle = '#22c55e';
+            // Flag icon above destination
+            ctx.font = '16px sans-serif';
+            ctx.fillText('🚩', endSx, endSy - 22);
+
+            // Show remaining AP after move
+            const remainingAP = currentUnit.ap - pathWithCosts[lastReachableIndex].totalCost;
+
+            // AP remaining badge
+            ctx.fillStyle = remainingAP > 0 ? 'rgba(34, 197, 94, 0.9)' : 'rgba(107, 114, 128, 0.9)';
             ctx.beginPath();
-            ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
+            ctx.roundRect(endSx + 16, endSy - 10, 38, 20, 5);
             ctx.fill();
 
-            // Flag icon at destination
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 12px sans-serif';
+            ctx.font = 'bold 11px sans-serif';
             ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🚩', endSx, endSy - 1);
+            ctx.fillText(`${remainingAP}⚡`, endSx + 35, endSy);
         }
     }
 
