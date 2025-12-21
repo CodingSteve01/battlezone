@@ -8,6 +8,8 @@ import { initRenderer, resizeCanvas, render } from './renderer.js';
 import { updateUI, showScreen } from './ui.js';
 import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
+import { generatePowerups } from './powerups.js';
+import { initUnitProgression } from './progression.js';
 
 /**
  * Start a new game
@@ -23,6 +25,12 @@ export function startGame() {
     // Generate map and units
     generateMap();
     createUnits();
+
+    // Initialize progression for all units
+    state.units.forEach(unit => initUnitProgression(unit));
+
+    // Generate power-ups on the map
+    generatePowerups();
 
     // Initialize visibility
     updateVisibility();

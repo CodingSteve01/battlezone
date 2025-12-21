@@ -26,42 +26,54 @@ export const CONFIG = {
 
 export const TERRAIN = {
     grass: {
-        color: '#3d6b4f',
+        color: '#2d5a40',
+        colorLight: '#3d7352',
+        colorDark: '#1e4030',
         walkable: true,
         cover: false,
         moveCost: 1,
         name: 'Gras'
     },
     forest: {
-        color: '#2d5a3d',
+        color: '#1e4d35',
+        colorLight: '#2a6045',
+        colorDark: '#143525',
         walkable: true,
         cover: true,
         moveCost: 2,
         name: 'Wald'
     },
     rock: {
-        color: '#5a5a6a',
+        color: '#4a4a5a',
+        colorLight: '#5a5a6a',
+        colorDark: '#3a3a4a',
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Felsen'
     },
     water: {
-        color: '#2a4a6f',
+        color: '#1a4a70',
+        colorLight: '#2a5a85',
+        colorDark: '#0f3555',
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Wasser'
     },
     sand: {
-        color: '#9b8365',
+        color: '#8a7355',
+        colorLight: '#a08565',
+        colorDark: '#6a5540',
         walkable: true,
         cover: false,
         moveCost: 1,
         name: 'Sand'
     },
     swamp: {
-        color: '#4a5a3a',
+        color: '#3a4a30',
+        colorLight: '#4a5a40',
+        colorDark: '#2a3520',
         walkable: true,
         cover: false,
         moveCost: 3,

@@ -4,6 +4,7 @@ import { CONFIG, UNIT_CLASSES } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit } from './state.js';
 import { calculateHitChance } from './combat.js';
 import { render } from './renderer.js';
+import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 
 /**
  * Update all UI elements
@@ -73,12 +74,27 @@ function updateUnitTabs(units) {
         if (hpPct <= 0.5) hpClass = ' medium';
         if (hpPct <= 0.25) hpClass = ' low';
 
+        // Get XP progress
+        const xpProgress = getXPProgress(unit);
+        const level = unit.level || 1;
+        const rankName = getRankName(level);
+
+        // Level badge color based on level
+        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
+        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
+
         tab.innerHTML = `
             <div class="class-icon">${UNIT_CLASSES[unit.class].icon}</div>
             <div class="class-name">${UNIT_CLASSES[unit.class].name}</div>
+            <div class="unit-level" style="background: ${levelColor}">Lv.${level}</div>
             <div class="hp-bar">
                 <div class="hp-fill${hpClass}" style="width: ${hpPct * 100}%"></div>
             </div>
+            ${!xpProgress.maxLevel ? `
+                <div class="xp-bar">
+                    <div class="xp-fill" style="width: ${xpProgress.progress * 100}%"></div>
+                </div>
+            ` : ''}
         `;
 
         tab.onclick = () => {
@@ -126,12 +142,21 @@ function updateTargetInfo(unit) {
 
     if (state.targetedUnit && state.selectedAction === 'attack' && unit) {
         const chance = calculateHitChance(unit, state.targetedUnit);
+        const effectiveDamage = getEffectiveDamage(unit);
 
         const hitChanceEl = document.getElementById('hit-chance');
         const damageEl = document.getElementById('damage-info');
 
         if (hitChanceEl) hitChanceEl.textContent = chance + '%';
-        if (damageEl) damageEl.textContent = `~${unit.damage} Schaden`;
+        if (damageEl) {
+            // Show damage with any bonuses
+            const bonusDmg = effectiveDamage - unit.damage;
+            if (bonusDmg > 0) {
+                damageEl.textContent = `~${effectiveDamage} Schaden (+${bonusDmg})`;
+            } else {
+                damageEl.textContent = `~${effectiveDamage} Schaden`;
+            }
+        }
 
         infoEl.classList.add('visible');
     } else {
@@ -166,6 +191,47 @@ export function showToast(message, type = '') {
 
     // Auto remove
     setTimeout(() => toast.remove(), 1800);
+}
+
+/**
+ * Show event banner for round events
+ */
+export function showEventBanner(event) {
+    // Remove existing banner
+    const existing = document.querySelector('.event-banner');
+    if (existing) existing.remove();
+
+    // Create event banner
+    const banner = document.createElement('div');
+    banner.className = 'event-banner';
+    banner.innerHTML = `
+        <div class="event-icon">${event.icon}</div>
+        <div class="event-content">
+            <div class="event-title">${event.name}</div>
+            <div class="event-desc">${event.description}</div>
+        </div>
+    `;
+    banner.style.setProperty('--event-color', event.color);
+    document.body.appendChild(banner);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        banner.classList.add('show');
+    });
+
+    // Auto remove after delay
+    setTimeout(() => {
+        banner.classList.remove('show');
+        setTimeout(() => banner.remove(), 500);
+    }, 3000);
+}
+
+/**
+ * Show power-up pickup notification
+ */
+export function showPowerupPickup(powerup, result) {
+    const message = `${powerup.icon} ${powerup.name} aufgesammelt!`;
+    showToast(message, 'powerup');
 }
 
 /**

@@ -7,6 +7,9 @@ import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
+import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
+import { getCurrentEvent } from './events.js';
+import { getRankName } from './progression.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -87,9 +90,9 @@ export function resizeCanvas() {
 }
 
 /**
- * Draw a hexagon with optional texture
+ * Draw a hexagon with optional texture and 3D effect
  */
-function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null) {
+function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null, terrain = null) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = Math.PI / 3 * i;
@@ -100,8 +103,15 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     }
     ctx.closePath();
 
-    // Fill with texture or color
-    if (texture) {
+    // Fill with gradient for 3D effect
+    if (terrain && terrain.colorLight && terrain.colorDark) {
+        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
+        gradient.addColorStop(0, terrain.colorLight);
+        gradient.addColorStop(0.5, terrain.color);
+        gradient.addColorStop(1, terrain.colorDark);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    } else if (texture) {
         ctx.save();
         ctx.clip();
         const pattern = ctx.createPattern(texture, 'repeat');
@@ -122,6 +132,24 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     } else {
         ctx.fillStyle = fillColor;
         ctx.fill();
+    }
+
+    // Inner highlight for depth
+    if (terrain) {
+        ctx.save();
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * 0.85 * Math.cos(angle);
+            const py = cy + size * 0.85 * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
     }
 
     if (strokeColor) {
@@ -316,6 +344,42 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
     ctx.textBaseline = 'middle';
     ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
 
+    // Level badge (left side)
+    const level = unit.level || 1;
+    if (level > 1) {
+        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
+        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
+
+        ctx.fillStyle = levelColor;
+        ctx.beginPath();
+        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
+        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
+    }
+
+    // Shield indicator (if unit has shield from power-up)
+    if (unit.shield) {
+        ctx.shadowColor = '#3b82f6';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
+        ctx.fillText('🛡️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Damage boost indicator
+    if (unit.damageBoost && unit.damageBoost > 0) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
+    }
+
     // HP bar with gradient
     const hpPct = unit.currentHp / unit.maxHp;
     const barWidth = size * 1.6;
@@ -445,12 +509,23 @@ export function render() {
     const w = canvas.width / window.devicePixelRatio;
     const h = canvas.height / window.devicePixelRatio;
 
-    // Background with gradient
-    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h));
-    bgGradient.addColorStop(0, '#1f1f35');
-    bgGradient.addColorStop(1, '#0a0a15');
+    // Background with modern gradient
+    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
+    bgGradient.addColorStop(0, '#1a1a3e');
+    bgGradient.addColorStop(0.5, '#12122b');
+    bgGradient.addColorStop(1, '#0c0c1d');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, w, h);
+
+    // Subtle ambient glow
+    ctx.save();
+    ctx.globalAlpha = 0.1;
+    const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
+    ambientGlow.addColorStop(0, '#10b981');
+    ambientGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = ambientGlow;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
 
     const currentUnit = getCurrentUnit();
     const reachableHexes = currentUnit && state.selectedAction === 'move'
@@ -509,9 +584,10 @@ export function render() {
             }
         }
 
-        // Draw hex with texture
-        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
-        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture);
+        // Draw hex with texture and 3D effect
+        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.03)';
+        const terrainData = fogLevel === 'visible' && !isReachable ? terrain : null;
+        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
 
         // Draw terrain details (only if visible)
         if (fogLevel === 'visible' && !isReachable) {
@@ -553,6 +629,14 @@ export function render() {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('🛡', sx, sy);
+        }
+
+        // Draw power-up if present
+        if (fogLevel === 'visible') {
+            const powerup = getPowerupAt(hex.q, hex.r);
+            if (powerup) {
+                drawPowerup(sx, sy, powerup, state.hexSize);
+            }
         }
     });
 
@@ -736,6 +820,9 @@ export function render() {
 
     // Draw scroll hint if map is larger than viewport
     drawScrollHint(w, h);
+
+    // Draw event indicator
+    drawEventIndicator(w, h);
 }
 
 /**
@@ -777,6 +864,67 @@ function drawScrollHint(w, h) {
         ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
         ctx.fillText('▼', w / 2, h - 20);
     }
+
+    ctx.restore();
+}
+
+/**
+ * Draw a power-up on the map
+ */
+function drawPowerup(cx, cy, powerup, size) {
+    const powerupType = POWERUP_TYPES[powerup.type];
+    if (!powerupType) return;
+
+    ctx.save();
+
+    // Floating animation offset
+    const floatOffset = Math.sin(Date.now() / 400 + powerup.q + powerup.r) * 3;
+
+    // Glow effect
+    ctx.shadowColor = powerupType.color;
+    ctx.shadowBlur = 15;
+
+    // Background circle
+    ctx.fillStyle = powerupType.color + '40';
+    ctx.beginPath();
+    ctx.arc(cx, cy + floatOffset, size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = powerupType.color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Icon
+    ctx.shadowBlur = 0;
+    ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(powerupType.icon, cx, cy + floatOffset);
+
+    ctx.restore();
+}
+
+/**
+ * Draw active event indicator
+ */
+function drawEventIndicator(w, h) {
+    const event = getCurrentEvent();
+    if (!event) return;
+
+    ctx.save();
+
+    // Small indicator in corner
+    ctx.fillStyle = event.color + 'cc';
+    ctx.beginPath();
+    ctx.roundRect(w - 100, 10, 90, 30, 8);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${event.icon} Aktiv`, w - 55, 25);
 
     ctx.restore();
 }

@@ -5,9 +5,11 @@ import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
-import { showScreen, updateUI } from './ui.js';
+import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit } from './input.js';
+import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
+import { rollRoundEvent, clearRoundEvent } from './events.js';
 
 /**
  * Start a player's turn
@@ -59,12 +61,29 @@ export function endTurn() {
  * Move to next player
  */
 export function nextPlayer() {
+    // Update power-up buffs for ending player
+    updatePowerupBuffs(state.currentPlayer);
+
     state.currentPlayer = (state.currentPlayer + 1) % state.settings.players;
 
     // New round
     if (state.currentPlayer === 0) {
         state.round++;
         resetSpecialAbilities();
+
+        // Clear previous round's event
+        clearRoundEvent();
+
+        // Roll for new round event
+        const event = rollRoundEvent();
+        if (event) {
+            setTimeout(() => {
+                showEventBanner(event);
+            }, 500);
+        }
+
+        // Spawn new power-ups periodically
+        spawnNewPowerups();
 
         // Check max rounds
         if (state.round > CONFIG.MAX_ROUNDS) {

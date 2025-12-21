@@ -3,6 +3,7 @@
 import { hexDistance, getHexesInRange, hexLine } from './hexMath.js';
 import { state, getHex, getPlayerUnits, isHexVisible } from './state.js';
 import { CONFIG } from './config.js';
+import { getFogEventModifier } from './events.js';
 
 /**
  * Calculate visible hexes for a single unit
@@ -10,7 +11,9 @@ import { CONFIG } from './config.js';
  */
 function getUnitVisibleHexes(unit) {
     const visible = new Set();
-    const visionRange = unit.vision || CONFIG.VISION_RANGE;
+    // Apply event modifier to vision range
+    const eventModifier = getFogEventModifier();
+    const visionRange = Math.max(1, (unit.vision || CONFIG.VISION_RANGE) + eventModifier);
 
     // Get all hexes in vision range
     const hexesInRange = getHexesInRange(unit.q, unit.r, visionRange);
