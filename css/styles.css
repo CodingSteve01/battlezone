@@ -99,21 +99,56 @@ html, body {
     padding-bottom: max(40px, calc(env(safe-area-inset-bottom) + 24px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: var(--bg-primary);
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 60%, rgba(168, 85, 247, 0.08) 0%, transparent 40%),
+        linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
     justify-content: center;
-    gap: 16px;
+    gap: 20px;
 }
 
 .menu-header {
     text-align: center;
-    padding: 20px 0;
+    padding: 30px 0 20px;
+    position: relative;
+}
+
+.menu-header::before {
+    content: '⚔️';
+    display: block;
+    font-size: 48px;
+    margin-bottom: 16px;
+    filter: drop-shadow(0 4px 20px rgba(16, 185, 129, 0.4));
+    animation: floatIcon 3s ease-in-out infinite;
+}
+
+@keyframes floatIcon {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
 }
 
 .menu-title {
-    font-size: clamp(32px, 10vw, 48px);
-    font-weight: 800;
-    color: var(--green);
-    letter-spacing: -1px;
+    font-size: clamp(36px, 12vw, 56px);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 50%, var(--cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -2px;
+    text-shadow: 0 4px 30px rgba(16, 185, 129, 0.3);
+    position: relative;
+}
+
+.menu-title::after {
+    content: 'TACTICAL COMBAT';
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    -webkit-text-fill-color: var(--text-muted);
 }
 
 .menu-subtitle {
@@ -121,11 +156,18 @@ html, body {
 }
 
 .menu-section {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    padding: 16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .menu-section:hover {
     transform: none;
+    border-color: var(--border-light);
 }
 
 .menu-section h3 {
@@ -134,62 +176,89 @@ html, body {
 
 .option-grid {
     display: flex;
-    gap: 8px;
+    gap: 10px;
 }
 
 .option-btn {
     flex: 1;
-    padding: 14px 12px;
-    background: transparent;
+    padding: 16px 12px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 100%);
     border: 2px solid var(--border-subtle);
-    border-radius: 12px;
+    border-radius: 14px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
 }
 
 .option-btn::before {
-    display: none;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .option-btn:hover {
     border-color: var(--border-light);
     color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }
 
 .option-btn.selected {
     border-color: var(--green);
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--green);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+    color: var(--green-light);
+    box-shadow: 0 0 25px var(--green-glow), inset 0 0 20px rgba(16, 185, 129, 0.1);
 }
 
 .start-btn {
     width: 100%;
-    padding: 16px;
-    background: var(--green);
+    padding: 18px;
+    background: linear-gradient(135deg, var(--green) 0%, #059669 100%);
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     color: white;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 18px;
+    font-weight: 800;
     cursor: pointer;
-    margin-top: 16px;
-    transition: all 0.2s ease;
+    margin-top: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     flex-shrink: 0;
+    box-shadow: 0 4px 20px var(--green-glow);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    position: relative;
+    overflow: hidden;
 }
 
 .start-btn::before {
-    display: none;
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.start-btn:hover::before {
+    left: 100%;
 }
 
 .start-btn:hover {
-    background: var(--green-light);
+    background: linear-gradient(135deg, var(--green-light) 0%, var(--green) 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 35px var(--green-glow);
 }
 
 .start-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.98) translateY(0);
 }
 
 .how-to-play {
