@@ -14,8 +14,9 @@
             --red: #ef4444;
             --blue: #3b82f6;
             --yellow: #eab308;
-            --dark: #0f172a;
-            --darker: #020617;
+            --purple: #a855f7;
+            --dark: #1a1a2e;
+            --darker: #0f0f1a;
             --light: #e2e8f0;
             --dim: #64748b;
         }
@@ -30,7 +31,6 @@
             touch-action: manipulation;
         }
 
-        /* ===== GAME CONTAINER ===== */
         #app {
             width: 100%;
             height: 100%;
@@ -56,90 +56,141 @@
             padding-bottom: max(20px, env(safe-area-inset-bottom));
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
         }
 
         .menu-header {
             text-align: center;
-            padding: 30px 0;
+            padding: 40px 0;
         }
 
         .menu-title {
-            font-size: clamp(28px, 8vw, 48px);
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--green), var(--blue));
+            font-size: clamp(32px, 10vw, 56px);
+            font-weight: 900;
+            background: linear-gradient(135deg, #22c55e 0%, #3b82f6 50%, #a855f7 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            text-shadow: 0 4px 30px rgba(34, 197, 94, 0.3);
+            letter-spacing: -1px;
         }
 
         .menu-subtitle {
             color: var(--dim);
             font-size: 14px;
             margin-top: 8px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         .menu-section {
-            background: var(--dark);
-            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
             padding: 20px;
             margin-bottom: 16px;
+            backdrop-filter: blur(10px);
         }
 
         .menu-section h3 {
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
             color: var(--dim);
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
         .option-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
         }
 
         .option-btn {
-            padding: 16px;
-            background: rgba(255,255,255,0.05);
-            border: 2px solid transparent;
+            padding: 14px 8px;
+            background: rgba(255,255,255,0.03);
+            border: 2px solid rgba(255,255,255,0.1);
             border-radius: 12px;
             color: var(--light);
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .option-btn.selected {
             border-color: var(--green);
-            background: rgba(34, 197, 94, 0.1);
+            background: rgba(34, 197, 94, 0.15);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
         }
 
         .start-btn {
             width: 100%;
             padding: 18px;
-            background: linear-gradient(135deg, var(--green), #16a34a);
+            background: linear-gradient(135deg, var(--green) 0%, #16a34a 100%);
             border: none;
-            border-radius: 14px;
+            border-radius: 16px;
             color: white;
             font-size: 18px;
             font-weight: 700;
             cursor: pointer;
             margin-top: 10px;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .start-btn:active {
+            transform: scale(0.98);
         }
 
         .how-to-play {
-            text-align: center;
-            padding: 20px;
+            text-align: left;
+            padding: 5px;
             color: var(--dim);
             font-size: 13px;
-            line-height: 1.6;
+            line-height: 1.8;
         }
 
         .how-to-play h4 {
             color: var(--light);
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .class-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .class-info .icon {
+            font-size: 28px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        .class-info .details {
+            flex: 1;
+        }
+
+        .class-info .name {
+            font-weight: 700;
+            color: var(--light);
+            font-size: 14px;
+        }
+
+        .class-info .desc {
+            font-size: 11px;
+            color: var(--dim);
         }
 
         /* ===== TURN SCREEN ===== */
@@ -148,46 +199,55 @@
             justify-content: center;
             text-align: center;
             padding: 20px;
+            background: radial-gradient(circle at center, rgba(34, 197, 94, 0.1) 0%, var(--darker) 70%);
         }
 
         .turn-badge {
-            width: 100px;
-            height: 100px;
+            width: 120px;
+            height: 120px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            animation: pulse 1.5s infinite;
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 24px;
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.5);
+            animation: pulse 2s infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(34, 197, 94, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 0 60px rgba(34, 197, 94, 0.7); }
         }
 
         .turn-title {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 10px;
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
         }
 
         .turn-hint {
             color: var(--dim);
-            margin-bottom: 30px;
+            margin-bottom: 40px;
+            font-size: 16px;
         }
 
         .ready-btn {
-            padding: 16px 60px;
+            padding: 18px 80px;
             background: transparent;
             border: 2px solid var(--green);
-            border-radius: 12px;
+            border-radius: 14px;
             color: var(--green);
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            font-weight: 700;
             cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .ready-btn:active {
+            background: var(--green);
+            color: white;
         }
 
         /* ===== GAME AREA ===== */
@@ -198,6 +258,7 @@
             min-height: 0;
             height: 100%;
             overflow: hidden;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
         }
 
         /* Top Bar */
@@ -205,9 +266,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 12px;
-            padding-top: max(8px, env(safe-area-inset-top));
-            background: var(--dark);
+            padding: 10px 16px;
+            padding-top: max(10px, env(safe-area-inset-top));
+            background: rgba(0,0,0,0.3);
             border-bottom: 1px solid rgba(255,255,255,0.1);
             flex-shrink: 0;
         }
@@ -215,23 +276,58 @@
         .player-indicator {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .player-dot {
-            width: 16px;
-            height: 16px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
         }
 
         .player-name {
-            font-weight: 600;
-            font-size: 14px;
+            font-weight: 700;
+            font-size: 16px;
         }
 
         .round-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .round-badge {
+            background: rgba(255,255,255,0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .ap-display {
+            display: flex;
+            gap: 4px;
+        }
+
+        .ap-pip {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: var(--yellow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 12px;
+            font-weight: 800;
+            color: #000;
+            box-shadow: 0 2px 8px rgba(234, 179, 8, 0.4);
+        }
+
+        .ap-pip.used {
+            background: rgba(255,255,255,0.1);
             color: var(--dim);
+            box-shadow: none;
         }
 
         /* Canvas Container */
@@ -240,8 +336,6 @@
             position: relative;
             overflow: hidden;
             min-height: 200px;
-            /* Ensure canvas gets adequate space on mobile */
-            height: 100%;
         }
 
         #game-canvas {
@@ -251,33 +345,65 @@
             display: block;
         }
 
+        /* Target Info Overlay */
+        .target-info {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            padding: 12px 24px;
+            border-radius: 12px;
+            display: none;
+            text-align: center;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        .target-info.visible { display: block; }
+        .target-info .hit-chance {
+            color: var(--green);
+            font-weight: 800;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        }
+        .target-info .damage {
+            color: var(--red);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
         /* Unit Panel */
         .unit-panel {
-            background: var(--dark);
+            background: rgba(0,0,0,0.5);
             border-top: 1px solid rgba(255,255,255,0.1);
-            padding: 10px;
+            padding: 12px;
             flex-shrink: 0;
+            backdrop-filter: blur(10px);
         }
 
         .unit-tabs {
             display: flex;
             gap: 8px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .unit-tab {
             flex: 1;
-            padding: 10px;
+            padding: 12px 8px;
             background: rgba(255,255,255,0.05);
             border: 2px solid transparent;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
             text-align: center;
+            transition: all 0.2s;
         }
 
         .unit-tab.selected {
             border-color: var(--green);
             background: rgba(34, 197, 94, 0.1);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
         }
 
         .unit-tab.dead {
@@ -286,27 +412,38 @@
         }
 
         .unit-tab .class-icon {
-            font-size: 20px;
+            font-size: 24px;
+            margin-bottom: 4px;
         }
 
         .unit-tab .class-name {
             font-size: 10px;
             color: var(--dim);
-            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
         }
 
         .unit-tab .hp-bar {
-            height: 3px;
-            background: #333;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
             border-radius: 2px;
-            margin-top: 4px;
             overflow: hidden;
         }
 
         .unit-tab .hp-fill {
             height: 100%;
-            background: var(--green);
+            background: linear-gradient(90deg, var(--green), #16a34a);
             transition: width 0.3s;
+            border-radius: 2px;
+        }
+
+        .unit-tab .hp-fill.medium {
+            background: linear-gradient(90deg, var(--yellow), #ca8a04);
+        }
+
+        .unit-tab .hp-fill.low {
+            background: linear-gradient(90deg, var(--red), #dc2626);
         }
 
         /* Actions */
@@ -317,10 +454,10 @@
 
         .action-btn {
             flex: 1;
-            padding: 12px 8px;
+            padding: 14px 8px;
             background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
             color: var(--light);
             font-size: 11px;
             cursor: pointer;
@@ -329,16 +466,18 @@
             align-items: center;
             gap: 4px;
             position: relative;
+            transition: all 0.2s;
         }
 
         .action-btn .icon {
-            font-size: 18px;
+            font-size: 22px;
         }
 
         .action-btn.selected {
             border-color: var(--green);
             background: rgba(34, 197, 94, 0.15);
             color: var(--green);
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
         }
 
         .action-btn.disabled {
@@ -348,35 +487,43 @@
 
         .action-btn .ap-cost {
             position: absolute;
-            top: -6px;
-            right: -6px;
-            width: 18px;
-            height: 18px;
+            top: -8px;
+            right: -8px;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
             background: var(--yellow);
             color: black;
-            font-size: 10px;
-            font-weight: 700;
-            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 800;
+            border-radius: 11px;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 2px 8px rgba(234, 179, 8, 0.4);
         }
 
         .end-turn-btn {
-            padding: 12px 20px;
-            background: var(--red);
+            padding: 14px 24px;
+            background: linear-gradient(135deg, var(--red) 0%, #dc2626 100%);
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             color: white;
-            font-weight: 600;
-            font-size: 12px;
+            font-weight: 700;
+            font-size: 13px;
             cursor: pointer;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+            transition: all 0.2s;
+        }
+
+        .end-turn-btn:active {
+            transform: scale(0.98);
         }
 
         /* Bottom Safe Area */
         .bottom-safe {
             height: env(safe-area-inset-bottom);
-            background: var(--dark);
+            background: rgba(0,0,0,0.5);
             flex-shrink: 0;
         }
 
@@ -386,41 +533,48 @@
             justify-content: center;
             text-align: center;
             padding: 20px;
+            background: radial-gradient(circle at center, rgba(234, 179, 8, 0.1) 0%, var(--darker) 70%);
         }
 
-        .winner-icon { font-size: 60px; margin-bottom: 20px; }
-        .winner-text { font-size: 28px; font-weight: 700; margin-bottom: 30px; }
+        .winner-icon {
+            font-size: 80px;
+            margin-bottom: 24px;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .winner-text {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 40px;
+        }
 
         .go-btn {
-            padding: 14px 40px;
-            border-radius: 12px;
+            padding: 16px 48px;
+            border-radius: 14px;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             margin: 8px;
+            transition: all 0.2s;
         }
 
-        .go-btn.primary { background: var(--green); border: none; color: white; }
-        .go-btn.secondary { background: transparent; border: 1px solid var(--dim); color: var(--light); }
-
-        /* ===== TARGETING OVERLAY ===== */
-        .target-info {
-            position: absolute;
-            bottom: 180px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            padding: 12px 20px;
-            border-radius: 12px;
-            font-size: 13px;
-            display: none;
-            text-align: center;
-            z-index: 50;
+        .go-btn.primary {
+            background: linear-gradient(135deg, var(--green) 0%, #16a34a 100%);
+            border: none;
+            color: white;
+            box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
         }
 
-        .target-info.visible { display: block; }
-        .target-info .hit-chance { color: var(--green); font-weight: 700; font-size: 18px; }
-        .target-info .damage { color: var(--red); }
+        .go-btn.secondary {
+            background: transparent;
+            border: 2px solid var(--dim);
+            color: var(--light);
+        }
 
         /* ===== TOAST ===== */
         .toast {
@@ -429,18 +583,25 @@
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(0,0,0,0.95);
-            padding: 16px 32px;
-            border-radius: 12px;
-            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 20px 40px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 18px;
             z-index: 200;
             animation: toastAnim 1.8s forwards;
+            backdrop-filter: blur(10px);
         }
 
         @keyframes toastAnim {
             0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
             15%, 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
         }
+
+        .toast.hit { border-color: var(--green); color: var(--green); }
+        .toast.miss { border-color: var(--red); color: var(--red); }
+        .toast.special { border-color: var(--purple); color: var(--purple); }
     </style>
 </head>
 <body>
@@ -449,20 +610,20 @@
         <div id="menu" class="screen active">
             <div class="menu-header">
                 <h1 class="menu-title">SHADOW SQUAD</h1>
-                <p class="menu-subtitle">Taktisches Team-Strategiespiel</p>
+                <p class="menu-subtitle">Taktisches Teamspiel</p>
             </div>
 
             <div class="menu-section">
-                <h3>Spieler</h3>
+                <h3>Spieleranzahl</h3>
                 <div class="option-grid">
-                    <button class="option-btn selected" data-players="2">2 Spieler</button>
-                    <button class="option-btn" data-players="3">3 Spieler</button>
-                    <button class="option-btn" data-players="4">4 Spieler</button>
+                    <button class="option-btn selected" data-players="2">2</button>
+                    <button class="option-btn" data-players="3">3</button>
+                    <button class="option-btn" data-players="4">4</button>
                 </div>
             </div>
 
             <div class="menu-section">
-                <h3>Spielfeld</h3>
+                <h3>Spielfeldgröße</h3>
                 <div class="option-grid">
                     <button class="option-btn" data-size="small">Klein</button>
                     <button class="option-btn selected" data-size="medium">Mittel</button>
@@ -471,16 +632,28 @@
             </div>
 
             <div class="menu-section how-to-play">
-                <h4>So wird gespielt</h4>
-                <p>
-                    Jeder Spieler führt ein Squad aus 3 Einheiten:<br>
-                    <strong>🎯 Scout</strong> - Schnell, sieht weit<br>
-                    <strong>🔫 Assault</strong> - Hoher Schaden<br>
-                    <strong>💊 Medic</strong> - Heilt Verbündete<br><br>
-                    Tippe auf Hex-Felder zum Bewegen.<br>
-                    Tippe auf Gegner zum Angreifen.<br>
-                    Eliminiere alle feindlichen Einheiten!
-                </p>
+                <h4>Dein Squad</h4>
+                <div class="class-info">
+                    <div class="icon">🎯</div>
+                    <div class="details">
+                        <div class="name">Scout</div>
+                        <div class="desc">Schnell & präzise • 4 Felder • Reichweite 4</div>
+                    </div>
+                </div>
+                <div class="class-info">
+                    <div class="icon">💥</div>
+                    <div class="details">
+                        <div class="name">Assault</div>
+                        <div class="desc">Hoher Schaden • 2 Felder • Reichweite 2</div>
+                    </div>
+                </div>
+                <div class="class-info">
+                    <div class="icon">💚</div>
+                    <div class="details">
+                        <div class="name">Medic</div>
+                        <div class="desc">Heilt Verbündete • 3 Felder • Reichweite 2</div>
+                    </div>
+                </div>
             </div>
 
             <button class="start-btn" id="start-btn">Spiel Starten</button>
@@ -501,7 +674,10 @@
                     <div class="player-dot" id="current-dot"></div>
                     <span class="player-name" id="current-name">Spieler 1</span>
                 </div>
-                <div class="round-info">Runde <span id="round-num">1</span></div>
+                <div class="round-info">
+                    <div class="round-badge">Runde <span id="round-num">1</span>/15</div>
+                    <div class="ap-display" id="ap-display"></div>
+                </div>
             </div>
 
             <div class="canvas-container">
@@ -548,48 +724,78 @@
     <script>
     // ===== CONFIGURATION =====
     const CONFIG = {
-        HEX_SIZE: 36, // Base size, will be recalculated dynamically
+        BASE_HEX_SIZE: 40,
         PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308'],
+        PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb'],
         UNITS_PER_PLAYER: 3,
-        AP_PER_TURN: 3,
-        MAX_ROUNDS: 20
+        AP_PER_TURN: 4,
+        MAX_ROUNDS: 15
     };
 
-    // Dynamic hex size calculation
-    function calculateHexSize() {
-        const container = canvas.parentElement;
-        if (!container) return CONFIG.HEX_SIZE;
-
-        const rect = container.getBoundingClientRect();
-        const sizes = { small: 4, medium: 5, large: 6 };
-        const radius = sizes[state.settings.size] || 5;
-
-        // Calculate the hex grid dimensions
-        // Hex grid spans roughly (2*radius + 1) hexes in each direction
-        const gridWidth = (2 * radius + 1) * 1.5; // Approximate width in hex units
-        const gridHeight = (2 * radius + 1) * Math.sqrt(3); // Approximate height in hex units
-
-        // Calculate hex size that fits the container with padding
-        const padding = 40; // Padding from edges
-        const availableWidth = rect.width - padding * 2;
-        const availableHeight = rect.height - padding * 2;
-
-        const hexSizeByWidth = availableWidth / gridWidth;
-        const hexSizeByHeight = availableHeight / gridHeight;
-
-        // Use the smaller of the two to ensure the grid fits
-        let hexSize = Math.min(hexSizeByWidth, hexSizeByHeight);
-
-        // Clamp to reasonable bounds
-        hexSize = Math.max(20, Math.min(50, hexSize));
-
-        return hexSize;
-    }
+    const TERRAIN = {
+        grass: {
+            color: '#2d5a3d',
+            walkable: true,
+            cover: false,
+            pattern: 'grass'
+        },
+        forest: {
+            color: '#1e4a2d',
+            walkable: true,
+            cover: true,
+            pattern: 'forest'
+        },
+        rock: {
+            color: '#4a4a5a',
+            walkable: false,
+            cover: false,
+            pattern: 'rock'
+        },
+        water: {
+            color: '#1e3a5f',
+            walkable: false,
+            cover: false,
+            pattern: 'water'
+        },
+        sand: {
+            color: '#8b7355',
+            walkable: true,
+            cover: false,
+            pattern: 'sand'
+        }
+    };
 
     const UNIT_CLASSES = {
-        scout: { name: 'Scout', icon: '🎯', hp: 60, damage: 15, range: 4, move: 4, special: 'Spähen' },
-        assault: { name: 'Assault', icon: '🔫', hp: 80, damage: 30, range: 2, move: 2, special: 'Sturm' },
-        medic: { name: 'Medic', icon: '💊', hp: 70, damage: 12, range: 2, move: 3, special: 'Heilen' }
+        scout: {
+            name: 'Scout',
+            icon: '🎯',
+            hp: 60,
+            damage: 18,
+            range: 4,
+            move: 4,
+            special: 'Sprint',
+            specialDesc: '+3 Bewegung'
+        },
+        assault: {
+            name: 'Assault',
+            icon: '💥',
+            hp: 100,
+            damage: 35,
+            range: 2,
+            move: 2,
+            special: 'Powershot',
+            specialDesc: '+20 Schaden'
+        },
+        medic: {
+            name: 'Medic',
+            icon: '💚',
+            hp: 80,
+            damage: 12,
+            range: 2,
+            move: 3,
+            special: 'Heilung',
+            specialDesc: 'Heilt Team +30 HP'
+        }
     };
 
     // ===== GAME STATE =====
@@ -597,18 +803,24 @@
         screen: 'menu',
         settings: { players: 2, size: 'medium' },
         hexes: [],
-        players: [],
         units: [],
         currentPlayer: 0,
         selectedUnit: null,
         selectedAction: 'move',
+        hoveredHex: null,
+        targetedUnit: null,
         round: 1,
-        gameOver: false
+        gameOver: false,
+        animating: false
     };
 
-    // ===== HEX UTILITIES =====
-    let currentHexSize = CONFIG.HEX_SIZE;
+    // ===== RENDERING STATE =====
+    let currentHexSize = CONFIG.BASE_HEX_SIZE;
+    let offsetX = 0, offsetY = 0;
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
 
+    // ===== HEX MATH (Flat-top hexagons) =====
     function hexToPixel(q, r) {
         const size = currentHexSize;
         const x = size * (3/2 * q);
@@ -616,10 +828,10 @@
         return { x, y };
     }
 
-    function pixelToHex(x, y) {
+    function pixelToHex(px, py) {
         const size = currentHexSize;
-        const q = (2/3 * x) / size;
-        const r = (-1/3 * x + Math.sqrt(3)/3 * y) / size;
+        const q = (2/3 * px) / size;
+        const r = (-1/3 * px + Math.sqrt(3)/3 * py) / size;
         return hexRound(q, r);
     }
 
@@ -640,13 +852,19 @@
         return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
     }
 
-    function hexNeighbors(q, r) {
-        const dirs = [[1,0], [1,-1], [0,-1], [-1,0], [-1,1], [0,1]];
-        return dirs.map(([dq, dr]) => ({ q: q + dq, r: r + dr }));
-    }
-
     function getHex(q, r) {
         return state.hexes.find(h => h.q === q && h.r === r);
+    }
+
+    function getHexesInRange(center, range) {
+        const results = [];
+        for (let q = -range; q <= range; q++) {
+            for (let r = Math.max(-range, -q - range); r <= Math.min(range, -q + range); r++) {
+                const hex = getHex(center.q + q, center.r + r);
+                if (hex) results.push(hex);
+            }
+        }
+        return results;
     }
 
     // ===== MAP GENERATION =====
@@ -655,21 +873,24 @@
         const sizes = { small: 4, medium: 5, large: 6 };
         const radius = sizes[state.settings.size];
 
+        // Generate base terrain
         for (let q = -radius; q <= radius; q++) {
             for (let r = -radius; r <= radius; r++) {
                 if (Math.abs(q + r) <= radius) {
+                    const distFromCenter = hexDistance({q: 0, r: 0}, {q, r});
                     const rand = Math.random();
-                    let type = 'grass';
-                    if (rand < 0.12) type = 'tree';
-                    else if (rand < 0.20) type = 'rock';
-                    else if (rand < 0.28) type = 'bush';
-                    else if (rand < 0.32) type = 'water';
 
+                    let type = 'grass';
+                    if (rand < 0.08) type = 'forest';
+                    else if (rand < 0.14) type = 'rock';
+                    else if (rand < 0.18 && distFromCenter > 1) type = 'water';
+                    else if (rand < 0.25) type = 'sand';
+
+                    const terrain = TERRAIN[type];
                     state.hexes.push({
-                        q, r,
-                        type,
-                        walkable: type !== 'water' && type !== 'rock',
-                        cover: type === 'tree' || type === 'bush',
+                        q, r, type,
+                        walkable: terrain.walkable,
+                        cover: terrain.cover,
                         unit: null
                     });
                 }
@@ -716,6 +937,7 @@
                     player: p,
                     class: classType,
                     ...classData,
+                    maxHp: classData.hp,
                     currentHp: classData.hp,
                     q: spawn.q,
                     r: spawn.r,
@@ -741,38 +963,56 @@
         return units[state.selectedUnit] || null;
     }
 
-    // ===== ACTIONS =====
-    function canMove(unit, hex) {
-        if (!hex || !hex.walkable || hex.unit) return false;
-        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: hex.q, r: hex.r });
-        return dist <= unit.ap && dist <= unit.move;
+    // ===== PATHFINDING =====
+    function getReachableHexes(unit) {
+        const reachable = [];
+        const maxDist = Math.min(unit.ap, unit.move);
+
+        const hexesInRange = getHexesInRange({q: unit.q, r: unit.r}, maxDist);
+        hexesInRange.forEach(hex => {
+            if (hex.walkable && !hex.unit) {
+                const dist = hexDistance({q: unit.q, r: unit.r}, hex);
+                if (dist > 0 && dist <= maxDist) {
+                    reachable.push({ hex, cost: dist });
+                }
+            }
+        });
+
+        return reachable;
     }
 
+    function getAttackableUnits(unit) {
+        if (unit.ap < 1) return [];
+        return state.units.filter(target => {
+            if (!target.alive || target.player === unit.player) return false;
+            const dist = hexDistance({q: unit.q, r: unit.r}, {q: target.q, r: target.r});
+            return dist <= unit.range;
+        });
+    }
+
+    // ===== ACTIONS =====
     function moveUnit(unit, hex) {
-        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: hex.q, r: hex.r });
+        const dist = hexDistance({ q: unit.q, r: unit.r }, hex);
         const oldHex = getHex(unit.q, unit.r);
         if (oldHex) oldHex.unit = null;
+
         unit.q = hex.q;
         unit.r = hex.r;
         hex.unit = unit;
         unit.ap -= dist;
+
         render();
         updateUI();
     }
 
-    function canAttack(unit, target) {
-        if (!target || target.player === unit.player || !target.alive) return false;
-        if (unit.ap < 1) return false;
-        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: target.q, r: target.r });
-        return dist <= unit.range;
-    }
-
     function calculateHitChance(attacker, defender) {
-        let chance = 75;
+        let chance = 70;
         const defHex = getHex(defender.q, defender.r);
-        if (defHex && defHex.cover) chance -= 20;
-        if (attacker.class === 'scout') chance += 10;
-        return Math.min(95, Math.max(30, chance));
+        if (defHex && defHex.cover) chance -= 25;
+        if (attacker.class === 'scout') chance += 15;
+        const dist = hexDistance({q: attacker.q, r: attacker.r}, {q: defender.q, r: defender.r});
+        chance -= (dist - 1) * 5;
+        return Math.min(95, Math.max(25, chance));
     }
 
     function attackUnit(attacker, defender) {
@@ -783,22 +1023,23 @@
 
         if (hit) {
             let damage = attacker.damage;
-            if (attacker.class === 'assault') damage += Math.floor(Math.random() * 10);
+            if (attacker.class === 'assault') damage += Math.floor(Math.random() * 15);
             defender.currentHp -= damage;
-            showToast(`Treffer! ${damage} Schaden`);
+            showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
 
             if (defender.currentHp <= 0) {
                 defender.alive = false;
                 defender.currentHp = 0;
                 const hex = getHex(defender.q, defender.r);
                 if (hex) hex.unit = null;
-                showToast(`${UNIT_CLASSES[defender.class].icon} eliminiert!`);
+                setTimeout(() => showToast(`☠️ ${UNIT_CLASSES[defender.class].name} eliminiert!`, 'hit'), 800);
                 checkWin();
             }
         } else {
-            showToast('Verfehlt!');
+            showToast('💨 Verfehlt!', 'miss');
         }
 
+        state.targetedUnit = null;
         render();
         updateUI();
     }
@@ -810,24 +1051,23 @@
         unit.usedSpecial = true;
 
         if (unit.class === 'medic') {
-            // Heal nearby allies
             const allies = getPlayerUnits(unit.player);
+            let healed = 0;
             allies.forEach(ally => {
-                if (ally.id === unit.id) return;
                 const dist = hexDistance({ q: unit.q, r: unit.r }, { q: ally.q, r: ally.r });
-                if (dist <= 2) {
-                    ally.currentHp = Math.min(ally.hp, ally.currentHp + 25);
+                if (dist <= 3) {
+                    const healAmount = Math.min(30, ally.maxHp - ally.currentHp);
+                    ally.currentHp += healAmount;
+                    healed += healAmount;
                 }
             });
-            showToast('💊 Team geheilt!');
+            showToast(`💚 ${healed} HP geheilt!`, 'special');
         } else if (unit.class === 'scout') {
-            // Extra move
-            unit.move += 2;
-            showToast('🎯 Schneller Späher!');
+            unit.move += 3;
+            showToast('🎯 Sprint aktiviert!', 'special');
         } else if (unit.class === 'assault') {
-            // Power shot next attack
-            unit.damage += 15;
-            showToast('🔫 Verstärkter Angriff!');
+            unit.damage += 20;
+            showToast('💥 Powershot bereit!', 'special');
         }
 
         render();
@@ -844,15 +1084,14 @@
 
         units.forEach(u => {
             u.ap = CONFIG.AP_PER_TURN;
-            // Reset assault damage boost
             if (u.class === 'assault') u.damage = UNIT_CLASSES.assault.damage;
             if (u.class === 'scout') u.move = UNIT_CLASSES.scout.move;
         });
 
         state.selectedUnit = 0;
         state.selectedAction = 'move';
+        state.targetedUnit = null;
 
-        // Show turn screen
         document.getElementById('turn-badge').style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
         document.getElementById('turn-badge').textContent = state.currentPlayer + 1;
         document.getElementById('turn-num').textContent = state.currentPlayer + 1;
@@ -875,7 +1114,6 @@
             }
         }
 
-        // Skip dead players
         if (getPlayerUnits(state.currentPlayer).length === 0) {
             const alive = [];
             for (let p = 0; p < state.settings.players; p++) {
@@ -898,7 +1136,7 @@
             if (getPlayerUnits(p).length > 0) alive.push(p);
         }
         if (alive.length <= 1) {
-            endGame(alive[0] ?? null);
+            setTimeout(() => endGame(alive[0] ?? null), 1200);
         }
     }
 
@@ -913,17 +1151,30 @@
     }
 
     // ===== RENDERING =====
-    const canvas = document.getElementById('game-canvas');
-    const ctx = canvas.getContext('2d');
-    let offsetX = 0, offsetY = 0;
+    function calculateHexSize() {
+        const container = canvas.parentElement;
+        if (!container) return CONFIG.BASE_HEX_SIZE;
+
+        const rect = container.getBoundingClientRect();
+        const sizes = { small: 4, medium: 5, large: 6 };
+        const radius = sizes[state.settings.size] || 5;
+
+        const gridWidth = (2 * radius + 1) * 1.8;
+        const gridHeight = (2 * radius + 1) * 1.6;
+
+        const padding = 30;
+        const availableWidth = rect.width - padding * 2;
+        const availableHeight = rect.height - padding * 2;
+
+        let hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
+        return Math.max(25, Math.min(55, hexSize));
+    }
 
     function resizeCanvas() {
         const container = canvas.parentElement;
         const rect = container.getBoundingClientRect();
 
-        // Ensure we have valid dimensions
         if (rect.width === 0 || rect.height === 0) {
-            // Retry after a short delay if container not yet laid out
             setTimeout(resizeCanvas, 50);
             return;
         }
@@ -932,25 +1183,211 @@
         canvas.height = rect.height * window.devicePixelRatio;
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform before scaling
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-        // Recalculate hex size to fit the screen
         currentHexSize = calculateHexSize();
-
         offsetX = rect.width / 2;
         offsetY = rect.height / 2;
         render();
+    }
+
+    function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1) {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * Math.cos(angle);
+            const py = cy + size * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+
+        if (strokeColor) {
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+        }
+    }
+
+    function drawTerrainPattern(cx, cy, size, type) {
+        const s = size * 0.4;
+        ctx.save();
+
+        if (type === 'forest') {
+            // Draw trees
+            ctx.fillStyle = '#0d3320';
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - s * 0.8);
+            ctx.lineTo(cx - s * 0.5, cy + s * 0.3);
+            ctx.lineTo(cx + s * 0.5, cy + s * 0.3);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#5c4033';
+            ctx.fillRect(cx - s * 0.1, cy + s * 0.3, s * 0.2, s * 0.4);
+        } else if (type === 'rock') {
+            // Draw rock
+            ctx.fillStyle = '#6b6b7a';
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, s * 0.7, s * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#8a8a9a';
+            ctx.beginPath();
+            ctx.ellipse(cx - s * 0.2, cy - s * 0.1, s * 0.3, s * 0.2, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (type === 'water') {
+            // Draw water waves
+            ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx - s * 0.5, cy);
+            ctx.quadraticCurveTo(cx - s * 0.25, cy - s * 0.2, cx, cy);
+            ctx.quadraticCurveTo(cx + s * 0.25, cy + s * 0.2, cx + s * 0.5, cy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx - s * 0.4, cy + s * 0.3);
+            ctx.quadraticCurveTo(cx, cy + s * 0.1, cx + s * 0.4, cy + s * 0.3);
+            ctx.stroke();
+        } else if (type === 'sand') {
+            // Draw sand dots
+            ctx.fillStyle = 'rgba(139, 115, 85, 0.3)';
+            for (let i = 0; i < 5; i++) {
+                const dx = (Math.random() - 0.5) * s;
+                const dy = (Math.random() - 0.5) * s;
+                ctx.beginPath();
+                ctx.arc(cx + dx, cy + dy, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        ctx.restore();
+    }
+
+    function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
+        const size = currentHexSize * 0.65;
+        const playerColor = CONFIG.PLAYER_COLORS[unit.player];
+
+        ctx.save();
+
+        // Selection glow
+        if (isSelected) {
+            ctx.shadowColor = playerColor;
+            ctx.shadowBlur = 20;
+        }
+
+        // Unit base (circle)
+        ctx.beginPath();
+        ctx.arc(cx, cy, size, 0, Math.PI * 2);
+
+        // Gradient fill
+        const gradient = ctx.createRadialGradient(cx - size * 0.3, cy - size * 0.3, 0, cx, cy, size);
+        gradient.addColorStop(0, lightenColor(playerColor, 30));
+        gradient.addColorStop(1, playerColor);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Border
+        ctx.strokeStyle = isSelected ? '#fff' : 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Class icon
+        ctx.font = `${Math.round(size * 1.1)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(UNIT_CLASSES[unit.class].icon, cx, cy);
+
+        // HP bar
+        const hpPct = unit.currentHp / unit.maxHp;
+        const barWidth = size * 1.8;
+        const barHeight = 5;
+        const barY = cy + size + 6;
+
+        // Bar background
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(cx - barWidth/2, barY, barWidth, barHeight, 2);
+        ctx.fill();
+
+        // Bar fill
+        let barColor = '#22c55e';
+        if (hpPct <= 0.5) barColor = '#eab308';
+        if (hpPct <= 0.25) barColor = '#ef4444';
+
+        ctx.fillStyle = barColor;
+        ctx.beginPath();
+        ctx.roundRect(cx - barWidth/2, barY, barWidth * hpPct, barHeight, 2);
+        ctx.fill();
+
+        // Attackable indicator
+        if (isAttackable && !isSelected) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.arc(cx, cy, size + 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Targeted crosshair
+        if (isTargeted) {
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            const crossSize = size + 15;
+
+            // Crosshair lines
+            ctx.beginPath();
+            ctx.moveTo(cx - crossSize, cy);
+            ctx.lineTo(cx - size - 5, cy);
+            ctx.moveTo(cx + size + 5, cy);
+            ctx.lineTo(cx + crossSize, cy);
+            ctx.moveTo(cx, cy - crossSize);
+            ctx.lineTo(cx, cy - size - 5);
+            ctx.moveTo(cx, cy + size + 5);
+            ctx.lineTo(cx, cy + crossSize);
+            ctx.stroke();
+
+            // Corner brackets
+            ctx.beginPath();
+            ctx.arc(cx, cy, crossSize, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.min(255, (num >> 16) + amt);
+        const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
+        const B = Math.min(255, (num & 0x0000FF) + amt);
+        return `rgb(${R},${G},${B})`;
     }
 
     function render() {
         const w = canvas.width / window.devicePixelRatio;
         const h = canvas.height / window.devicePixelRatio;
 
-        ctx.fillStyle = '#0f172a';
+        // Background gradient
+        const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
+        bgGradient.addColorStop(0, '#1a1a2e');
+        bgGradient.addColorStop(1, '#0f0f1a');
+        ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, w, h);
 
-        const unit = getCurrentUnit();
+        const currentUnit = getCurrentUnit();
+        const reachableHexes = currentUnit && state.selectedAction === 'move' ?
+            getReachableHexes(currentUnit).map(r => r.hex) : [];
+        const attackableUnits = currentUnit && state.selectedAction === 'attack' ?
+            getAttackableUnits(currentUnit) : [];
 
         // Draw hexes
         state.hexes.forEach(hex => {
@@ -958,119 +1395,89 @@
             const sx = offsetX + pos.x;
             const sy = offsetY + pos.y;
 
-            // Hex shape
-            ctx.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 3 * i - Math.PI / 6;
-                const px = sx + currentHexSize * Math.cos(angle);
-                const py = sy + currentHexSize * Math.sin(angle);
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
-            }
-            ctx.closePath();
+            const terrain = TERRAIN[hex.type];
+            let fillColor = terrain.color;
 
-            // Fill based on type
-            const colors = {
-                grass: '#22543d',
-                tree: '#14532d',
-                bush: '#166534',
-                rock: '#374151',
-                water: '#1e3a5f'
-            };
-            ctx.fillStyle = colors[hex.type] || '#22543d';
-            ctx.fill();
-
-            // Highlight valid moves/targets
-            if (unit && state.selectedAction === 'move' && canMove(unit, hex)) {
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
-                ctx.fill();
+            // Highlight reachable hexes
+            const isReachable = reachableHexes.includes(hex);
+            if (isReachable) {
+                fillColor = '#2d6a4f';
             }
 
-            // Border
-            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            // Draw hex
+            drawHex(sx, sy, currentHexSize * 0.95, fillColor, 'rgba(255,255,255,0.08)', 1);
 
-            // Draw terrain features (proportional to hex size)
-            const scale = currentHexSize / 36; // Scale relative to base size
-            if (hex.type === 'tree') {
-                ctx.fillStyle = '#15803d';
+            // Draw terrain pattern
+            if (!isReachable) {
+                drawTerrainPattern(sx, sy, currentHexSize, hex.type);
+            }
+
+            // Movement overlay
+            if (isReachable) {
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
+                drawHex(sx, sy, currentHexSize * 0.95, 'rgba(34, 197, 94, 0.25)');
+
+                // Move indicator dot
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
                 ctx.beginPath();
-                ctx.arc(sx, sy - 8 * scale, 12 * scale, 0, Math.PI * 2);
+                ctx.arc(sx, sy, 6, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.fillStyle = '#422006';
-                ctx.fillRect(sx - 3 * scale, sy, 6 * scale, 10 * scale);
-            } else if (hex.type === 'rock') {
-                ctx.fillStyle = '#6b7280';
-                ctx.beginPath();
-                ctx.ellipse(sx, sy, 14 * scale, 10 * scale, 0, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (hex.type === 'bush') {
-                ctx.fillStyle = '#16a34a';
-                ctx.beginPath();
-                ctx.arc(sx - 6 * scale, sy, 8 * scale, 0, Math.PI * 2);
-                ctx.arc(sx + 6 * scale, sy, 8 * scale, 0, Math.PI * 2);
-                ctx.arc(sx, sy - 5 * scale, 8 * scale, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (hex.type === 'water') {
-                ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
-                ctx.beginPath();
-                ctx.ellipse(sx, sy, 10 * scale, 6 * scale, 0, 0, Math.PI * 2);
-                ctx.fill();
+            }
+
+            // Cover indicator
+            if (hex.cover && !hex.unit) {
+                ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
+                drawHex(sx, sy, currentHexSize * 0.95, 'rgba(139, 92, 246, 0.15)');
             }
         });
 
-        // Draw units
-        const unitScale = currentHexSize / 36; // Scale relative to base size
-        state.units.forEach(u => {
-            if (!u.alive) return;
+        // Draw attack line
+        if (currentUnit && state.targetedUnit && state.selectedAction === 'attack') {
+            const fromPos = hexToPixel(currentUnit.q, currentUnit.r);
+            const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r);
 
-            const pos = hexToPixel(u.q, u.r);
+            ctx.save();
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 5]);
+            ctx.beginPath();
+            ctx.moveTo(offsetX + fromPos.x, offsetY + fromPos.y);
+            ctx.lineTo(offsetX + toPos.x, offsetY + toPos.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        // Draw units
+        state.units.forEach(unit => {
+            if (!unit.alive) return;
+
+            const pos = hexToPixel(unit.q, unit.r);
             const sx = offsetX + pos.x;
             const sy = offsetY + pos.y;
 
-            // Selection ring
-            if (unit && u.id === unit.id) {
-                ctx.strokeStyle = CONFIG.PLAYER_COLORS[u.player];
-                ctx.lineWidth = 3 * unitScale;
-                ctx.beginPath();
-                ctx.arc(sx, sy, 18 * unitScale, 0, Math.PI * 2);
-                ctx.stroke();
-            }
+            const isSelected = currentUnit && unit.id === currentUnit.id;
+            const isTargeted = state.targetedUnit && unit.id === state.targetedUnit.id;
+            const isAttackable = attackableUnits.some(u => u.id === unit.id);
 
-            // Unit body
-            ctx.fillStyle = CONFIG.PLAYER_COLORS[u.player];
-            ctx.beginPath();
-            ctx.arc(sx, sy, 14 * unitScale, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Class icon
-            ctx.font = `${Math.round(16 * unitScale)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(UNIT_CLASSES[u.class].icon, sx, sy);
-
-            // HP bar
-            const hpPct = u.currentHp / u.hp;
-            const hpBarWidth = 28 * unitScale;
-            const hpBarHeight = 4 * unitScale;
-            const hpBarY = sy + 18 * unitScale;
-            ctx.fillStyle = '#1f2937';
-            ctx.fillRect(sx - hpBarWidth / 2, hpBarY, hpBarWidth, hpBarHeight);
-            ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : (hpPct > 0.25 ? '#eab308' : '#ef4444');
-            ctx.fillRect(sx - hpBarWidth / 2, hpBarY, hpBarWidth * hpPct, hpBarHeight);
-
-            // Highlight attackable
-            if (unit && state.selectedAction === 'attack' && canAttack(unit, u)) {
-                ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 2 * unitScale;
-                ctx.setLineDash([4 * unitScale, 4 * unitScale]);
-                ctx.beginPath();
-                ctx.arc(sx, sy, 20 * unitScale, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
+            drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable);
         });
+
+        // Draw range indicator for attack mode
+        if (currentUnit && state.selectedAction === 'attack') {
+            const pos = hexToPixel(currentUnit.q, currentUnit.r);
+            const sx = offsetX + pos.x;
+            const sy = offsetY + pos.y;
+            const rangeRadius = currentUnit.range * currentHexSize * 1.7;
+
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.3)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
     // ===== UI =====
@@ -1079,9 +1486,23 @@
         const unit = getCurrentUnit();
 
         // Top bar
-        document.getElementById('current-dot').style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
+        const dot = document.getElementById('current-dot');
+        dot.style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
+        dot.style.boxShadow = `0 0 10px ${CONFIG.PLAYER_COLORS[state.currentPlayer]}`;
         document.getElementById('current-name').textContent = `Spieler ${state.currentPlayer + 1}`;
         document.getElementById('round-num').textContent = state.round;
+
+        // AP display
+        const apDisplay = document.getElementById('ap-display');
+        apDisplay.innerHTML = '';
+        if (unit) {
+            for (let i = 0; i < CONFIG.AP_PER_TURN; i++) {
+                const pip = document.createElement('div');
+                pip.className = 'ap-pip' + (i >= unit.ap ? ' used' : '');
+                pip.textContent = i < unit.ap ? '⚡' : '';
+                apDisplay.appendChild(pip);
+            }
+        }
 
         // Unit tabs
         const tabsEl = document.getElementById('unit-tabs');
@@ -1089,14 +1510,21 @@
         units.forEach((u, i) => {
             const tab = document.createElement('div');
             tab.className = 'unit-tab' + (i === state.selectedUnit ? ' selected' : '') + (!u.alive ? ' dead' : '');
+
+            const hpPct = u.currentHp / u.maxHp;
+            let hpClass = '';
+            if (hpPct <= 0.5) hpClass = ' medium';
+            if (hpPct <= 0.25) hpClass = ' low';
+
             tab.innerHTML = `
                 <div class="class-icon">${UNIT_CLASSES[u.class].icon}</div>
-                <div class="class-name">${u.class.toUpperCase()}</div>
-                <div class="hp-bar"><div class="hp-fill" style="width: ${(u.currentHp/u.hp)*100}%"></div></div>
+                <div class="class-name">${UNIT_CLASSES[u.class].name}</div>
+                <div class="hp-bar"><div class="hp-fill${hpClass}" style="width: ${hpPct*100}%"></div></div>
             `;
             tab.onclick = () => {
                 if (u.alive) {
                     state.selectedUnit = i;
+                    state.targetedUnit = null;
                     updateUI();
                     render();
                 }
@@ -1118,8 +1546,15 @@
             }
         });
 
-        // Hide target info
-        document.getElementById('target-info').classList.remove('visible');
+        // Update target info
+        if (state.targetedUnit && state.selectedAction === 'attack' && unit) {
+            const chance = calculateHitChance(unit, state.targetedUnit);
+            document.getElementById('hit-chance').textContent = chance + '%';
+            document.getElementById('damage-info').textContent = `~${unit.damage} Schaden`;
+            document.getElementById('target-info').classList.add('visible');
+        } else {
+            document.getElementById('target-info').classList.remove('visible');
+        }
     }
 
     function showScreen(id) {
@@ -1127,11 +1562,11 @@
         if (id) document.getElementById(id).classList.add('active');
     }
 
-    function showToast(msg) {
+    function showToast(msg, type = '') {
         const existing = document.querySelector('.toast');
         if (existing) existing.remove();
         const toast = document.createElement('div');
-        toast.className = 'toast';
+        toast.className = 'toast' + (type ? ` ${type}` : '');
         toast.textContent = msg;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 1800);
@@ -1139,11 +1574,13 @@
 
     // ===== INPUT =====
     function handleCanvasClick(e) {
-        if (state.gameOver) return;
+        if (state.gameOver || state.animating) return;
 
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left - offsetX;
-        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top - offsetY;
+        const clientX = e.clientX || e.touches?.[0]?.clientX;
+        const clientY = e.clientY || e.touches?.[0]?.clientY;
+        const x = clientX - rect.left - offsetX;
+        const y = clientY - rect.top - offsetY;
 
         const hexCoord = pixelToHex(x, y);
         const hex = getHex(hexCoord.q, hexCoord.r);
@@ -1153,38 +1590,44 @@
         if (!unit) return;
 
         if (state.selectedAction === 'move') {
-            if (canMove(unit, hex)) {
-                moveUnit(unit, hex);
+            const reachable = getReachableHexes(unit);
+            const target = reachable.find(r => r.hex.q === hex.q && r.hex.r === hex.r);
+            if (target) {
+                moveUnit(unit, target.hex);
             }
         } else if (state.selectedAction === 'attack') {
-            if (hex.unit && canAttack(unit, hex.unit)) {
-                attackUnit(unit, hex.unit);
+            if (hex.unit && hex.unit.player !== unit.player && hex.unit.alive) {
+                const attackable = getAttackableUnits(unit);
+                if (attackable.some(u => u.id === hex.unit.id)) {
+                    if (state.targetedUnit && state.targetedUnit.id === hex.unit.id) {
+                        // Confirm attack
+                        attackUnit(unit, hex.unit);
+                    } else {
+                        // Target unit
+                        state.targetedUnit = hex.unit;
+                        render();
+                        updateUI();
+                    }
+                }
+            } else {
+                state.targetedUnit = null;
+                render();
+                updateUI();
             }
         }
     }
 
     function handleCanvasMove(e) {
-        if (state.selectedAction !== 'attack') {
-            document.getElementById('target-info').classList.remove('visible');
-            return;
-        }
-
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX || e.touches?.[0]?.clientX) - rect.left - offsetX;
-        const y = (e.clientY || e.touches?.[0]?.clientY) - rect.top - offsetY;
+        const clientX = e.clientX || e.touches?.[0]?.clientX;
+        const clientY = e.clientY || e.touches?.[0]?.clientY;
+        if (!clientX || !clientY) return;
+
+        const x = clientX - rect.left - offsetX;
+        const y = clientY - rect.top - offsetY;
 
         const hexCoord = pixelToHex(x, y);
-        const hex = getHex(hexCoord.q, hexCoord.r);
-        const unit = getCurrentUnit();
-
-        if (hex?.unit && unit && canAttack(unit, hex.unit)) {
-            const chance = calculateHitChance(unit, hex.unit);
-            document.getElementById('hit-chance').textContent = chance + '% Treffer';
-            document.getElementById('damage-info').textContent = `~${unit.damage} Schaden`;
-            document.getElementById('target-info').classList.add('visible');
-        } else {
-            document.getElementById('target-info').classList.remove('visible');
-        }
+        state.hoveredHex = getHex(hexCoord.q, hexCoord.r);
     }
 
     // ===== GAME INIT =====
@@ -1194,6 +1637,7 @@
         state.currentPlayer = 0;
         state.selectedUnit = 0;
         state.selectedAction = 'move';
+        state.targetedUnit = null;
 
         generateMap();
         createUnits();
@@ -1235,9 +1679,12 @@
                 const action = btn.dataset.action;
                 if (action === 'special') {
                     const unit = getCurrentUnit();
-                    if (unit) useSpecial(unit);
+                    if (unit && unit.ap >= 2 && !unit.usedSpecial) {
+                        useSpecial(unit);
+                    }
                 } else {
                     state.selectedAction = action;
+                    state.targetedUnit = null;
                     updateUI();
                     render();
                 }
@@ -1255,19 +1702,17 @@
         canvas.addEventListener('touchend', e => { e.preventDefault(); handleCanvasClick(e); });
         canvas.addEventListener('mousemove', handleCanvasMove);
 
-        // Resize - handle various mobile scenarios
+        // Resize
         window.addEventListener('resize', () => {
             if (state.screen !== 'menu') resizeCanvas();
         });
 
-        // Handle orientation change on mobile
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
                 if (state.screen !== 'menu') resizeCanvas();
             }, 100);
         });
 
-        // Handle visual viewport resize (for iOS Safari)
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', () => {
                 if (state.screen !== 'menu') resizeCanvas();
