@@ -168,6 +168,10 @@ function selectBestTarget(attacker, targets) {
         if (a.class === 'sniper' && b.class !== 'sniper') return -1;
         if (b.class === 'sniper' && a.class !== 'sniper') return 1;
 
+        // Then ninjas (dangerous in melee)
+        if (a.class === 'ninja' && b.class !== 'ninja') return -1;
+        if (b.class === 'ninja' && a.class !== 'ninja') return 1;
+
         // Then by HP (low HP first)
         return a.currentHp - b.currentHp;
     })[0];
@@ -202,6 +206,13 @@ function shouldUseSpecial(unit, enemies) {
         case 'sniper':
             // Cloak if not cloaked and enemies nearby
             return !unit.cloaked && enemies.length > 0;
+
+        case 'ninja':
+            // Stealth if not cloaked and enemies are close
+            if (unit.cloaked) return false;
+            return enemies.some(e =>
+                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= 4
+            );
 
         default:
             return false;

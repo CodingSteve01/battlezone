@@ -47,15 +47,15 @@ function createHex(q, r, distFromCenter, radius) {
     let type = 'grass';
 
     // More variety based on position
-    if (rand < 0.10) {
-        type = 'forest';
-    } else if (rand < 0.14) {
+    if (rand < 0.18) {
+        type = 'forest';  // More forests for cover
+    } else if (rand < 0.22) {
         type = 'rock';
-    } else if (rand < 0.18 && distFromCenter > 2) {
+    } else if (rand < 0.26 && distFromCenter > 3) {
         type = 'water';
-    } else if (rand < 0.24) {
+    } else if (rand < 0.30) {
         type = 'sand';
-    } else if (rand < 0.28 && distFromCenter > 1) {
+    } else if (rand < 0.34 && distFromCenter > 2) {
         type = 'swamp';
     }
 

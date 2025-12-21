@@ -113,10 +113,11 @@ export function isUnitVisible(unit) {
         return false;
     }
 
-    // Sniper stealth: harder to detect at range
-    if (unit.class === 'sniper' && unit.stealthActive !== false) {
+    // Sniper/Ninja stealth: harder to detect at range
+    if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive !== false) {
         const playerUnits = getPlayerUnits(state.currentPlayer);
-        const detectionRange = UNIT_CLASSES.sniper.stealthDetectionRange || 2;
+        const classData = UNIT_CLASSES[unit.class];
+        const detectionRange = classData.stealthDetectionRange || 2;
 
         // Check if any friendly unit is close enough to detect
         const detected = playerUnits.some(friendlyUnit => {

@@ -7,7 +7,8 @@ export const state = {
     screen: 'menu',
     settings: {
         players: 2,
-        size: 'medium'
+        size: 'medium',
+        singlePlayer: false
     },
 
     // Map data

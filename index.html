@@ -14,11 +14,9 @@
         <div id="menu" class="screen active">
             <div class="menu-header">
                 <h1 class="menu-title">SHADOW SQUAD</h1>
-                <p class="menu-subtitle">Taktisches Teamspiel</p>
             </div>
 
             <div class="menu-section">
-                <h3>Spielmodus</h3>
                 <div class="option-grid two-col">
                     <button class="option-btn mode-btn selected" data-mode="multi">
                         <span class="mode-icon">👥</span>
@@ -32,42 +30,29 @@
             </div>
 
             <div class="menu-section" id="players-section">
-                <h3>Spieleranzahl</h3>
                 <div class="option-grid">
-                    <button class="option-btn selected" data-players="2">2</button>
-                    <button class="option-btn" data-players="3">3</button>
-                    <button class="option-btn" data-players="4">4</button>
+                    <button class="option-btn selected" data-players="2">2 Spieler</button>
+                    <button class="option-btn" data-players="3">3 Spieler</button>
+                    <button class="option-btn" data-players="4">4 Spieler</button>
                 </div>
             </div>
 
             <div class="menu-section">
-                <h3>Spielfeldgröße</h3>
                 <div class="option-grid">
-                    <button class="option-btn" data-size="small">Klein</button>
-                    <button class="option-btn selected" data-size="medium">Mittel</button>
-                    <button class="option-btn" data-size="large">Groß</button>
+                    <button class="option-btn" data-size="small">S</button>
+                    <button class="option-btn selected" data-size="medium">M</button>
+                    <button class="option-btn" data-size="large">L</button>
                 </div>
             </div>
 
-            <button class="start-btn" id="start-btn">Spiel Starten</button>
+            <button class="start-btn" id="start-btn">Start</button>
 
             <button class="help-toggle" id="help-toggle">
-                <span>?</span> Spielanleitung
+                <span>?</span>
             </button>
 
             <div class="help-panel" id="help-panel">
-                <div class="help-section">
-                    <h4>🎮 Steuerung</h4>
-                    <p>Ziehen = Karte scrollen • Tippen = Aktion ausführen • Doppeltippen = Zentrieren</p>
-                </div>
-                <div class="help-section">
-                    <h4>⚔️ Kampf</h4>
-                    <p>4 AP pro Zug • Bewegen kostet 1-3 AP • Angriff kostet 1 AP • Spezial kostet 2 AP</p>
-                </div>
-                <div class="help-section">
-                    <h4>🌲 Terrain</h4>
-                    <p>Wald = Deckung +25% • Sumpf = langsam • Wasser/Felsen = blockiert</p>
-                </div>
+                <p>Ziehen = Scrollen • Tippen = Aktion • 4 AP pro Zug</p>
             </div>
         </div>
 
@@ -76,7 +61,6 @@
             <div class="team-select-header">
                 <div class="team-select-badge" id="team-select-badge">1</div>
                 <h2 class="team-select-title">Spieler <span id="team-select-player">1</span></h2>
-                <p class="team-select-hint">Wähle dein Team (3 Einheiten)</p>
             </div>
 
             <div class="team-select-grid" id="team-select-grid">
@@ -84,7 +68,6 @@
             </div>
 
             <div class="team-select-preview">
-                <h3>Dein Team:</h3>
                 <div class="team-preview-units" id="team-preview-units">
                     <div class="team-slot empty">?</div>
                     <div class="team-slot empty">?</div>
@@ -92,7 +75,7 @@
                 </div>
             </div>
 
-            <button class="start-btn team-confirm-btn" id="team-confirm-btn" disabled>Team bestätigen</button>
+            <button class="start-btn team-confirm-btn" id="team-confirm-btn" disabled>Weiter</button>
         </div>
 
         <!-- TURN SCREEN -->
@@ -120,34 +103,23 @@
                 <canvas id="game-canvas"></canvas>
                 <div class="target-info" id="target-info">
                     <div class="hit-chance" id="hit-chance">75%</div>
-                    <div class="damage" id="damage-info">~25 Schaden</div>
-                </div>
-                <div class="fog-info">
-                    <span><div class="dot visible"></div> Sichtbar</span>
-                    <span><div class="dot explored"></div> Erkundet</span>
-                    <span><div class="dot hidden"></div> Unbekannt</span>
+                    <div class="damage" id="damage-info">~25</div>
                 </div>
             </div>
 
             <div class="unit-panel">
                 <div class="unit-tabs" id="unit-tabs"></div>
                 <div class="action-row">
-                    <button class="action-btn selected" data-action="move">
+                    <button class="action-btn selected" data-action="move" title="Bewegen (1+ AP)">
                         <span class="icon">👟</span>
-                        <span>Bewegen</span>
-                        <span class="ap-cost">1+</span>
                     </button>
-                    <button class="action-btn" data-action="attack">
+                    <button class="action-btn" data-action="attack" title="Angriff (1 AP)">
                         <span class="icon">⚔️</span>
-                        <span>Angriff</span>
-                        <span class="ap-cost">1</span>
                     </button>
-                    <button class="action-btn" data-action="special">
+                    <button class="action-btn" data-action="special" title="Spezial (2 AP)">
                         <span class="icon">✨</span>
-                        <span>Spezial</span>
-                        <span class="ap-cost">2</span>
                     </button>
-                    <button class="end-turn-btn" id="end-turn-btn">Zug Ende</button>
+                    <button class="end-turn-btn" id="end-turn-btn">Ende</button>
                 </div>
             </div>
             <div class="bottom-safe"></div>

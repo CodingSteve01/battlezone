@@ -132,14 +132,8 @@ function generateUnitCards() {
  * Toggle unit selection
  */
 function toggleUnitSelection(classKey, card) {
-    const index = currentPlayerSelection.indexOf(classKey);
-
-    if (index >= 0) {
-        // Remove from selection
-        currentPlayerSelection.splice(index, 1);
-        updateCardSelectionState();
-    } else if (currentPlayerSelection.length < CONFIG.UNITS_PER_PLAYER) {
-        // Add to selection
+    if (currentPlayerSelection.length < CONFIG.UNITS_PER_PLAYER) {
+        // Add to selection (allow duplicates)
         currentPlayerSelection.push(classKey);
         updateCardSelectionState();
     }
@@ -193,12 +187,30 @@ function updateTeamPreview() {
             slot.textContent = classData.icon;
             slot.classList.add('filled');
             slot.classList.remove('empty');
+            slot.style.cursor = 'pointer';
+            slot.onclick = () => removeFromSelection(index);
         } else {
             slot.textContent = '?';
             slot.classList.remove('filled');
             slot.classList.add('empty');
+            slot.style.cursor = 'default';
+            slot.onclick = null;
         }
     });
+}
+
+/**
+ * Remove unit from selection by index
+ */
+function removeFromSelection(index) {
+    currentPlayerSelection.splice(index, 1);
+    updateCardSelectionState();
+    updateTeamPreview();
+
+    const confirmBtn = document.getElementById('team-confirm-btn');
+    if (confirmBtn) {
+        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
+    }
 }
 
 /**
@@ -292,7 +304,10 @@ function init() {
 
     // Setup game mode buttons
     document.querySelectorAll('[data-mode]').forEach(btn => {
-        btn.onclick = () => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
 
@@ -309,7 +324,13 @@ function init() {
                     playersSection.classList.remove('hidden');
                 }
             }
-        };
+        });
+
+        // Also handle touch events for mobile
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
     });
 
     // Setup help toggle

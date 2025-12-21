@@ -25,12 +25,23 @@ export function calculateHitChance(attacker, defender) {
         chance += 15;
     }
 
-    // Distance penalty
+    // Distance calculation
     const dist = hexDistance(
         { q: attacker.q, r: attacker.r },
         { q: defender.q, r: defender.r }
     );
-    chance -= (dist - 1) * 5;
+
+    // Sniper: accuracy bonus, especially at range
+    if (attacker.class === 'sniper') {
+        chance += 20; // Base accuracy bonus
+        // Sniper gets BETTER at range, not worse
+        if (dist >= 4) {
+            chance += 10; // Optimal range bonus
+        }
+    } else {
+        // Normal units: distance penalty
+        chance -= (dist - 1) * 5;
+    }
 
     // Clamp to reasonable bounds
     return Math.min(95, Math.max(25, chance));
@@ -75,6 +86,17 @@ export function executeAttack(attacker, defender) {
         // Assault has damage variance
         if (attacker.class === 'assault') {
             damage += Math.floor(Math.random() * 15);
+        }
+
+        // Ninja melee bonus (at range 1)
+        if (attacker.class === 'ninja') {
+            const dist = hexDistance(
+                { q: attacker.q, r: attacker.r },
+                { q: defender.q, r: defender.r }
+            );
+            if (dist === 1) {
+                damage += UNIT_CLASSES.ninja.meleeBonus || 15;
+            }
         }
 
         // Calculate critical hit
@@ -152,6 +174,8 @@ export function useSpecialAbility(unit) {
             return useAssaultSpecial(unit);
         case 'sniper':
             return useSniperSpecial(unit);
+        case 'ninja':
+            return useNinjaSpecial(unit);
         default:
             return false;
     }
@@ -221,7 +245,17 @@ function useAssaultSpecial(unit) {
  */
 function useSniperSpecial(unit) {
     unit.cloaked = true;
-    showToast('🔫 Getarnt! Unsichtbar bis zum Angriff', 'special');
+    showToast('🔫 Getarnt!', 'special');
+    return true;
+}
+
+/**
+ * Ninja stealth + movement ability
+ */
+function useNinjaSpecial(unit) {
+    unit.cloaked = true;
+    unit.move += 2;  // Bonus movement
+    showToast('🥷 Schleichen aktiviert!', 'special');
     return true;
 }
 
