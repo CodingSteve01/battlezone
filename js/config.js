@@ -125,6 +125,19 @@ export const UNIT_CLASSES = {
         vision: 7,
         special: 'Tarnung',
         specialDesc: 'Unsichtbar für 1 Runde',
-        stealthDetectionRange: 2  // Gegner müssen sehr nah sein um ihn zu sehen
+        stealthDetectionRange: 2
+    },
+    ninja: {
+        name: 'Ninja',
+        icon: '🥷',
+        hp: 65,
+        damage: 40,
+        range: 1,           // Nahkampf
+        move: 4,
+        vision: 5,
+        special: 'Schleichen',
+        specialDesc: 'Tarnung + Bonus-Bewegung',
+        stealthDetectionRange: 1,  // Noch schwerer zu entdecken
+        meleeBonus: 15      // Extra Schaden im Nahkampf
     }
 };

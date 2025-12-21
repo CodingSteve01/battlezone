@@ -354,6 +354,11 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
 
     ctx.save();
 
+    // Cloaked units appear semi-transparent to their owner
+    if (unit.cloaked && unit.player === state.currentPlayer) {
+        ctx.globalAlpha = 0.5;
+    }
+
     // Selection glow effect
     if (isSelected) {
         ctx.shadowColor = '#ffffff';
@@ -416,10 +421,21 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
 
     // Shield indicator (if unit has shield from power-up)
     if (unit.shield) {
+        ctx.globalAlpha = 1;  // Reset for indicators
         ctx.shadowColor = '#3b82f6';
         ctx.shadowBlur = 10;
         ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
         ctx.fillText('🛡️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Cloak indicator (visible to owner)
+    if (unit.cloaked && unit.player === state.currentPlayer) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#a855f7';
+        ctx.shadowBlur = 15;
+        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+        ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
         ctx.shadowBlur = 0;
     }
 

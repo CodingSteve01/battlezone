@@ -88,6 +88,17 @@ export function executeAttack(attacker, defender) {
             damage += Math.floor(Math.random() * 15);
         }
 
+        // Ninja melee bonus (at range 1)
+        if (attacker.class === 'ninja') {
+            const dist = hexDistance(
+                { q: attacker.q, r: attacker.r },
+                { q: defender.q, r: defender.r }
+            );
+            if (dist === 1) {
+                damage += UNIT_CLASSES.ninja.meleeBonus || 15;
+            }
+        }
+
         // Calculate critical hit
         const crit = calculateCritical(attacker, defender);
         if (crit.isCrit) {
@@ -163,6 +174,8 @@ export function useSpecialAbility(unit) {
             return useAssaultSpecial(unit);
         case 'sniper':
             return useSniperSpecial(unit);
+        case 'ninja':
+            return useNinjaSpecial(unit);
         default:
             return false;
     }
@@ -232,7 +245,17 @@ function useAssaultSpecial(unit) {
  */
 function useSniperSpecial(unit) {
     unit.cloaked = true;
-    showToast('🔫 Getarnt! Unsichtbar bis zum Angriff', 'special');
+    showToast('🔫 Getarnt!', 'special');
+    return true;
+}
+
+/**
+ * Ninja stealth + movement ability
+ */
+function useNinjaSpecial(unit) {
+    unit.cloaked = true;
+    unit.move += 2;  // Bonus movement
+    showToast('🥷 Schleichen aktiviert!', 'special');
     return true;
 }
 
