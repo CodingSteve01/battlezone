@@ -6,7 +6,7 @@ import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
 import { initRenderer, resizeCanvas, render } from './renderer.js';
 import { updateUI, showScreen } from './ui.js';
-import { initInput } from './input.js';
+import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 
 /**
@@ -15,6 +15,10 @@ import { updateVisibility } from './fogOfWar.js';
 export function startGame() {
     // Reset state
     resetState();
+
+    // Reset camera position
+    state.cameraX = 0;
+    state.cameraY = 0;
 
     // Generate map and units
     generateMap();
