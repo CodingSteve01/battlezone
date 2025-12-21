@@ -25,6 +25,7 @@ export const state = {
     hoveredHex: null,
     targetedUnit: null,
     currentPath: null,  // A* path for visualization
+    pendingMoveDestination: null,  // Hex for tap-to-confirm movement
 
     // Game progress
     round: 1,
@@ -95,6 +96,7 @@ export function resetState() {
     state.hoveredHex = null;
     state.targetedUnit = null;
     state.currentPath = null;
+    state.pendingMoveDestination = null;
     state.round = 1;
     state.gameOver = false;
     state.animating = false;

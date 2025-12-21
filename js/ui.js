@@ -137,6 +137,7 @@ function updateUnitTabs(units) {
                 state.selectedUnit = index;
                 state.targetedUnit = null;
                 state.currentPath = null;
+                state.pendingMoveDestination = null;
                 // Center camera on the selected unit
                 centerOnUnit(unit);
                 updateUI();
@@ -342,6 +343,7 @@ export function selectAction(action) {
     state.selectedAction = action;
     state.targetedUnit = null;
     state.currentPath = null;
+    state.pendingMoveDestination = null;
     updateUI();
     render();
 }

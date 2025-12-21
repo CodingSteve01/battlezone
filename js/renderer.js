@@ -184,10 +184,10 @@ function seededRandom(seed) {
 }
 
 /**
- * Draw enhanced terrain pattern on a hex - rich landscape decorations like Civilization
+ * Draw enhanced terrain pattern on a hex - optimized for performance
  */
 function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
-    const s = size * 0.55;  // Larger size for more coverage
+    const s = size * 0.45;
     ctx.save();
 
     // Create consistent seed for this hex
@@ -195,75 +195,42 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            // First: Full grass coverage layer - creates natural meadow look
-            drawGrassTexture(cx, cy, size, baseSeed);
-
-            // Then: Dense grass blades covering the hex
+            // Simplified grass - just a few blades and occasional decoration
             drawGrassBlades(cx, cy, s, baseSeed);
 
-            // Additional decorations based on seed - larger and more natural
+            // Only 30% of grass hexes get extra decoration
             const grassType = Math.abs(baseSeed) % 100;
-
-            if (grassType < 20) {
-                // Bush cluster - multiple bushes for natural grouping
-                drawBush(cx - s * 0.25, cy - s * 0.15, s * 0.5, baseSeed);
-                drawBush(cx + s * 0.35, cy + s * 0.1, s * 0.4, baseSeed + 10);
-                if (seededRandom(baseSeed + 2) > 0.6) {
-                    drawBush(cx - s * 0.1, cy + s * 0.35, s * 0.35, baseSeed + 20);
-                }
-            } else if (grassType < 40) {
-                // Rich flower meadow - more flowers
+            if (grassType < 15) {
+                drawBush(cx, cy, s * 0.4, baseSeed);
+            } else if (grassType < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
-                drawTallGrass(cx - s * 0.3, cy + s * 0.2, s * 0.7, baseSeed + 5);
-            } else if (grassType < 55) {
-                // Natural stone arrangement with vegetation
-                drawStones(cx, cy, s, baseSeed);
-                drawTallGrass(cx + s * 0.3, cy - s * 0.2, s * 0.6, baseSeed + 3);
-            } else if (grassType < 75) {
-                // Dense tall grass patch - prairie style
-                drawTallGrass(cx, cy, s, baseSeed);
-                drawTallGrass(cx - s * 0.3, cy + s * 0.15, s * 0.8, baseSeed + 7);
-            } else {
-                // Wild meadow - mixed vegetation
-                drawWildMeadow(cx, cy, s, baseSeed);
             }
             break;
 
         case 'forest':
-            // Draw undergrowth first
-            drawUndergrowth(cx, cy, s, baseSeed);
-
-            // Multiple trees with variation
-            const treeCount = 2 + Math.abs(baseSeed % 2);
+            // Simplified forest - fewer trees
+            const treeCount = 1 + Math.abs(baseSeed % 2);
             for (let i = 0; i < treeCount; i++) {
-                const tx = cx + (seededRandom(baseSeed + i * 10) - 0.5) * s * 1.2;
-                const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.8;
-                const treeSize = s * (0.6 + seededRandom(baseSeed + i * 10 + 2) * 0.5);
-                const treeType = Math.floor(seededRandom(baseSeed + i) * 3);
-                drawTree(tx, ty, treeSize, treeType, baseSeed + i);
+                const tx = cx + (seededRandom(baseSeed + i * 10) - 0.5) * s * 0.8;
+                const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.6;
+                const treeSize = s * (0.7 + seededRandom(baseSeed + i * 10 + 2) * 0.4);
+                drawTree(tx, ty, treeSize, 0, baseSeed + i);
             }
-
-            // Add some forest floor details
-            drawForestFloor(cx, cy, s, baseSeed);
             break;
 
         case 'rock':
-            // 3D rock formation with more detail
             drawRockFormation(cx, cy, s, baseSeed);
             break;
 
         case 'water':
-            // Water with reflections and movement
             drawWaterDetails(cx, cy, s, baseSeed);
             break;
 
         case 'sand':
-            // Sand with dunes and details
             drawSandDetails(cx, cy, s, baseSeed);
             break;
 
         case 'swamp':
-            // Murky swamp with vegetation
             drawSwampDetails(cx, cy, s, baseSeed);
             break;
     }
@@ -359,19 +326,19 @@ function drawWildMeadow(cx, cy, s, seed) {
 }
 
 /**
- * Draw grass blades for texture - enhanced density
+ * Draw grass blades for texture - optimized
  */
 function drawGrassBlades(cx, cy, s, seed) {
-    const bladeCount = 12 + (seed % 6);  // More blades for denser coverage
+    const bladeCount = 5 + (seed % 3);  // Reduced for performance
     for (let i = 0; i < bladeCount; i++) {
-        const bx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.6;
-        const by = cy + (seededRandom(seed + i * 7 + 3) - 0.5) * s * 1.4;
-        const height = s * (0.18 + seededRandom(seed + i * 7 + 1) * 0.22);
-        const lean = (seededRandom(seed + i * 7 + 2) - 0.5) * s * 0.18;
+        const bx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.4;
+        const by = cy + (seededRandom(seed + i * 7 + 3) - 0.5) * s * 1.2;
+        const height = s * (0.15 + seededRandom(seed + i * 7 + 1) * 0.2);
+        const lean = (seededRandom(seed + i * 7 + 2) - 0.5) * s * 0.15;
 
-        const shade = 0.65 + seededRandom(seed + i * 7 + 4) * 0.35;
-        ctx.strokeStyle = `rgba(${Math.floor(48 * shade)}, ${Math.floor(100 * shade)}, ${Math.floor(52 * shade)}, 0.85)`;
-        ctx.lineWidth = 1.2 + seededRandom(seed + i * 7 + 5) * 0.6;
+        const shade = 0.7 + seededRandom(seed + i * 7 + 4) * 0.3;
+        ctx.strokeStyle = `rgba(${Math.floor(45 * shade)}, ${Math.floor(95 * shade)}, ${Math.floor(50 * shade)}, 0.8)`;
+        ctx.lineWidth = 1 + seededRandom(seed + i * 7 + 5) * 0.5;
         ctx.beginPath();
         ctx.moveTo(bx, by);
         ctx.quadraticCurveTo(bx + lean * 0.5, by - height * 0.6, bx + lean, by - height);
@@ -1294,18 +1261,6 @@ export function render() {
             drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
         }
 
-        // Cover indicator (forest) - subtle hint
-        if (hex.cover && !hex.unit && fogLevel === 'visible') {
-            ctx.fillStyle = 'rgba(139, 92, 246, 0.08)';
-            drawHex(sx, sy, state.hexSize * 0.95, 'rgba(139, 92, 246, 0.08)');
-
-            // Shield icon for cover
-            ctx.fillStyle = 'rgba(139, 92, 246, 0.6)';
-            ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🛡', sx, sy);
-        }
 
         // Draw power-up if present
         if (fogLevel === 'visible') {
@@ -1320,30 +1275,30 @@ export function render() {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && fogLevel === 'visible' && !hex.unit) {
-                // Draw movement range highlight
-                ctx.fillStyle = 'rgba(250, 204, 21, 0.2)';  // Yellow tint for reachable
-                drawHex(sx, sy, state.hexSize * 0.9);
+                // Draw movement range highlight - use explicit fill
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize * 0.85);
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                ctx.fill();
 
                 // Draw border to make it clearer
-                ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+                ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
                 ctx.lineWidth = 2;
-                ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize * 0.9);
                 ctx.stroke();
 
                 // Show AP cost in corner for each reachable hex
                 const cost = pathData.cost;
                 if (cost > 0) {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                     ctx.beginPath();
-                    ctx.arc(sx + state.hexSize * 0.35, sy - state.hexSize * 0.35, 10, 0, Math.PI * 2);
+                    ctx.arc(sx + state.hexSize * 0.3, sy - state.hexSize * 0.3, 11, 0, Math.PI * 2);
                     ctx.fill();
 
                     ctx.fillStyle = cost <= currentUnit.ap ? '#fbbf24' : '#ef4444';
-                    ctx.font = `bold ${Math.round(state.hexSize * 0.2)}px sans-serif`;
+                    ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(cost, sx + state.hexSize * 0.35, sy - state.hexSize * 0.35);
+                    ctx.fillText(cost, sx + state.hexSize * 0.3, sy - state.hexSize * 0.3);
                 }
             }
         }
@@ -1476,9 +1431,47 @@ export function render() {
             const endSx = state.offsetX + endPos.x;
             const endSy = state.offsetY + endPos.y;
 
-            // Flag icon above destination
-            ctx.font = '16px sans-serif';
-            ctx.fillText('🚩', endSx, endSy - 22);
+            // Check if this is a pending move destination (tap-to-confirm)
+            const isPending = state.pendingMoveDestination &&
+                state.pendingMoveDestination.q === endPoint.q &&
+                state.pendingMoveDestination.r === endPoint.r;
+
+            if (isPending) {
+                // Pulsing effect for tap-to-confirm
+                const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
+
+                // Large pulsing circle behind flag
+                ctx.fillStyle = `rgba(34, 197, 94, ${0.3 * pulse})`;
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pulsing ring
+                ctx.strokeStyle = `rgba(34, 197, 94, ${0.8 * pulse})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, state.hexSize * 0.5, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Flag icon - larger and pulsing
+                ctx.font = `${Math.round(22 * pulse)}px sans-serif`;
+                ctx.fillText('🚩', endSx, endSy - 25);
+
+                // "Tippen zum Laufen" hint
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.beginPath();
+                ctx.roundRect(endSx - 55, endSy + state.hexSize * 0.4, 110, 24, 6);
+                ctx.fill();
+
+                ctx.fillStyle = '#22c55e';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('⬆ Tippen zum Laufen', endSx, endSy + state.hexSize * 0.4 + 13);
+            } else {
+                // Normal flag icon
+                ctx.font = '16px sans-serif';
+                ctx.fillText('🚩', endSx, endSy - 22);
+            }
 
             // Show remaining AP after move
             const remainingAP = currentUnit.ap - pathWithCosts[lastReachableIndex].totalCost;
