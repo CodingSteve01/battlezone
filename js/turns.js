@@ -7,6 +7,7 @@ import { updateVisibility } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI } from './ui.js';
 import { render } from './renderer.js';
+import { centerOnCurrentUnit } from './input.js';
 
 /**
  * Start a player's turn
@@ -98,6 +99,11 @@ export function handleReady() {
     updateVisibility();
     updateUI();
     render();
+
+    // Center camera on first unit
+    requestAnimationFrame(() => {
+        centerOnCurrentUnit();
+    });
 }
 
 /**

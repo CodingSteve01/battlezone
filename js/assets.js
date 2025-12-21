@@ -2,6 +2,46 @@
 
 // Pre-rendered texture canvases for performance
 const textureCache = new Map();
+const TEXTURE_SIZE = 128;
+
+// Perlin-like noise for realistic textures
+function noise2D(x, y, seed = 0) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+function smoothNoise(x, y, seed = 0) {
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const fx = x - x0;
+    const fy = y - y0;
+
+    const v00 = noise2D(x0, y0, seed);
+    const v10 = noise2D(x0 + 1, y0, seed);
+    const v01 = noise2D(x0, y0 + 1, seed);
+    const v11 = noise2D(x0 + 1, y0 + 1, seed);
+
+    const i1 = v00 * (1 - fx) + v10 * fx;
+    const i2 = v01 * (1 - fx) + v11 * fx;
+
+    return i1 * (1 - fy) + i2 * fy;
+}
+
+function fractalNoise(x, y, octaves = 4, seed = 0) {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let maxValue = 0;
+
+    for (let i = 0; i < octaves; i++) {
+        value += smoothNoise(x * frequency, y * frequency, seed + i * 100) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2;
+    }
+
+    return value / maxValue;
+}
 
 /**
  * Initialize all textures
@@ -23,42 +63,47 @@ export function getTexture(type) {
 }
 
 /**
- * Create grass texture with subtle variation
+ * Create realistic grass texture
  */
 function createGrassTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Base color
-    ctx.fillStyle = '#3d6b4f';
-    ctx.fillRect(0, 0, 64, 64);
-
-    // Add grass blades
-    for (let i = 0; i < 40; i++) {
-        const x = Math.random() * 64;
-        const y = Math.random() * 64;
-        const height = 4 + Math.random() * 8;
-        const angle = (Math.random() - 0.5) * 0.5;
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(angle);
-        ctx.strokeStyle = `rgba(${45 + Math.random() * 30}, ${90 + Math.random() * 40}, ${60 + Math.random() * 30}, 0.6)`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(0, -height);
-        ctx.stroke();
-        ctx.restore();
+    // Base green with variation
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 20, y / 20, 4, 1);
+            const r = Math.floor(40 + n * 30);
+            const g = Math.floor(90 + n * 50);
+            const b = Math.floor(50 + n * 25);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
     }
 
-    // Small dots for texture
-    for (let i = 0; i < 20; i++) {
-        ctx.fillStyle = `rgba(${30 + Math.random() * 40}, ${80 + Math.random() * 50}, ${40 + Math.random() * 30}, 0.3)`;
+    // Add grass blades
+    for (let i = 0; i < 300; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const height = 3 + Math.random() * 8;
+        const lean = (Math.random() - 0.5) * 3;
+
+        const shade = 0.6 + Math.random() * 0.4;
+        ctx.strokeStyle = `rgba(${Math.floor(30 * shade)}, ${Math.floor(100 * shade)}, ${Math.floor(40 * shade)}, 0.8)`;
+        ctx.lineWidth = 0.5 + Math.random() * 0.5;
         ctx.beginPath();
-        ctx.arc(Math.random() * 64, Math.random() * 64, 1 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + lean * 0.5, y - height * 0.5, x + lean, y - height);
+        ctx.stroke();
+    }
+
+    // Add small highlights
+    for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = `rgba(150, 200, 100, ${0.1 + Math.random() * 0.15})`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 2, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -66,33 +111,64 @@ function createGrassTexture() {
 }
 
 /**
- * Create forest texture with trees
+ * Create realistic forest floor texture
  */
 function createForestTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Dark forest floor
-    ctx.fillStyle = '#2d5a3d';
-    ctx.fillRect(0, 0, 64, 64);
+    // Dark forest floor base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 15, y / 15, 5, 2);
+            const r = Math.floor(30 + n * 25);
+            const g = Math.floor(55 + n * 35);
+            const b = Math.floor(30 + n * 20);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
 
-    // Fallen leaves/debris
-    for (let i = 0; i < 25; i++) {
-        const x = Math.random() * 64;
-        const y = Math.random() * 64;
-        ctx.fillStyle = `rgba(${20 + Math.random() * 30}, ${50 + Math.random() * 40}, ${25 + Math.random() * 25}, 0.5)`;
+    // Add fallen leaves
+    for (let i = 0; i < 80; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 2 + Math.random() * 4;
+        const hue = Math.random() < 0.5 ?
+            `rgba(${60 + Math.random() * 40}, ${40 + Math.random() * 30}, ${20}, 0.6)` :
+            `rgba(${30 + Math.random() * 30}, ${50 + Math.random() * 30}, ${25}, 0.5)`;
+        ctx.fillStyle = hue;
         ctx.beginPath();
-        ctx.ellipse(x, y, 2 + Math.random() * 3, 1 + Math.random() * 2, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Add twigs
+    for (let i = 0; i < 20; i++) {
+        ctx.strokeStyle = `rgba(60, 45, 30, ${0.4 + Math.random() * 0.3})`;
+        ctx.lineWidth = 1 + Math.random();
+        ctx.beginPath();
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20);
+        ctx.stroke();
     }
 
     // Tree shadows
     for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = 'rgba(0, 30, 15, 0.3)';
+        ctx.fillStyle = 'rgba(0, 20, 10, 0.3)';
         ctx.beginPath();
-        ctx.ellipse(15 + i * 20, 32 + (i % 2) * 10, 12, 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(
+            30 + Math.random() * 68,
+            30 + Math.random() * 68,
+            15 + Math.random() * 15,
+            10 + Math.random() * 10,
+            Math.random() * Math.PI,
+            0, Math.PI * 2
+        );
         ctx.fill();
     }
 
@@ -100,51 +176,58 @@ function createForestTexture() {
 }
 
 /**
- * Create rock texture with cracks
+ * Create realistic rock texture
  */
 function createRockTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Base rock color
-    ctx.fillStyle = '#5a5a6a';
-    ctx.fillRect(0, 0, 64, 64);
-
-    // Rock layers
-    for (let i = 0; i < 8; i++) {
-        const x = Math.random() * 64;
-        const y = Math.random() * 64;
-        const w = 10 + Math.random() * 20;
-        const h = 6 + Math.random() * 12;
-        ctx.fillStyle = `rgba(${80 + Math.random() * 40}, ${80 + Math.random() * 40}, ${90 + Math.random() * 40}, 0.5)`;
-        ctx.beginPath();
-        ctx.ellipse(x, y, w, h, Math.random() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
+    // Stone base with layers
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n1 = fractalNoise(x / 25, y / 25, 4, 3);
+            const n2 = fractalNoise(x / 10, y / 10, 3, 4);
+            const combined = n1 * 0.7 + n2 * 0.3;
+            const base = 70 + combined * 50;
+            const r = Math.floor(base);
+            const g = Math.floor(base * 0.95);
+            const b = Math.floor(base * 1.05);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
     }
 
-    // Cracks
-    ctx.strokeStyle = 'rgba(40, 40, 50, 0.6)';
+    // Add cracks
+    ctx.strokeStyle = 'rgba(40, 40, 50, 0.5)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) {
         ctx.beginPath();
-        let x = Math.random() * 64;
-        let y = Math.random() * 64;
+        let x = Math.random() * TEXTURE_SIZE;
+        let y = Math.random() * TEXTURE_SIZE;
         ctx.moveTo(x, y);
-        for (let j = 0; j < 3; j++) {
-            x += (Math.random() - 0.5) * 15;
-            y += (Math.random() - 0.5) * 15;
+        for (let j = 0; j < 5; j++) {
+            x += (Math.random() - 0.5) * 20;
+            y += (Math.random() - 0.5) * 20;
             ctx.lineTo(x, y);
         }
         ctx.stroke();
     }
 
-    // Highlights
-    for (let i = 0; i < 10; i++) {
-        ctx.fillStyle = `rgba(150, 150, 160, ${0.1 + Math.random() * 0.2})`;
+    // Add highlights
+    for (let i = 0; i < 30; i++) {
+        ctx.fillStyle = `rgba(180, 180, 190, ${0.1 + Math.random() * 0.2})`;
         ctx.beginPath();
-        ctx.arc(Math.random() * 64, Math.random() * 64, 1 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Dark spots
+    for (let i = 0; i < 20; i++) {
+        ctx.fillStyle = `rgba(50, 50, 60, ${0.15 + Math.random() * 0.15})`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 2 + Math.random() * 5, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -152,40 +235,59 @@ function createRockTexture() {
 }
 
 /**
- * Create water texture with waves
+ * Create realistic water texture
  */
 function createWaterTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
     // Deep water gradient
-    const gradient = ctx.createLinearGradient(0, 0, 64, 64);
-    gradient.addColorStop(0, '#2a4a6f');
-    gradient.addColorStop(0.5, '#1e3a5f');
-    gradient.addColorStop(1, '#2a4a6f');
+    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+    gradient.addColorStop(0, '#1a3a5c');
+    gradient.addColorStop(0.5, '#0d2840');
+    gradient.addColorStop(1, '#1a3a5c');
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 64, 64);
+    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 
-    // Wave patterns
-    ctx.strokeStyle = 'rgba(100, 180, 255, 0.3)';
+    // Wave distortion
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 30, y / 30, 3, 5);
+            if (n > 0.55) {
+                ctx.fillStyle = `rgba(80, 150, 200, ${(n - 0.55) * 0.5})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+    }
+
+    // Wave lines
+    ctx.strokeStyle = 'rgba(120, 180, 220, 0.4)';
     ctx.lineWidth = 2;
-    for (let i = 0; i < 4; i++) {
-        const y = 10 + i * 15;
+    for (let i = 0; i < 6; i++) {
+        const yBase = 15 + i * 18;
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        for (let x = 0; x <= 64; x += 8) {
-            ctx.quadraticCurveTo(x + 4, y - 4 + (i % 2) * 8, x + 8, y);
+        ctx.moveTo(0, yBase);
+        for (let x = 0; x <= TEXTURE_SIZE; x += 8) {
+            const waveY = yBase + Math.sin(x / 15 + i) * 4;
+            ctx.lineTo(x, waveY);
         }
         ctx.stroke();
     }
 
     // Light reflections
-    for (let i = 0; i < 8; i++) {
-        ctx.fillStyle = `rgba(200, 230, 255, ${0.1 + Math.random() * 0.15})`;
+    for (let i = 0; i < 20; i++) {
+        ctx.fillStyle = `rgba(200, 230, 255, ${0.15 + Math.random() * 0.2})`;
         ctx.beginPath();
-        ctx.ellipse(Math.random() * 64, Math.random() * 64, 2 + Math.random() * 4, 1, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(
+            Math.random() * TEXTURE_SIZE,
+            Math.random() * TEXTURE_SIZE,
+            2 + Math.random() * 5,
+            1 + Math.random() * 2,
+            Math.random() * Math.PI,
+            0, Math.PI * 2
+        );
         ctx.fill();
     }
 
@@ -193,76 +295,135 @@ function createWaterTexture() {
 }
 
 /**
- * Create sand texture with grains
+ * Create realistic sand texture
  */
 function createSandTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Base sand color
-    ctx.fillStyle = '#9b8365';
-    ctx.fillRect(0, 0, 64, 64);
+    // Sandy base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 20, y / 20, 4, 6);
+            const r = Math.floor(170 + n * 40);
+            const g = Math.floor(145 + n * 35);
+            const b = Math.floor(100 + n * 30);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
 
     // Sand grains
-    for (let i = 0; i < 100; i++) {
-        const x = Math.random() * 64;
-        const y = Math.random() * 64;
-        ctx.fillStyle = `rgba(${140 + Math.random() * 40}, ${120 + Math.random() * 30}, ${80 + Math.random() * 40}, ${0.3 + Math.random() * 0.4})`;
+    for (let i = 0; i < 400; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const shade = 0.7 + Math.random() * 0.3;
+        ctx.fillStyle = `rgba(${Math.floor(200 * shade)}, ${Math.floor(175 * shade)}, ${Math.floor(130 * shade)}, 0.6)`;
         ctx.beginPath();
-        ctx.arc(x, y, 0.5 + Math.random() * 1.5, 0, Math.PI * 2);
+        ctx.arc(x, y, 0.5 + Math.random() * 1, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Wind patterns
-    ctx.strokeStyle = 'rgba(180, 160, 120, 0.2)';
+    // Wind ripples
+    ctx.strokeStyle = 'rgba(190, 165, 120, 0.25)';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
         ctx.beginPath();
-        ctx.moveTo(0, 15 + i * 20);
-        ctx.bezierCurveTo(20, 10 + i * 20, 44, 20 + i * 20, 64, 15 + i * 20);
+        const yBase = 20 + i * 30;
+        ctx.moveTo(0, yBase);
+        for (let x = 0; x <= TEXTURE_SIZE; x += 5) {
+            ctx.lineTo(x, yBase + Math.sin(x / 20 + i) * 3);
+        }
         ctx.stroke();
+    }
+
+    // Small pebbles
+    for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = `rgba(130, 110, 80, ${0.4 + Math.random() * 0.3})`;
+        ctx.beginPath();
+        ctx.ellipse(
+            Math.random() * TEXTURE_SIZE,
+            Math.random() * TEXTURE_SIZE,
+            2 + Math.random() * 3,
+            1.5 + Math.random() * 2,
+            Math.random() * Math.PI,
+            0, Math.PI * 2
+        );
+        ctx.fill();
     }
 
     textureCache.set('sand', canvas);
 }
 
 /**
- * Create swamp texture with murky water
+ * Create realistic swamp texture
  */
 function createSwampTexture() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
     // Murky base
-    ctx.fillStyle = '#4a5a3a';
-    ctx.fillRect(0, 0, 64, 64);
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 18, y / 18, 4, 7);
+            const r = Math.floor(55 + n * 30);
+            const g = Math.floor(70 + n * 35);
+            const b = Math.floor(45 + n * 25);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
 
-    // Muddy patches
-    for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = `rgba(${50 + Math.random() * 30}, ${60 + Math.random() * 30}, ${30 + Math.random() * 30}, 0.5)`;
+    // Murky water puddles
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15 + Math.random() * 15);
+        gradient.addColorStop(0, 'rgba(35, 50, 40, 0.6)');
+        gradient.addColorStop(1, 'rgba(55, 70, 50, 0)');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(Math.random() * 64, Math.random() * 64, 8 + Math.random() * 10, 5 + Math.random() * 8, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(x, y, 20 + Math.random() * 15, 12 + Math.random() * 10, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Water puddles
-    for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = 'rgba(40, 60, 50, 0.4)';
+    // Mud patches
+    for (let i = 0; i < 8; i++) {
+        ctx.fillStyle = `rgba(60, 50, 35, ${0.3 + Math.random() * 0.3})`;
         ctx.beginPath();
-        ctx.ellipse(10 + Math.random() * 44, 10 + Math.random() * 44, 5 + Math.random() * 8, 3 + Math.random() * 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(
+            Math.random() * TEXTURE_SIZE,
+            Math.random() * TEXTURE_SIZE,
+            8 + Math.random() * 12,
+            5 + Math.random() * 8,
+            Math.random() * Math.PI,
+            0, Math.PI * 2
+        );
         ctx.fill();
     }
 
-    // Vegetation bits
+    // Bubbles
     for (let i = 0; i < 15; i++) {
-        ctx.fillStyle = `rgba(${40 + Math.random() * 30}, ${70 + Math.random() * 40}, ${30 + Math.random() * 30}, 0.4)`;
+        ctx.fillStyle = `rgba(70, 85, 60, ${0.4 + Math.random() * 0.3})`;
         ctx.beginPath();
-        ctx.arc(Math.random() * 64, Math.random() * 64, 1 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 3, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Dead reeds
+    for (let i = 0; i < 10; i++) {
+        ctx.strokeStyle = `rgba(90, 75, 50, ${0.4 + Math.random() * 0.3})`;
+        ctx.lineWidth = 1 + Math.random();
+        ctx.beginPath();
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 8, y - 10 - Math.random() * 15);
+        ctx.stroke();
     }
 
     textureCache.set('swamp', canvas);
@@ -275,210 +436,212 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
     ctx.save();
     ctx.translate(cx, cy);
 
-    const scale = size / 40; // Base size is 40
+    const scale = size / 45;
     ctx.scale(scale, scale);
 
     // Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
-    ctx.ellipse(0, 28, 15, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 32, 18, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Selection glow
     if (isSelected) {
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 20;
     }
 
-    // Body colors based on class
+    // Class-specific colors
     let bodyColor, armorColor, helmetColor;
     switch (classType) {
         case 'scout':
-            bodyColor = '#3a3a4a';
-            armorColor = '#4a4a5a';
-            helmetColor = '#5a5a6a';
+            bodyColor = '#2a2a3a';
+            armorColor = '#3a3a4a';
+            helmetColor = '#4a4a5a';
             break;
         case 'assault':
-            bodyColor = '#4a3a3a';
-            armorColor = '#5a4a4a';
-            helmetColor = '#6a5a5a';
+            bodyColor = '#3a2a2a';
+            armorColor = '#4a3a3a';
+            helmetColor = '#5a4a4a';
             break;
         case 'medic':
-            bodyColor = '#3a4a3a';
-            armorColor = '#4a5a4a';
-            helmetColor = '#5a6a5a';
+            bodyColor = '#2a3a2a';
+            armorColor = '#3a4a3a';
+            helmetColor = '#4a5a4a';
             break;
         default:
-            bodyColor = '#3a3a4a';
-            armorColor = '#4a4a5a';
-            helmetColor = '#5a5a6a';
+            bodyColor = '#2a2a3a';
+            armorColor = '#3a3a4a';
+            helmetColor = '#4a4a5a';
     }
 
     // Legs
     ctx.fillStyle = bodyColor;
     ctx.beginPath();
-    ctx.roundRect(-10, 8, 8, 20, 3);
+    ctx.roundRect(-12, 8, 10, 22, 3);
     ctx.fill();
     ctx.beginPath();
-    ctx.roundRect(2, 8, 8, 20, 3);
+    ctx.roundRect(2, 8, 10, 22, 3);
     ctx.fill();
 
     // Boots
-    ctx.fillStyle = '#2a2a2a';
+    ctx.fillStyle = '#1a1a1a';
     ctx.beginPath();
-    ctx.roundRect(-11, 24, 10, 6, 2);
+    ctx.roundRect(-13, 26, 12, 7, 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.roundRect(1, 24, 10, 6, 2);
+    ctx.roundRect(1, 26, 12, 7, 2);
     ctx.fill();
 
     // Torso/Armor
     ctx.fillStyle = armorColor;
     ctx.beginPath();
-    ctx.roundRect(-14, -12, 28, 24, 4);
+    ctx.roundRect(-16, -14, 32, 26, 5);
     ctx.fill();
 
-    // Armor details - player color stripe
+    // Player color stripe
     ctx.fillStyle = playerColor;
-    ctx.fillRect(-12, -8, 4, 16);
-    ctx.fillRect(8, -8, 4, 16);
+    ctx.fillRect(-14, -10, 5, 18);
+    ctx.fillRect(9, -10, 5, 18);
+
+    // Chest plate highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.beginPath();
+    ctx.roundRect(-10, -12, 20, 10, 3);
+    ctx.fill();
 
     // Arms
     ctx.fillStyle = bodyColor;
     ctx.beginPath();
-    ctx.roundRect(-20, -10, 8, 18, 3);
+    ctx.roundRect(-24, -12, 10, 20, 3);
     ctx.fill();
     ctx.beginPath();
-    ctx.roundRect(12, -10, 8, 18, 3);
+    ctx.roundRect(14, -12, 10, 20, 3);
     ctx.fill();
 
     // Gloves
-    ctx.fillStyle = '#2a2a2a';
+    ctx.fillStyle = '#1a1a1a';
     ctx.beginPath();
-    ctx.arc(-16, 10, 5, 0, Math.PI * 2);
+    ctx.arc(-19, 10, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(16, 10, 5, 0, Math.PI * 2);
+    ctx.arc(19, 10, 6, 0, Math.PI * 2);
     ctx.fill();
 
     // Neck
-    ctx.fillStyle = '#d4a574';
+    ctx.fillStyle = '#c9a07a';
     ctx.beginPath();
-    ctx.roundRect(-4, -18, 8, 8, 2);
+    ctx.roundRect(-5, -20, 10, 8, 2);
     ctx.fill();
 
     // Head/Helmet
     ctx.fillStyle = helmetColor;
     ctx.beginPath();
-    ctx.arc(0, -26, 12, 0, Math.PI * 2);
+    ctx.arc(0, -28, 14, 0, Math.PI * 2);
     ctx.fill();
 
     // Visor
-    ctx.fillStyle = 'rgba(100, 200, 255, 0.6)';
+    const visorGradient = ctx.createLinearGradient(-10, -30, 10, -26);
+    visorGradient.addColorStop(0, 'rgba(80, 180, 220, 0.8)');
+    visorGradient.addColorStop(1, 'rgba(40, 120, 180, 0.6)');
+    ctx.fillStyle = visorGradient;
     ctx.beginPath();
-    ctx.ellipse(0, -26, 10, 6, 0, 0, Math.PI);
+    ctx.ellipse(0, -28, 11, 7, 0, 0, Math.PI);
     ctx.fill();
+
+    // Helmet detail
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, -28, 14, 0, Math.PI * 2);
+    ctx.stroke();
 
     // Class-specific equipment
     ctx.shadowBlur = 0;
     switch (classType) {
         case 'scout':
-            // Sniper rifle on back
-            ctx.fillStyle = '#3a3a3a';
+            // Sniper rifle
+            ctx.fillStyle = '#2a2a2a';
             ctx.save();
-            ctx.rotate(-0.3);
-            ctx.fillRect(-25, -35, 4, 45);
+            ctx.rotate(-0.25);
+            ctx.fillRect(-28, -38, 5, 50);
             ctx.restore();
-            // Scope
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath();
-            ctx.ellipse(-22, -32, 3, 3, 0, 0, Math.PI * 2);
+            ctx.ellipse(-24, -35, 4, 4, 0, 0, Math.PI * 2);
             ctx.fill();
             break;
 
         case 'assault':
-            // Heavy weapon in hands
-            ctx.fillStyle = '#3a3a3a';
-            ctx.beginPath();
-            ctx.roundRect(14, -2, 20, 6, 2);
-            ctx.fill();
-            // Barrel
+            // Heavy weapon
             ctx.fillStyle = '#2a2a2a';
-            ctx.fillRect(30, 0, 8, 3);
+            ctx.beginPath();
+            ctx.roundRect(16, -4, 24, 8, 2);
+            ctx.fill();
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(36, -2, 10, 4);
             // Shoulder pads
             ctx.fillStyle = armorColor;
             ctx.beginPath();
-            ctx.ellipse(-18, -8, 6, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(-20, -10, 8, 5, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.beginPath();
-            ctx.ellipse(18, -8, 6, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(20, -10, 8, 5, 0, 0, Math.PI * 2);
             ctx.fill();
             break;
 
         case 'medic':
             // Medical backpack
-            ctx.fillStyle = '#4a5a4a';
+            ctx.fillStyle = '#3a4a3a';
             ctx.beginPath();
-            ctx.roundRect(-18, -15, 10, 20, 3);
+            ctx.roundRect(-22, -18, 12, 24, 4);
             ctx.fill();
             // Red cross
-            ctx.fillStyle = '#ff4444';
-            ctx.fillRect(-16, -10, 6, 2);
-            ctx.fillRect(-14, -12, 2, 6);
-            // Medical tool in hand
+            ctx.fillStyle = '#cc3333';
+            ctx.fillRect(-19, -12, 6, 2);
+            ctx.fillRect(-17, -14, 2, 6);
+            // Medical tool
             ctx.fillStyle = '#aaaaaa';
             ctx.beginPath();
-            ctx.roundRect(14, 0, 12, 4, 2);
+            ctx.roundRect(16, -2, 14, 5, 2);
             ctx.fill();
             break;
     }
-
-    // Player number badge on shoulder
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    ctx.arc(12, -10, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
 
     ctx.restore();
 }
 
 /**
- * Create action point indicator icons
+ * Draw action point indicators
  */
-export function drawAPIndicator(ctx, x, y, current, max, size = 20) {
-    const spacing = size + 4;
+export function drawAPIndicator(ctx, x, y, current, max, size = 16) {
+    const spacing = size + 3;
     const startX = x - ((max - 1) * spacing) / 2;
 
     for (let i = 0; i < max; i++) {
         const px = startX + i * spacing;
         const isActive = i < current;
 
-        // Lightning bolt shape
         ctx.save();
         ctx.translate(px, y);
 
         if (isActive) {
-            // Glow effect
             ctx.shadowColor = '#eab308';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 6;
             ctx.fillStyle = '#eab308';
         } else {
-            ctx.fillStyle = 'rgba(100, 100, 100, 0.4)';
+            ctx.fillStyle = 'rgba(80, 80, 80, 0.5)';
         }
 
-        // Draw lightning bolt
-        const s = size / 20;
+        // Lightning bolt
+        const s = size / 16;
         ctx.beginPath();
-        ctx.moveTo(4 * s, -10 * s);
-        ctx.lineTo(-2 * s, 0);
+        ctx.moveTo(3 * s, -8 * s);
+        ctx.lineTo(-1 * s, 0);
         ctx.lineTo(2 * s, 0);
-        ctx.lineTo(-4 * s, 10 * s);
-        ctx.lineTo(2 * s, 2 * s);
-        ctx.lineTo(-2 * s, 2 * s);
+        ctx.lineTo(-3 * s, 8 * s);
+        ctx.lineTo(1 * s, 1 * s);
+        ctx.lineTo(-2 * s, 1 * s);
         ctx.closePath();
         ctx.fill();
 

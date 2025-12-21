@@ -1,7 +1,7 @@
 // ===== INPUT HANDLING =====
 
 import { state, getHex, getCurrentUnit } from './state.js';
-import { pixelToHex } from './hexMath.js';
+import { pixelToHex, hexToPixel } from './hexMath.js';
 import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
@@ -21,33 +21,34 @@ let dragStartCameraX = 0;
 let dragStartCameraY = 0;
 let lastTapTime = 0;
 let hasDragged = false;
-
-// Touch handling
-let lastTouchDistance = 0;
-let initialPinchDistance = 0;
+let dragDistance = 0;
 
 /**
  * Initialize input handlers
  */
 export function initInput() {
     canvas = document.getElementById('game-canvas');
+    if (!canvas) {
+        console.error('Canvas not found!');
+        return;
+    }
 
     // Canvas interactions - mouse
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('mouseleave', handleMouseUp);
-    canvas.addEventListener('click', handleCanvasClick);
 
-    // Touch support
+    // Touch support - critical for mobile
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
     // Prevent context menu on long press
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Mouse wheel for zooming (optional future feature)
+    // Mouse wheel for scrolling
     canvas.addEventListener('wheel', handleWheel, { passive: false });
 
     // Menu buttons
@@ -57,21 +58,16 @@ export function initInput() {
     setupActionButtons();
 
     // Window resize
-    window.addEventListener('resize', () => {
-        if (state.screen !== 'menu') resizeCanvas();
-    });
-
-    window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
-            if (state.screen !== 'menu') resizeCanvas();
-        }, 100);
-    });
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', () => {
-            if (state.screen !== 'menu') resizeCanvas();
-        });
+        window.visualViewport.addEventListener('resize', handleResize);
     }
+}
+
+function handleResize() {
+    resizeCanvas();
 }
 
 /**
@@ -82,6 +78,7 @@ function handleMouseDown(e) {
 
     isDragging = true;
     hasDragged = false;
+    dragDistance = 0;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     dragStartCameraX = state.cameraX;
@@ -99,22 +96,23 @@ function handleMouseMove(e) {
     if (isDragging) {
         const dx = e.clientX - dragStartX;
         const dy = e.clientY - dragStartY;
+        dragDistance = Math.sqrt(dx * dx + dy * dy);
 
-        // Only count as drag if moved more than 5 pixels
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        // Only count as drag if moved more than 8 pixels
+        if (dragDistance > 8) {
             hasDragged = true;
+
+            // Update camera position
+            state.cameraX = dragStartCameraX + dx;
+            state.cameraY = dragStartCameraY + dy;
+
+            // Limit camera to map bounds
+            limitCameraBounds();
+
+            // Update offsets and re-render
+            updateCameraOffset();
+            render();
         }
-
-        // Update camera position
-        state.cameraX = dragStartCameraX + dx;
-        state.cameraY = dragStartCameraY + dy;
-
-        // Limit camera to map bounds
-        limitCameraBounds();
-
-        // Update offsets and re-render
-        updateCameraOffset();
-        render();
     } else {
         // Path preview when not dragging
         handlePathPreview(e.clientX, e.clientY);
@@ -125,7 +123,14 @@ function handleMouseMove(e) {
  * Handle mouse up
  */
 function handleMouseUp(e) {
+    if (isDragging && !hasDragged) {
+        // It was a click, not a drag
+        handleTapOrClick(e.clientX, e.clientY);
+    }
+
     isDragging = false;
+    hasDragged = false;
+    dragDistance = 0;
     canvas.style.cursor = 'grab';
 }
 
@@ -134,20 +139,20 @@ function handleMouseUp(e) {
  */
 function handleTouchStart(e) {
     if (state.gameOver || state.animating) return;
+
+    // Always prevent default to avoid scrolling the page
     e.preventDefault();
+    e.stopPropagation();
 
     if (e.touches.length === 1) {
-        // Single touch - start drag
+        const touch = e.touches[0];
         isDragging = true;
         hasDragged = false;
-        dragStartX = e.touches[0].clientX;
-        dragStartY = e.touches[0].clientY;
+        dragDistance = 0;
+        dragStartX = touch.clientX;
+        dragStartY = touch.clientY;
         dragStartCameraX = state.cameraX;
         dragStartCameraY = state.cameraY;
-    } else if (e.touches.length === 2) {
-        // Two finger touch - prepare for pinch zoom (future feature)
-        isDragging = false;
-        initialPinchDistance = getPinchDistance(e.touches);
     }
 }
 
@@ -156,31 +161,32 @@ function handleTouchStart(e) {
  */
 function handleTouchMove(e) {
     if (state.gameOver) return;
+
+    // Always prevent default
     e.preventDefault();
+    e.stopPropagation();
 
     if (e.touches.length === 1 && isDragging) {
-        const dx = e.touches[0].clientX - dragStartX;
-        const dy = e.touches[0].clientY - dragStartY;
+        const touch = e.touches[0];
+        const dx = touch.clientX - dragStartX;
+        const dy = touch.clientY - dragStartY;
+        dragDistance = Math.sqrt(dx * dx + dy * dy);
 
-        // Only count as drag if moved more than 10 pixels (more forgiving on touch)
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        // Lower threshold for touch - 15 pixels
+        if (dragDistance > 15) {
             hasDragged = true;
+
+            // Update camera position
+            state.cameraX = dragStartCameraX + dx;
+            state.cameraY = dragStartCameraY + dy;
+
+            // Limit camera to map bounds
+            limitCameraBounds();
+
+            // Update offsets and re-render
+            updateCameraOffset();
+            render();
         }
-
-        // Update camera position
-        state.cameraX = dragStartCameraX + dx;
-        state.cameraY = dragStartCameraY + dy;
-
-        // Limit camera to map bounds
-        limitCameraBounds();
-
-        // Update offsets and re-render
-        updateCameraOffset();
-        render();
-    } else if (e.touches.length === 2) {
-        // Two finger pinch - future zoom feature
-        const currentDistance = getPinchDistance(e.touches);
-        // Could implement zoom here
     }
 }
 
@@ -189,38 +195,36 @@ function handleTouchMove(e) {
  */
 function handleTouchEnd(e) {
     if (state.gameOver || state.animating) return;
+
     e.preventDefault();
+    e.stopPropagation();
+
+    // Get the touch that ended
+    const touch = e.changedTouches[0];
+    if (!touch) {
+        isDragging = false;
+        hasDragged = false;
+        return;
+    }
 
     // Check for tap (not drag)
-    if (!hasDragged && e.changedTouches.length > 0) {
-        const touch = e.changedTouches[0];
-
+    if (!hasDragged && dragDistance < 15) {
         // Double tap detection for centering
         const now = Date.now();
-        if (now - lastTapTime < 300) {
+        if (now - lastTapTime < 350) {
             // Double tap - center on current unit
             centerOnCurrentUnit();
             lastTapTime = 0;
-            isDragging = false;
-            return;
+        } else {
+            lastTapTime = now;
+            // Single tap - handle as click
+            handleTapOrClick(touch.clientX, touch.clientY);
         }
-        lastTapTime = now;
-
-        // Single tap - handle as click
-        handleTapOrClick(touch.clientX, touch.clientY);
     }
 
     isDragging = false;
     hasDragged = false;
-}
-
-/**
- * Get distance between two touch points
- */
-function getPinchDistance(touches) {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
+    dragDistance = 0;
 }
 
 /**
@@ -228,7 +232,7 @@ function getPinchDistance(touches) {
  */
 function limitCameraBounds() {
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    const maxOffset = radius * state.hexSize * 1.5;
+    const maxOffset = radius * state.hexSize * 2;
 
     state.cameraX = Math.max(-maxOffset, Math.min(maxOffset, state.cameraX));
     state.cameraY = Math.max(-maxOffset, Math.min(maxOffset, state.cameraY));
@@ -247,52 +251,43 @@ function updateCameraOffset() {
 }
 
 /**
- * Center view on current unit
+ * Center view on current unit - exported for external use
  */
 export function centerOnCurrentUnit() {
     const unit = getCurrentUnit();
-    if (!unit) return;
-
-    // Calculate where unit should be
-    const hexSize = state.hexSize;
-    const unitX = hexSize * (3/2 * unit.q);
-    const unitY = hexSize * (Math.sqrt(3)/2 * unit.q + Math.sqrt(3) * unit.r);
-
-    // Set camera to center on unit
-    state.cameraX = -unitX;
-    state.cameraY = -unitY;
-
-    updateCameraOffset();
-    render();
-}
-
-/**
- * Handle mouse wheel for potential zoom
- */
-function handleWheel(e) {
-    e.preventDefault();
-    // Could implement zoom here in the future
-    // For now, use wheel for panning
-    state.cameraX -= e.deltaX * 0.5;
-    state.cameraY -= e.deltaY * 0.5;
-    limitCameraBounds();
-    updateCameraOffset();
-    render();
-}
-
-/**
- * Handle canvas click (after checking for drag)
- */
-function handleCanvasClick(e) {
-    if (state.gameOver || state.animating) return;
-
-    // Don't handle click if we were dragging
-    if (hasDragged) {
-        hasDragged = false;
+    if (!unit) {
+        // If no current unit, center on map
+        state.cameraX = 0;
+        state.cameraY = 0;
+        updateCameraOffset();
+        render();
         return;
     }
 
-    handleTapOrClick(e.clientX, e.clientY);
+    // Calculate unit position in pixels
+    const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+
+    // Set camera to center on unit
+    state.cameraX = -pos.x;
+    state.cameraY = -pos.y;
+
+    updateCameraOffset();
+    render();
+}
+
+/**
+ * Handle mouse wheel for scrolling
+ */
+function handleWheel(e) {
+    e.preventDefault();
+
+    // Use wheel for panning
+    state.cameraX -= e.deltaX;
+    state.cameraY -= e.deltaY;
+
+    limitCameraBounds();
+    updateCameraOffset();
+    render();
 }
 
 /**
@@ -319,7 +314,7 @@ function handleTapOrClick(clientX, clientY) {
 }
 
 /**
- * Handle path preview on hover
+ * Handle path preview on hover (mouse only)
  */
 function handlePathPreview(clientX, clientY) {
     if (state.gameOver || state.selectedAction !== 'move') return;
@@ -333,17 +328,15 @@ function handlePathPreview(clientX, clientY) {
 
     state.hoveredHex = hex;
 
-    // Update path preview - now showing full path even beyond AP
+    // Update path preview
     const unit = getCurrentUnit();
     if (unit && hex && hex.walkable && !hex.unit) {
-        // Try to find path to hex (even if beyond current AP)
-        const maxPossibleCost = unit.move * 3; // Allow showing path beyond current AP
+        const maxPossibleCost = unit.move * 3;
         const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
 
         if (pathResult && pathResult.path) {
             state.currentPath = pathResult.path;
         } else {
-            // Try reachable hexes as fallback
             const reachable = getReachableHexes(unit);
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachable.get(hexKey);
@@ -365,29 +358,23 @@ function handlePathPreview(clientX, clientY) {
  * Handle move action click
  */
 function handleMoveClick(unit, hex) {
-    // First check if hex is directly reachable
     const reachable = getReachableHexes(unit);
     const hexKey = `${hex.q},${hex.r}`;
     const pathData = reachable.get(hexKey);
 
     if (pathData) {
-        // Direct move - hex is within AP range
         moveUnit(unit, pathData.hex, pathData.cost);
         state.currentPath = null;
-
-        // Update visibility after move
         updateVisibility();
-
         render();
         updateUI();
     } else {
-        // Check if we can move partially along the path
+        // Move partially along the path
         const maxMoveCost = Math.min(unit.ap, unit.move);
         const maxPossibleCost = unit.move * 3;
         const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
 
         if (pathResult && pathResult.path && pathResult.path.length > 1) {
-            // Find the furthest hex we can reach along this path
             let cumulativeCost = 0;
             let targetHex = null;
             let targetCost = 0;
@@ -408,7 +395,6 @@ function handleMoveClick(unit, hex) {
                 }
             }
 
-            // Move to the furthest reachable hex along the path
             if (targetHex && targetCost > 0) {
                 moveUnit(unit, targetHex, targetCost);
                 state.currentPath = null;
@@ -430,9 +416,7 @@ function handleAttackClick(unit, hex) {
 
         if (canAttack) {
             if (state.targetedUnit && state.targetedUnit.id === hex.unit.id) {
-                // Confirm attack (second click)
                 const result = executeAttack(unit, hex.unit);
-
                 state.targetedUnit = null;
 
                 if (result.killed) {
@@ -442,14 +426,12 @@ function handleAttackClick(unit, hex) {
                 render();
                 updateUI();
             } else {
-                // Target unit (first click)
                 state.targetedUnit = hex.unit;
                 render();
                 updateUI();
             }
         }
     } else {
-        // Clicked empty hex - deselect target
         state.targetedUnit = null;
         render();
         updateUI();
@@ -460,7 +442,6 @@ function handleAttackClick(unit, hex) {
  * Setup menu buttons
  */
 function setupMenuButtons() {
-    // Player count buttons
     document.querySelectorAll('[data-players]').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('[data-players]').forEach(b => b.classList.remove('selected'));
@@ -469,7 +450,6 @@ function setupMenuButtons() {
         };
     });
 
-    // Map size buttons
     document.querySelectorAll('[data-size]').forEach(btn => {
         btn.onclick = () => {
             document.querySelectorAll('[data-size]').forEach(b => b.classList.remove('selected'));
@@ -478,7 +458,6 @@ function setupMenuButtons() {
         };
     });
 
-    // Ready button (turn screen)
     const readyBtn = document.getElementById('ready-btn');
     if (readyBtn) {
         readyBtn.onclick = () => {
@@ -486,20 +465,18 @@ function setupMenuButtons() {
             updateVisibility();
             updateUI();
 
-            // Center on current unit when turn starts
-            setTimeout(() => {
+            // Center on current unit immediately
+            requestAnimationFrame(() => {
                 centerOnCurrentUnit();
-            }, 100);
+            });
         };
     }
 
-    // End turn button
     const endTurnBtn = document.getElementById('end-turn-btn');
     if (endTurnBtn) {
         endTurnBtn.onclick = endTurn;
     }
 
-    // Game over buttons
     const menuBtn = document.getElementById('menu-btn');
     if (menuBtn) {
         menuBtn.onclick = () => showScreen('menu');
