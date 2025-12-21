@@ -367,6 +367,14 @@ function init() {
         };
     }
 
+    // Setup turn back button (go back to menu during turn transition)
+    const turnBackBtn = document.getElementById('turn-back-btn');
+    if (turnBackBtn) {
+        turnBackBtn.onclick = () => {
+            showScreen('menu');
+        };
+    }
+
     // Setup rematch button
     const rematchBtn = document.getElementById('rematch-btn');
     if (rematchBtn) {
