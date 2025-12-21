@@ -196,6 +196,8 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            height: 100%;
+            overflow: hidden;
         }
 
         /* Top Bar */
@@ -237,13 +239,16 @@
             flex: 1;
             position: relative;
             overflow: hidden;
-            min-height: 0;
+            min-height: 200px;
+            /* Ensure canvas gets adequate space on mobile */
+            height: 100%;
         }
 
         #game-canvas {
             width: 100%;
             height: 100%;
             touch-action: none;
+            display: block;
         }
 
         /* Unit Panel */
@@ -543,12 +548,43 @@
     <script>
     // ===== CONFIGURATION =====
     const CONFIG = {
-        HEX_SIZE: 36,
+        HEX_SIZE: 36, // Base size, will be recalculated dynamically
         PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308'],
         UNITS_PER_PLAYER: 3,
         AP_PER_TURN: 3,
         MAX_ROUNDS: 20
     };
+
+    // Dynamic hex size calculation
+    function calculateHexSize() {
+        const container = canvas.parentElement;
+        if (!container) return CONFIG.HEX_SIZE;
+
+        const rect = container.getBoundingClientRect();
+        const sizes = { small: 4, medium: 5, large: 6 };
+        const radius = sizes[state.settings.size] || 5;
+
+        // Calculate the hex grid dimensions
+        // Hex grid spans roughly (2*radius + 1) hexes in each direction
+        const gridWidth = (2 * radius + 1) * 1.5; // Approximate width in hex units
+        const gridHeight = (2 * radius + 1) * Math.sqrt(3); // Approximate height in hex units
+
+        // Calculate hex size that fits the container with padding
+        const padding = 40; // Padding from edges
+        const availableWidth = rect.width - padding * 2;
+        const availableHeight = rect.height - padding * 2;
+
+        const hexSizeByWidth = availableWidth / gridWidth;
+        const hexSizeByHeight = availableHeight / gridHeight;
+
+        // Use the smaller of the two to ensure the grid fits
+        let hexSize = Math.min(hexSizeByWidth, hexSizeByHeight);
+
+        // Clamp to reasonable bounds
+        hexSize = Math.max(20, Math.min(50, hexSize));
+
+        return hexSize;
+    }
 
     const UNIT_CLASSES = {
         scout: { name: 'Scout', icon: '🎯', hp: 60, damage: 15, range: 4, move: 4, special: 'Spähen' },
@@ -571,15 +607,17 @@
     };
 
     // ===== HEX UTILITIES =====
+    let currentHexSize = CONFIG.HEX_SIZE;
+
     function hexToPixel(q, r) {
-        const size = CONFIG.HEX_SIZE;
+        const size = currentHexSize;
         const x = size * (3/2 * q);
         const y = size * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
         return { x, y };
     }
 
     function pixelToHex(x, y) {
-        const size = CONFIG.HEX_SIZE;
+        const size = currentHexSize;
         const q = (2/3 * x) / size;
         const r = (-1/3 * x + Math.sqrt(3)/3 * y) / size;
         return hexRound(q, r);
@@ -882,11 +920,23 @@
     function resizeCanvas() {
         const container = canvas.parentElement;
         const rect = container.getBoundingClientRect();
+
+        // Ensure we have valid dimensions
+        if (rect.width === 0 || rect.height === 0) {
+            // Retry after a short delay if container not yet laid out
+            setTimeout(resizeCanvas, 50);
+            return;
+        }
+
         canvas.width = rect.width * window.devicePixelRatio;
         canvas.height = rect.height * window.devicePixelRatio;
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform before scaling
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+        // Recalculate hex size to fit the screen
+        currentHexSize = calculateHexSize();
 
         offsetX = rect.width / 2;
         offsetY = rect.height / 2;
@@ -912,8 +962,8 @@
             ctx.beginPath();
             for (let i = 0; i < 6; i++) {
                 const angle = Math.PI / 3 * i - Math.PI / 6;
-                const px = sx + CONFIG.HEX_SIZE * Math.cos(angle);
-                const py = sy + CONFIG.HEX_SIZE * Math.sin(angle);
+                const px = sx + currentHexSize * Math.cos(angle);
+                const py = sy + currentHexSize * Math.sin(angle);
                 if (i === 0) ctx.moveTo(px, py);
                 else ctx.lineTo(px, py);
             }
@@ -941,35 +991,37 @@
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // Draw terrain features
+            // Draw terrain features (proportional to hex size)
+            const scale = currentHexSize / 36; // Scale relative to base size
             if (hex.type === 'tree') {
                 ctx.fillStyle = '#15803d';
                 ctx.beginPath();
-                ctx.arc(sx, sy - 8, 12, 0, Math.PI * 2);
+                ctx.arc(sx, sy - 8 * scale, 12 * scale, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.fillStyle = '#422006';
-                ctx.fillRect(sx - 3, sy, 6, 10);
+                ctx.fillRect(sx - 3 * scale, sy, 6 * scale, 10 * scale);
             } else if (hex.type === 'rock') {
                 ctx.fillStyle = '#6b7280';
                 ctx.beginPath();
-                ctx.ellipse(sx, sy, 14, 10, 0, 0, Math.PI * 2);
+                ctx.ellipse(sx, sy, 14 * scale, 10 * scale, 0, 0, Math.PI * 2);
                 ctx.fill();
             } else if (hex.type === 'bush') {
                 ctx.fillStyle = '#16a34a';
                 ctx.beginPath();
-                ctx.arc(sx - 6, sy, 8, 0, Math.PI * 2);
-                ctx.arc(sx + 6, sy, 8, 0, Math.PI * 2);
-                ctx.arc(sx, sy - 5, 8, 0, Math.PI * 2);
+                ctx.arc(sx - 6 * scale, sy, 8 * scale, 0, Math.PI * 2);
+                ctx.arc(sx + 6 * scale, sy, 8 * scale, 0, Math.PI * 2);
+                ctx.arc(sx, sy - 5 * scale, 8 * scale, 0, Math.PI * 2);
                 ctx.fill();
             } else if (hex.type === 'water') {
                 ctx.fillStyle = 'rgba(96, 165, 250, 0.3)';
                 ctx.beginPath();
-                ctx.ellipse(sx, sy, 10, 6, 0, 0, Math.PI * 2);
+                ctx.ellipse(sx, sy, 10 * scale, 6 * scale, 0, 0, Math.PI * 2);
                 ctx.fill();
             }
         });
 
         // Draw units
+        const unitScale = currentHexSize / 36; // Scale relative to base size
         state.units.forEach(u => {
             if (!u.alive) return;
 
@@ -980,38 +1032,41 @@
             // Selection ring
             if (unit && u.id === unit.id) {
                 ctx.strokeStyle = CONFIG.PLAYER_COLORS[u.player];
-                ctx.lineWidth = 3;
+                ctx.lineWidth = 3 * unitScale;
                 ctx.beginPath();
-                ctx.arc(sx, sy, 18, 0, Math.PI * 2);
+                ctx.arc(sx, sy, 18 * unitScale, 0, Math.PI * 2);
                 ctx.stroke();
             }
 
             // Unit body
             ctx.fillStyle = CONFIG.PLAYER_COLORS[u.player];
             ctx.beginPath();
-            ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 14 * unitScale, 0, Math.PI * 2);
             ctx.fill();
 
             // Class icon
-            ctx.font = '16px sans-serif';
+            ctx.font = `${Math.round(16 * unitScale)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(UNIT_CLASSES[u.class].icon, sx, sy);
 
             // HP bar
             const hpPct = u.currentHp / u.hp;
+            const hpBarWidth = 28 * unitScale;
+            const hpBarHeight = 4 * unitScale;
+            const hpBarY = sy + 18 * unitScale;
             ctx.fillStyle = '#1f2937';
-            ctx.fillRect(sx - 14, sy + 18, 28, 4);
+            ctx.fillRect(sx - hpBarWidth / 2, hpBarY, hpBarWidth, hpBarHeight);
             ctx.fillStyle = hpPct > 0.5 ? '#22c55e' : (hpPct > 0.25 ? '#eab308' : '#ef4444');
-            ctx.fillRect(sx - 14, sy + 18, 28 * hpPct, 4);
+            ctx.fillRect(sx - hpBarWidth / 2, hpBarY, hpBarWidth * hpPct, hpBarHeight);
 
             // Highlight attackable
             if (unit && state.selectedAction === 'attack' && canAttack(unit, u)) {
                 ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 2 * unitScale;
+                ctx.setLineDash([4 * unitScale, 4 * unitScale]);
                 ctx.beginPath();
-                ctx.arc(sx, sy, 20, 0, Math.PI * 2);
+                ctx.arc(sx, sy, 20 * unitScale, 0, Math.PI * 2);
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
@@ -1200,10 +1255,24 @@
         canvas.addEventListener('touchend', e => { e.preventDefault(); handleCanvasClick(e); });
         canvas.addEventListener('mousemove', handleCanvasMove);
 
-        // Resize
+        // Resize - handle various mobile scenarios
         window.addEventListener('resize', () => {
             if (state.screen !== 'menu') resizeCanvas();
         });
+
+        // Handle orientation change on mobile
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                if (state.screen !== 'menu') resizeCanvas();
+            }, 100);
+        });
+
+        // Handle visual viewport resize (for iOS Safari)
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                if (state.screen !== 'menu') resizeCanvas();
+            });
+        }
     }
 
     // ===== START =====
