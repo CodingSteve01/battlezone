@@ -30,6 +30,9 @@ export const state = {
     gameOver: false,
     animating: false,
 
+    // Movement animation
+    movementAnimation: null,  // { unit, path, currentStep, startTime }
+
     // Fog of War
     visibleHexes: new Set(),  // Set of "q,r" keys for visible hexes
     exploredHexes: new Set(), // Set of "q,r" keys for previously seen hexes

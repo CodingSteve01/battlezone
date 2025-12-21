@@ -3,7 +3,7 @@
 import { state, getHex, getCurrentUnit } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
-import { getAttackableUnits, moveUnit } from './units.js';
+import { getAttackableUnits, moveUnit, animateUnitMovement } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -359,15 +359,48 @@ function handlePathPreview(clientX, clientY) {
  * Handle move action click
  */
 function handleMoveClick(unit, hex) {
-    const reachable = getReachableHexes(unit);
-    const hexKey = `${hex.q},${hex.r}`;
-    const pathData = reachable.get(hexKey);
+    // Don't allow movement during animation
+    if (state.animating) return;
 
-    if (pathData) {
-        moveUnit(unit, pathData.hex, pathData.cost);
-        state.currentPath = null;
+    const maxMoveCost = Math.min(unit.ap, unit.move);
+    const maxPossibleCost = unit.move * 3;
+    const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
 
-        // Check for power-up pickup
+    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        return;
+    }
+
+    // Calculate the reachable portion of the path
+    let cumulativeCost = 0;
+    let reachablePath = [pathResult.path[0]]; // Start with current position
+    let totalCost = 0;
+
+    for (let i = 1; i < pathResult.path.length; i++) {
+        const point = pathResult.path[i];
+        const pointHex = getHex(point.q, point.r);
+        if (!pointHex) break;
+
+        const terrain = TERRAIN[pointHex.type];
+        cumulativeCost += terrain.moveCost;
+
+        if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
+            reachablePath.push(point);
+            totalCost = cumulativeCost;
+        } else {
+            break;
+        }
+    }
+
+    // Only move if we can reach at least one hex
+    if (reachablePath.length < 2 || totalCost === 0) {
+        return;
+    }
+
+    state.currentPath = null;
+
+    // Animate the movement
+    animateUnitMovement(unit, reachablePath, totalCost, () => {
+        // Check for power-up pickup after animation
         const pickup = checkPowerupPickup(unit);
         if (pickup) {
             showPowerupPickup(pickup.powerup, pickup.result);
@@ -376,49 +409,7 @@ function handleMoveClick(unit, hex) {
         updateVisibility();
         render();
         updateUI();
-    } else {
-        // Move partially along the path
-        const maxMoveCost = Math.min(unit.ap, unit.move);
-        const maxPossibleCost = unit.move * 3;
-        const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
-
-        if (pathResult && pathResult.path && pathResult.path.length > 1) {
-            let cumulativeCost = 0;
-            let targetHex = null;
-            let targetCost = 0;
-
-            for (let i = 1; i < pathResult.path.length; i++) {
-                const point = pathResult.path[i];
-                const pointHex = getHex(point.q, point.r);
-                if (!pointHex) break;
-
-                const terrain = TERRAIN[pointHex.type];
-                cumulativeCost += terrain.moveCost;
-
-                if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
-                    targetHex = pointHex;
-                    targetCost = cumulativeCost;
-                } else {
-                    break;
-                }
-            }
-
-            if (targetHex && targetCost > 0) {
-                moveUnit(unit, targetHex, targetCost);
-                state.currentPath = null;
-
-                // Check for power-up pickup
-                const pickup = checkPowerupPickup(unit);
-                if (pickup) {
-                    showPowerupPickup(pickup.powerup, pickup.result);
-                }
-
-                updateVisibility();
-                render();
-                updateUI();
-            }
-        }
-    }
+    }, render);
 }
 
 /**

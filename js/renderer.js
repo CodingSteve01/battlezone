@@ -115,6 +115,8 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.save();
         ctx.clip();
         const pattern = ctx.createPattern(texture, 'repeat');
+        // Anchor pattern to world coordinates so it doesn't slide when scrolling
+        pattern.setTransform(new DOMMatrix().translate(state.offsetX, state.offsetY));
         ctx.fillStyle = pattern;
         ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
         ctx.restore();
@@ -640,7 +642,7 @@ export function render() {
         }
     });
 
-    // Draw path preview with range visualization
+    // Draw path preview - only show reachable portion
     if (state.currentPath && state.selectedAction === 'move' && currentUnit) {
         const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
@@ -656,17 +658,19 @@ export function render() {
             return { ...point, totalCost: cumulativeCost };
         });
 
-        // Find where the path exceeds AP
-        let lastReachableIndex = pathWithCosts.length - 1;
+        // Find where the path exceeds AP - only show reachable portion
+        let lastReachableIndex = 0;
         for (let i = 1; i < pathWithCosts.length; i++) {
-            if (pathWithCosts[i].totalCost > maxCost) {
-                lastReachableIndex = i - 1;
+            if (pathWithCosts[i].totalCost <= maxCost) {
+                lastReachableIndex = i;
+            } else {
                 break;
             }
         }
 
-        // Draw the reachable part of the path (green)
+        // Only draw if there's a reachable path
         if (lastReachableIndex > 0) {
+            // Draw the path line (green)
             ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
             ctx.lineWidth = 5;
             ctx.setLineDash([]);
@@ -695,60 +699,25 @@ export function render() {
                 ctx.arc(sx, sy, i === lastReachableIndex ? 8 : 5, 0, Math.PI * 2);
                 ctx.fill();
             }
-        }
 
-        // Draw the unreachable part of the path (red/orange dashed)
-        if (lastReachableIndex < pathWithCosts.length - 1) {
-            ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
-            ctx.lineWidth = 3;
-            ctx.setLineDash([8, 6]);
+            // Draw endpoint marker at the last reachable position
+            const endPoint = pathWithCosts[lastReachableIndex];
+            const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
+            const endSx = state.offsetX + endPos.x;
+            const endSy = state.offsetY + endPos.y;
+
+            ctx.fillStyle = '#22c55e';
             ctx.beginPath();
+            ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
+            ctx.fill();
 
-            const startPoint = pathWithCosts[lastReachableIndex];
-            const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
-            ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
-
-            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Draw X marks on unreachable hexes
-            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                const sx = state.offsetX + pos.x;
-                const sy = state.offsetY + pos.y;
-
-                ctx.strokeStyle = 'rgba(234, 179, 8, 0.8)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(sx, sy, 6, 0, Math.PI * 2);
-                ctx.stroke();
-            }
+            // Flag icon at destination
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🚩', endSx, endSy - 1);
         }
-
-        // Draw endpoint marker
-        const endPoint = pathWithCosts[pathWithCosts.length - 1];
-        const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
-        const endSx = state.offsetX + endPos.x;
-        const endSy = state.offsetY + endPos.y;
-        const isEndReachable = endPoint.totalCost <= maxCost;
-
-        ctx.fillStyle = isEndReachable ? '#22c55e' : '#eab308';
-        ctx.beginPath();
-        ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Flag icon at destination
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🚩', endSx, endSy - 1);
     }
 
     // Draw attack line
