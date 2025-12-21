@@ -3,8 +3,31 @@
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit } from './state.js';
 import { calculateHitChance } from './combat.js';
-import { render } from './renderer.js';
+import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
+import { hexToPixel } from './hexMath.js';
+
+/**
+ * Center camera on a specific unit
+ */
+function centerOnUnit(unit) {
+    if (!unit) return;
+
+    // Calculate unit position in pixels
+    const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+
+    // Set camera to center on unit with smooth animation feel
+    state.cameraX = -pos.x;
+    state.cameraY = -pos.y;
+
+    // Update offset (replicated from input.js to avoid circular dependency)
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        state.offsetX = rect.width / 2 + state.cameraX;
+        state.offsetY = rect.height / 2 + state.cameraY;
+    }
+}
 
 /**
  * Update all UI elements
@@ -114,6 +137,8 @@ function updateUnitTabs(units) {
                 state.selectedUnit = index;
                 state.targetedUnit = null;
                 state.currentPath = null;
+                // Center camera on the selected unit
+                centerOnUnit(unit);
                 updateUI();
                 render();
             }

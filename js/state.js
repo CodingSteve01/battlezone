@@ -39,6 +39,10 @@ export const state = {
     exploredHexes: new Set(), // Current player's explored hexes
     playerExploredHexes: [],  // Array of Sets, one per player - stores explored hexes per player
 
+    // Ghost indicators for cloaked enemy attacks (per player)
+    // Format: { unitId, q, r, player, class, timestamp }
+    ghostIndicators: [],      // Array of ghost indicator objects
+
     // Team selection
     teamSelections: [],       // Array of arrays - each player's selected unit classes
 
@@ -96,6 +100,7 @@ export function resetState() {
     state.animating = false;
     state.visibleHexes.clear();
     state.exploredHexes.clear();
+    state.ghostIndicators = [];
     state.cameraX = 0;
     state.cameraY = 0;
 
@@ -104,6 +109,48 @@ export function resetState() {
     for (let i = 0; i < state.settings.players; i++) {
         state.playerExploredHexes.push(new Set());
     }
+}
+
+/**
+ * Add a ghost indicator when a cloaked unit attacks
+ */
+export function addGhostIndicator(unit) {
+    // Remove any existing ghost for this unit
+    state.ghostIndicators = state.ghostIndicators.filter(g => g.unitId !== unit.id);
+
+    // Add new ghost indicator
+    state.ghostIndicators.push({
+        unitId: unit.id,
+        q: unit.q,
+        r: unit.r,
+        player: unit.player,
+        unitClass: unit.class,
+        timestamp: Date.now(),
+        fadeStart: Date.now() + 3000  // Start fading after 3 seconds
+    });
+}
+
+/**
+ * Clear ghost indicator for a unit (when they attack again or die)
+ */
+export function clearGhostIndicator(unitId) {
+    state.ghostIndicators = state.ghostIndicators.filter(g => g.unitId !== unitId);
+}
+
+/**
+ * Get ghost indicators visible to current player
+ */
+export function getVisibleGhosts() {
+    const now = Date.now();
+    const maxAge = 8000;  // Ghosts disappear after 8 seconds
+
+    return state.ghostIndicators.filter(ghost => {
+        // Only show ghosts of enemy units
+        if (ghost.player === state.currentPlayer) return false;
+        // Remove old ghosts
+        if (now - ghost.timestamp > maxAge) return false;
+        return true;
+    });
 }
 
 /**

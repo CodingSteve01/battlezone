@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts } from './state.js';
 import { hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
@@ -92,6 +92,20 @@ export function resizeCanvas() {
 /**
  * Draw a hexagon with optional texture and 3D effect
  */
+/**
+ * Draw just the hex path (for stroking)
+ */
+function drawHexPath(cx, cy, size) {
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const px = cx + size * Math.cos(angle);
+        const py = cy + size * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+}
+
 function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null, terrain = null) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
@@ -170,10 +184,10 @@ function seededRandom(seed) {
 }
 
 /**
- * Draw enhanced terrain pattern on a hex - rich landscape decorations
+ * Draw enhanced terrain pattern on a hex - rich landscape decorations like Civilization
  */
 function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
-    const s = size * 0.45;
+    const s = size * 0.55;  // Larger size for more coverage
     ctx.save();
 
     // Create consistent seed for this hex
@@ -181,29 +195,38 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            // Always draw some grass blades for texture
+            // First: Full grass coverage layer - creates natural meadow look
+            drawGrassTexture(cx, cy, size, baseSeed);
+
+            // Then: Dense grass blades covering the hex
             drawGrassBlades(cx, cy, s, baseSeed);
 
-            // Additional decorations based on seed
+            // Additional decorations based on seed - larger and more natural
             const grassType = Math.abs(baseSeed) % 100;
 
-            if (grassType < 25) {
-                // Bush cluster
-                drawBush(cx - s * 0.2, cy - s * 0.1, s * 0.4, baseSeed);
-                if (seededRandom(baseSeed + 1) > 0.5) {
-                    drawBush(cx + s * 0.3, cy + s * 0.15, s * 0.3, baseSeed + 10);
+            if (grassType < 20) {
+                // Bush cluster - multiple bushes for natural grouping
+                drawBush(cx - s * 0.25, cy - s * 0.15, s * 0.5, baseSeed);
+                drawBush(cx + s * 0.35, cy + s * 0.1, s * 0.4, baseSeed + 10);
+                if (seededRandom(baseSeed + 2) > 0.6) {
+                    drawBush(cx - s * 0.1, cy + s * 0.35, s * 0.35, baseSeed + 20);
                 }
-            } else if (grassType < 45) {
-                // Flower meadow
+            } else if (grassType < 40) {
+                // Rich flower meadow - more flowers
                 drawFlowerCluster(cx, cy, s, baseSeed);
-            } else if (grassType < 60) {
-                // Small stones with moss
+                drawTallGrass(cx - s * 0.3, cy + s * 0.2, s * 0.7, baseSeed + 5);
+            } else if (grassType < 55) {
+                // Natural stone arrangement with vegetation
                 drawStones(cx, cy, s, baseSeed);
+                drawTallGrass(cx + s * 0.3, cy - s * 0.2, s * 0.6, baseSeed + 3);
             } else if (grassType < 75) {
-                // Tall grass patch
+                // Dense tall grass patch - prairie style
                 drawTallGrass(cx, cy, s, baseSeed);
+                drawTallGrass(cx - s * 0.3, cy + s * 0.15, s * 0.8, baseSeed + 7);
+            } else {
+                // Wild meadow - mixed vegetation
+                drawWildMeadow(cx, cy, s, baseSeed);
             }
-            // 25% just has grass blades (already drawn above)
             break;
 
         case 'forest':
@@ -249,19 +272,106 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 }
 
 /**
- * Draw grass blades for texture
+ * Draw full grass texture coverage - creates the base meadow look
+ */
+function drawGrassTexture(cx, cy, size, seed) {
+    const radius = size * 0.8;
+
+    // Multiple overlapping grass patches for natural coverage
+    for (let ring = 0; ring < 3; ring++) {
+        const ringRadius = radius * (0.3 + ring * 0.3);
+        const patchCount = 4 + ring * 2;
+
+        for (let i = 0; i < patchCount; i++) {
+            const angle = (i / patchCount) * Math.PI * 2 + seededRandom(seed + ring * 100 + i) * 0.5;
+            const dist = ringRadius * (0.5 + seededRandom(seed + ring * 100 + i + 50) * 0.5);
+            const px = cx + Math.cos(angle) * dist;
+            const py = cy + Math.sin(angle) * dist;
+
+            // Grass patch - organic shape
+            const patchSize = size * (0.15 + seededRandom(seed + ring * 100 + i + 10) * 0.12);
+            const shade = 0.7 + seededRandom(seed + ring * 100 + i + 20) * 0.3;
+
+            ctx.fillStyle = `rgba(${Math.floor(55 * shade)}, ${Math.floor(115 * shade)}, ${Math.floor(60 * shade)}, 0.4)`;
+            ctx.beginPath();
+            ctx.ellipse(px, py, patchSize, patchSize * 0.7,
+                seededRandom(seed + ring * 100 + i + 30) * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Central grass tufts
+    for (let i = 0; i < 5; i++) {
+        const tx = cx + (seededRandom(seed + i * 23) - 0.5) * radius * 0.6;
+        const ty = cy + (seededRandom(seed + i * 23 + 1) - 0.5) * radius * 0.5;
+        const shade = 0.8 + seededRandom(seed + i * 23 + 2) * 0.2;
+
+        ctx.fillStyle = `rgba(${Math.floor(60 * shade)}, ${Math.floor(120 * shade)}, ${Math.floor(65 * shade)}, 0.35)`;
+        ctx.beginPath();
+        ctx.ellipse(tx, ty, size * 0.1, size * 0.06, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+/**
+ * Draw wild meadow with mixed vegetation
+ */
+function drawWildMeadow(cx, cy, s, seed) {
+    // Scattered wild grass clumps
+    const clumpCount = 4 + (seed % 3);
+    for (let i = 0; i < clumpCount; i++) {
+        const clumpX = cx + (seededRandom(seed + i * 31) - 0.5) * s * 1.4;
+        const clumpY = cy + (seededRandom(seed + i * 31 + 1) - 0.5) * s * 1.1;
+
+        // Draw 3-5 grass blades per clump
+        const bladeCount = 3 + (Math.floor(seededRandom(seed + i * 31 + 2) * 3));
+        for (let j = 0; j < bladeCount; j++) {
+            const bx = clumpX + (seededRandom(seed + i * 31 + j * 5) - 0.5) * s * 0.15;
+            const by = clumpY;
+            const height = s * (0.2 + seededRandom(seed + i * 31 + j * 5 + 1) * 0.2);
+            const lean = (seededRandom(seed + i * 31 + j * 5 + 2) - 0.5) * s * 0.12;
+
+            const shade = 0.7 + seededRandom(seed + i * 31 + j * 5 + 3) * 0.3;
+            ctx.strokeStyle = `rgba(${Math.floor(50 * shade)}, ${Math.floor(105 * shade)}, ${Math.floor(55 * shade)}, 0.85)`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.quadraticCurveTo(bx + lean * 0.5, by - height * 0.6, bx + lean, by - height);
+            ctx.stroke();
+        }
+    }
+
+    // Occasional small wildflowers
+    if (seededRandom(seed + 500) > 0.4) {
+        const flowerCount = 2 + Math.floor(seededRandom(seed + 501) * 3);
+        const flowerColors = ['#ffeb99', '#ffd4e5', '#d4f0ff', '#e5d4ff'];
+        for (let i = 0; i < flowerCount; i++) {
+            const fx = cx + (seededRandom(seed + 600 + i) - 0.5) * s * 1.2;
+            const fy = cy + (seededRandom(seed + 601 + i) - 0.5) * s;
+            const fSize = 2 + seededRandom(seed + 602 + i) * 1.5;
+
+            ctx.fillStyle = flowerColors[Math.floor(seededRandom(seed + 603 + i) * flowerColors.length)];
+            ctx.beginPath();
+            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+}
+
+/**
+ * Draw grass blades for texture - enhanced density
  */
 function drawGrassBlades(cx, cy, s, seed) {
-    const bladeCount = 5 + (seed % 4);
+    const bladeCount = 12 + (seed % 6);  // More blades for denser coverage
     for (let i = 0; i < bladeCount; i++) {
-        const bx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.4;
-        const by = cy + (seededRandom(seed + i * 7 + 3) - 0.5) * s * 1.2;
-        const height = s * (0.15 + seededRandom(seed + i * 7 + 1) * 0.2);
-        const lean = (seededRandom(seed + i * 7 + 2) - 0.5) * s * 0.15;
+        const bx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.6;
+        const by = cy + (seededRandom(seed + i * 7 + 3) - 0.5) * s * 1.4;
+        const height = s * (0.18 + seededRandom(seed + i * 7 + 1) * 0.22);
+        const lean = (seededRandom(seed + i * 7 + 2) - 0.5) * s * 0.18;
 
-        const shade = 0.7 + seededRandom(seed + i * 7 + 4) * 0.3;
-        ctx.strokeStyle = `rgba(${Math.floor(45 * shade)}, ${Math.floor(95 * shade)}, ${Math.floor(50 * shade)}, 0.8)`;
-        ctx.lineWidth = 1 + seededRandom(seed + i * 7 + 5) * 0.5;
+        const shade = 0.65 + seededRandom(seed + i * 7 + 4) * 0.35;
+        ctx.strokeStyle = `rgba(${Math.floor(48 * shade)}, ${Math.floor(100 * shade)}, ${Math.floor(52 * shade)}, 0.85)`;
+        ctx.lineWidth = 1.2 + seededRandom(seed + i * 7 + 5) * 0.6;
         ctx.beginPath();
         ctx.moveTo(bx, by);
         ctx.quadraticCurveTo(bx + lean * 0.5, by - height * 0.6, bx + lean, by - height);
@@ -798,6 +908,100 @@ function drawSwampDetails(cx, cy, s, seed) {
 }
 
 /**
+ * Draw a ghost indicator showing where a cloaked unit last attacked from
+ */
+function drawGhostIndicator(cx, cy, ghost) {
+    const size = state.hexSize * 0.65;
+    const now = Date.now();
+    const age = now - ghost.timestamp;
+    const fadeStart = ghost.fadeStart || (ghost.timestamp + 3000);
+
+    // Calculate opacity - full for 3 seconds, then fade out over 5 seconds
+    let alpha = 1;
+    if (now > fadeStart) {
+        const fadeProgress = (now - fadeStart) / 5000;
+        alpha = Math.max(0, 1 - fadeProgress);
+    }
+
+    // Pulse effect
+    const pulse = 0.8 + Math.sin(now / 200) * 0.2;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.6 * pulse;
+
+    // Ghost silhouette - ethereal glow effect
+    const playerColor = CONFIG.PLAYER_COLORS[ghost.player];
+
+    // Outer glow ring - pulsing warning
+    ctx.strokeStyle = `rgba(239, 68, 68, ${alpha * 0.8})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, size + 15 + Math.sin(now / 150) * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Inner danger zone
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size + 10);
+    gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
+    gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
+    gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size + 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ghost silhouette shape
+    ctx.globalAlpha = alpha * 0.4 * pulse;
+    ctx.fillStyle = playerColor;
+
+    // Draw ghostly human shape
+    // Head
+    ctx.beginPath();
+    ctx.arc(cx, cy - size * 0.5, size * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.3, cy - size * 0.2);
+    ctx.lineTo(cx + size * 0.3, cy - size * 0.2);
+    ctx.lineTo(cx + size * 0.25, cy + size * 0.3);
+    ctx.lineTo(cx - size * 0.25, cy + size * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Arms
+    ctx.lineWidth = size * 0.12;
+    ctx.strokeStyle = playerColor;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - size * 0.3, cy - size * 0.1);
+    ctx.lineTo(cx - size * 0.5, cy + size * 0.1);
+    ctx.moveTo(cx + size * 0.3, cy - size * 0.1);
+    ctx.lineTo(cx + size * 0.5, cy + size * 0.1);
+    ctx.stroke();
+
+    // Warning icon
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.font = `bold ${Math.round(size * 0.5)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = '#fca5a5';
+    ctx.fillText('👻', cx, cy - size - 15);
+    ctx.shadowBlur = 0;
+
+    // "Letzter Angriff" text
+    ctx.globalAlpha = alpha * 0.7;
+    ctx.font = `bold ${Math.round(size * 0.22)}px sans-serif`;
+    ctx.fillStyle = '#fca5a5';
+    ctx.fillText('LETZTER ANGRIFF', cx, cy + size + 20);
+
+    ctx.restore();
+}
+
+/**
  * Draw a human unit with equipment
  */
 function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
@@ -1110,6 +1314,39 @@ export function render() {
                 drawPowerup(sx, sy, powerup, state.hexSize);
             }
         }
+
+        // Highlight reachable hexes for movement - always visible when unit selected
+        if (state.selectedAction === 'move' && reachableHexes.size > 0) {
+            const hexKey = `${hex.q},${hex.r}`;
+            const pathData = reachableHexes.get(hexKey);
+            if (pathData && fogLevel === 'visible' && !hex.unit) {
+                // Draw movement range highlight
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.2)';  // Yellow tint for reachable
+                drawHex(sx, sy, state.hexSize * 0.9);
+
+                // Draw border to make it clearer
+                ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize * 0.9);
+                ctx.stroke();
+
+                // Show AP cost in corner for each reachable hex
+                const cost = pathData.cost;
+                if (cost > 0) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(sx + state.hexSize * 0.35, sy - state.hexSize * 0.35, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = cost <= currentUnit.ap ? '#fbbf24' : '#ef4444';
+                    ctx.font = `bold ${Math.round(state.hexSize * 0.2)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(cost, sx + state.hexSize * 0.35, sy - state.hexSize * 0.35);
+                }
+            }
+        }
     });
 
     // Draw path preview - show full path with color coding (yellow=reachable, red=too far)
@@ -1284,6 +1521,15 @@ export function render() {
         ctx.setLineDash([]);
         ctx.restore();
     }
+
+    // Draw ghost indicators for cloaked enemy attacks
+    const ghosts = getVisibleGhosts();
+    ghosts.forEach(ghost => {
+        const pos = hexToPixel(ghost.q, ghost.r, state.hexSize);
+        const sx = state.offsetX + pos.x;
+        const sy = state.offsetY + pos.y;
+        drawGhostIndicator(sx, sy, ghost);
+    });
 
     // Draw units (sorted by y position for proper layering)
     const visibleUnits = state.units
