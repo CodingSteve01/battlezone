@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>Shadow Tactics - Rundenbasierter Stealth Shooter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --primary: #00ff88;
+            --primary-dark: #00cc6a;
+            --secondary: #ff4444;
+            --warning: #ffaa00;
+            --bg-dark: #0a0a0f;
+            --bg-medium: #12121a;
+            --bg-light: #1a1a25;
+            --text: #e0e0e0;
+            --text-dim: #888;
+        }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        /* ========== SCREENS ========== */
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 100;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* ========== MAIN MENU ========== */
+        #menu-screen {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0f1a15 100%);
+        }
+
+        .menu-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2rem, 8vw, 4rem);
+            color: var(--primary);
+            text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .menu-subtitle {
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+            color: var(--text-dim);
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .menu-container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .menu-section {
+            background: var(--bg-medium);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+
+        .menu-section h3 {
+            color: var(--primary);
+            font-size: 1rem;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .player-count {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .player-count-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid var(--primary);
+            background: transparent;
+            color: var(--primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .player-count-btn.selected {
+            background: var(--primary);
+            color: var(--bg-dark);
+        }
+
+        .map-size-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .map-size-slider input {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 8px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .map-size-slider input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .map-size-label {
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+
+        .game-mode-select {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .game-mode-btn {
+            padding: 15px;
+            background: var(--bg-light);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+
+        .game-mode-btn.selected {
+            border-color: var(--primary);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .game-mode-btn .mode-name {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .game-mode-btn .mode-desc {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        .start-btn {
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            border-radius: 15px;
+            color: var(--bg-dark);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 0 5px 30px rgba(0, 255, 136, 0.4);
+            transition: all 0.3s;
+        }
+
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 40px rgba(0, 255, 136, 0.6);
+        }
+
+        /* ========== TURN TRANSITION ========== */
+        #turn-screen {
+            background: var(--bg-dark);
+        }
+
+        .turn-content {
+            text-align: center;
+        }
+
+        .turn-player-indicator {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .turn-text {
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            margin-bottom: 10px;
+        }
+
+        .turn-instruction {
+            color: var(--text-dim);
+            font-size: 1rem;
+            margin-bottom: 40px;
+        }
+
+        .ready-btn {
+            padding: 20px 60px;
+            background: transparent;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            color: var(--primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .ready-btn:hover {
+            background: var(--primary);
+            color: var(--bg-dark);
+        }
+
+        /* ========== GAME SCREEN ========== */
+        #game-screen {
+            padding: 0;
+            flex-direction: column;
+        }
+
+        /* Top HUD */
+        .game-hud-top {
+            width: 100%;
+            padding: 10px 15px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .current-player-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .player-color-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+
+        .player-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+        }
+
+        .turn-counter {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+        }
+
+        .action-points {
+            display: flex;
+            gap: 5px;
+        }
+
+        .ap-dot {
+            width: 15px;
+            height: 15px;
+            background: var(--primary);
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+
+        .ap-dot.used {
+            background: var(--bg-light);
+            opacity: 0.3;
+        }
+
+        /* Game Canvas Area */
+        .game-canvas-container {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #game-canvas {
+            display: block;
+            touch-action: none;
+        }
+
+        /* Bottom Action Bar */
+        .action-bar {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.8) 100%);
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            z-index: 10;
+        }
+
+        .action-btn {
+            width: 60px;
+            height: 60px;
+            background: var(--bg-medium);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 0.7rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .action-btn.selected {
+            border-color: var(--primary);
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--primary);
+        }
+
+        .action-btn.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .action-btn .ap-cost {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background: var(--warning);
+            border-radius: 50%;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--bg-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .end-turn-btn {
+            padding: 15px 30px;
+            background: var(--secondary);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        /* Player Stats Panel */
+        .stats-panel {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            padding: 10px;
+            min-width: 150px;
+            z-index: 10;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 0.85rem;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+        }
+
+        .stat-value {
+            font-weight: 700;
+        }
+
+        .health-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .health-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--secondary) 0%, var(--primary) 100%);
+            transition: width 0.3s;
+        }
+
+        /* Info Messages */
+        .game-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 20px 40px;
+            border-radius: 15px;
+            border: 2px solid var(--primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2rem;
+            text-align: center;
+            z-index: 20;
+            animation: fadeInOut 2s forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* ========== GAME OVER ========== */
+        #gameover-screen {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1a0a0a 100%);
+        }
+
+        .winner-announcement {
+            text-align: center;
+        }
+
+        .winner-crown {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        .winner-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2rem, 6vw, 3rem);
+            margin-bottom: 10px;
+        }
+
+        .game-stats {
+            background: var(--bg-medium);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 30px 0;
+            min-width: 280px;
+        }
+
+        .game-stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--bg-light);
+        }
+
+        .game-stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .rematch-btn {
+            padding: 15px 40px;
+            background: var(--primary);
+            border: none;
+            border-radius: 10px;
+            color: var(--bg-dark);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        .menu-btn {
+            padding: 15px 40px;
+            background: transparent;
+            border: 2px solid var(--text-dim);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        /* ========== RULES MODAL ========== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-medium);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid var(--primary);
+        }
+
+        .modal-content h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+
+        .modal-content h4 {
+            color: var(--primary);
+            margin: 15px 0 10px;
+        }
+
+        .modal-content p, .modal-content li {
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .modal-content ul {
+            padding-left: 20px;
+        }
+
+        .close-modal-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            border: none;
+            border-radius: 10px;
+            color: var(--bg-dark);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .rules-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-medium);
+            border: 1px solid var(--primary);
+            border-radius: 50%;
+            color: var(--primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- MAIN MENU -->
+    <screen id="menu-screen" class="screen active">
+        <h1 class="menu-title">SHADOW TACTICS</h1>
+        <p class="menu-subtitle">Rundenbasierter Stealth Shooter</p>
+
+        <div class="menu-container">
+            <div class="menu-section">
+                <h3>Spieleranzahl</h3>
+                <div class="player-count">
+                    <button class="player-count-btn selected" data-count="2">2</button>
+                    <button class="player-count-btn" data-count="3">3</button>
+                    <button class="player-count-btn" data-count="4">4</button>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <h3>Kartengröße</h3>
+                <div class="map-size-slider">
+                    <input type="range" id="map-size" min="10" max="20" value="12">
+                </div>
+                <p class="map-size-label">Mittel (12x12)</p>
+            </div>
+
+            <div class="menu-section">
+                <h3>Spielmodus</h3>
+                <div class="game-mode-select">
+                    <button class="game-mode-btn selected" data-mode="deathmatch">
+                        <div class="mode-name">Deathmatch</div>
+                        <div class="mode-desc">Letzter Überlebender gewinnt</div>
+                    </button>
+                    <button class="game-mode-btn" data-mode="capture">
+                        <div class="mode-name">Flagge erobern</div>
+                        <div class="mode-desc">Erreiche das Ziel als Erster</div>
+                    </button>
+                    <button class="game-mode-btn" data-mode="assassination">
+                        <div class="mode-name">Assassination</div>
+                        <div class="mode-desc">Eliminiere dein zugewiesenes Ziel</div>
+                    </button>
+                </div>
+            </div>
+
+            <button class="start-btn" id="start-game-btn">Spiel Starten</button>
+        </div>
+
+        <button class="rules-btn" id="show-rules-btn">?</button>
+    </screen>
+
+    <!-- TURN TRANSITION -->
+    <screen id="turn-screen" class="screen">
+        <div class="turn-content">
+            <div class="turn-player-indicator" id="turn-player-indicator">1</div>
+            <h2 class="turn-text">Spieler <span id="turn-player-num">1</span> ist dran</h2>
+            <p class="turn-instruction">Stelle sicher, dass kein anderer Spieler auf den Bildschirm schaut!</p>
+            <button class="ready-btn" id="ready-btn">Bereit</button>
+        </div>
+    </screen>
+
+    <!-- GAME SCREEN -->
+    <screen id="game-screen" class="screen">
+        <div class="game-hud-top">
+            <div class="current-player-badge">
+                <div class="player-color-dot" id="current-player-dot"></div>
+                <span class="player-name" id="current-player-name">Spieler 1</span>
+            </div>
+            <div class="turn-counter">
+                Runde <span id="round-number">1</span> / <span id="max-rounds">20</span>
+            </div>
+            <div class="action-points" id="action-points">
+                <!-- AP dots injected here -->
+            </div>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stat-row">
+                <span class="stat-label">Leben</span>
+                <span class="stat-value" id="stat-health">100</span>
+            </div>
+            <div class="health-bar">
+                <div class="health-bar-fill" id="health-bar-fill" style="width: 100%"></div>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Munition</span>
+                <span class="stat-value" id="stat-ammo">6/6</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Granaten</span>
+                <span class="stat-value" id="stat-grenades">2</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Sichtweite</span>
+                <span class="stat-value" id="stat-vision">4</span>
+            </div>
+        </div>
+
+        <div class="game-canvas-container">
+            <canvas id="game-canvas"></canvas>
+        </div>
+
+        <div class="action-bar">
+            <button class="action-btn selected" data-action="move" title="Bewegen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+                <span>Bewegen</span>
+                <span class="ap-cost">1</span>
+            </button>
+            <button class="action-btn" data-action="shoot" title="Schießen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                </svg>
+                <span>Schießen</span>
+                <span class="ap-cost">2</span>
+            </button>
+            <button class="action-btn" data-action="grenade" title="Granate">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="14" r="6"/>
+                    <path d="M12 8V4M9 4h6"/>
+                </svg>
+                <span>Granate</span>
+                <span class="ap-cost">2</span>
+            </button>
+            <button class="action-btn" data-action="sneak" title="Schleichen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 12c-3 0-5 2-5 5h10c0-3-2-5-5-5z"/>
+                    <circle cx="12" cy="7" r="3"/>
+                </svg>
+                <span>Schleichen</span>
+                <span class="ap-cost">0</span>
+            </button>
+            <button class="action-btn" data-action="reload" title="Nachladen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                </svg>
+                <span>Nachladen</span>
+                <span class="ap-cost">1</span>
+            </button>
+            <button class="end-turn-btn" id="end-turn-btn">Zug beenden</button>
+        </div>
+    </screen>
+
+    <!-- GAME OVER -->
+    <screen id="gameover-screen" class="screen">
+        <div class="winner-announcement">
+            <div class="winner-crown">👑</div>
+            <h1 class="winner-text" id="winner-text">Spieler 1 gewinnt!</h1>
+            <div class="game-stats">
+                <div class="game-stat-row">
+                    <span>Runden gespielt</span>
+                    <span id="stat-rounds">15</span>
+                </div>
+                <div class="game-stat-row">
+                    <span>Kills gesamt</span>
+                    <span id="stat-kills">3</span>
+                </div>
+            </div>
+            <button class="rematch-btn" id="rematch-btn">Revanche</button>
+            <button class="menu-btn" id="back-to-menu-btn">Hauptmenü</button>
+        </div>
+    </screen>
+
+    <!-- RULES MODAL -->
+    <div class="modal-overlay" id="rules-modal">
+        <div class="modal-content">
+            <h2>Spielregeln</h2>
+
+            <h4>Ziel</h4>
+            <p>Eliminiere deine Gegner durch taktisches Vorgehen. Nutze Deckung und Schleichen um unentdeckt zu bleiben.</p>
+
+            <h4>Aktionspunkte (AP)</h4>
+            <ul>
+                <li><strong>Bewegen:</strong> 1 AP pro Feld</li>
+                <li><strong>Schießen:</strong> 2 AP</li>
+                <li><strong>Granate werfen:</strong> 2 AP</li>
+                <li><strong>Nachladen:</strong> 1 AP</li>
+                <li><strong>Schleichmodus:</strong> 0 AP (umschalten)</li>
+            </ul>
+
+            <h4>Sichtbarkeit</h4>
+            <p>Du siehst nur Gegner in deinem Sichtfeld. Büsche und Wände blockieren die Sicht. Im Schleichmodus bist du schwerer zu entdecken.</p>
+
+            <h4>Stealth</h4>
+            <ul>
+                <li>Schüsse verraten deine Position</li>
+                <li>Schleichen reduziert deine Sichtweite für Gegner</li>
+                <li>Büsche bieten Deckung</li>
+            </ul>
+
+            <h4>Hot-Seat Multiplayer</h4>
+            <p>Alle Spieler spielen am selben Gerät. Zwischen den Zügen wird der Bildschirm verdeckt, damit der nächste Spieler nicht sieht, wo du bist!</p>
+
+            <button class="close-modal-btn" id="close-rules-btn">Verstanden</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== GAME CONFIGURATION ====================
+        const CONFIG = {
+            TILE_SIZE: 60,
+            AP_PER_TURN: 4,
+            MAX_HEALTH: 100,
+            MAX_AMMO: 6,
+            MAX_GRENADES: 3,
+            BASE_VISION: 4,
+            SNEAK_VISION_REDUCTION: 2,
+            BULLET_DAMAGE: 35,
+            GRENADE_DAMAGE: 60,
+            GRENADE_RADIUS: 2,
+            SHOT_NOISE_RADIUS: 5,
+            MAX_ROUNDS: 20,
+            PLAYER_COLORS: ['#00ff88', '#ff4444', '#4488ff', '#ffaa00']
+        };
+
+        // ==================== TILE TYPES ====================
+        const TILES = {
+            GRASS: {
+                name: 'grass',
+                walkable: true,
+                blocksSight: false,
+                cover: false,
+                color: '#2d5a2d',
+                variants: ['#2d5a2d', '#3d6a3d', '#2a522a']
+            },
+            BUSH: {
+                name: 'bush',
+                walkable: true,
+                blocksSight: true,
+                cover: true,
+                color: '#1a4a1a',
+                variants: ['#1a4a1a', '#1d4d1d', '#174717']
+            },
+            WALL: {
+                name: 'wall',
+                walkable: false,
+                blocksSight: true,
+                cover: false,
+                color: '#4a4a5a',
+                variants: ['#4a4a5a', '#555565', '#3f3f4f']
+            },
+            WATER: {
+                name: 'water',
+                walkable: false,
+                blocksSight: false,
+                cover: false,
+                color: '#2244aa',
+                variants: ['#2244aa', '#2848b0', '#1e3fa0']
+            },
+            FLOOR: {
+                name: 'floor',
+                walkable: true,
+                blocksSight: false,
+                cover: false,
+                color: '#5a5a4a',
+                variants: ['#5a5a4a', '#636352', '#515142']
+            },
+            CRATE: {
+                name: 'crate',
+                walkable: false,
+                blocksSight: true,
+                cover: true,
+                color: '#8b6914',
+                variants: ['#8b6914', '#9a7518', '#7c5e12']
+            },
+            FLAG: {
+                name: 'flag',
+                walkable: true,
+                blocksSight: false,
+                cover: false,
+                color: '#ff00ff',
+                variants: ['#ff00ff']
+            }
+        };
+
+        // ==================== GAME STATE ====================
+        let gameState = {
+            screen: 'menu',
+            settings: {
+                playerCount: 2,
+                mapSize: 12,
+                gameMode: 'deathmatch'
+            },
+            map: [],
+            players: [],
+            currentPlayerIndex: 0,
+            round: 1,
+            selectedAction: 'move',
+            isSneaking: false,
+            gameOver: false,
+            winner: null,
+            flagPosition: null,
+            noiseMarkers: [],
+            lastKnownPositions: {} // For tracking where players were last seen
+        };
+
+        // ==================== DOM ELEMENTS ====================
+        const screens = {
+            menu: document.getElementById('menu-screen'),
+            turn: document.getElementById('turn-screen'),
+            game: document.getElementById('game-screen'),
+            gameover: document.getElementById('gameover-screen')
+        };
+
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+            gameState.screen = screenName;
+        }
+
+        function distance(x1, y1, x2, y2) {
+            return Math.abs(x1 - x2) + Math.abs(y1 - y2); // Manhattan distance
+        }
+
+        function euclideanDistance(x1, y1, x2, y2) {
+            return Math.sqrt((x2-x1)**2 + (y2-y1)**2);
+        }
+
+        function hasLineOfSight(x1, y1, x2, y2) {
+            // Bresenham's line algorithm to check for obstacles
+            const dx = Math.abs(x2 - x1);
+            const dy = Math.abs(y2 - y1);
+            const sx = x1 < x2 ? 1 : -1;
+            const sy = y1 < y2 ? 1 : -1;
+            let err = dx - dy;
+            let x = x1, y = y1;
+
+            while (true) {
+                if (x === x2 && y === y2) return true;
+
+                // Check if this tile blocks sight (skip start and end)
+                if (!(x === x1 && y === y1) && !(x === x2 && y === y2)) {
+                    const tile = getTile(x, y);
+                    if (tile && tile.blocksSight) return false;
+                }
+
+                const e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; x += sx; }
+                if (e2 < dx) { err += dx; y += sy; }
+            }
+        }
+
+        function getTile(x, y) {
+            if (x < 0 || y < 0 || x >= gameState.settings.mapSize || y >= gameState.settings.mapSize) {
+                return TILES.WALL;
+            }
+            return gameState.map[y][x];
+        }
+
+        function isValidMove(x, y) {
+            const tile = getTile(x, y);
+            if (!tile || !tile.walkable) return false;
+
+            // Check if another player is there
+            for (const p of gameState.players) {
+                if (p.alive && p.x === x && p.y === y) return false;
+            }
+            return true;
+        }
+
+        // ==================== MAP GENERATION ====================
+        function generateMap() {
+            const size = gameState.settings.mapSize;
+            const map = [];
+
+            // Fill with grass
+            for (let y = 0; y < size; y++) {
+                map[y] = [];
+                for (let x = 0; x < size; x++) {
+                    map[y][x] = {...TILES.GRASS};
+                    map[y][x].variant = Math.floor(Math.random() * 3);
+                }
+            }
+
+            // Add walls around edges
+            for (let i = 0; i < size; i++) {
+                map[0][i] = {...TILES.WALL};
+                map[size-1][i] = {...TILES.WALL};
+                map[i][0] = {...TILES.WALL};
+                map[i][size-1] = {...TILES.WALL};
+            }
+
+            // Add random structures
+            const numStructures = Math.floor(size * size * 0.05);
+            for (let i = 0; i < numStructures; i++) {
+                const sx = Math.floor(Math.random() * (size - 4)) + 2;
+                const sy = Math.floor(Math.random() * (size - 4)) + 2;
+                const sw = Math.floor(Math.random() * 3) + 2;
+                const sh = Math.floor(Math.random() * 3) + 2;
+
+                // Create building outline
+                for (let y = sy; y < sy + sh && y < size - 1; y++) {
+                    for (let x = sx; x < sx + sw && x < size - 1; x++) {
+                        if (y === sy || y === sy + sh - 1 || x === sx || x === sx + sw - 1) {
+                            map[y][x] = {...TILES.WALL};
+                        } else {
+                            map[y][x] = {...TILES.FLOOR};
+                        }
+                    }
+                }
+                // Add door
+                const doorSide = Math.floor(Math.random() * 4);
+                if (doorSide === 0 && sy + 1 < size) map[sy][sx + Math.floor(sw/2)] = {...TILES.FLOOR};
+                if (doorSide === 1 && sy + sh - 1 < size) map[sy + sh - 1][sx + Math.floor(sw/2)] = {...TILES.FLOOR};
+                if (doorSide === 2 && sx + 1 < size) map[sy + Math.floor(sh/2)][sx] = {...TILES.FLOOR};
+                if (doorSide === 3 && sx + sw - 1 < size) map[sy + Math.floor(sh/2)][sx + sw - 1] = {...TILES.FLOOR};
+            }
+
+            // Add bushes for cover
+            const numBushes = Math.floor(size * size * 0.1);
+            for (let i = 0; i < numBushes; i++) {
+                const x = Math.floor(Math.random() * (size - 2)) + 1;
+                const y = Math.floor(Math.random() * (size - 2)) + 1;
+                if (map[y][x].name === 'grass') {
+                    map[y][x] = {...TILES.BUSH};
+                    map[y][x].variant = Math.floor(Math.random() * 3);
+                }
+            }
+
+            // Add crates
+            const numCrates = Math.floor(size * size * 0.03);
+            for (let i = 0; i < numCrates; i++) {
+                const x = Math.floor(Math.random() * (size - 2)) + 1;
+                const y = Math.floor(Math.random() * (size - 2)) + 1;
+                if (map[y][x].name === 'grass' || map[y][x].name === 'floor') {
+                    map[y][x] = {...TILES.CRATE};
+                }
+            }
+
+            // Add water pond
+            const pondX = Math.floor(Math.random() * (size - 6)) + 3;
+            const pondY = Math.floor(Math.random() * (size - 6)) + 3;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (pondY + dy > 0 && pondY + dy < size - 1 &&
+                        pondX + dx > 0 && pondX + dx < size - 1) {
+                        map[pondY + dy][pondX + dx] = {...TILES.WATER};
+                    }
+                }
+            }
+
+            // Add flag for capture mode
+            if (gameState.settings.gameMode === 'capture') {
+                const flagX = Math.floor(size / 2);
+                const flagY = Math.floor(size / 2);
+                map[flagY][flagX] = {...TILES.FLAG};
+                gameState.flagPosition = {x: flagX, y: flagY};
+            }
+
+            return map;
+        }
+
+        // ==================== PLAYER FUNCTIONS ====================
+        function createPlayers() {
+            const size = gameState.settings.mapSize;
+            const count = gameState.settings.playerCount;
+            const players = [];
+
+            // Spawn positions in corners
+            const spawnPositions = [
+                {x: 2, y: 2},
+                {x: size - 3, y: size - 3},
+                {x: 2, y: size - 3},
+                {x: size - 3, y: 2}
+            ];
+
+            for (let i = 0; i < count; i++) {
+                const spawn = spawnPositions[i];
+                // Make sure spawn is walkable
+                gameState.map[spawn.y][spawn.x] = {...TILES.GRASS};
+
+                players.push({
+                    id: i,
+                    x: spawn.x,
+                    y: spawn.y,
+                    health: CONFIG.MAX_HEALTH,
+                    ammo: CONFIG.MAX_AMMO,
+                    grenades: CONFIG.MAX_GRENADES,
+                    ap: CONFIG.AP_PER_TURN,
+                    alive: true,
+                    sneaking: false,
+                    color: CONFIG.PLAYER_COLORS[i],
+                    kills: 0,
+                    // For assassination mode
+                    target: null
+                });
+            }
+
+            // Assign targets for assassination mode
+            if (gameState.settings.gameMode === 'assassination') {
+                for (let i = 0; i < players.length; i++) {
+                    players[i].target = (i + 1) % players.length;
+                }
+            }
+
+            return players;
+        }
+
+        function getCurrentPlayer() {
+            return gameState.players[gameState.currentPlayerIndex];
+        }
+
+        // ==================== VISIBILITY SYSTEM ====================
+        function getVisibleTiles(player) {
+            const visible = new Set();
+            const vision = player.sneaking ? CONFIG.BASE_VISION - CONFIG.SNEAK_VISION_REDUCTION : CONFIG.BASE_VISION;
+
+            for (let dy = -vision; dy <= vision; dy++) {
+                for (let dx = -vision; dx <= vision; dx++) {
+                    const tx = player.x + dx;
+                    const ty = player.y + dy;
+
+                    if (tx < 0 || ty < 0 || tx >= gameState.settings.mapSize || ty >= gameState.settings.mapSize) continue;
+
+                    const dist = euclideanDistance(player.x, player.y, tx, ty);
+                    if (dist <= vision && hasLineOfSight(player.x, player.y, tx, ty)) {
+                        visible.add(`${tx},${ty}`);
+                    }
+                }
+            }
+
+            return visible;
+        }
+
+        function canSeePlayer(viewer, target) {
+            if (!target.alive) return false;
+
+            const viewerVision = viewer.sneaking ? CONFIG.BASE_VISION - CONFIG.SNEAK_VISION_REDUCTION : CONFIG.BASE_VISION;
+            const dist = euclideanDistance(viewer.x, viewer.y, target.x, target.y);
+
+            // Target in bush is harder to see
+            const targetTile = getTile(target.x, target.y);
+            const effectiveVision = (targetTile.cover && target.sneaking) ? viewerVision - 2 : viewerVision;
+
+            if (dist > effectiveVision) return false;
+
+            return hasLineOfSight(viewer.x, viewer.y, target.x, target.y);
+        }
+
+        // ==================== ACTIONS ====================
+        function movePlayer(player, targetX, targetY) {
+            if (player.ap < 1) return false;
+
+            const dist = distance(player.x, player.y, targetX, targetY);
+            if (dist !== 1) return false;
+
+            if (!isValidMove(targetX, targetY)) return false;
+
+            player.x = targetX;
+            player.y = targetY;
+            player.ap -= 1;
+
+            updateUI();
+            render();
+            return true;
+        }
+
+        function shoot(player, targetX, targetY) {
+            if (player.ap < 2 || player.ammo < 1) return false;
+
+            const dist = euclideanDistance(player.x, player.y, targetX, targetY);
+            if (dist > CONFIG.BASE_VISION) return false;
+
+            if (!hasLineOfSight(player.x, player.y, targetX, targetY)) {
+                showMessage('Kein Sichtfeld!');
+                return false;
+            }
+
+            player.ammo -= 1;
+            player.ap -= 2;
+
+            // Create noise marker (reveals shooter position)
+            gameState.noiseMarkers.push({
+                x: player.x,
+                y: player.y,
+                radius: CONFIG.SHOT_NOISE_RADIUS,
+                turnsLeft: 1,
+                type: 'shot'
+            });
+
+            // Check if hit a player
+            for (const target of gameState.players) {
+                if (target.id === player.id || !target.alive) continue;
+                if (target.x === targetX && target.y === targetY) {
+                    target.health -= CONFIG.BULLET_DAMAGE;
+                    showMessage(`Treffer! ${CONFIG.BULLET_DAMAGE} Schaden`);
+
+                    if (target.health <= 0) {
+                        target.alive = false;
+                        player.kills++;
+                        showMessage(`Spieler ${target.id + 1} eliminiert!`);
+                        checkWinCondition();
+                    }
+                    break;
+                }
+            }
+
+            updateUI();
+            render();
+            return true;
+        }
+
+        function throwGrenade(player, targetX, targetY) {
+            if (player.ap < 2 || player.grenades < 1) return false;
+
+            const dist = euclideanDistance(player.x, player.y, targetX, targetY);
+            if (dist > CONFIG.BASE_VISION) return false;
+
+            player.grenades -= 1;
+            player.ap -= 2;
+
+            // Create noise marker
+            gameState.noiseMarkers.push({
+                x: targetX,
+                y: targetY,
+                radius: CONFIG.GRENADE_RADIUS + 2,
+                turnsLeft: 1,
+                type: 'explosion'
+            });
+
+            // Deal damage in radius
+            for (const target of gameState.players) {
+                if (!target.alive) continue;
+                const targetDist = euclideanDistance(target.x, target.y, targetX, targetY);
+                if (targetDist <= CONFIG.GRENADE_RADIUS) {
+                    const damage = Math.floor(CONFIG.GRENADE_DAMAGE * (1 - targetDist / (CONFIG.GRENADE_RADIUS + 1)));
+                    target.health -= damage;
+
+                    if (target.health <= 0) {
+                        target.alive = false;
+                        if (target.id !== player.id) player.kills++;
+                        showMessage(`Spieler ${target.id + 1} eliminiert!`);
+                    }
+                }
+            }
+
+            checkWinCondition();
+            updateUI();
+            render();
+            return true;
+        }
+
+        function reload(player) {
+            if (player.ap < 1) return false;
+            if (player.ammo >= CONFIG.MAX_AMMO) return false;
+
+            player.ammo = CONFIG.MAX_AMMO;
+            player.ap -= 1;
+
+            updateUI();
+            return true;
+        }
+
+        function toggleSneak(player) {
+            player.sneaking = !player.sneaking;
+            gameState.isSneaking = player.sneaking;
+            updateUI();
+            render();
+        }
+
+        // ==================== TURN MANAGEMENT ====================
+        function startTurn() {
+            const player = getCurrentPlayer();
+
+            // Skip dead players
+            if (!player.alive) {
+                nextPlayer();
+                return;
+            }
+
+            player.ap = CONFIG.AP_PER_TURN;
+            gameState.selectedAction = 'move';
+
+            // Update turn screen
+            document.getElementById('turn-player-num').textContent = player.id + 1;
+            const indicator = document.getElementById('turn-player-indicator');
+            indicator.textContent = player.id + 1;
+            indicator.style.backgroundColor = player.color;
+            indicator.style.color = '#000';
+
+            showScreen('turn');
+        }
+
+        function endTurn() {
+            // Reduce noise markers
+            gameState.noiseMarkers = gameState.noiseMarkers.filter(n => {
+                n.turnsLeft--;
+                return n.turnsLeft > 0;
+            });
+
+            nextPlayer();
+        }
+
+        function nextPlayer() {
+            gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+
+            // Check if we've gone through all players (new round)
+            if (gameState.currentPlayerIndex === 0) {
+                gameState.round++;
+                if (gameState.round > CONFIG.MAX_ROUNDS) {
+                    endGame(null); // Draw
+                    return;
+                }
+            }
+
+            // Skip dead players
+            const alivePlayers = gameState.players.filter(p => p.alive);
+            if (alivePlayers.length <= 1) {
+                checkWinCondition();
+                return;
+            }
+
+            if (!getCurrentPlayer().alive) {
+                nextPlayer();
+                return;
+            }
+
+            startTurn();
+        }
+
+        function checkWinCondition() {
+            const alivePlayers = gameState.players.filter(p => p.alive);
+
+            if (gameState.settings.gameMode === 'deathmatch') {
+                if (alivePlayers.length === 1) {
+                    endGame(alivePlayers[0]);
+                } else if (alivePlayers.length === 0) {
+                    endGame(null);
+                }
+            } else if (gameState.settings.gameMode === 'capture') {
+                const player = getCurrentPlayer();
+                if (player.x === gameState.flagPosition.x && player.y === gameState.flagPosition.y) {
+                    endGame(player);
+                }
+            } else if (gameState.settings.gameMode === 'assassination') {
+                const player = getCurrentPlayer();
+                const target = gameState.players[player.target];
+                if (!target.alive && player.alive) {
+                    endGame(player);
+                }
+            }
+        }
+
+        function endGame(winner) {
+            gameState.gameOver = true;
+            gameState.winner = winner;
+
+            // Update game over screen
+            if (winner) {
+                document.getElementById('winner-text').textContent = `Spieler ${winner.id + 1} gewinnt!`;
+                document.getElementById('winner-text').style.color = winner.color;
+            } else {
+                document.getElementById('winner-text').textContent = 'Unentschieden!';
+                document.getElementById('winner-text').style.color = '#fff';
+            }
+
+            document.getElementById('stat-rounds').textContent = gameState.round;
+            const totalKills = gameState.players.reduce((sum, p) => sum + p.kills, 0);
+            document.getElementById('stat-kills').textContent = totalKills;
+
+            showScreen('gameover');
+        }
+
+        // ==================== UI FUNCTIONS ====================
+        function updateUI() {
+            const player = getCurrentPlayer();
+            if (!player) return;
+
+            // Player badge
+            document.getElementById('current-player-dot').style.backgroundColor = player.color;
+            document.getElementById('current-player-name').textContent = `Spieler ${player.id + 1}`;
+
+            // Round counter
+            document.getElementById('round-number').textContent = gameState.round;
+            document.getElementById('max-rounds').textContent = CONFIG.MAX_ROUNDS;
+
+            // Action points
+            const apContainer = document.getElementById('action-points');
+            apContainer.innerHTML = '';
+            for (let i = 0; i < CONFIG.AP_PER_TURN; i++) {
+                const dot = document.createElement('div');
+                dot.className = `ap-dot ${i >= player.ap ? 'used' : ''}`;
+                apContainer.appendChild(dot);
+            }
+
+            // Stats
+            document.getElementById('stat-health').textContent = player.health;
+            document.getElementById('health-bar-fill').style.width = `${player.health}%`;
+            document.getElementById('stat-ammo').textContent = `${player.ammo}/${CONFIG.MAX_AMMO}`;
+            document.getElementById('stat-grenades').textContent = player.grenades;
+            document.getElementById('stat-vision').textContent = player.sneaking ?
+                CONFIG.BASE_VISION - CONFIG.SNEAK_VISION_REDUCTION : CONFIG.BASE_VISION;
+
+            // Action buttons
+            document.querySelectorAll('.action-btn').forEach(btn => {
+                btn.classList.remove('selected', 'disabled');
+                const action = btn.dataset.action;
+
+                if (action === gameState.selectedAction) {
+                    btn.classList.add('selected');
+                }
+
+                // Check if action is available
+                if (action === 'move' && player.ap < 1) btn.classList.add('disabled');
+                if (action === 'shoot' && (player.ap < 2 || player.ammo < 1)) btn.classList.add('disabled');
+                if (action === 'grenade' && (player.ap < 2 || player.grenades < 1)) btn.classList.add('disabled');
+                if (action === 'reload' && (player.ap < 1 || player.ammo >= CONFIG.MAX_AMMO)) btn.classList.add('disabled');
+
+                if (action === 'sneak') {
+                    if (player.sneaking) {
+                        btn.classList.add('selected');
+                    }
+                }
+            });
+        }
+
+        function showMessage(text) {
+            const existing = document.querySelector('.game-message');
+            if (existing) existing.remove();
+
+            const msg = document.createElement('div');
+            msg.className = 'game-message';
+            msg.textContent = text;
+            screens.game.appendChild(msg);
+
+            setTimeout(() => msg.remove(), 2000);
+        }
+
+        // ==================== RENDERING ====================
+        function resizeCanvas() {
+            const container = document.querySelector('.game-canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+
+        function render() {
+            const player = getCurrentPlayer();
+            if (!player) return;
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const mapSize = gameState.settings.mapSize;
+            const tileSize = Math.min(
+                (canvas.width - 20) / mapSize,
+                (canvas.height - 20) / mapSize
+            );
+
+            const offsetX = (canvas.width - mapSize * tileSize) / 2;
+            const offsetY = (canvas.height - mapSize * tileSize) / 2;
+
+            const visibleTiles = getVisibleTiles(player);
+
+            // Draw tiles
+            for (let y = 0; y < mapSize; y++) {
+                for (let x = 0; x < mapSize; x++) {
+                    const tile = gameState.map[y][x];
+                    const isVisible = visibleTiles.has(`${x},${y}`);
+                    const px = offsetX + x * tileSize;
+                    const py = offsetY + y * tileSize;
+
+                    // Tile background
+                    if (isVisible) {
+                        ctx.fillStyle = tile.variants ? tile.variants[tile.variant || 0] : tile.color;
+                    } else {
+                        ctx.fillStyle = '#111';
+                    }
+                    ctx.fillRect(px, py, tileSize, tileSize);
+
+                    // Tile border
+                    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                    ctx.strokeRect(px, py, tileSize, tileSize);
+
+                    // Special tile decorations
+                    if (isVisible) {
+                        if (tile.name === 'bush') {
+                            ctx.fillStyle = '#0a3a0a';
+                            ctx.beginPath();
+                            ctx.arc(px + tileSize/2, py + tileSize/2, tileSize/3, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.fillStyle = '#1a5a1a';
+                            ctx.beginPath();
+                            ctx.arc(px + tileSize/3, py + tileSize/3, tileSize/4, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else if (tile.name === 'crate') {
+                            ctx.strokeStyle = '#5a4010';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(px + 4, py + 4, tileSize - 8, tileSize - 8);
+                            ctx.beginPath();
+                            ctx.moveTo(px + 4, py + tileSize/2);
+                            ctx.lineTo(px + tileSize - 4, py + tileSize/2);
+                            ctx.stroke();
+                        } else if (tile.name === 'water') {
+                            // Animated water effect
+                            const time = Date.now() / 1000;
+                            ctx.fillStyle = `rgba(100, 150, 255, ${0.3 + Math.sin(time + x + y) * 0.1})`;
+                            ctx.fillRect(px, py, tileSize, tileSize);
+                        } else if (tile.name === 'flag') {
+                            ctx.fillStyle = '#ff00ff';
+                            ctx.beginPath();
+                            ctx.moveTo(px + tileSize/4, py + tileSize * 0.8);
+                            ctx.lineTo(px + tileSize/4, py + tileSize * 0.2);
+                            ctx.lineTo(px + tileSize * 0.75, py + tileSize * 0.35);
+                            ctx.lineTo(px + tileSize/4, py + tileSize * 0.5);
+                            ctx.fill();
+                        }
+                    }
+                }
+            }
+
+            // Draw noise markers
+            for (const noise of gameState.noiseMarkers) {
+                const px = offsetX + noise.x * tileSize + tileSize/2;
+                const py = offsetY + noise.y * tileSize + tileSize/2;
+                const radius = noise.radius * tileSize;
+
+                ctx.strokeStyle = noise.type === 'explosion' ? 'rgba(255, 100, 0, 0.5)' : 'rgba(255, 255, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.arc(px, py, radius, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Draw movement range for move action
+            if (gameState.selectedAction === 'move' && player.ap > 0) {
+                const neighbors = [
+                    {dx: -1, dy: 0}, {dx: 1, dy: 0},
+                    {dx: 0, dy: -1}, {dx: 0, dy: 1}
+                ];
+
+                for (const n of neighbors) {
+                    const nx = player.x + n.dx;
+                    const ny = player.y + n.dy;
+                    if (isValidMove(nx, ny)) {
+                        const px = offsetX + nx * tileSize;
+                        const py = offsetY + ny * tileSize;
+                        ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+                        ctx.fillRect(px, py, tileSize, tileSize);
+                    }
+                }
+            }
+
+            // Draw attack range for shoot/grenade
+            if ((gameState.selectedAction === 'shoot' || gameState.selectedAction === 'grenade') && player.ap >= 2) {
+                const range = CONFIG.BASE_VISION;
+                ctx.strokeStyle = gameState.selectedAction === 'shoot' ?
+                    'rgba(255, 68, 68, 0.3)' : 'rgba(255, 170, 0, 0.3)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(
+                    offsetX + player.x * tileSize + tileSize/2,
+                    offsetY + player.y * tileSize + tileSize/2,
+                    range * tileSize,
+                    0, Math.PI * 2
+                );
+                ctx.stroke();
+            }
+
+            // Draw other players (if visible)
+            for (const p of gameState.players) {
+                if (p.id === player.id || !p.alive) continue;
+
+                // Check visibility
+                const canSee = canSeePlayer(player, p);
+
+                // Also check if in noise radius
+                let inNoiseRadius = false;
+                for (const noise of gameState.noiseMarkers) {
+                    if (euclideanDistance(p.x, p.y, noise.x, noise.y) <= noise.radius) {
+                        inNoiseRadius = true;
+                        break;
+                    }
+                }
+
+                if (canSee || inNoiseRadius) {
+                    const px = offsetX + p.x * tileSize + tileSize/2;
+                    const py = offsetY + p.y * tileSize + tileSize/2;
+
+                    // Player circle
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(px, py, tileSize/3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Player number
+                    ctx.fillStyle = '#000';
+                    ctx.font = `bold ${tileSize/3}px Orbitron`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(p.id + 1, px, py);
+
+                    // Sneak indicator
+                    if (p.sneaking) {
+                        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([3, 3]);
+                        ctx.beginPath();
+                        ctx.arc(px, py, tileSize/2.5, 0, Math.PI * 2);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+
+                    // Store last known position
+                    gameState.lastKnownPositions[p.id] = {x: p.x, y: p.y};
+                }
+            }
+
+            // Draw current player
+            const ppx = offsetX + player.x * tileSize + tileSize/2;
+            const ppy = offsetY + player.y * tileSize + tileSize/2;
+
+            // Player glow
+            ctx.shadowColor = player.color;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(ppx, ppy, tileSize/3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Player number
+            ctx.fillStyle = '#000';
+            ctx.font = `bold ${tileSize/3}px Orbitron`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.id + 1, ppx, ppy);
+
+            // Direction indicator / sneak indicator
+            if (player.sneaking) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.arc(ppx, ppy, tileSize/2.5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Target marker for assassination mode
+            if (gameState.settings.gameMode === 'assassination' && player.target !== null) {
+                const target = gameState.players[player.target];
+                if (target.alive && canSeePlayer(player, target)) {
+                    const tx = offsetX + target.x * tileSize + tileSize/2;
+                    const ty = offsetY + target.y * tileSize + tileSize/2;
+
+                    ctx.strokeStyle = '#ff0000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(tx - tileSize/2, ty - tileSize/2);
+                    ctx.lineTo(tx + tileSize/2, ty + tileSize/2);
+                    ctx.moveTo(tx + tileSize/2, ty - tileSize/2);
+                    ctx.lineTo(tx - tileSize/2, ty + tileSize/2);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // ==================== INPUT HANDLING ====================
+        function setupInputHandlers() {
+            // Canvas click/touch
+            canvas.addEventListener('click', handleCanvasClick);
+            canvas.addEventListener('touchend', handleCanvasTouch);
+
+            // Prevent scrolling
+            canvas.addEventListener('touchmove', e => e.preventDefault(), {passive: false});
+
+            // Action buttons
+            document.querySelectorAll('.action-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const action = btn.dataset.action;
+                    if (action === 'sneak') {
+                        toggleSneak(getCurrentPlayer());
+                    } else if (action === 'reload') {
+                        reload(getCurrentPlayer());
+                    } else {
+                        gameState.selectedAction = action;
+                        updateUI();
+                        render();
+                    }
+                });
+            });
+
+            // End turn button
+            document.getElementById('end-turn-btn').addEventListener('click', endTurn);
+
+            // Ready button
+            document.getElementById('ready-btn').addEventListener('click', () => {
+                showScreen('game');
+                updateUI();
+                render();
+            });
+
+            // Menu buttons
+            document.querySelectorAll('.player-count-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.player-count-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    gameState.settings.playerCount = parseInt(btn.dataset.count);
+                });
+            });
+
+            document.querySelectorAll('.game-mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.game-mode-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    gameState.settings.gameMode = btn.dataset.mode;
+                });
+            });
+
+            const mapSizeSlider = document.getElementById('map-size');
+            mapSizeSlider.addEventListener('input', () => {
+                const size = parseInt(mapSizeSlider.value);
+                gameState.settings.mapSize = size;
+                const labels = {10: 'Klein', 12: 'Mittel', 15: 'Groß', 18: 'Sehr groß', 20: 'Riesig'};
+                let label = 'Mittel';
+                if (size <= 10) label = 'Klein';
+                else if (size <= 13) label = 'Mittel';
+                else if (size <= 16) label = 'Groß';
+                else label = 'Riesig';
+                document.querySelector('.map-size-label').textContent = `${label} (${size}x${size})`;
+            });
+
+            // Start game
+            document.getElementById('start-game-btn').addEventListener('click', startGame);
+
+            // Rematch & Menu
+            document.getElementById('rematch-btn').addEventListener('click', startGame);
+            document.getElementById('back-to-menu-btn').addEventListener('click', () => showScreen('menu'));
+
+            // Rules modal
+            document.getElementById('show-rules-btn').addEventListener('click', () => {
+                document.getElementById('rules-modal').classList.add('active');
+            });
+            document.getElementById('close-rules-btn').addEventListener('click', () => {
+                document.getElementById('rules-modal').classList.remove('active');
+            });
+
+            // Window resize
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                render();
+            });
+        }
+
+        function handleCanvasClick(e) {
+            handleInput(e.clientX, e.clientY);
+        }
+
+        function handleCanvasTouch(e) {
+            e.preventDefault();
+            if (e.changedTouches.length > 0) {
+                const touch = e.changedTouches[0];
+                handleInput(touch.clientX, touch.clientY);
+            }
+        }
+
+        function handleInput(clientX, clientY) {
+            const player = getCurrentPlayer();
+            if (!player || gameState.gameOver) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // Calculate tile position
+            const mapSize = gameState.settings.mapSize;
+            const tileSize = Math.min(
+                (canvas.width - 20) / mapSize,
+                (canvas.height - 20) / mapSize
+            );
+            const offsetX = (canvas.width - mapSize * tileSize) / 2;
+            const offsetY = (canvas.height - mapSize * tileSize) / 2;
+
+            const tileX = Math.floor((x - offsetX) / tileSize);
+            const tileY = Math.floor((y - offsetY) / tileSize);
+
+            if (tileX < 0 || tileY < 0 || tileX >= mapSize || tileY >= mapSize) return;
+
+            // Perform action based on selected action
+            if (gameState.selectedAction === 'move') {
+                if (movePlayer(player, tileX, tileY)) {
+                    checkWinCondition();
+                }
+            } else if (gameState.selectedAction === 'shoot') {
+                // Check if targeting an enemy
+                const target = gameState.players.find(p => p.id !== player.id && p.alive && p.x === tileX && p.y === tileY);
+                if (target && canSeePlayer(player, target)) {
+                    shoot(player, tileX, tileY);
+                } else if (hasLineOfSight(player.x, player.y, tileX, tileY)) {
+                    // Shoot at empty tile (miss or warning shot)
+                    shoot(player, tileX, tileY);
+                } else {
+                    showMessage('Kein gültiges Ziel!');
+                }
+            } else if (gameState.selectedAction === 'grenade') {
+                const dist = euclideanDistance(player.x, player.y, tileX, tileY);
+                if (dist <= CONFIG.BASE_VISION) {
+                    throwGrenade(player, tileX, tileY);
+                } else {
+                    showMessage('Zu weit!');
+                }
+            }
+        }
+
+        // ==================== GAME INITIALIZATION ====================
+        function startGame() {
+            // Reset game state
+            gameState.gameOver = false;
+            gameState.winner = null;
+            gameState.round = 1;
+            gameState.currentPlayerIndex = 0;
+            gameState.noiseMarkers = [];
+            gameState.lastKnownPositions = {};
+            gameState.selectedAction = 'move';
+            gameState.isSneaking = false;
+
+            // Generate map and players
+            gameState.map = generateMap();
+            gameState.players = createPlayers();
+
+            // Start first turn
+            startTurn();
+        }
+
+        // ==================== MAIN ====================
+        function init() {
+            resizeCanvas();
+            setupInputHandlers();
+            showScreen('menu');
+        }
+
+        // Start when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
