@@ -469,6 +469,16 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
             armorColor = '#3a4a3a';
             helmetColor = '#4a5a4a';
             break;
+        case 'sniper':
+            bodyColor = '#2a2a40';  // Dark blue-purple
+            armorColor = '#3a3a55';
+            helmetColor = '#4a4a65';
+            break;
+        case 'ninja':
+            bodyColor = '#1a1a1a';  // Very dark/black
+            armorColor = '#252525';
+            helmetColor = '#303030';
+            break;
         default:
             bodyColor = '#2a2a3a';
             armorColor = '#3a3a4a';
@@ -604,6 +614,78 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
             ctx.fillStyle = '#aaaaaa';
             ctx.beginPath();
             ctx.roundRect(16, -2, 14, 5, 2);
+            ctx.fill();
+            break;
+
+        case 'sniper':
+            // Long sniper rifle with scope
+            ctx.fillStyle = '#1a1a1a';
+            ctx.save();
+            ctx.rotate(-0.2);
+            ctx.fillRect(-30, -42, 4, 60);  // Long barrel
+            ctx.restore();
+            // Scope
+            ctx.fillStyle = '#3a3a55';
+            ctx.beginPath();
+            ctx.ellipse(-26, -38, 5, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // Scope lens (glowing)
+            ctx.fillStyle = '#6080ff';
+            ctx.beginPath();
+            ctx.arc(-26, -38, 3, 0, Math.PI * 2);
+            ctx.fill();
+            // Ghillie hood detail
+            ctx.fillStyle = '#3a4a3a';
+            ctx.beginPath();
+            ctx.arc(0, -35, 8, Math.PI, 2 * Math.PI);
+            ctx.fill();
+            // Camo stripes on armor
+            ctx.fillStyle = '#2a3a2a';
+            ctx.fillRect(-8, -8, 3, 12);
+            ctx.fillRect(5, -8, 3, 12);
+            break;
+
+        case 'ninja':
+            // Katana on back
+            ctx.fillStyle = '#1a1a1a';
+            ctx.save();
+            ctx.rotate(0.3);
+            ctx.fillRect(8, -48, 3, 45);  // Blade
+            ctx.restore();
+            // Katana handle
+            ctx.fillStyle = '#4a2020';
+            ctx.save();
+            ctx.rotate(0.3);
+            ctx.fillRect(8, -5, 3, 12);
+            ctx.restore();
+            // Katana guard
+            ctx.fillStyle = '#c0a040';
+            ctx.beginPath();
+            ctx.ellipse(15, -2, 4, 2, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            // Shuriken on belt
+            ctx.fillStyle = '#606060';
+            ctx.beginPath();
+            ctx.moveTo(-18, 4);
+            for (let i = 0; i < 4; i++) {
+                const angle = (Math.PI / 2) * i;
+                ctx.lineTo(-18 + Math.cos(angle) * 5, 4 + Math.sin(angle) * 5);
+                ctx.lineTo(-18 + Math.cos(angle + Math.PI / 4) * 2, 4 + Math.sin(angle + Math.PI / 4) * 2);
+            }
+            ctx.closePath();
+            ctx.fill();
+            // Mask detail (covering lower face)
+            ctx.fillStyle = '#151515';
+            ctx.beginPath();
+            ctx.arc(0, -24, 10, 0.2 * Math.PI, 0.8 * Math.PI);
+            ctx.fill();
+            // Glowing eyes
+            ctx.fillStyle = '#ff3030';
+            ctx.beginPath();
+            ctx.ellipse(-4, -30, 2, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(4, -30, 2, 1.5, 0, 0, Math.PI * 2);
             ctx.fill();
             break;
     }

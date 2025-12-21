@@ -87,13 +87,14 @@ function showTeamSelectForPlayer(playerIndex) {
     // Generate unit cards
     generateUnitCards();
 
-    // Reset preview
+    // Update card selection state and preview
+    updateCardSelectionState();
     updateTeamPreview();
 
-    // Disable confirm button
+    // Enable/disable confirm button based on current selection
     const confirmBtn = document.getElementById('team-confirm-btn');
     if (confirmBtn) {
-        confirmBtn.disabled = true;
+        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
     }
 
     showScreen('team-select');
@@ -347,6 +348,23 @@ function init() {
     const teamConfirmBtn = document.getElementById('team-confirm-btn');
     if (teamConfirmBtn) {
         teamConfirmBtn.onclick = confirmTeamSelection;
+    }
+
+    // Setup team back button
+    const teamBackBtn = document.getElementById('team-back-btn');
+    if (teamBackBtn) {
+        teamBackBtn.onclick = () => {
+            // Go back to previous player or main menu
+            if (currentTeamSelectPlayer > 0) {
+                // Go back to previous player's selection
+                currentTeamSelectPlayer--;
+                currentPlayerSelection = [...state.teamSelections[currentTeamSelectPlayer]];
+                showTeamSelectForPlayer(currentTeamSelectPlayer);
+            } else {
+                // Go back to main menu
+                showScreen('menu');
+            }
+        };
     }
 
     // Setup rematch button
