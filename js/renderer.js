@@ -164,14 +164,14 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
 /**
  * Draw enhanced terrain pattern on a hex
  */
-function drawTerrainDetails(cx, cy, size, type) {
+function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     const s = size * 0.4;
     ctx.save();
 
     switch (type) {
         case 'grass':
-            // Random seed based on position for consistent decoration
-            const seed = Math.abs((cx * 7 + cy * 13) % 100);
+            // Random seed based on hex coordinates for consistent decoration
+            const seed = Math.abs((hexQ * 7 + hexR * 13 + hexQ * hexR) % 100);
 
             if (seed < 30) {
                 // Small bush
@@ -657,7 +657,7 @@ export function render() {
 
         // Draw terrain details (only if visible)
         if (fogLevel === 'visible' && !isReachable) {
-            drawTerrainDetails(sx, sy, state.hexSize, hex.type);
+            drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
         }
 
         // Movement overlay and cost display
