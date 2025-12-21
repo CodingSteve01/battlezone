@@ -196,6 +196,7 @@ html, body {
     background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.05) 100%);
     opacity: 0;
     transition: opacity 0.3s;
+    pointer-events: none;
 }
 
 .option-btn:hover::before {

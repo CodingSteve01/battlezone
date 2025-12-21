@@ -292,7 +292,10 @@ function init() {
 
     // Setup game mode buttons
     document.querySelectorAll('[data-mode]').forEach(btn => {
-        btn.onclick = () => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
             document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
 
@@ -309,7 +312,13 @@ function init() {
                     playersSection.classList.remove('hidden');
                 }
             }
-        };
+        });
+
+        // Also handle touch events for mobile
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
     });
 
     // Setup help toggle
