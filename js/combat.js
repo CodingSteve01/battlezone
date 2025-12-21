@@ -1,6 +1,6 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator } from './state.js';
 import { UNIT_CLASSES } from './config.js';
 import { hexDistance, hexToPixel } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -51,6 +51,16 @@ export function calculateHitChance(attacker, defender) {
  * Execute an attack
  */
 export function executeAttack(attacker, defender) {
+    // Track ghost indicator for stealth units before revealing
+    // This shows enemy where the attack came from
+    const wasStealthed = attacker.cloaked ||
+        ((attacker.class === 'sniper' || attacker.class === 'ninja') && attacker.stealthActive !== false);
+
+    if (wasStealthed && attacker.player !== defender.player) {
+        // Add ghost indicator at attack position
+        addGhostIndicator(attacker);
+    }
+
     // Remove cloak when attacking
     if (attacker.cloaked) {
         attacker.cloaked = false;

@@ -393,6 +393,7 @@ function handleMoveClick(unit, hex) {
 
     // Only move if we can reach at least one hex
     if (reachablePath.length < 2 || totalCost === 0) {
+        showToast('❌ Ziel nicht erreichbar!', 'warning');
         return;
     }
 
@@ -436,6 +437,9 @@ function handleAttackClick(unit, hex) {
                 render();
                 updateUI();
             }
+        } else {
+            // Target is out of range
+            showToast('❌ Ziel außer Reichweite!', 'warning');
         }
     } else {
         state.targetedUnit = null;
@@ -480,7 +484,24 @@ function setupMenuButtons() {
 
     const endTurnBtn = document.getElementById('end-turn-btn');
     if (endTurnBtn) {
-        endTurnBtn.onclick = endTurn;
+        let endTurnPending = false;
+        endTurnBtn.onclick = () => {
+            // Check if any unit still has AP
+            const playerUnits = state.units.filter(u => u.player === state.currentPlayer && u.alive);
+            const totalAP = playerUnits.reduce((sum, u) => sum + u.ap, 0);
+
+            if (totalAP > 0 && !endTurnPending) {
+                // First click: warn about remaining AP
+                endTurnPending = true;
+                showToast(`⚠️ Noch ${totalAP} AP übrig! Erneut tippen zum Beenden.`, 'warning');
+                // Reset after 3 seconds
+                setTimeout(() => { endTurnPending = false; }, 3000);
+            } else {
+                // Second click or no AP remaining: end turn
+                endTurnPending = false;
+                endTurn();
+            }
+        };
     }
 
     const menuBtn = document.getElementById('menu-btn');

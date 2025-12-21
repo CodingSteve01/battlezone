@@ -177,7 +177,13 @@ export function endGame(winner) {
 export function checkWinCondition() {
     const result = checkGameOver();
     if (result.gameOver) {
-        setTimeout(() => endGame(result.winner), 1200);
+        // Show announcement toast before game over screen
+        if (result.winner !== null) {
+            showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+        } else {
+            showToast('⚖️ UNENTSCHIEDEN!', 'special');
+        }
+        setTimeout(() => endGame(result.winner), 1500);
         return true;
     }
     return false;
