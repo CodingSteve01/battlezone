@@ -11,6 +11,7 @@ import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
+import { isAIPlayer, executeAITurn } from './ai.js';
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -22,8 +23,17 @@ let currentPlayerSelection = [];
 function startTeamSelection() {
     // Initialize team selections array
     state.teamSelections = [];
+    const numHumanPlayers = state.settings.singlePlayer ? 1 : state.settings.players;
+
     for (let i = 0; i < state.settings.players; i++) {
         state.teamSelections.push([]);
+    }
+
+    // In single player, auto-select AI teams
+    if (state.settings.singlePlayer) {
+        for (let i = 1; i < state.settings.players; i++) {
+            state.teamSelections[i] = generateAITeam();
+        }
     }
 
     currentTeamSelectPlayer = 0;
@@ -31,15 +41,35 @@ function startTeamSelection() {
 }
 
 /**
+ * Generate a random team for AI
+ */
+function generateAITeam() {
+    const classes = Object.keys(UNIT_CLASSES);
+    const team = [];
+    for (let i = 0; i < CONFIG.UNITS_PER_PLAYER; i++) {
+        const randomClass = classes[Math.floor(Math.random() * classes.length)];
+        team.push(randomClass);
+    }
+    return team;
+}
+
+/**
  * Show team selection screen for a specific player
  */
 function showTeamSelectForPlayer(playerIndex) {
+    // Skip AI players in single player mode
+    if (state.settings.singlePlayer && playerIndex > 0) {
+        startGameWithTeams();
+        return;
+    }
+
     currentTeamSelectPlayer = playerIndex;
     currentPlayerSelection = [];
 
     // Update header
     const badge = document.getElementById('team-select-badge');
     const playerNum = document.getElementById('team-select-player');
+    const hint = document.querySelector('.team-select-hint');
 
     if (badge) {
         badge.style.backgroundColor = CONFIG.PLAYER_COLORS[playerIndex];
@@ -47,6 +77,11 @@ function showTeamSelectForPlayer(playerIndex) {
     }
     if (playerNum) {
         playerNum.textContent = playerIndex + 1;
+    }
+    if (hint) {
+        hint.textContent = state.settings.singlePlayer
+            ? 'Wähle dein Team (3 Einheiten)'
+            : `Spieler ${playerIndex + 1}: Wähle dein Team`;
     }
 
     // Generate unit cards
@@ -176,10 +211,13 @@ function confirmTeamSelection() {
     state.teamSelections[currentTeamSelectPlayer] = [...currentPlayerSelection];
 
     // Move to next player or start game
-    if (currentTeamSelectPlayer < state.settings.players - 1) {
-        showTeamSelectForPlayer(currentTeamSelectPlayer + 1);
+    const nextPlayer = currentTeamSelectPlayer + 1;
+    const isNextAI = state.settings.singlePlayer && nextPlayer > 0;
+
+    if (nextPlayer < state.settings.players && !isNextAI) {
+        showTeamSelectForPlayer(nextPlayer);
     } else {
-        // All players selected, start game
+        // All human players selected, start game
         startGameWithTeams();
     }
 }
@@ -188,10 +226,12 @@ function confirmTeamSelection() {
  * Start a new game with selected teams
  */
 function startGameWithTeams() {
-    // Reset state (but keep teamSelections)
+    // Reset state (but keep teamSelections and singlePlayer setting)
     const savedSelections = [...state.teamSelections];
+    const singlePlayer = state.settings.singlePlayer;
     resetState();
     state.teamSelections = savedSelections;
+    state.settings.singlePlayer = singlePlayer;
 
     // Reset camera position
     state.cameraX = 0;
@@ -199,7 +239,7 @@ function startGameWithTeams() {
 
     // Generate map and units
     generateMap();
-    createUnits(); // Now uses state.teamSelections
+    createUnits();
 
     // Initialize progression for all units
     state.units.forEach(unit => initUnitProgression(unit));
@@ -221,10 +261,23 @@ function startGameWithTeams() {
 }
 
 /**
- * Start a new game (legacy - now goes through team selection)
+ * Start a new game
  */
 export function startGame() {
     startTeamSelection();
+}
+
+/**
+ * Check if we should trigger AI turn
+ */
+export function checkAITurn() {
+    if (isAIPlayer()) {
+        setTimeout(() => {
+            executeAITurn();
+        }, 500);
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -235,6 +288,38 @@ function init() {
     const startBtn = document.getElementById('start-btn');
     if (startBtn) {
         startBtn.onclick = startGame;
+    }
+
+    // Setup game mode buttons
+    document.querySelectorAll('[data-mode]').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            const mode = btn.dataset.mode;
+            state.settings.singlePlayer = (mode === 'single');
+
+            // Hide/show players section
+            const playersSection = document.getElementById('players-section');
+            if (playersSection) {
+                if (mode === 'single') {
+                    playersSection.classList.add('hidden');
+                    state.settings.players = 2; // AI opponent
+                } else {
+                    playersSection.classList.remove('hidden');
+                }
+            }
+        };
+    });
+
+    // Setup help toggle
+    const helpToggle = document.getElementById('help-toggle');
+    const helpPanel = document.getElementById('help-panel');
+    if (helpToggle && helpPanel) {
+        helpToggle.onclick = () => {
+            helpToggle.classList.toggle('active');
+            helpPanel.classList.toggle('show');
+        };
     }
 
     // Setup team confirm button

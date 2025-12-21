@@ -10,6 +10,7 @@ import { render } from './renderer.js';
 import { centerOnCurrentUnit } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
+import { isAIPlayer, executeAITurn } from './ai.js';
 
 /**
  * Start a player's turn
@@ -35,7 +36,21 @@ export function startTurn() {
     // Update fog of war
     updateVisibility();
 
-    // Show turn screen
+    // Check if this is an AI player
+    if (isAIPlayer()) {
+        // Skip turn screen for AI, go directly to game
+        showScreen(null);
+        updateUI();
+        render();
+
+        // Execute AI turn after short delay
+        setTimeout(() => {
+            executeAITurn();
+        }, 500);
+        return;
+    }
+
+    // Show turn screen for human players
     const turnBadge = document.getElementById('turn-badge');
     if (turnBadge) {
         turnBadge.style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
@@ -45,6 +60,17 @@ export function startTurn() {
     const turnNum = document.getElementById('turn-num');
     if (turnNum) {
         turnNum.textContent = state.currentPlayer + 1;
+    }
+
+    // In single player, skip the turn screen for player 1 after first turn
+    if (state.settings.singlePlayer && state.round > 1) {
+        showScreen(null);
+        updateUI();
+        render();
+        requestAnimationFrame(() => {
+            centerOnCurrentUnit();
+        });
+        return;
     }
 
     showScreen('turn-screen');
