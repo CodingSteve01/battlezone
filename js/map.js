@@ -38,30 +38,79 @@ export function generateMap() {
 }
 
 /**
- * Create a single hex with terrain
+ * Simple noise function for terrain generation
+ */
+function noise2D(x, y, seed = 0) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+/**
+ * Smooth noise using bilinear interpolation
+ */
+function smoothNoise(q, r, scale, seed) {
+    const x = q / scale;
+    const y = r / scale;
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const fx = x - x0;
+    const fy = y - y0;
+
+    const n00 = noise2D(x0, y0, seed);
+    const n10 = noise2D(x0 + 1, y0, seed);
+    const n01 = noise2D(x0, y0 + 1, seed);
+    const n11 = noise2D(x0 + 1, y0 + 1, seed);
+
+    const nx0 = n00 * (1 - fx) + n10 * fx;
+    const nx1 = n01 * (1 - fx) + n11 * fx;
+
+    return nx0 * (1 - fy) + nx1 * fy;
+}
+
+/**
+ * Create a single hex with terrain using noise-based biomes
  */
 function createHex(q, r, distFromCenter, radius) {
-    const rand = Math.random();
     const edgeFactor = distFromCenter / radius;
+
+    // Use multiple noise layers for different terrain features
+    const elevationNoise = smoothNoise(q, r, 4, 1) * 0.6 + smoothNoise(q, r, 8, 2) * 0.4;
+    const moistureNoise = smoothNoise(q, r, 5, 3) * 0.5 + smoothNoise(q, r, 10, 4) * 0.5;
+    const vegetationNoise = smoothNoise(q, r, 3, 5);
 
     let type = 'grass';
 
-    // More variety based on position
-    if (rand < 0.18) {
-        type = 'forest';  // More forests for cover
-    } else if (rand < 0.22) {
+    // Determine terrain based on noise values (biome system)
+    if (elevationNoise > 0.75) {
+        // High elevation = rocks/mountains
         type = 'rock';
-    } else if (rand < 0.26 && distFromCenter > 3) {
+    } else if (elevationNoise > 0.55) {
+        // Medium-high elevation = hills
+        type = 'hills';
+    } else if (elevationNoise < 0.2 && moistureNoise > 0.6 && distFromCenter > 2) {
+        // Low elevation + high moisture = water (lakes)
         type = 'water';
-    } else if (rand < 0.30) {
-        type = 'sand';
-    } else if (rand < 0.34 && distFromCenter > 2) {
+    } else if (elevationNoise < 0.3 && moistureNoise > 0.5 && distFromCenter > 1) {
+        // Low elevation + medium moisture = swamp (near water)
         type = 'swamp';
+    } else if (moistureNoise > 0.55 && vegetationNoise > 0.4) {
+        // High moisture + vegetation = forest
+        type = 'forest';
+    } else if (moistureNoise < 0.3 && elevationNoise < 0.4) {
+        // Low moisture + low elevation = sand
+        type = 'sand';
+    }
+    // Default: grass
+
+    // Add some randomness to prevent too uniform patterns
+    const rand = Math.random();
+    if (type === 'grass' && rand < 0.08) {
+        type = vegetationNoise > 0.5 ? 'forest' : 'hills';
     }
 
-    // Fewer rocks at edges to ensure connectivity
-    if (edgeFactor > 0.85 && Math.random() < 0.15) {
-        type = 'rock';
+    // Keep edges more passable
+    if (edgeFactor > 0.85 && !TERRAIN[type].walkable) {
+        type = 'grass';
     }
 
     const terrain = TERRAIN[type];
@@ -78,39 +127,69 @@ function createHex(q, r, distFromCenter, radius) {
 }
 
 /**
- * Get spawn positions for all players
+ * Shuffle array using Fisher-Yates algorithm
+ */
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+/**
+ * Get spawn positions for all players - randomized each game
  */
 export function getSpawnPositions() {
     const radius = CONFIG.MAP_SIZES[state.settings.size];
     const offset = CONFIG.SPAWN_OFFSET[state.settings.size];
 
-    // Spawn positions at corners/edges of the map
-    return [
-        // Player 1: West
+    // Define all possible spawn locations (6 directions for variety)
+    const allSpawnLocations = [
+        // West
         [
             { q: -offset, r: 0 },
             { q: -offset, r: 1 },
             { q: -offset + 1, r: 0 }
         ],
-        // Player 2: East
+        // East
         [
             { q: offset, r: 0 },
             { q: offset, r: -1 },
             { q: offset - 1, r: 0 }
         ],
-        // Player 3: North
+        // North-West
         [
-            { q: 0, r: -offset },
-            { q: 1, r: -offset },
-            { q: 0, r: -offset + 1 }
+            { q: -Math.floor(offset * 0.7), r: -Math.floor(offset * 0.7) },
+            { q: -Math.floor(offset * 0.7) + 1, r: -Math.floor(offset * 0.7) },
+            { q: -Math.floor(offset * 0.7), r: -Math.floor(offset * 0.7) + 1 }
         ],
-        // Player 4: South
+        // North-East
         [
-            { q: 0, r: offset },
-            { q: -1, r: offset },
-            { q: 0, r: offset - 1 }
+            { q: Math.floor(offset * 0.7), r: -offset },
+            { q: Math.floor(offset * 0.7) - 1, r: -offset + 1 },
+            { q: Math.floor(offset * 0.7), r: -offset + 1 }
+        ],
+        // South-West
+        [
+            { q: -Math.floor(offset * 0.7), r: offset },
+            { q: -Math.floor(offset * 0.7), r: offset - 1 },
+            { q: -Math.floor(offset * 0.7) + 1, r: offset - 1 }
+        ],
+        // South-East
+        [
+            { q: Math.floor(offset * 0.7), r: Math.floor(offset * 0.7) },
+            { q: Math.floor(offset * 0.7) - 1, r: Math.floor(offset * 0.7) },
+            { q: Math.floor(offset * 0.7), r: Math.floor(offset * 0.7) - 1 }
         ]
     ];
+
+    // Shuffle spawn locations for variety
+    const shuffled = shuffleArray(allSpawnLocations);
+
+    // Return only the number of spawns needed for active players
+    return shuffled.slice(0, 4);
 }
 
 /**

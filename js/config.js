@@ -43,6 +43,17 @@ export const TERRAIN = {
         moveCost: 2,
         name: 'Wald'
     },
+    hills: {
+        color: '#5a6a50',
+        colorLight: '#6a7a60',
+        colorDark: '#4a5a40',
+        walkable: true,
+        cover: false,
+        moveCost: 2,
+        name: 'Hügel',
+        rangeBonus: 1,      // +1 Reichweite für Angriffe
+        defenseBonus: 10    // +10% Trefferchance beim Verteidigen (Höhenvorteil)
+    },
     rock: {
         color: '#4a4a5a',
         colorLight: '#5a5a6a',

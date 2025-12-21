@@ -1,6 +1,6 @@
 // ===== UNIT SYSTEM =====
 
-import { CONFIG, UNIT_CLASSES } from './config.js';
+import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getHex, getPlayerUnits } from './state.js';
 import { getSpawnPositions } from './map.js';
 
@@ -54,10 +54,30 @@ export function createUnits() {
 }
 
 /**
+ * Get effective range for a unit (including terrain bonuses)
+ */
+export function getEffectiveRange(unit) {
+    let range = unit.range;
+
+    // Hills give +1 range (high ground advantage)
+    const unitHex = getHex(unit.q, unit.r);
+    if (unitHex && unitHex.type === 'hills') {
+        const terrain = TERRAIN[unitHex.type];
+        if (terrain && terrain.rangeBonus) {
+            range += terrain.rangeBonus;
+        }
+    }
+
+    return range;
+}
+
+/**
  * Get attackable enemies for a unit
  */
 export function getAttackableUnits(unit) {
     if (unit.ap < 1) return [];
+
+    const effectiveRange = getEffectiveRange(unit);
 
     return state.units.filter(target => {
         if (!target.alive || target.player === unit.player) return false;
@@ -67,7 +87,7 @@ export function getAttackableUnits(unit) {
         const dz = Math.abs((-target.q - target.r) - (-unit.q - unit.r));
         const dist = Math.max(dx, dy, dz);
 
-        return dist <= unit.range;
+        return dist <= effectiveRange;
     });
 }
 
