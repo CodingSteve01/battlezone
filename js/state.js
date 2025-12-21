@@ -41,7 +41,11 @@ export const state = {
 
     // Camera/Pan
     cameraX: 0,
-    cameraY: 0
+    cameraY: 0,
+
+    // Canvas dimensions
+    canvasWidth: 0,
+    canvasHeight: 0
 };
 
 /**

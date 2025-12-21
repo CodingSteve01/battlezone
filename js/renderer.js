@@ -6,8 +6,10 @@ import { hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
+import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 
 let canvas, ctx;
+let texturesInitialized = false;
 
 /**
  * Initialize renderer
@@ -15,6 +17,13 @@ let canvas, ctx;
 export function initRenderer() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
+
+    // Initialize textures once
+    if (!texturesInitialized) {
+        initTextures();
+        texturesInitialized = true;
+    }
+
     resizeCanvas();
 }
 
@@ -56,6 +65,10 @@ export function resizeCanvas() {
         return;
     }
 
+    // Store canvas dimensions
+    state.canvasWidth = rect.width;
+    state.canvasHeight = rect.height;
+
     // Set canvas resolution
     canvas.width = rect.width * window.devicePixelRatio;
     canvas.height = rect.height * window.devicePixelRatio;
@@ -74,9 +87,9 @@ export function resizeCanvas() {
 }
 
 /**
- * Draw a hexagon
+ * Draw a hexagon with optional texture
  */
-function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1) {
+function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, texture = null) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = Math.PI / 3 * i;
@@ -87,8 +100,29 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1) {
     }
     ctx.closePath();
 
-    ctx.fillStyle = fillColor;
-    ctx.fill();
+    // Fill with texture or color
+    if (texture) {
+        ctx.save();
+        ctx.clip();
+        const pattern = ctx.createPattern(texture, 'repeat');
+        ctx.fillStyle = pattern;
+        ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+        ctx.restore();
+
+        // Draw hex shape again for stroke
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * Math.cos(angle);
+            const py = cy + size * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+    } else {
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+    }
 
     if (strokeColor) {
         ctx.strokeStyle = strokeColor;
@@ -98,77 +132,113 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1) {
 }
 
 /**
- * Draw terrain pattern on a hex
+ * Draw enhanced terrain pattern on a hex
  */
-function drawTerrainPattern(cx, cy, size, type) {
+function drawTerrainDetails(cx, cy, size, type) {
     const s = size * 0.4;
     ctx.save();
 
     switch (type) {
         case 'forest':
-            // Multiple trees
-            ctx.fillStyle = '#0d3320';
-            // Tree 1
-            ctx.beginPath();
-            ctx.moveTo(cx - s * 0.3, cy - s * 0.6);
-            ctx.lineTo(cx - s * 0.6, cy + s * 0.2);
-            ctx.lineTo(cx, cy + s * 0.2);
-            ctx.closePath();
-            ctx.fill();
-            // Tree 2
-            ctx.beginPath();
-            ctx.moveTo(cx + s * 0.3, cy - s * 0.4);
-            ctx.lineTo(cx, cy + s * 0.4);
-            ctx.lineTo(cx + s * 0.6, cy + s * 0.4);
-            ctx.closePath();
-            ctx.fill();
+            // Multiple detailed trees
+            drawTree(cx - s * 0.5, cy - s * 0.3, s * 0.8);
+            drawTree(cx + s * 0.4, cy + s * 0.1, s * 0.6);
+            drawTree(cx - s * 0.1, cy + s * 0.4, s * 0.5);
             break;
 
         case 'rock':
-            ctx.fillStyle = '#6b6b7a';
+            // 3D rock formation
+            ctx.fillStyle = '#7a7a8a';
             ctx.beginPath();
-            ctx.ellipse(cx, cy, s * 0.8, s * 0.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy + s * 0.1, s * 0.9, s * 0.5, 0, 0, Math.PI * 2);
             ctx.fill();
+
             ctx.fillStyle = '#8a8a9a';
             ctx.beginPath();
-            ctx.ellipse(cx - s * 0.2, cy - s * 0.15, s * 0.35, s * 0.25, -0.3, 0, Math.PI * 2);
+            ctx.ellipse(cx - s * 0.2, cy - s * 0.15, s * 0.5, s * 0.35, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(cx - s * 0.3, cy - s * 0.25, s * 0.2, s * 0.15, -0.3, 0, Math.PI * 2);
             ctx.fill();
             break;
 
         case 'water':
-            ctx.strokeStyle = 'rgba(100, 180, 255, 0.5)';
+            // Animated-looking waves
+            ctx.strokeStyle = 'rgba(150, 210, 255, 0.5)';
             ctx.lineWidth = 2;
-            // Wave 1
+
+            for (let i = 0; i < 3; i++) {
+                const yOff = (i - 1) * s * 0.35;
+                ctx.beginPath();
+                ctx.moveTo(cx - s * 0.7, cy + yOff);
+                ctx.quadraticCurveTo(cx - s * 0.35, cy + yOff - s * 0.15, cx, cy + yOff);
+                ctx.quadraticCurveTo(cx + s * 0.35, cy + yOff + s * 0.15, cx + s * 0.7, cy + yOff);
+                ctx.stroke();
+            }
+
+            // Light sparkles
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.beginPath();
-            ctx.moveTo(cx - s * 0.6, cy - s * 0.1);
-            ctx.quadraticCurveTo(cx - s * 0.3, cy - s * 0.3, cx, cy - s * 0.1);
-            ctx.quadraticCurveTo(cx + s * 0.3, cy + s * 0.1, cx + s * 0.6, cy - s * 0.1);
-            ctx.stroke();
-            // Wave 2
+            ctx.arc(cx - s * 0.3, cy - s * 0.2, 2, 0, Math.PI * 2);
+            ctx.fill();
             ctx.beginPath();
-            ctx.moveTo(cx - s * 0.5, cy + s * 0.25);
-            ctx.quadraticCurveTo(cx, cy + s * 0.05, cx + s * 0.5, cy + s * 0.25);
-            ctx.stroke();
+            ctx.arc(cx + s * 0.4, cy + s * 0.1, 1.5, 0, Math.PI * 2);
+            ctx.fill();
             break;
 
         case 'sand':
-            ctx.fillStyle = 'rgba(160, 140, 100, 0.4)';
-            for (let i = 0; i < 6; i++) {
-                const dx = (Math.random() - 0.5) * s * 1.2;
-                const dy = (Math.random() - 0.5) * s * 1.2;
+            // Sand dune patterns
+            ctx.strokeStyle = 'rgba(180, 150, 100, 0.3)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 2; i++) {
                 ctx.beginPath();
-                ctx.arc(cx + dx, cy + dy, 2.5, 0, Math.PI * 2);
+                ctx.moveTo(cx - s * 0.8, cy + i * s * 0.4 - s * 0.2);
+                ctx.bezierCurveTo(
+                    cx - s * 0.3, cy + i * s * 0.4 - s * 0.4,
+                    cx + s * 0.3, cy + i * s * 0.4,
+                    cx + s * 0.8, cy + i * s * 0.4 - s * 0.2
+                );
+                ctx.stroke();
+            }
+
+            // Scattered pebbles
+            ctx.fillStyle = 'rgba(120, 100, 70, 0.5)';
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    cx + (Math.sin(i * 2.5) * s * 0.5),
+                    cy + (Math.cos(i * 2.5) * s * 0.4),
+                    1.5, 0, Math.PI * 2
+                );
                 ctx.fill();
             }
             break;
 
         case 'swamp':
-            ctx.fillStyle = 'rgba(60, 80, 50, 0.5)';
+            // Murky puddles
+            ctx.fillStyle = 'rgba(30, 50, 30, 0.5)';
             ctx.beginPath();
-            ctx.ellipse(cx, cy + s * 0.2, s * 0.6, s * 0.3, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy + s * 0.15, s * 0.6, s * 0.35, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = 'rgba(80, 100, 60, 0.6)';
-            ctx.lineWidth = 1;
+
+            // Bubbles
+            ctx.fillStyle = 'rgba(60, 80, 60, 0.6)';
+            ctx.beginPath();
+            ctx.arc(cx - s * 0.2, cy, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx + s * 0.3, cy + s * 0.1, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Dead vegetation
+            ctx.strokeStyle = 'rgba(80, 60, 40, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(cx + s * 0.4, cy + s * 0.3);
+            ctx.lineTo(cx + s * 0.35, cy - s * 0.2);
             ctx.stroke();
             break;
     }
@@ -177,77 +247,116 @@ function drawTerrainPattern(cx, cy, size, type) {
 }
 
 /**
- * Draw a unit
+ * Draw a simple tree
+ */
+function drawTree(x, y, size) {
+    // Trunk
+    ctx.fillStyle = '#3d2817';
+    ctx.fillRect(x - size * 0.1, y + size * 0.2, size * 0.2, size * 0.4);
+
+    // Foliage layers
+    const colors = ['#1a4d2e', '#0d3320', '#0a2618'];
+    for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        ctx.moveTo(x, y - size * 0.5 + i * size * 0.2);
+        ctx.lineTo(x - size * 0.4 + i * 0.05, y + size * 0.1 + i * size * 0.15);
+        ctx.lineTo(x + size * 0.4 - i * 0.05, y + size * 0.1 + i * size * 0.15);
+        ctx.closePath();
+        ctx.fill();
+    }
+}
+
+/**
+ * Draw a human unit with equipment
  */
 function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
-    const size = state.hexSize * 0.55;
+    const size = state.hexSize * 0.65;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
 
-    // Selection glow
+    // Selection glow effect
     if (isSelected) {
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 25;
+        ctx.shadowBlur = 20;
+
+        // Pulsing selection ring
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 8, 0, Math.PI * 2);
+        ctx.stroke();
     }
 
-    // Unit base circle
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
-    ctx.arc(cx, cy, size, 0, Math.PI * 2);
-
-    // Gradient fill
-    const gradient = ctx.createRadialGradient(cx - size * 0.3, cy - size * 0.3, 0, cx, cy, size);
-    gradient.addColorStop(0, lightenColor(playerColor, 40));
-    gradient.addColorStop(0.7, playerColor);
-    gradient.addColorStop(1, darkenColor(playerColor, 20));
-    ctx.fillStyle = gradient;
+    ctx.ellipse(cx, cy + size * 0.7, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Border
-    ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = isSelected ? 4 : 2;
-    ctx.stroke();
 
     ctx.shadowBlur = 0;
 
+    // Draw the human sprite
+    drawHumanSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, isSelected);
+
     // Player number badge
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = playerColor;
     ctx.beginPath();
-    ctx.arc(cx + size * 0.6, cy - size * 0.6, size * 0.35, 0, Math.PI * 2);
+    ctx.arc(cx + size * 0.5, cy - size * 0.6, size * 0.28, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(size * 0.4)}px sans-serif`;
+    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(unit.player + 1, cx + size * 0.6, cy - size * 0.6);
+    ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
 
-    // Class icon
-    ctx.font = `${Math.round(size * 1.0)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(unit.icon, cx, cy + size * 0.05);
-
-    // HP bar
+    // HP bar with gradient
     const hpPct = unit.currentHp / unit.maxHp;
-    const barWidth = size * 2;
-    const barHeight = 6;
-    const barY = cy + size + 10;
+    const barWidth = size * 1.6;
+    const barHeight = 8;
+    const barY = cy + size * 0.65;
 
     // Bar background
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2, barY, barWidth, barHeight, 3);
+    ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
     ctx.fill();
 
-    // Bar fill
-    let barColor = '#22c55e';
-    if (hpPct <= 0.5) barColor = '#eab308';
-    if (hpPct <= 0.25) barColor = '#ef4444';
+    // HP bar fill with gradient
+    let barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
+    if (hpPct > 0.5) {
+        barGradient.addColorStop(0, '#22c55e');
+        barGradient.addColorStop(1, '#16a34a');
+    } else if (hpPct > 0.25) {
+        barGradient.addColorStop(0, '#eab308');
+        barGradient.addColorStop(1, '#ca8a04');
+    } else {
+        barGradient.addColorStop(0, '#ef4444');
+        barGradient.addColorStop(1, '#dc2626');
+    }
 
-    ctx.fillStyle = barColor;
+    ctx.fillStyle = barGradient;
     ctx.beginPath();
     ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 3);
     ctx.fill();
+
+    // HP text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(barHeight * 0.9)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
+
+    // AP indicators below HP bar
+    if (isSelected) {
+        drawAPIndicator(ctx, cx, barY + barHeight + 16, unit.ap, CONFIG.AP_PER_TURN, 14);
+    }
 
     // Attackable indicator
     if (isAttackable && !isSelected) {
@@ -255,32 +364,48 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
         ctx.lineWidth = 3;
         ctx.setLineDash([8, 5]);
         ctx.beginPath();
-        ctx.arc(cx, cy, size + 12, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // "Target" icon
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.beginPath();
+        ctx.arc(cx, cy - size - 10, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText('!', cx, cy - size - 10);
     }
 
-    // Targeted crosshair
+    // Targeted crosshair animation
     if (isTargeted) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 3;
-        const crossSize = size + 20;
+        const crossSize = size + 25;
 
-        // Animated crosshair lines
+        // Crosshair lines
         ctx.beginPath();
         ctx.moveTo(cx - crossSize, cy);
-        ctx.lineTo(cx - size - 8, cy);
-        ctx.moveTo(cx + size + 8, cy);
+        ctx.lineTo(cx - size - 10, cy);
+        ctx.moveTo(cx + size + 10, cy);
         ctx.lineTo(cx + crossSize, cy);
         ctx.moveTo(cx, cy - crossSize);
-        ctx.lineTo(cx, cy - size - 8);
-        ctx.moveTo(cx, cy + size + 8);
+        ctx.lineTo(cx, cy - size - 10);
+        ctx.moveTo(cx, cy + size + 10);
         ctx.lineTo(cx, cy + crossSize);
         ctx.stroke();
 
-        // Outer ring
+        // Outer targeting ring
         ctx.beginPath();
         ctx.arc(cx, cy, crossSize, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner pulsing ring
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
         ctx.stroke();
     }
 
@@ -320,10 +445,10 @@ export function render() {
     const w = canvas.width / window.devicePixelRatio;
     const h = canvas.height / window.devicePixelRatio;
 
-    // Background
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, h);
-    bgGradient.addColorStop(0, '#1a1a2e');
-    bgGradient.addColorStop(1, '#0f0f1a');
+    // Background with gradient
+    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h));
+    bgGradient.addColorStop(0, '#1f1f35');
+    bgGradient.addColorStop(1, '#0a0a15');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, w, h);
 
@@ -335,15 +460,25 @@ export function render() {
         ? getAttackableUnits(currentUnit)
         : [];
 
+    // Get max move cost for path visualization
+    const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
+
     // Draw hexes
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
 
+        // Skip if off screen (with margin)
+        if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
+            sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+            return;
+        }
+
         const fogLevel = getFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
         let fillColor = terrain.color;
+        const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
 
         // Fog of war overlay
         if (fogLevel === 'hidden') {
@@ -352,69 +487,184 @@ export function render() {
             fillColor = darkenColor(terrain.color, 50);
         }
 
-        // Highlight reachable hexes
+        // Check if hex is reachable and get its cost
         const hexKey = `${hex.q},${hex.r}`;
-        const isReachable = reachableHexes.has(hexKey);
+        const reachableData = reachableHexes.get(hexKey);
+        const isReachable = !!reachableData;
 
-        if (isReachable && fogLevel === 'visible') {
-            fillColor = '#2d6a4f';
+        // Determine if this hex is within move range
+        let isWithinRange = false;
+        let pathCost = 0;
+        if (isReachable) {
+            pathCost = reachableData.cost;
+            isWithinRange = pathCost <= maxMoveCost;
         }
 
-        // Draw hex
-        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)';
-        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1);
+        // Color reachable hexes
+        if (isReachable && fogLevel === 'visible') {
+            if (isWithinRange) {
+                fillColor = '#2d6a4f'; // Green - can reach
+            } else {
+                fillColor = '#6a4f2d'; // Orange - beyond AP range
+            }
+        }
 
-        // Draw terrain pattern (only if visible)
+        // Draw hex with texture
+        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
+        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture);
+
+        // Draw terrain details (only if visible)
         if (fogLevel === 'visible' && !isReachable) {
-            drawTerrainPattern(sx, sy, state.hexSize, hex.type);
+            drawTerrainDetails(sx, sy, state.hexSize, hex.type);
         }
 
-        // Movement overlay and cost
+        // Movement overlay and cost display
         if (isReachable && fogLevel === 'visible') {
-            const data = reachableHexes.get(hexKey);
+            // Overlay color based on reachability
+            const overlayColor = isWithinRange
+                ? 'rgba(34, 197, 94, 0.3)'  // Green
+                : 'rgba(234, 179, 8, 0.25)'; // Yellow/orange for out of range
 
-            // Green overlay
-            drawHex(sx, sy, state.hexSize * 0.95, 'rgba(34, 197, 94, 0.25)');
+            drawHex(sx, sy, state.hexSize * 0.95, overlayColor);
 
-            // Move indicator dot
-            ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
+            // Move indicator with cost
+            const dotColor = isWithinRange ? 'rgba(34, 197, 94, 0.9)' : 'rgba(234, 179, 8, 0.9)';
+            ctx.fillStyle = dotColor;
             ctx.beginPath();
-            ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+            ctx.arc(sx, sy, 12, 0, Math.PI * 2);
             ctx.fill();
 
             // Cost number
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 12px sans-serif';
+            ctx.font = 'bold 11px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(data.cost, sx, sy);
+            ctx.fillText(pathCost, sx, sy);
         }
 
         // Cover indicator (forest)
-        if (hex.cover && !hex.unit && fogLevel === 'visible') {
+        if (hex.cover && !hex.unit && fogLevel === 'visible' && !isReachable) {
             ctx.fillStyle = 'rgba(139, 92, 246, 0.15)';
             drawHex(sx, sy, state.hexSize * 0.95, 'rgba(139, 92, 246, 0.15)');
+
+            // Shield icon for cover
+            ctx.fillStyle = 'rgba(139, 92, 246, 0.6)';
+            ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🛡', sx, sy);
         }
     });
 
-    // Draw path preview
-    if (state.currentPath && state.selectedAction === 'move') {
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.8)';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([10, 5]);
-        ctx.beginPath();
+    // Draw path preview with range visualization
+    if (state.currentPath && state.selectedAction === 'move' && currentUnit) {
+        const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
-        state.currentPath.forEach((point, index) => {
-            const pos = hexToPixel(point.q, point.r, state.hexSize);
-            const sx = state.offsetX + pos.x;
-            const sy = state.offsetY + pos.y;
-
-            if (index === 0) ctx.moveTo(sx, sy);
-            else ctx.lineTo(sx, sy);
+        // Calculate cumulative costs along path
+        let cumulativeCost = 0;
+        const pathWithCosts = state.currentPath.map((point, index) => {
+            if (index > 0) {
+                const hex = getHex(point.q, point.r);
+                if (hex) {
+                    cumulativeCost += TERRAIN[hex.type].moveCost;
+                }
+            }
+            return { ...point, totalCost: cumulativeCost };
         });
 
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Find where the path exceeds AP
+        let lastReachableIndex = pathWithCosts.length - 1;
+        for (let i = 1; i < pathWithCosts.length; i++) {
+            if (pathWithCosts[i].totalCost > maxCost) {
+                lastReachableIndex = i - 1;
+                break;
+            }
+        }
+
+        // Draw the reachable part of the path (green)
+        if (lastReachableIndex > 0) {
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+            ctx.lineWidth = 5;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+
+            for (let i = 0; i <= lastReachableIndex; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                const sx = state.offsetX + pos.x;
+                const sy = state.offsetY + pos.y;
+
+                if (i === 0) ctx.moveTo(sx, sy);
+                else ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+
+            // Draw dots at each step
+            for (let i = 0; i <= lastReachableIndex; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                const sx = state.offsetX + pos.x;
+                const sy = state.offsetY + pos.y;
+
+                ctx.fillStyle = i === lastReachableIndex ? '#22c55e' : 'rgba(34, 197, 94, 0.7)';
+                ctx.beginPath();
+                ctx.arc(sx, sy, i === lastReachableIndex ? 8 : 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Draw the unreachable part of the path (red/orange dashed)
+        if (lastReachableIndex < pathWithCosts.length - 1) {
+            ctx.strokeStyle = 'rgba(234, 179, 8, 0.6)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+
+            const startPoint = pathWithCosts[lastReachableIndex];
+            const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
+            ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
+
+            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw X marks on unreachable hexes
+            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
+                const point = pathWithCosts[i];
+                const pos = hexToPixel(point.q, point.r, state.hexSize);
+                const sx = state.offsetX + pos.x;
+                const sy = state.offsetY + pos.y;
+
+                ctx.strokeStyle = 'rgba(234, 179, 8, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw endpoint marker
+        const endPoint = pathWithCosts[pathWithCosts.length - 1];
+        const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
+        const endSx = state.offsetX + endPos.x;
+        const endSy = state.offsetY + endPos.y;
+        const isEndReachable = endPoint.totalCost <= maxCost;
+
+        ctx.fillStyle = isEndReachable ? '#22c55e' : '#eab308';
+        ctx.beginPath();
+        ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Flag icon at destination
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🚩', endSx, endSy - 1);
     }
 
     // Draw attack line
@@ -422,8 +672,17 @@ export function render() {
         const fromPos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
         const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r, state.hexSize);
 
+        // Gradient attack line
+        const gradient = ctx.createLinearGradient(
+            state.offsetX + fromPos.x, state.offsetY + fromPos.y,
+            state.offsetX + toPos.x, state.offsetY + toPos.y
+        );
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+
         ctx.save();
-        ctx.strokeStyle = '#ef4444';
+        ctx.strokeStyle = gradient;
         ctx.lineWidth = 4;
         ctx.setLineDash([12, 6]);
         ctx.beginPath();
@@ -434,13 +693,12 @@ export function render() {
         ctx.restore();
     }
 
-    // Draw units
-    state.units.forEach(unit => {
-        if (!unit.alive) return;
+    // Draw units (sorted by y position for proper layering)
+    const visibleUnits = state.units
+        .filter(unit => unit.alive && isUnitVisible(unit))
+        .sort((a, b) => a.r - b.r);
 
-        // Only draw visible units
-        if (!isUnitVisible(unit)) return;
-
+    visibleUnits.forEach(unit => {
         const pos = hexToPixel(unit.q, unit.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
@@ -459,12 +717,66 @@ export function render() {
         const sy = state.offsetY + pos.y;
         const rangeRadius = currentUnit.range * state.hexSize * 1.75;
 
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([10, 5]);
+        // Gradient range circle
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([15, 8]);
         ctx.beginPath();
         ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // Inner glow
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.2)';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(sx, sy, rangeRadius - 5, 0, Math.PI * 2);
+        ctx.stroke();
     }
+
+    // Draw scroll hint if map is larger than viewport
+    drawScrollHint(w, h);
+}
+
+/**
+ * Draw scroll hint arrows if map extends beyond viewport
+ */
+function drawScrollHint(w, h) {
+    if (!state.hexes.length) return;
+
+    // Check if map extends beyond viewport
+    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
+    const mapPixelRadius = radius * state.hexSize * 1.8;
+
+    const leftEdge = state.offsetX - mapPixelRadius;
+    const rightEdge = state.offsetX + mapPixelRadius;
+    const topEdge = state.offsetY - mapPixelRadius;
+    const bottomEdge = state.offsetY + mapPixelRadius;
+
+    ctx.save();
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Arrow indicators with fade effect
+    const arrowAlpha = 0.5;
+
+    if (leftEdge < 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
+        ctx.fillText('◀', 20, h / 2);
+    }
+    if (rightEdge > w) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
+        ctx.fillText('▶', w - 20, h / 2);
+    }
+    if (topEdge < 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
+        ctx.fillText('▲', w / 2, 20);
+    }
+    if (bottomEdge > h) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
+        ctx.fillText('▼', w / 2, h - 20);
+    }
+
+    ctx.restore();
 }
