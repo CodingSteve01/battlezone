@@ -132,14 +132,8 @@ function generateUnitCards() {
  * Toggle unit selection
  */
 function toggleUnitSelection(classKey, card) {
-    const index = currentPlayerSelection.indexOf(classKey);
-
-    if (index >= 0) {
-        // Remove from selection
-        currentPlayerSelection.splice(index, 1);
-        updateCardSelectionState();
-    } else if (currentPlayerSelection.length < CONFIG.UNITS_PER_PLAYER) {
-        // Add to selection
+    if (currentPlayerSelection.length < CONFIG.UNITS_PER_PLAYER) {
+        // Add to selection (allow duplicates)
         currentPlayerSelection.push(classKey);
         updateCardSelectionState();
     }
@@ -193,12 +187,30 @@ function updateTeamPreview() {
             slot.textContent = classData.icon;
             slot.classList.add('filled');
             slot.classList.remove('empty');
+            slot.style.cursor = 'pointer';
+            slot.onclick = () => removeFromSelection(index);
         } else {
             slot.textContent = '?';
             slot.classList.remove('filled');
             slot.classList.add('empty');
+            slot.style.cursor = 'default';
+            slot.onclick = null;
         }
     });
+}
+
+/**
+ * Remove unit from selection by index
+ */
+function removeFromSelection(index) {
+    currentPlayerSelection.splice(index, 1);
+    updateCardSelectionState();
+    updateTeamPreview();
+
+    const confirmBtn = document.getElementById('team-confirm-btn');
+    if (confirmBtn) {
+        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
+    }
 }
 
 /**

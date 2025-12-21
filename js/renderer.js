@@ -169,6 +169,54 @@ function drawTerrainDetails(cx, cy, size, type) {
     ctx.save();
 
     switch (type) {
+        case 'grass':
+            // Random seed based on position for consistent decoration
+            const seed = Math.abs((cx * 7 + cy * 13) % 100);
+
+            if (seed < 30) {
+                // Small bush
+                ctx.fillStyle = '#2d5a3d';
+                ctx.beginPath();
+                ctx.arc(cx, cy, s * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1e4d2e';
+                ctx.beginPath();
+                ctx.arc(cx - s * 0.1, cy - s * 0.05, s * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (seed < 45) {
+                // Grass tufts
+                ctx.strokeStyle = '#3d6b4d';
+                ctx.lineWidth = 1.5;
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + (i - 1) * s * 0.2, cy + s * 0.15);
+                    ctx.quadraticCurveTo(
+                        cx + (i - 1) * s * 0.25,
+                        cy - s * 0.1,
+                        cx + (i - 1) * s * 0.15 + (i - 1) * s * 0.1,
+                        cy - s * 0.25
+                    );
+                    ctx.stroke();
+                }
+            } else if (seed < 55) {
+                // Small flowers
+                const flowerColors = ['#ff6b9d', '#ffeb3b', '#fff'];
+                ctx.fillStyle = flowerColors[seed % 3];
+                ctx.beginPath();
+                ctx.arc(cx - s * 0.2, cy, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(cx + s * 0.15, cy + s * 0.1, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (seed < 65) {
+                // Small stones
+                ctx.fillStyle = '#6a6a7a';
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, s * 0.15, s * 0.1, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            break;
+
         case 'forest':
             // Multiple detailed trees
             drawTree(cx - s * 0.5, cy - s * 0.3, s * 0.8);

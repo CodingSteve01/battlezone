@@ -11,16 +11,16 @@ export const CONFIG = {
 
     // Map-Größen (Radius)
     MAP_SIZES: {
-        small: 6,
-        medium: 8,
-        large: 10
+        small: 8,
+        medium: 12,
+        large: 16
     },
 
     // Spawn-Abstände vom Rand
     SPAWN_OFFSET: {
-        small: 5,
-        medium: 7,
-        large: 9
+        small: 6,
+        medium: 10,
+        large: 14
     }
 };
 

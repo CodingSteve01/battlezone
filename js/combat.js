@@ -25,12 +25,23 @@ export function calculateHitChance(attacker, defender) {
         chance += 15;
     }
 
-    // Distance penalty
+    // Distance calculation
     const dist = hexDistance(
         { q: attacker.q, r: attacker.r },
         { q: defender.q, r: defender.r }
     );
-    chance -= (dist - 1) * 5;
+
+    // Sniper: accuracy bonus, especially at range
+    if (attacker.class === 'sniper') {
+        chance += 20; // Base accuracy bonus
+        // Sniper gets BETTER at range, not worse
+        if (dist >= 4) {
+            chance += 10; // Optimal range bonus
+        }
+    } else {
+        // Normal units: distance penalty
+        chance -= (dist - 1) * 5;
+    }
 
     // Clamp to reasonable bounds
     return Math.min(95, Math.max(25, chance));
