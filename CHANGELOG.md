@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/CodingSteve01/battlezone/compare/v1.1.1...v1.2.0) (2025-12-22)
+
+
+### Features
+
+* improve game balance for faster enemy encounters ([#37](https://github.com/CodingSteve01/battlezone/issues/37)) ([eb6870d](https://github.com/CodingSteve01/battlezone/commit/eb6870da0c7db441415ea2479e927c0dfc0d4dc3))
+
 ## [1.1.1](https://github.com/CodingSteve01/battlezone/compare/v1.1.0...v1.1.1) (2025-12-22)
 
 
