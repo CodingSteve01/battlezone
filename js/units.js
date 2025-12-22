@@ -43,8 +43,8 @@ export function createUnits() {
                 ap: CONFIG.AP_PER_TURN,
                 alive: true,
                 usedSpecial: false,
-                cloaked: false,           // Sniper stealth
-                stealthActive: true,      // Sniper passive stealth detection reduction
+                cloaked: false,           // Sniper stealth (active cloak ability)
+                stealthActive: classType === 'sniper' || classType === 'ninja', // Only sniper/ninja have passive stealth
                 hiding: false             // Taking cover in forest/rocks
             };
 

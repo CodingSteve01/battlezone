@@ -5,7 +5,7 @@ import { hexDistance, hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, moveUnitInstant } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
-import { updateVisibility } from './fogOfWar.js';
+import { updateVisibility, isUnitVisible } from './fogOfWar.js';
 import { updateUI, showToast } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
@@ -147,12 +147,13 @@ async function performUnitAI(unit) {
 
 /**
  * Find enemies visible to the AI
+ * Uses the same visibility logic as the renderer for consistency
  */
 function findVisibleEnemies(unit) {
     return state.units.filter(u =>
         u.alive &&
         u.player !== unit.player &&
-        state.visibleHexes.has(`${u.q},${u.r}`)
+        isUnitVisible(u)
     );
 }
 
@@ -305,9 +306,12 @@ async function executeAIMove(unit, target, shouldRender = true) {
     targetHex.unit = unit;
     unit.ap -= target.cost;
 
-    // In single-player, don't update visibility/render to hide AI positions
+    // Always update visibility so AI can see enemies after moving
+    // This is needed for subsequent AI units to have correct visibility info
+    updateVisibility();
+
+    // Only render in multiplayer to hide AI positions from human player
     if (shouldRender) {
-        updateVisibility();
         render();
         updateUI();
     }
