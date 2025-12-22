@@ -935,24 +935,9 @@ function handleAttackClick(unit, hex) {
 
 /**
  * Setup menu buttons
+ * Note: [data-players], [data-size], and [data-mode] buttons are handled in main.js
  */
 function setupMenuButtons() {
-    document.querySelectorAll('[data-players]').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('[data-players]').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            state.settings.players = parseInt(btn.dataset.players);
-        };
-    });
-
-    document.querySelectorAll('[data-size]').forEach(btn => {
-        btn.onclick = () => {
-            document.querySelectorAll('[data-size]').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            state.settings.size = btn.dataset.size;
-        };
-    });
-
     const readyBtn = document.getElementById('ready-btn');
     if (readyBtn) {
         readyBtn.onclick = () => {
