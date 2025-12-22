@@ -1,0 +1,91 @@
+# Workflow for preview deployments from branches
+# Trigger manually via GitHub Actions UI
+name: Preview Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Run CI checks first
+  ci:
+    name: CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  # Deploy after CI passes
+  deploy:
+    name: Deploy Preview
+    needs: ci
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Cache-bust with git hash
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          BRANCH="${{ github.event.inputs.branch }}"
+          echo "Version: $VERSION (Branch: $BRANCH)"
+          sed -i "s/\?v=[^\"']*/\?v=$VERSION/g" index.html
+
+      - name: Update version info display
+        run: |
+          VERSION=$(git rev-parse --short HEAD)
+          BRANCH="${{ github.event.inputs.branch }}"
+          BUILD_DATE=$(TZ='Europe/Berlin' date '+%d.%m.%Y %H:%M')
+          echo "Build: $VERSION @ $BUILD_DATE (Preview: $BRANCH)"
+          sed -i "s|Version DEV • Build: --|Version $VERSION • Build: $BUILD_DATE (🧪 $BRANCH)|g" index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Output URL
+        run: |
+          echo "::notice::🎮 Preview deployed to: ${{ steps.deployment.outputs.page_url }}"

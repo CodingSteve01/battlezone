@@ -393,9 +393,22 @@ function init() {
     const volumeSlider = document.getElementById('volume-slider');
     const muteBtn = document.getElementById('mute-btn');
 
+    // Initialize audio on first user interaction (required by browsers)
+    const initAudioOnInteraction = () => {
+        initAudio();
+        resumeAudio();
+        // Remove listeners after first interaction
+        document.removeEventListener('click', initAudioOnInteraction);
+        document.removeEventListener('touchstart', initAudioOnInteraction);
+    };
+    document.addEventListener('click', initAudioOnInteraction);
+    document.addEventListener('touchstart', initAudioOnInteraction);
+
     if (volumeSlider) {
         volumeSlider.value = audioSettings.masterVolume * 100;
         volumeSlider.addEventListener('input', (e) => {
+            initAudio(); // Ensure audio is ready
+            resumeAudio();
             const volume = parseInt(e.target.value) / 100;
             setMasterVolume(volume);
             // Update mute button icon
@@ -408,6 +421,8 @@ function init() {
 
     if (muteBtn) {
         muteBtn.addEventListener('click', () => {
+            initAudio(); // Ensure audio is ready
+            resumeAudio();
             const isMuted = audioSettings.masterVolume === 0;
             if (isMuted) {
                 // Unmute - restore to previous or default
