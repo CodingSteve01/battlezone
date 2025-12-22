@@ -5,7 +5,7 @@ import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlay
 import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisible } from './fogOfWar.js';
+import { getFogLevel, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -2750,8 +2750,9 @@ export function render() {
     });
 
     // Combine units and foreground elements for 2.5D depth sorting
+    // Use isUnitVisibleToViewer for proper fog of war from human player's perspective
     const visibleUnits = state.units
-        .filter(unit => unit.alive && isUnitVisible(unit));
+        .filter(unit => unit.alive && isUnitVisibleToViewer(unit));
 
     // Convert units to drawable objects with sortY
     const unitDrawables = visibleUnits.map(unit => {

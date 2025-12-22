@@ -1,7 +1,7 @@
 // ===== FOG OF WAR SYSTEM =====
 
 import { hexDistance, getHexesInRange } from './hexMath.js';
-import { state, getHex, getPlayerUnits, isHexVisible, markEnemyContact } from './state.js';
+import { state, getHex, getPlayerUnits, isHexVisible, isHexVisibleToPlayer, markEnemyContact } from './state.js';
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 import { hasLineOfSight } from './combat.js';
@@ -37,6 +37,33 @@ function getUnitVisibleHexes(unit) {
 }
 
 /**
+ * Update visible hexes for a specific player
+ * Used for per-player visibility tracking
+ */
+export function updateVisibilityForPlayer(player) {
+    // Ensure arrays exist
+    if (!state.playerVisibleHexes[player]) {
+        state.playerVisibleHexes[player] = new Set();
+    }
+    if (!state.playerExploredHexes[player]) {
+        state.playerExploredHexes[player] = new Set();
+    }
+
+    // Clear and recalculate visible hexes for this player
+    state.playerVisibleHexes[player].clear();
+
+    const playerUnits = getPlayerUnits(player);
+
+    for (const unit of playerUnits) {
+        const unitVisible = getUnitVisibleHexes(unit);
+        unitVisible.forEach(key => {
+            state.playerVisibleHexes[player].add(key);
+            state.playerExploredHexes[player].add(key);
+        });
+    }
+}
+
+/**
  * Update visible hexes for current player
  * Should be called at start of turn and after movement
  */
@@ -46,6 +73,9 @@ export function updateVisibility() {
     // Ensure playerExploredHexes array exists
     if (!state.playerExploredHexes[state.currentPlayer]) {
         state.playerExploredHexes[state.currentPlayer] = new Set();
+    }
+    if (!state.playerVisibleHexes[state.currentPlayer]) {
+        state.playerVisibleHexes[state.currentPlayer] = new Set();
     }
 
     // Set current player's explored set as active
@@ -58,6 +88,7 @@ export function updateVisibility() {
         unitVisible.forEach(key => {
             state.visibleHexes.add(key);
             state.exploredHexes.add(key); // Mark as explored for THIS player only
+            state.playerVisibleHexes[state.currentPlayer].add(key); // Also store in per-player array
         });
     }
 
@@ -66,12 +97,12 @@ export function updateVisibility() {
 }
 
 /**
- * Check if an enemy unit is visible to current player
- * Considers line of sight - can't see enemies behind rocks/dense forests
+ * Check if an enemy unit is visible to a specific player
+ * Used for rendering from a specific player's perspective
  */
-export function isUnitVisible(unit) {
-    // Own units are always visible
-    if (unit.player === state.currentPlayer) {
+export function isUnitVisibleToPlayer(unit, viewerPlayer) {
+    // Own units are always visible to their owner
+    if (unit.player === viewerPlayer) {
         return true;
     }
 
@@ -80,14 +111,14 @@ export function isUnitVisible(unit) {
         return false;
     }
 
-    // Enemy units only visible if in visible hex
-    if (!isHexVisible(unit.q, unit.r)) {
+    // Enemy units only visible if in viewer's visible hex
+    if (!isHexVisibleToPlayer(unit.q, unit.r, viewerPlayer)) {
         return false;
     }
 
-    // Check if at least one friendly unit has line of sight to this enemy
-    const playerUnits = getPlayerUnits(state.currentPlayer);
-    const hasAnyLOS = playerUnits.some(friendlyUnit => {
+    // Check if at least one of viewer's units has line of sight to this enemy
+    const viewerUnits = getPlayerUnits(viewerPlayer);
+    const hasAnyLOS = viewerUnits.some(friendlyUnit => {
         const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
         return los.clear;
     });
@@ -98,16 +129,15 @@ export function isUnitVisible(unit) {
 
     // Units hiding in cover are harder to detect (need to be within 2 hexes with LOS)
     if (unit.hiding) {
-        const hidingDetectionRange = 2; // Can only detect hiding units within 2 hexes
+        const hidingDetectionRange = 2;
 
-        const detected = playerUnits.some(friendlyUnit => {
+        const detected = viewerUnits.some(friendlyUnit => {
             const dist = hexDistance(
                 { q: friendlyUnit.q, r: friendlyUnit.r },
                 { q: unit.q, r: unit.r }
             );
             if (dist > hidingDetectionRange) return false;
 
-            // Also need clear LOS
             const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
             return los.clear;
         });
@@ -115,20 +145,18 @@ export function isUnitVisible(unit) {
         return detected;
     }
 
-    // Sniper/Ninja stealth: harder to detect at range (only when stealthActive is explicitly true)
+    // Sniper/Ninja stealth: harder to detect at range
     if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive === true) {
         const classData = UNIT_CLASSES[unit.class];
         const detectionRange = classData.stealthDetectionRange || 2;
 
-        // Check if any friendly unit is close enough to detect with LOS
-        const detected = playerUnits.some(friendlyUnit => {
+        const detected = viewerUnits.some(friendlyUnit => {
             const dist = hexDistance(
                 { q: friendlyUnit.q, r: friendlyUnit.r },
                 { q: unit.q, r: unit.r }
             );
             if (dist > detectionRange) return false;
 
-            // Also need clear LOS
             const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
             return los.clear;
         });
@@ -137,6 +165,22 @@ export function isUnitVisible(unit) {
     }
 
     return true;
+}
+
+/**
+ * Check if an enemy unit is visible to current player
+ * Considers line of sight - can't see enemies behind rocks/dense forests
+ */
+export function isUnitVisible(unit) {
+    return isUnitVisibleToPlayer(unit, state.currentPlayer);
+}
+
+/**
+ * Check if a unit is visible to the viewing player (for rendering)
+ * In single-player, this checks from human player's perspective even during AI turn
+ */
+export function isUnitVisibleToViewer(unit) {
+    return isUnitVisibleToPlayer(unit, state.viewingPlayer);
 }
 
 /**
@@ -159,16 +203,22 @@ export function getVisibleEnemies() {
 
 /**
  * Get fog level for a hex (for rendering)
+ * Uses viewing player's perspective in single-player mode
  * Returns: 'visible', 'explored', 'hidden'
  */
 export function getFogLevel(q, r) {
     const key = `${q},${r}`;
+    const viewPlayer = state.viewingPlayer;
 
-    if (state.visibleHexes.has(key)) {
+    // Use viewing player's visibility for rendering
+    const visibleHexes = state.playerVisibleHexes[viewPlayer];
+    const exploredHexes = state.playerExploredHexes[viewPlayer];
+
+    if (visibleHexes && visibleHexes.has(key)) {
         return 'visible';
     }
 
-    if (state.exploredHexes.has(key)) {
+    if (exploredHexes && exploredHexes.has(key)) {
         return 'explored';
     }
 

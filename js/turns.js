@@ -35,6 +35,10 @@ export function startTurn() {
     state.currentPath = null;
     state.pendingMoveDestination = null;
 
+    // In single-player, always render from human player's perspective (player 0)
+    // In multiplayer, render from current player's perspective
+    state.viewingPlayer = state.settings.singlePlayer ? 0 : state.currentPlayer;
+
     // Update fog of war
     updateVisibility();
 
