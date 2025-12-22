@@ -240,6 +240,18 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'hills':
             drawHillsDetails(cx, cy, s, baseSeed);
             break;
+
+        case 'road':
+            drawRoadDetails(cx, cy, s, baseSeed);
+            break;
+
+        case 'path':
+            drawPathDetails(cx, cy, s, baseSeed);
+            break;
+
+        case 'river':
+            drawRiverDetails(cx, cy, s, baseSeed);
+            break;
     }
 
     ctx.restore();
@@ -309,6 +321,127 @@ function drawHillsDetails(cx, cy, s, seed) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('⛰', cx, cy);
+}
+
+/**
+ * Draw road terrain details
+ */
+function drawRoadDetails(cx, cy, s, seed) {
+    // Cobblestone pattern
+    ctx.strokeStyle = 'rgba(80, 70, 60, 0.4)';
+    ctx.lineWidth = 1;
+
+    // Draw cobblestone grid
+    for (let i = 0; i < 5; i++) {
+        const rx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.2;
+        const ry = cy + (seededRandom(seed + i * 7 + 1) - 0.5) * s * 0.9;
+        const rSize = s * (0.15 + seededRandom(seed + i * 7 + 2) * 0.1);
+
+        ctx.beginPath();
+        ctx.roundRect(
+            rx - rSize / 2,
+            ry - rSize / 2,
+            rSize,
+            rSize * 0.7,
+            rSize * 0.1
+        );
+        ctx.stroke();
+    }
+
+    // Road edge markings
+    ctx.strokeStyle = 'rgba(90, 80, 70, 0.3)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.7, cy - s * 0.4);
+    ctx.lineTo(cx + s * 0.7, cy - s * 0.4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.7, cy + s * 0.4);
+    ctx.lineTo(cx + s * 0.7, cy + s * 0.4);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Speed indicator
+    ctx.fillStyle = 'rgba(100, 90, 80, 0.4)';
+    ctx.font = `${Math.round(s * 0.3)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🛤️', cx, cy);
+}
+
+/**
+ * Draw path terrain details
+ */
+function drawPathDetails(cx, cy, s, seed) {
+    // Dirt path with footprints
+    ctx.strokeStyle = 'rgba(70, 60, 50, 0.4)';
+    ctx.lineWidth = 1;
+
+    // Worn path marks
+    for (let i = 0; i < 6; i++) {
+        const px = cx + (seededRandom(seed + i * 11) - 0.5) * s * 1.0;
+        const py = cy + (seededRandom(seed + i * 11 + 1) - 0.5) * s * 0.8;
+        const pSize = s * (0.08 + seededRandom(seed + i * 11 + 2) * 0.06);
+
+        ctx.fillStyle = `rgba(${70 + seededRandom(seed + i) * 20}, ${60 + seededRandom(seed + i + 1) * 20}, ${50 + seededRandom(seed + i + 2) * 15}, 0.3)`;
+        ctx.beginPath();
+        ctx.ellipse(px, py, pSize, pSize * 0.5, seededRandom(seed + i * 11 + 3) * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Small pebbles
+    for (let i = 0; i < 3; i++) {
+        const px = cx + (seededRandom(seed + i * 19) - 0.5) * s * 0.8;
+        const py = cy + (seededRandom(seed + i * 19 + 1) - 0.5) * s * 0.6;
+        const pSize = s * 0.05;
+
+        ctx.fillStyle = 'rgba(80, 75, 65, 0.5)';
+        ctx.beginPath();
+        ctx.arc(px, py, pSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+/**
+ * Draw river terrain details
+ */
+function drawRiverDetails(cx, cy, s, seed) {
+    // Flowing water ripples
+    ctx.strokeStyle = 'rgba(60, 120, 160, 0.4)';
+    ctx.lineWidth = 1.5;
+
+    // Wave patterns
+    for (let i = 0; i < 3; i++) {
+        const yOffset = (i - 1) * s * 0.35;
+        ctx.beginPath();
+        for (let x = -s * 0.8; x <= s * 0.8; x += s * 0.2) {
+            const wobble = Math.sin(x * 0.3 + seed * 0.1 + i) * s * 0.1;
+            if (x === -s * 0.8) {
+                ctx.moveTo(cx + x, cy + yOffset + wobble);
+            } else {
+                ctx.lineTo(cx + x, cy + yOffset + wobble);
+            }
+        }
+        ctx.stroke();
+    }
+
+    // Sparkle effects on water
+    ctx.fillStyle = 'rgba(180, 220, 255, 0.5)';
+    for (let i = 0; i < 2; i++) {
+        const sx = cx + (seededRandom(seed + i * 13) - 0.5) * s * 1.0;
+        const sy = cy + (seededRandom(seed + i * 13 + 1) - 0.5) * s * 0.6;
+        ctx.beginPath();
+        ctx.arc(sx, sy, s * 0.04, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // River flow indicator
+    ctx.fillStyle = 'rgba(70, 130, 170, 0.4)';
+    ctx.font = `${Math.round(s * 0.3)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🌊', cx, cy);
 }
 
 /**
@@ -1290,14 +1423,11 @@ export function render() {
     ctx.restore();
 
     const currentUnit = getCurrentUnit();
-    const reachableHexes = currentUnit && state.selectedAction === 'move'
-        ? getReachableHexes(currentUnit)
-        : new Map();
-    const attackableUnits = currentUnit && state.selectedAction === 'attack'
-        ? getAttackableUnits(currentUnit)
-        : [];
+    // Always show reachable hexes when a unit is selected (point-and-click system)
+    const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
+    const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
 
-    // Get max move cost for path visualization
+    // Get max move cost for path visualization (consistent with getReachableHexes)
     const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
 
     // Draw hexes
@@ -1343,28 +1473,38 @@ export function render() {
             }
         }
 
-        // Highlight reachable hexes for movement - simple green overlay
-        if (state.selectedAction === 'move' && reachableHexes.size > 0) {
+        // Highlight reachable hexes for movement - simple green overlay (point-and-click system)
+        if (reachableHexes.size > 0 && fogLevel === 'visible') {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
-            if (pathData && fogLevel === 'visible' && !hex.unit) {
+            if (pathData && !hex.unit) {
                 // Draw simple movement range highlight (green)
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.85);
                 ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
                 ctx.fill();
 
-                // Subtle border
+                // Subtle border with cost indicator for high-cost terrain
                 ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
+
+                // Show movement cost on each hex for better clarity
+                if (pathData.cost > 0) {
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
+                    ctx.font = `bold ${Math.round(state.hexSize * 0.25)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${pathData.cost}`, sx, sy + state.hexSize * 0.5);
+                }
             }
         }
     });
 
-    // Draw path preview - clean simple path line with destination marker
-    if (state.currentPath && state.currentPath.length >= 2 && state.selectedAction === 'move' && currentUnit) {
-        const maxCost = currentUnit.ap;
+    // Draw path preview - clean simple path line with destination marker (point-and-click system)
+    if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {
+        // Use the lesser of AP or move stat (consistent with movement calculation)
+        const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
         // Calculate cumulative costs along path
         let cumulativeCost = 0;
@@ -1625,8 +1765,8 @@ export function render() {
         drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable);
     });
 
-    // Draw attack range indicator
-    if (currentUnit && state.selectedAction === 'attack') {
+    // Draw attack range indicator when targeting an enemy
+    if (currentUnit && state.targetedUnit) {
         const pos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;

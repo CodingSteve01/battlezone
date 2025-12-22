@@ -4,7 +4,7 @@ import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueued
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement } from './units.js';
-import { executeAttack, useSpecialAbility } from './combat.js';
+import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCover } from './combat.js';
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -551,7 +551,8 @@ function handleMoveClick(unit, hex) {
 
     // Try to find path with extended range for multi-turn movement
     const maxExtendedCost = unit.move * 10; // Allow planning for many turns ahead
-    const maxMoveCost = unit.ap;
+    // Use the lesser of AP or move stat (unit's movement capability per turn)
+    const maxMoveCost = Math.min(unit.ap, unit.move);
 
     // First try to find the full path
     let pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxExtendedCost);
@@ -614,6 +615,11 @@ function handleMoveClick(unit, hex) {
         // Second tap - execute the movement
         state.pendingMoveDestination = null;
         state.currentPath = null;
+
+        // Reveal from cover when moving
+        if (unit.hiding) {
+            unit.hiding = false;
+        }
 
         // Store previous visible enemies before movement
         const prevEnemies = getVisibleEnemies();
@@ -730,7 +736,8 @@ export function continueQueuedPath(unit) {
     }
 
     // Recalculate path from current position to target
-    const maxMoveCost = unit.ap;
+    // Use the lesser of AP or move stat (unit's movement capability per turn)
+    const maxMoveCost = Math.min(unit.ap, unit.move);
     const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
@@ -930,6 +937,25 @@ function setupMenuButtons() {
  * Setup action buttons
  */
 function setupActionButtons() {
+    // Cover button - take cover on forest/rock tiles
+    const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
+    if (coverBtn) {
+        coverBtn.onclick = () => {
+            const unit = getCurrentUnit();
+            if (unit && canTakeCover(unit)) {
+                takeCover(unit);
+                render();
+                updateUI();
+            } else if (unit && unit.hiding) {
+                showToast('❌ Bereits in Deckung!', 'warning');
+            } else if (unit && unit.ap < 1) {
+                showToast('❌ Nicht genug AP (braucht 1)!', 'warning');
+            } else {
+                showToast('❌ Hier keine Deckung möglich!', 'warning');
+            }
+        };
+    }
+
     // Special ability button - simplified UI
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {

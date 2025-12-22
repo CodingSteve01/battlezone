@@ -43,7 +43,8 @@ export function createUnits() {
                 alive: true,
                 usedSpecial: false,
                 cloaked: false,           // Sniper stealth
-                stealthActive: true       // Sniper passive stealth detection reduction
+                stealthActive: true,      // Sniper passive stealth detection reduction
+                hiding: false             // Taking cover in forest/rocks
             };
 
             const hex = getHex(spawn.q, spawn.r);

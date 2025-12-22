@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
-import { CONFIG, UNIT_CLASSES } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit } from './state.js';
+import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex } from './state.js';
 import { calculateHitChance } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
@@ -153,6 +153,36 @@ function updateUnitTabs(units) {
  * Update action buttons state
  */
 function updateActionButtons(unit) {
+    // Update cover button
+    const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
+    if (coverBtn) {
+        coverBtn.classList.remove('disabled', 'active');
+        const coverLabel = document.getElementById('cover-label');
+
+        if (!unit) {
+            coverBtn.classList.add('disabled');
+            if (coverLabel) coverLabel.textContent = 'Deckung';
+        } else {
+            // Check if unit can take cover
+            const hex = getHex(unit.q, unit.r);
+            const canHide = hex && TERRAIN[hex.type] && TERRAIN[hex.type].canHide;
+
+            if (unit.hiding) {
+                // Already hiding - show active state
+                coverBtn.classList.add('active');
+                if (coverLabel) coverLabel.textContent = 'In Deckung';
+            } else if (!canHide) {
+                coverBtn.classList.add('disabled');
+                if (coverLabel) coverLabel.textContent = 'Deckung';
+            } else if (unit.ap < 1) {
+                coverBtn.classList.add('disabled');
+                if (coverLabel) coverLabel.textContent = 'Deckung';
+            } else {
+                if (coverLabel) coverLabel.textContent = 'Deckung';
+            }
+        }
+    }
+
     // Update special ability button
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {

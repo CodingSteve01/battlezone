@@ -1,12 +1,51 @@
 // ===== COMBAT SYSTEM =====
 
 import { state, getHex, getPlayerUnits, addGhostIndicator } from './state.js';
-import { UNIT_CLASSES } from './config.js';
+import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
 import { checkEventMiss } from './events.js';
+
+/**
+ * Check if a unit can take cover on their current hex
+ */
+export function canTakeCover(unit) {
+    if (!unit || !unit.alive) return false;
+    if (unit.hiding) return false; // Already hiding
+    if (unit.ap < 1) return false; // Needs 1 AP
+
+    const hex = getHex(unit.q, unit.r);
+    if (!hex) return false;
+
+    const terrain = TERRAIN[hex.type];
+    return terrain && terrain.canHide;
+}
+
+/**
+ * Make a unit take cover (hide) on their current hex
+ * Returns true if successful
+ */
+export function takeCover(unit) {
+    if (!canTakeCover(unit)) return false;
+
+    unit.hiding = true;
+    unit.ap -= 1;
+    showToast('🌲 Deckung genommen!', 'special');
+    return true;
+}
+
+/**
+ * Remove cover/hiding status from a unit
+ * Called when moving or attacking
+ */
+export function revealFromCover(unit) {
+    if (unit.hiding) {
+        unit.hiding = false;
+        showToast('👁️ Aus Deckung aufgetaucht', 'info');
+    }
+}
 
 /**
  * Calculate hit chance for an attack
@@ -21,6 +60,11 @@ export function calculateHitChance(attacker, defender) {
     // Defender in cover (forest) - harder to hit
     if (defHex && defHex.cover) {
         chance -= 25;
+    }
+
+    // Defender is actively hiding - even harder to hit
+    if (defender.hiding) {
+        chance -= 20;
     }
 
     // Attacker on hills - better accuracy (high ground)
@@ -66,7 +110,7 @@ export function calculateHitChance(attacker, defender) {
 export function executeAttack(attacker, defender) {
     // Track ghost indicator for stealth units before revealing
     // This shows enemy where the attack came from
-    const wasStealthed = attacker.cloaked ||
+    const wasStealthed = attacker.cloaked || attacker.hiding ||
         ((attacker.class === 'sniper' || attacker.class === 'ninja') && attacker.stealthActive !== false);
 
     if (wasStealthed && attacker.player !== defender.player) {
@@ -78,6 +122,11 @@ export function executeAttack(attacker, defender) {
     if (attacker.cloaked) {
         attacker.cloaked = false;
         showToast('🔫 Tarnung aufgehoben!', 'special');
+    }
+
+    // Remove cover/hiding when attacking
+    if (attacker.hiding) {
+        attacker.hiding = false;
     }
 
     const hitChance = calculateHitChance(attacker, defender);
