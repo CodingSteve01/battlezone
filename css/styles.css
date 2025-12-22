@@ -1667,6 +1667,20 @@ button:focus:not(:focus-visible),
     display: none;
 }
 
+/* ===== VERSION INFO ===== */
+.version-info {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 12px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    letter-spacing: 0.5px;
+}
+
 /* AI turn indicator */
 .ai-thinking {
     position: fixed;
