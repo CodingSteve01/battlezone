@@ -220,37 +220,38 @@ main.js
 
 ## GitHub Pages Deployment
 
-### Cache-Busting for Updates
+### Automatic Cache-Busting (GitHub Actions)
 
-The project uses version query strings to prevent browser caching issues. When making changes:
+The project uses a GitHub Actions pipeline (`.github/workflows/deploy.yml`) that automatically:
 
-1. **Update version strings** in `index.html`:
-   ```html
-   <link rel="stylesheet" href="css/styles.css?v=1.1">
-   <script type="module" src="js/main.js?v=1.1"></script>
-   ```
+1. Replaces version strings with the git commit hash (e.g., `?v=fa38f5d`)
+2. Deploys to GitHub Pages
 
-2. **Increment the version** with each deployment (e.g., `?v=1.0` → `?v=1.1`)
+**No manual version updates needed!** Just push to `main` or `master`.
 
-3. **Why this matters**: GitHub Pages serves files with cache headers. Without version strings, browsers may use stale cached files, causing partial updates or broken functionality.
+### How It Works
+
+```yaml
+# The pipeline runs this on every push:
+VERSION=$(git rev-parse --short HEAD)
+sed -i "s/\?v=[^\"']*/\?v=$VERSION/g" index.html
+```
+
+This ensures every deployment has a unique cache-busting version.
 
 ### Testing After Deployment
 
-After pushing to GitHub Pages, verify the update loaded correctly:
+After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 1. **Hard refresh**: `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac)
-2. **Check DevTools Network tab**: Verify files show `200` status (not `304 Not Modified` from cache)
+2. **Check DevTools Network tab**: Verify files load fresh (status `200`)
 3. **Use Incognito/Private browsing**: Bypasses all caching
-4. **Clear site data**: DevTools → Application → Storage → Clear site data
 
-### Deployment Checklist
+### GitHub Pages Setup (One-Time)
 
-- [ ] Increment version strings in `index.html`
-- [ ] Test locally before pushing
-- [ ] Push to main/master branch
-- [ ] Wait 1-2 minutes for GitHub Pages to rebuild
-- [ ] Hard refresh the live site
-- [ ] Test in incognito mode to verify
+1. Go to Repository → Settings → Pages
+2. Under "Build and deployment", select **GitHub Actions**
+3. The workflow will auto-deploy on push to main/master
 
 ## Important Notes for AI Assistants
 
