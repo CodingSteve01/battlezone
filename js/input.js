@@ -30,6 +30,9 @@ let dragDistance = 0;
 let isPinching = false;
 let initialPinchDistance = 0;
 let initialZoomLevel = 1.0;
+let initialPinchCenter = null;  // Store initial pinch center for consistent zoom point
+let initialCameraX = 0;
+let initialCameraY = 0;
 
 /**
  * Initialize input handlers
@@ -158,6 +161,15 @@ function handleTouchStart(e) {
         isDragging = false;
         initialPinchDistance = getPinchDistance(e.touches);
         initialZoomLevel = state.zoomLevel;
+        initialCameraX = state.cameraX;
+        initialCameraY = state.cameraY;
+        // Store initial pinch center for consistent zoom point
+        const rect = canvas.getBoundingClientRect();
+        const center = getPinchCenter(e.touches);
+        initialPinchCenter = {
+            x: center.x - rect.left - rect.width / 2,
+            y: center.y - rect.top - rect.height / 2
+        };
     } else if (e.touches.length === 1) {
         const touch = e.touches[0];
         isDragging = true;
@@ -200,39 +212,34 @@ function handleTouchMove(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (e.touches.length === 2 && isPinching) {
+    if (e.touches.length === 2 && isPinching && initialPinchCenter) {
         // Handle pinch zoom
         const currentDistance = getPinchDistance(e.touches);
         const scale = currentDistance / initialPinchDistance;
         const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, initialZoomLevel * scale));
 
         if (newZoom !== state.zoomLevel) {
-            const center = getPinchCenter(e.touches);
-            const rect = canvas.getBoundingClientRect();
+            // Use the INITIAL pinch center for consistent zoom point
+            const relX = initialPinchCenter.x;
+            const relY = initialPinchCenter.y;
 
-            // Calculate pinch center relative to canvas center
-            const screenX = center.x - rect.left;
-            const screenY = center.y - rect.top;
-            const canvasCenterX = rect.width / 2;
-            const canvasCenterY = rect.height / 2;
+            // Calculate zoom ratio from initial state
+            const zoomRatio = newZoom / initialZoomLevel;
 
-            // Position relative to canvas center
-            const relX = screenX - canvasCenterX;
-            const relY = screenY - canvasCenterY;
-
-            const oldZoom = state.zoomLevel;
-            const zoomRatio = newZoom / oldZoom;
-
-            // Adjust camera to keep the pinch center stationary
-            // Formula: newCameraX = relX * (1 - zoomRatio) + oldCameraX * zoomRatio
-            state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
-            state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
+            // Adjust camera to keep the initial pinch center stationary
+            // Formula derived from: keeping world point under finger fixed
+            // newCamera = relX * (1 - zoomRatio) + initialCamera * zoomRatio
+            state.cameraX = relX * (1 - zoomRatio) + initialCameraX * zoomRatio;
+            state.cameraY = relY * (1 - zoomRatio) + initialCameraY * zoomRatio;
 
             state.zoomLevel = newZoom;
 
+            // Update camera offset before limiting bounds (uses current hexSize)
+            updateCameraOffset();
+            // Recalculate hex size with new zoom, then limit bounds
+            resizeCanvas();
             limitCameraBounds();
             updateCameraOffset();
-            resizeCanvas();
         }
     } else if (e.touches.length === 1 && isDragging && !isPinching) {
         const touch = e.touches[0];
@@ -270,6 +277,7 @@ function handleTouchEnd(e) {
     // If we were pinching and now have one finger, switch to drag
     if (isPinching && e.touches.length === 1) {
         isPinching = false;
+        initialPinchCenter = null;  // Reset pinch center
         isDragging = true;
         hasDragged = true;  // Prevent accidental tap
         const touch = e.touches[0];
@@ -306,6 +314,7 @@ function handleTouchEnd(e) {
 
     isDragging = false;
     isPinching = false;
+    initialPinchCenter = null;  // Reset pinch center
     hasDragged = false;
     dragDistance = 0;
 }
@@ -402,15 +411,19 @@ function applyZoom(zoomDelta, screenX, screenY) {
     const zoomRatio = newZoom / oldZoom;
 
     // Adjust camera to keep the point under the mouse stationary
-    // Formula: newCameraX = relX * (1 - zoomRatio) + oldCameraX * zoomRatio
+    // Formula derived from: keeping world point under cursor fixed
+    // newCamera = relX * (1 - zoomRatio) + oldCamera * zoomRatio
     state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
     state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
 
     state.zoomLevel = newZoom;
 
+    // Update camera offset, then recalculate hex size with new zoom
+    updateCameraOffset();
+    resizeCanvas();
+    // Limit bounds AFTER hexSize is updated so bounds are calculated correctly
     limitCameraBounds();
     updateCameraOffset();
-    resizeCanvas();  // This will recalculate hex size with zoom
 }
 
 /**
