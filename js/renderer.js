@@ -1542,7 +1542,7 @@ export function render() {
     }
 
     // Draw queued path indicator for selected unit
-    if (currentUnit && state.selectedAction === 'move') {
+    if (currentUnit) {
         const queuedPath = getQueuedPath(currentUnit.id);
         if (queuedPath && queuedPath.path && !state.currentPath) {
             // Draw indicator showing there's a queued destination
@@ -1573,8 +1573,8 @@ export function render() {
         }
     }
 
-    // Draw attack line
-    if (currentUnit && state.targetedUnit && state.selectedAction === 'attack') {
+    // Draw attack line when targeting an enemy
+    if (currentUnit && state.targetedUnit) {
         const fromPos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
         const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r, state.hexSize);
 

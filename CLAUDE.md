@@ -220,24 +220,14 @@ main.js
 
 ## GitHub Pages Deployment
 
-### Automatic Cache-Busting (GitHub Actions)
+### Static Deployment (GitHub Actions)
 
-The project uses a GitHub Actions pipeline (`.github/workflows/deploy.yml`) that automatically:
+The project uses a simple GitHub Actions pipeline (`.github/workflows/static.yml`) that:
 
-1. Replaces version strings with the git commit hash (e.g., `?v=fa38f5d`)
-2. Deploys to GitHub Pages
+1. Triggers on push to `main` branch
+2. Deploys all static files directly to GitHub Pages
 
-**No manual version updates needed!** Just push to `main` or `master`.
-
-### How It Works
-
-```yaml
-# The pipeline runs this on every push:
-VERSION=$(git rev-parse --short HEAD)
-sed -i "s/\?v=[^\"']*/\?v=$VERSION/g" index.html
-```
-
-This ensures every deployment has a unique cache-busting version.
+**Just push to `main` and wait ~1-2 minutes for deployment!**
 
 ### Testing After Deployment
 
@@ -251,7 +241,7 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 1. Go to Repository → Settings → Pages
 2. Under "Build and deployment", select **GitHub Actions**
-3. The workflow will auto-deploy on push to main/master
+3. The workflow will auto-deploy on push to main
 
 ## Important Notes for AI Assistants
 
