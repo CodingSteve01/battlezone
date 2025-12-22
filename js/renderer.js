@@ -1,8 +1,8 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath } from './state.js';
-import { hexToPixel } from './hexMath.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits } from './state.js';
+import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
@@ -13,6 +13,323 @@ import { getRankName } from './progression.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
+
+// ===== HEX TILE CACHING SYSTEM =====
+// Pre-renders hex tiles with terrain details for improved performance
+
+/**
+ * Cache for pre-rendered hex tiles.
+ * Key format: "${q},${r}_${fogLevel}_${quality}"
+ * Value: OffscreenCanvas or regular Canvas with the pre-rendered hex
+ */
+const hexTileCache = new Map();
+
+/**
+ * Cache for pre-rendered foreground elements (trees, rocks, bushes).
+ * Key format: "${q},${r}"
+ * Value: { canvas, elements } where elements contains position data for sorting
+ */
+const foregroundCache = new Map();
+
+/**
+ * Track the current quality level for cache invalidation
+ */
+let cachedQualityLevel = null;
+
+/**
+ * Maximum number of cached tiles to prevent memory issues
+ */
+const MAX_CACHE_SIZE = 1000;
+
+/**
+ * Clear all caches (call when map regenerates or quality changes significantly)
+ */
+export function clearRenderCaches() {
+    hexTileCache.clear();
+    foregroundCache.clear();
+    cachedQualityLevel = null;
+}
+
+/**
+ * Get or create a cached hex tile with terrain details
+ * @param {Object} hex - The hex object
+ * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
+ * @param {number} hexSize - Current hex size for rendering
+ * @returns {HTMLCanvasElement|null} Cached canvas or null if caching disabled
+ */
+function getCachedHexTile(hex, fogLevel, hexSize) {
+    // Only cache on medium/high quality - low quality is simple enough
+    if (state.effectiveQuality === 'low') {
+        return null;
+    }
+
+    // Invalidate cache if quality changed
+    if (cachedQualityLevel !== state.effectiveQuality) {
+        hexTileCache.clear();
+        foregroundCache.clear();
+        cachedQualityLevel = state.effectiveQuality;
+    }
+
+    const cacheKey = `${hex.q},${hex.r}_${fogLevel}_${state.effectiveQuality}_${Math.round(hexSize)}`;
+
+    if (hexTileCache.has(cacheKey)) {
+        return hexTileCache.get(cacheKey);
+    }
+
+    // Enforce cache size limit using LRU-style eviction
+    if (hexTileCache.size >= MAX_CACHE_SIZE) {
+        // Remove oldest entries (first 20% of cache)
+        const keysToRemove = Array.from(hexTileCache.keys()).slice(0, MAX_CACHE_SIZE / 5);
+        keysToRemove.forEach(key => hexTileCache.delete(key));
+    }
+
+    // Create new cached tile
+    const tileCanvas = createHexTileCanvas(hex, fogLevel, hexSize);
+    hexTileCache.set(cacheKey, tileCanvas);
+
+    return tileCanvas;
+}
+
+/**
+ * Create a canvas with the pre-rendered hex tile
+ * @param {Object} hex - The hex object
+ * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
+ * @param {number} hexSize - Current hex size
+ * @returns {HTMLCanvasElement} Canvas with rendered hex
+ */
+function createHexTileCanvas(hex, fogLevel, hexSize) {
+    // Canvas size needs margin for effects
+    const margin = hexSize * 0.2;
+    const canvasSize = hexSize * 2 + margin * 2;
+
+    const tileCanvas = document.createElement('canvas');
+    tileCanvas.width = canvasSize;
+    tileCanvas.height = canvasSize;
+    const tileCtx = tileCanvas.getContext('2d');
+
+    const cx = canvasSize / 2;
+    const cy = canvasSize / 2;
+
+    const terrain = TERRAIN[hex.type];
+    let fillColor = terrain.color;
+    const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
+
+    // Fog of war overlay
+    if (fogLevel === 'hidden') {
+        fillColor = '#000000';
+    } else if (fogLevel === 'explored') {
+        fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
+    }
+
+    // Draw hex with texture
+    const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
+        (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
+    const terrainData = fogLevel === 'visible' ? terrain : null;
+
+    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData, hex.q, hex.r);
+
+    // Add fog overlays
+    if (fogLevel === 'explored') {
+        drawExploredOverlay(tileCtx, cx, cy, hexSize);
+    } else if (fogLevel === 'hidden') {
+        drawHiddenOverlay(tileCtx, cx, cy, hexSize);
+    }
+
+    // Draw terrain details for visible/explored hexes
+    if (fogLevel === 'visible' && shouldRenderDetails()) {
+        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
+    } else if (fogLevel === 'explored' && shouldRenderDetails()) {
+        tileCtx.save();
+        tileCtx.globalAlpha = 0.3;
+        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
+        tileCtx.restore();
+    }
+
+    return tileCanvas;
+}
+
+/**
+ * Draw explored hex shadow overlay to a context
+ */
+function drawExploredOverlay(context, cx, cy, hexSize) {
+    context.save();
+    context.beginPath();
+    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+
+    const shadowGradient = context.createLinearGradient(
+        cx - hexSize * 0.5, cy - hexSize * 0.5,
+        cx + hexSize * 0.5, cy + hexSize * 0.5
+    );
+    shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
+    shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
+    shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
+    context.fillStyle = shadowGradient;
+    context.fill();
+
+    const vignetteGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
+    vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignetteGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.05)');
+    vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
+    context.beginPath();
+    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+    context.fillStyle = vignetteGradient;
+    context.fill();
+
+    context.restore();
+}
+
+/**
+ * Draw hidden hex fog overlay to a context
+ */
+function drawHiddenOverlay(context, cx, cy, hexSize) {
+    context.save();
+    context.beginPath();
+    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+    const fogGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
+    fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
+    fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+    context.fillStyle = fogGradient;
+    context.fill();
+    context.restore();
+}
+
+/**
+ * Draw hex path to a specific context
+ */
+function drawHexPathToContext(context, cx, cy, size) {
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const px = cx + size * Math.cos(angle);
+        const py = cy + size * Math.sin(angle);
+        if (i === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+    }
+    context.closePath();
+}
+
+/**
+ * Draw hex with texture to a specific context (for caching)
+ */
+function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWidth, texture, terrain, hexQ, hexR) {
+    context.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const px = cx + size * Math.cos(angle);
+        const py = cy + size * Math.sin(angle);
+        if (i === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+    }
+    context.closePath();
+
+    if (terrain && terrain.colorLight && terrain.colorDark) {
+        const gradient = context.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
+        gradient.addColorStop(0, terrain.colorLight);
+        gradient.addColorStop(0.5, terrain.color);
+        gradient.addColorStop(1, terrain.colorDark);
+        context.fillStyle = gradient;
+        context.fill();
+    } else if (texture) {
+        context.save();
+        context.clip();
+        const pattern = context.createPattern(texture, 'repeat');
+        // Use hex coordinates for consistent pattern alignment
+        pattern.setTransform(new DOMMatrix().translate(hexQ * 10, hexR * 10));
+        context.fillStyle = pattern;
+        context.fillRect(cx - size, cy - size, size * 2, size * 2);
+        context.restore();
+
+        context.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * Math.cos(angle);
+            const py = cy + size * Math.sin(angle);
+            if (i === 0) context.moveTo(px, py);
+            else context.lineTo(px, py);
+        }
+        context.closePath();
+    } else {
+        context.fillStyle = fillColor;
+        context.fill();
+    }
+
+    if (terrain) {
+        context.save();
+        context.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * 0.85 * Math.cos(angle);
+            const py = cy + size * 0.85 * Math.sin(angle);
+            if (i === 0) context.moveTo(px, py);
+            else context.lineTo(px, py);
+        }
+        context.closePath();
+        context.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        context.lineWidth = 1.5;
+        context.stroke();
+        context.restore();
+    }
+
+    if (strokeColor) {
+        context.strokeStyle = strokeColor;
+        context.lineWidth = lineWidth;
+        context.stroke();
+    }
+}
+
+/**
+ * Draw terrain details to a specific context (for caching)
+ * This is a wrapper that temporarily swaps the global ctx
+ */
+function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
+    const originalCtx = ctx;
+    ctx = context;
+    drawTerrainDetails(cx, cy, size, type, hexQ, hexR);
+    ctx = originalCtx;
+}
+
+/**
+ * Calculate stealth unit visibility alpha based on distance to nearest friendly unit.
+ * Stealth units become more visible the closer they are to friendly non-cloaked units.
+ * @param {Object} stealthUnit - The cloaked unit to calculate visibility for
+ * @returns {number} Alpha value between 0 (invisible) and 0.85 (nearly visible)
+ */
+function getStealthVisibilityAlpha(stealthUnit) {
+    const friendlyUnits = getPlayerUnits(stealthUnit.player);
+
+    // Find the nearest non-cloaked friendly unit
+    let minDistance = Infinity;
+    for (const unit of friendlyUnits) {
+        // Skip the stealth unit itself and other cloaked units
+        if (unit.id === stealthUnit.id || unit.cloaked) continue;
+
+        const distance = hexDistance(
+            { q: stealthUnit.q, r: stealthUnit.r },
+            { q: unit.q, r: unit.r }
+        );
+        minDistance = Math.min(minDistance, distance);
+    }
+
+    // If no friendly units nearby, use moderate visibility
+    if (minDistance === Infinity) {
+        return 0.4;
+    }
+
+    // Distance-based transparency:
+    // 0-1 hexes: High visibility (alpha 0.7-0.85)
+    // 2-3 hexes: Medium visibility (alpha 0.4-0.6)
+    // 4-5 hexes: Low visibility (alpha 0.2-0.35)
+    // 6+ hexes: Very low visibility (alpha 0.1-0.15)
+    if (minDistance <= 1) {
+        return 0.85 - minDistance * 0.15;
+    } else if (minDistance <= 3) {
+        return 0.6 - (minDistance - 1) * 0.1;
+    } else if (minDistance <= 5) {
+        return 0.35 - (minDistance - 3) * 0.075;
+    } else {
+        // Beyond 5 hexes, very low visibility with minimum floor
+        return Math.max(0.1, 0.2 - (minDistance - 5) * 0.02);
+    }
+}
 
 /**
  * Initialize renderer
@@ -1626,9 +1943,10 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     ctx.save();
 
-    // Cloaked units appear semi-transparent to their owner
+    // Cloaked units visibility based on distance to nearest friendly unit
+    // Closer = more visible, farther = more transparent
     if (unit.cloaked && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 0.5;
+        ctx.globalAlpha = getStealthVisibilityAlpha(unit);
     }
 
     // Selection glow effect
@@ -2060,7 +2378,7 @@ export function render() {
     // Collect all foreground elements for 2.5D depth sorting
     const foregroundElements = [];
 
-    // Draw hexes (ground layer)
+    // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
@@ -2074,91 +2392,67 @@ export function render() {
 
         const fogLevel = getFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
-        let fillColor = terrain.color;
-        const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
 
-        // Fog of war overlay - enhanced visual distinction
-        if (fogLevel === 'hidden') {
-            // Completely black/unexplored - mysterious and dark
-            fillColor = '#000000';
-        } else if (fogLevel === 'explored') {
-            // Previously seen but not currently visible - keep terrain recognizable but desaturated
-            fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
-        }
+        // Try to use cached tile for better performance
+        const cachedTile = getCachedHexTile(hex, fogLevel, state.hexSize);
 
-        // Draw hex with texture and 3D effect - always keep natural terrain colors
-        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
-        const terrainData = fogLevel === 'visible' ? terrain : null;
-        drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
-
-        // Add realistic shadow overlay for explored but not visible hexes
-        if (fogLevel === 'explored') {
-            ctx.save();
-            ctx.beginPath();
-            drawHexPath(sx, sy, state.hexSize * 0.95);
-
-            // Create a realistic shadow gradient from top-left (light blocked)
-            const shadowGradient = ctx.createLinearGradient(
-                sx - state.hexSize * 0.5, sy - state.hexSize * 0.5,
-                sx + state.hexSize * 0.5, sy + state.hexSize * 0.5
+        if (cachedTile) {
+            // Draw cached tile - much faster than individual draw calls
+            const tileSize = cachedTile.width;
+            ctx.drawImage(
+                cachedTile,
+                sx - tileSize / 2,
+                sy - tileSize / 2
             );
-            shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
-            shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
-            shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
-            ctx.fillStyle = shadowGradient;
-            ctx.fill();
+        } else {
+            // Fallback: draw directly (low quality mode or cache miss)
+            let fillColor = terrain.color;
+            const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
 
-            // Add subtle vignette effect for depth
-            const vignetteGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-            vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            vignetteGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.05)');
-            vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
-            ctx.beginPath();
-            drawHexPath(sx, sy, state.hexSize * 0.95);
-            ctx.fillStyle = vignetteGradient;
-            ctx.fill();
-
-            ctx.restore();
-        }
-
-        // Add dense fog overlay for hidden hexes
-        if (fogLevel === 'hidden') {
-            ctx.save();
-            ctx.beginPath();
-            drawHexPath(sx, sy, state.hexSize * 0.95);
-            // Create a subtle noise pattern for fog effect
-            const fogGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-            fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
-            fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
-            ctx.fillStyle = fogGradient;
-            ctx.fill();
-            ctx.restore();
-        }
-
-        // Draw terrain details (ground-level only) - based on quality settings
-        if (fogLevel === 'visible') {
-            // Only draw detailed terrain decorations on high quality
-            if (shouldRenderDetails()) {
-                drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            if (fogLevel === 'hidden') {
+                fillColor = '#000000';
+            } else if (fogLevel === 'explored') {
+                fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
             }
 
-            // Collect foreground elements for 2.5D sorting (trees, large rocks, bushes)
-            // Skip on low quality for better performance
-            if (shouldRenderForeground()) {
-                const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
-                foregroundElements.push(...elements);
+            const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
+                (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
+            const terrainData = fogLevel === 'visible' ? terrain : null;
+            drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
+
+            // Fog overlays for non-cached rendering
+            if (fogLevel === 'explored') {
+                ctx.save();
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize * 0.95);
+                const shadowGradient = ctx.createLinearGradient(
+                    sx - state.hexSize * 0.5, sy - state.hexSize * 0.5,
+                    sx + state.hexSize * 0.5, sy + state.hexSize * 0.5
+                );
+                shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
+                shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
+                shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
+                ctx.fillStyle = shadowGradient;
+                ctx.fill();
+                ctx.restore();
+            } else if (fogLevel === 'hidden') {
+                ctx.save();
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize * 0.95);
+                const fogGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
+                fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
+                fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+                ctx.fillStyle = fogGradient;
+                ctx.fill();
+                ctx.restore();
             }
         }
 
-        // Draw silhouette terrain for explored hexes (show what was there, but shadowy)
-        // Skip on low quality
-        if (fogLevel === 'explored' && shouldRenderDetails()) {
-            ctx.save();
-            ctx.globalAlpha = 0.3;
-            drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
-            ctx.restore();
+        // Collect foreground elements for 2.5D sorting (always needed for depth sorting)
+        if (fogLevel === 'visible' && shouldRenderForeground()) {
+            const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            foregroundElements.push(...elements);
         }
-
 
         // Draw power-up if present
         if (fogLevel === 'visible') {

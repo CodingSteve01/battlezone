@@ -249,12 +249,12 @@ export function playNinjaAttack() {
     osc.start(now);
     osc.stop(now + 0.15);
 
-    // Treffer-Geräusch
+    // Hit sound effect
     setTimeout(() => playNoise(0.05, 0.25, 500), 100);
 }
 
 /**
- * Spielt den passenden Waffen-Sound basierend auf Einheitenklasse
+ * Play the appropriate weapon sound based on unit class
  */
 export function playWeaponSound(unitClass) {
     switch (unitClass) {
@@ -373,15 +373,15 @@ export function playShieldBlock() {
     playNoise(0.05, 0.2, 3000);
 }
 
-// ===== SPEZIALFÄHIGKEITS-SOUNDS =====
+// ===== SPECIAL ABILITY SOUNDS =====
 
 /**
- * Heilung
+ * Healing sound effect
  */
 export function playHeal() {
     if (!ensureAudioReady() || !audioSettings.enabled) return;
 
-    // Aufsteigender, warmer Ton
+    // Ascending, warm tone
     const now = audioContext.currentTime;
 
     [400, 500, 600, 800].forEach((freq, i) => {
@@ -392,13 +392,13 @@ export function playHeal() {
 }
 
 /**
- * Sprint aktiviert
+ * Sprint activated sound effect
  */
 export function playSprint() {
     if (!ensureAudioReady() || !audioSettings.enabled) return;
     if (!audioContext || !masterGain) return;
 
-    // Schneller aufsteigender Ton
+    // Fast ascending tone
     const now = audioContext.currentTime;
 
     const osc = audioContext.createOscillator();
@@ -419,24 +419,24 @@ export function playSprint() {
 }
 
 /**
- * Powershot aktiviert
+ * Powershot activated sound effect
  */
 export function playPowershot() {
     if (!ensureAudioReady() || !audioSettings.enabled) return;
 
-    // Kraftvolles Aufladen
+    // Powerful charging sound
     playTone(150, 'sawtooth', 0.2, 0.25);
     playTone(300, 'square', 0.15, 0.15);
     playNoise(0.1, 0.15, 500);
 }
 
 /**
- * Tarnung aktiviert
+ * Cloak activated sound effect
  */
 export function playCloak() {
     if (!ensureAudioReady() || !audioSettings.enabled) return;
 
-    // Mysteriöser, abfallender Ton
+    // Mysterious, descending tone
     const now = audioContext.currentTime;
 
     const osc = audioContext.createOscillator();
@@ -671,7 +671,7 @@ export function playEvent() {
 export function playStorm() {
     if (!ensureAudioReady() || !audioSettings.enabled) return;
 
-    // Donner-ähnlicher Sound
+    // Thunder-like sound
     playNoise(0.5, 0.3, 200);
     playTone(80, 'sawtooth', 0.4, 0.2);
 
@@ -680,20 +680,20 @@ export function playStorm() {
     }, 200);
 }
 
-// ===== AMBIENT-SOUNDS =====
+// ===== AMBIENT SOUNDS =====
 
 /**
- * Startet Ambient-Sound-Loop
+ * Start ambient sound loop
  */
 export function startAmbient() {
     if (!audioContext || !audioSettings.enabled || ambientSource) return;
 
-    // Erzeuge sanftes Wind-Rauschen
-    const bufferSize = audioContext.sampleRate * 2; // 2 Sekunden Loop
+    // Create gentle wind noise
+    const bufferSize = audioContext.sampleRate * 2; // 2 second loop
     const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
     const data = buffer.getChannelData(0);
 
-    // Gefiltertes Rauschen für Wind-Effekt
+    // Filtered noise for wind effect
     let lastOut = 0;
     for (let i = 0; i < bufferSize; i++) {
         const white = Math.random() * 2 - 1;
