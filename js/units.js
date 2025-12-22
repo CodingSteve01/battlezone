@@ -4,6 +4,7 @@ import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getHex, getPlayerUnits } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
+import { updateVisibility } from './fogOfWar.js';
 
 /**
  * Create all units for all players
@@ -196,6 +197,8 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
         if (nextHex) {
             moveUnitInstant(unit, nextHex);
             state.movementAnimation.currentStep = currentStep;
+            // Update visibility after each step so fog of war is dynamically updated
+            updateVisibility();
             render();
         }
 
