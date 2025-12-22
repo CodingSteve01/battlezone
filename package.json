@@ -7,12 +7,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "lint": "eslint js/ tests/",
     "lint:fix": "eslint js/ tests/ --fix",
-    "validate": "npm run lint && npm run test"
+    "validate": "npm run lint && npm run test && npm run test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@playwright/test": "^1.57.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.15.0",
     "globals": "^15.12.0",
