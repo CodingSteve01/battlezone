@@ -6,6 +6,7 @@ import { calculateHitChance, getCoverInfo } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
+import { playPowerup, playLevelUp, playSelect } from './audio.js';
 
 /**
  * Center camera on a specific unit
@@ -134,6 +135,7 @@ function updateUnitTabs(units) {
 
         tab.onclick = () => {
             if (unit.alive) {
+                playSelect();
                 state.selectedUnit = index;
                 state.targetedUnit = null;
                 state.currentPath = null;
@@ -444,6 +446,7 @@ export function showEventBanner(event) {
  * Show power-up pickup notification
  */
 export function showPowerupPickup(powerup, result) {
+    playPowerup();
     const message = `${powerup.icon} ${powerup.name} aufgesammelt!`;
     showToast(message, 'powerup');
 }
