@@ -2,7 +2,7 @@
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit, getHex } from './state.js';
-import { calculateHitChance } from './combat.js';
+import { calculateHitChance, getCoverInfo } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
@@ -269,9 +269,11 @@ function updateTargetInfo(unit) {
     if (state.targetedUnit && unit) {
         const chance = calculateHitChance(unit, state.targetedUnit);
         const effectiveDamage = getEffectiveDamage(unit);
+        const coverInfo = getCoverInfo(unit, state.targetedUnit);
 
         const hitChanceEl = document.getElementById('hit-chance');
         const damageEl = document.getElementById('damage-info');
+        const coverEl = document.getElementById('cover-info');
 
         if (hitChanceEl) hitChanceEl.textContent = chance + '%';
         if (damageEl) {
@@ -281,6 +283,28 @@ function updateTargetInfo(unit) {
                 damageEl.textContent = `~${effectiveDamage} Schaden (+${bonusDmg})`;
             } else {
                 damageEl.textContent = `~${effectiveDamage} Schaden`;
+            }
+        }
+
+        // Show cover effectiveness info
+        if (coverEl) {
+            if (state.targetedUnit.hiding) {
+                if (coverInfo.isFlanked) {
+                    coverEl.textContent = '⚠️ Flankiert! Deckung unwirksam';
+                    coverEl.className = 'cover-info flanked';
+                } else if (coverInfo.isHidingEffective) {
+                    coverEl.textContent = `🌲 Deckung wirksam (${coverInfo.coverEffectiveness}%)`;
+                    coverEl.className = 'cover-info effective';
+                } else {
+                    coverEl.textContent = '👁️ Deckung umgangen';
+                    coverEl.className = 'cover-info bypassed';
+                }
+            } else if (coverInfo.hasLineOfSightCover) {
+                coverEl.textContent = `🌲 Hindernisse: ${coverInfo.blockingTerrain.join(', ')}`;
+                coverEl.className = 'cover-info obstacles';
+            } else {
+                coverEl.textContent = '✓ Freie Sicht';
+                coverEl.className = 'cover-info clear';
             }
         }
 
