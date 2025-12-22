@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/CodingSteve01/battlezone/compare/v1.0.2...v1.1.0) (2025-12-22)
+
+
+### Features
+
+* add distance-based stealth visibility and hex tile caching ([#33](https://github.com/CodingSteve01/battlezone/issues/33)) ([0d6996f](https://github.com/CodingSteve01/battlezone/commit/0d6996f6a7717adf71e9ff720d4974dfda0baa68))
+
 ## [1.0.2](https://github.com/CodingSteve01/battlezone/compare/v1.0.1...v1.0.2) (2025-12-22)
 
 
