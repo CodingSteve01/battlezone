@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/CodingSteve01/battlezone/compare/v1.0.1...v1.0.2) (2025-12-22)
+
+
+### Bug Fixes
+
+* correct enemy detection for stealth units and AI visibility ([#31](https://github.com/CodingSteve01/battlezone/issues/31)) ([eda86b8](https://github.com/CodingSteve01/battlezone/commit/eda86b82ff7aaf118813c8fc73aa72f9cdabc8fe))
+
 ## [1.0.1](https://github.com/CodingSteve01/battlezone/compare/v1.0.0...v1.0.1) (2025-12-22)
 
 
