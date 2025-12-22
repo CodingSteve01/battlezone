@@ -3,7 +3,7 @@
 import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
-import { getAttackableUnits, moveUnit, animateUnitMovement } from './units.js';
+import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
 import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCover } from './combat.js';
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
@@ -417,11 +417,30 @@ function handleTapOrClick(clientX, clientY) {
 
     const unit = getCurrentUnit();
 
-    // 1. Check if clicking on own unit to select it
+    // 1. Check if clicking on own unit
     if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
         const playerUnits = getPlayerUnits(state.currentPlayer);
         const unitIndex = playerUnits.findIndex(u => u.id === hex.unit.id);
         if (unitIndex >= 0) {
+            // Check if current unit is a Medic and clicking on injured ally (context action: heal)
+            if (unit && unit.class === 'medic' && hex.unit.id !== unit.id) {
+                const allyHex = hex.unit;
+                if (allyHex.currentHp < allyHex.maxHp && unit.ap >= 2 && !unit.usedSpecial) {
+                    // Show healing option
+                    showToast(`💚 ${unit.name} kann ${allyHex.name} heilen! Tippe nochmal zum Heilen.`, 'info');
+                    if (state.pendingHealTarget && state.pendingHealTarget.id === allyHex.id) {
+                        // Second tap - use special ability
+                        useSpecialAbility(unit);
+                        state.pendingHealTarget = null;
+                        render();
+                        updateUI();
+                        return;
+                    }
+                    state.pendingHealTarget = allyHex;
+                    return;
+                }
+            }
+
             // If clicking on already selected unit, do nothing special
             if (unitIndex === state.selectedUnit) {
                 return;
@@ -431,6 +450,7 @@ function handleTapOrClick(clientX, clientY) {
             state.pendingMoveDestination = null;
             state.currentPath = null;
             state.targetedUnit = null;
+            state.pendingHealTarget = null;
             state.selectedAction = 'move';  // Reset to move mode
             updateUI();
             render();
@@ -647,6 +667,12 @@ function handleMoveClick(unit, hex) {
 
             // Check for newly discovered enemies
             checkForNewEnemies(prevEnemyIds);
+
+            // Auto-take cover if on valid terrain (forest)
+            if (canAutoTakeCover(unit)) {
+                autoTakeCover(unit);
+                showToast('🌲 Automatisch in Deckung gegangen!', 'special');
+            }
 
             render();
             updateUI();

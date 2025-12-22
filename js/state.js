@@ -26,6 +26,7 @@ export const state = {
     targetedUnit: null,
     currentPath: null,  // A* path for visualization
     pendingMoveDestination: null,  // Hex for tap-to-confirm movement
+    pendingHealTarget: null,  // For context-sensitive healing action
 
     // Game progress
     round: 1,
@@ -108,6 +109,7 @@ export function resetState() {
     state.targetedUnit = null;
     state.currentPath = null;
     state.pendingMoveDestination = null;
+    state.pendingHealTarget = null;
     state.round = 1;
     state.gameOver = false;
     state.animating = false;

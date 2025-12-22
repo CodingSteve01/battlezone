@@ -2,7 +2,7 @@
 
 import { state, getHex, getPlayerUnits, addGhostIndicator } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
-import { hexDistance, hexToPixel } from './hexMath.js';
+import { hexDistance, hexToPixel, hexLine, getNeighbors } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
@@ -48,6 +48,158 @@ export function revealFromCover(unit) {
 }
 
 /**
+ * Check if there is a clear line of sight between two hex positions
+ * Returns { clear: boolean, blockedBy: string|null, blockingHex: {q,r}|null }
+ * Rocks completely block LOS, multiple forests heavily obstruct
+ */
+export function hasLineOfSight(fromQ, fromR, toQ, toR) {
+    const line = hexLine(
+        { q: fromQ, r: fromR },
+        { q: toQ, r: toR }
+    );
+
+    let forestCount = 0;
+
+    // Check hexes between start and end (excluding start and end)
+    for (let i = 1; i < line.length - 1; i++) {
+        const hex = getHex(line[i].q, line[i].r);
+        if (hex) {
+            // Rocks completely block line of sight
+            if (hex.type === 'rock') {
+                return {
+                    clear: false,
+                    blockedBy: 'rock',
+                    blockingHex: { q: line[i].q, r: line[i].r }
+                };
+            }
+            // Multiple forests block line of sight (simulates dense vegetation)
+            if (hex.type === 'forest') {
+                forestCount++;
+                if (forestCount >= 2) {
+                    return {
+                        clear: false,
+                        blockedBy: 'forest',
+                        blockingHex: { q: line[i].q, r: line[i].r }
+                    };
+                }
+            }
+        }
+    }
+
+    return { clear: true, blockedBy: null, blockingHex: null };
+}
+
+/**
+ * Calculate how much cover is on the line of sight between attacker and defender
+ * Returns an object with cover information
+ */
+function calculateLineOfSightCover(attacker, defender) {
+    const line = hexLine(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
+
+    let coverCount = 0;
+    let blockingTerrain = [];
+
+    // Check hexes between attacker and defender (excluding start and end)
+    for (let i = 1; i < line.length - 1; i++) {
+        const hex = getHex(line[i].q, line[i].r);
+        if (hex) {
+            const terrain = TERRAIN[hex.type];
+            if (terrain) {
+                // Rocks and forest provide cover on the line of sight
+                if (hex.type === 'rock') {
+                    coverCount += 2; // Rocks provide more cover
+                    blockingTerrain.push('rock');
+                } else if (hex.type === 'forest') {
+                    coverCount += 1;
+                    blockingTerrain.push('forest');
+                }
+            }
+        }
+    }
+
+    return {
+        coverCount,
+        blockingTerrain,
+        hasObstruction: coverCount > 0
+    };
+}
+
+/**
+ * Check if defender's cover (hiding position) is effective against this attacker
+ * Cover is effective when the defender is positioned so that terrain is between them and the attacker
+ */
+function isCoverEffectiveAgainstAttacker(attacker, defender) {
+    if (!defender.hiding) return false;
+
+    const defHex = getHex(defender.q, defender.r);
+    if (!defHex) return false;
+
+    const terrain = TERRAIN[defHex.type];
+    if (!terrain || !terrain.canHide) return false;
+
+    const distance = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
+
+    // At melee range (distance 1), cover is less effective - enemy is too close
+    if (distance <= 1) {
+        return false;
+    }
+
+    // Check if there's blocking terrain on the line of sight
+    // If attacker shoots through forest/obstacles, the defender's cover is effective
+    const losInfo = calculateLineOfSightCover(attacker, defender);
+
+    // Cover is effective if:
+    // 1. There's terrain blocking the line of sight, OR
+    // 2. The defender is in forest and the attack comes from distance >= 2
+    //    (simulating the defender using trees as cover in their hex)
+
+    if (losInfo.hasObstruction) {
+        return true;
+    }
+
+    // If defender is in forest and at range, they can use the local trees as cover
+    // But this is less effective than having obstacles between them
+    if (defHex.type === 'forest' && distance >= 2) {
+        // Check if the attacker's angle allows the defender to hide behind trees
+        // We simulate this by checking if the defender's hex has "effective" tree positions
+        // For simplicity: at range 2+, forest cover is 70% effective based on direction
+        return Math.random() < 0.7;
+    }
+
+    return false;
+}
+
+/**
+ * Calculate the cover direction penalty
+ * Returns 0-100% effectiveness based on attacker angle relative to defender
+ */
+function calculateCoverEffectiveness(attacker, defender) {
+    if (!defender.hiding) return 0;
+
+    // Check basic cover effectiveness
+    if (!isCoverEffectiveAgainstAttacker(attacker, defender)) {
+        return 0; // Cover is not effective from this angle
+    }
+
+    // Calculate LOS obstruction
+    const losInfo = calculateLineOfSightCover(attacker, defender);
+
+    let effectiveness = 0.5; // Base 50% if cover is effective
+
+    // Add bonus for each obstruction
+    effectiveness += losInfo.coverCount * 0.25;
+
+    // Cap at 100%
+    return Math.min(1.0, effectiveness);
+}
+
+/**
  * Calculate hit chance for an attack
  */
 export function calculateHitChance(attacker, defender) {
@@ -57,14 +209,28 @@ export function calculateHitChance(attacker, defender) {
     const attHex = getHex(attacker.q, attacker.r);
     const defHex = getHex(defender.q, defender.r);
 
-    // Defender in cover (forest) - harder to hit
-    if (defHex && defHex.cover) {
-        chance -= 25;
+    // Calculate line of sight cover
+    const losInfo = calculateLineOfSightCover(attacker, defender);
+
+    // Penalty for shooting through obstacles
+    if (losInfo.hasObstruction) {
+        chance -= losInfo.coverCount * 10; // -10% per obstacle
     }
 
-    // Defender is actively hiding - even harder to hit
+    // Defender in cover terrain (forest) - base cover bonus
+    if (defHex && defHex.cover) {
+        chance -= 15; // Reduced from 25 - this is passive terrain cover
+    }
+
+    // Defender is actively hiding - bonus depends on direction
     if (defender.hiding) {
-        chance -= 20;
+        const coverEffectiveness = calculateCoverEffectiveness(attacker, defender);
+        if (coverEffectiveness > 0) {
+            // Cover is effective - apply full hiding bonus scaled by effectiveness
+            const hidingPenalty = Math.round(25 * coverEffectiveness);
+            chance -= hidingPenalty;
+        }
+        // If coverEffectiveness is 0, the attacker has a clear shot (flanked)
     }
 
     // Attacker on hills - better accuracy (high ground)
@@ -102,6 +268,27 @@ export function calculateHitChance(attacker, defender) {
 
     // Clamp to reasonable bounds
     return Math.min(95, Math.max(25, chance));
+}
+
+/**
+ * Get cover info for UI display
+ */
+export function getCoverInfo(attacker, defender) {
+    const losInfo = calculateLineOfSightCover(attacker, defender);
+    const coverEffectiveness = calculateCoverEffectiveness(attacker, defender);
+    const distance = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
+
+    return {
+        hasLineOfSightCover: losInfo.hasObstruction,
+        blockingTerrain: losInfo.blockingTerrain,
+        isHidingEffective: coverEffectiveness > 0,
+        coverEffectiveness: Math.round(coverEffectiveness * 100),
+        distance,
+        isFlanked: defender.hiding && coverEffectiveness === 0
+    };
 }
 
 /**

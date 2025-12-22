@@ -573,6 +573,38 @@ button:focus:not(:focus-visible),
     margin-top: 4px;
 }
 
+.target-info .cover-info {
+    font-size: 11px;
+    margin-top: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.target-info .cover-info.clear {
+    color: #9ca3af;
+}
+
+.target-info .cover-info.effective {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.target-info .cover-info.flanked {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.15);
+}
+
+.target-info .cover-info.bypassed {
+    color: #f97316;
+    background: rgba(249, 115, 22, 0.15);
+}
+
+.target-info .cover-info.obstacles {
+    color: #a78bfa;
+    background: rgba(167, 139, 250, 0.15);
+}
+
 .target-info .attack-hint {
     color: var(--yellow);
     font-size: 11px;
@@ -898,6 +930,37 @@ button:focus:not(:focus-visible),
 .action-btn.special-btn.disabled {
     opacity: 0.4;
     pointer-events: none;
+}
+
+/* Suggested action - pulsing animation to draw attention */
+.action-btn.suggested {
+    animation: suggestPulse 1.5s ease-in-out infinite;
+    border-color: #fbbf24 !important;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.action-btn.suggested::before {
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.15) 0%, transparent 50%);
+}
+
+@keyframes suggestPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 25px rgba(251, 191, 36, 0.5);
+    }
+}
+
+/* Special tip text under button */
+.special-tip {
+    font-size: 9px;
+    color: #fbbf24;
+    margin-top: 2px;
+    opacity: 0.9;
+    text-align: center;
 }
 
 .end-turn-btn {

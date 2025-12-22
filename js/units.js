@@ -3,6 +3,7 @@
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getHex, getPlayerUnits } from './state.js';
 import { getSpawnPositions } from './map.js';
+import { hasLineOfSight } from './combat.js';
 
 /**
  * Create all units for all players
@@ -74,6 +75,7 @@ export function getEffectiveRange(unit) {
 
 /**
  * Get attackable enemies for a unit
+ * Considers range and line of sight (rocks block completely, 2+ forests block)
  */
 export function getAttackableUnits(unit) {
     if (unit.ap < 1) return [];
@@ -88,7 +90,43 @@ export function getAttackableUnits(unit) {
         const dz = Math.abs((-target.q - target.r) - (-unit.q - unit.r));
         const dist = Math.max(dx, dy, dz);
 
-        return dist <= effectiveRange;
+        if (dist > effectiveRange) return false;
+
+        // Check line of sight - can't attack through rocks or dense forests
+        const los = hasLineOfSight(unit.q, unit.r, target.q, target.r);
+        return los.clear;
+    });
+}
+
+/**
+ * Get enemies in range but with blocked line of sight
+ * Used for UI feedback
+ */
+export function getBlockedTargets(unit) {
+    if (unit.ap < 1) return [];
+
+    const effectiveRange = getEffectiveRange(unit);
+
+    return state.units.filter(target => {
+        if (!target.alive || target.player === unit.player) return false;
+
+        const dx = Math.abs(target.q - unit.q);
+        const dy = Math.abs(target.r - unit.r);
+        const dz = Math.abs((-target.q - target.r) - (-unit.q - unit.r));
+        const dist = Math.max(dx, dy, dz);
+
+        if (dist > effectiveRange) return false;
+
+        // Return only those with blocked LOS
+        const los = hasLineOfSight(unit.q, unit.r, target.q, target.r);
+        return !los.clear;
+    }).map(target => {
+        const los = hasLineOfSight(unit.q, unit.r, target.q, target.r);
+        return {
+            unit: target,
+            blockedBy: los.blockedBy,
+            blockingHex: los.blockingHex
+        };
     });
 }
 
@@ -218,6 +256,31 @@ export function killUnit(unit) {
 
     const hex = getHex(unit.q, unit.r);
     if (hex) hex.unit = null;
+}
+
+/**
+ * Check if unit can automatically take cover at current position
+ */
+export function canAutoTakeCover(unit) {
+    if (!unit || !unit.alive) return false;
+    if (unit.hiding) return false;
+
+    const hex = getHex(unit.q, unit.r);
+    if (!hex) return false;
+
+    const terrain = TERRAIN[hex.type];
+    return terrain && terrain.canHide;
+}
+
+/**
+ * Automatically take cover if standing on a valid terrain
+ * Returns true if cover was taken
+ */
+export function autoTakeCover(unit) {
+    if (!canAutoTakeCover(unit)) return false;
+
+    unit.hiding = true;
+    return true;
 }
 
 /**

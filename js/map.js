@@ -139,11 +139,45 @@ function shuffleArray(array) {
 }
 
 /**
+ * Clamp a spawn position to be within map bounds
+ */
+function clampSpawnPosition(pos, radius) {
+    let { q, r } = pos;
+
+    // First, check if position is valid
+    if (isValidHex(q, r, radius)) {
+        return { q, r };
+    }
+
+    // If not valid, find the nearest valid hex
+    // Scale down the position proportionally to fit within bounds
+    const maxCoord = Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+    if (maxCoord > 0) {
+        const scale = (radius - 1) / maxCoord;
+        q = Math.round(q * scale);
+        r = Math.round(r * scale);
+    }
+
+    // Final validation - if still invalid, move toward center
+    while (!isValidHex(q, r, radius) && (Math.abs(q) > 0 || Math.abs(r) > 0)) {
+        if (Math.abs(q) >= Math.abs(r)) {
+            q = q > 0 ? q - 1 : q + 1;
+        } else {
+            r = r > 0 ? r - 1 : r + 1;
+        }
+    }
+
+    return { q, r };
+}
+
+/**
  * Get spawn positions for all players - randomized each game
  */
 export function getSpawnPositions() {
     const radius = CONFIG.MAP_SIZES[state.settings.size];
-    const offset = CONFIG.SPAWN_OFFSET[state.settings.size];
+    // Use a smaller offset to ensure spawns are well inside the map
+    const baseOffset = CONFIG.SPAWN_OFFSET[state.settings.size];
+    const offset = Math.min(baseOffset, radius - 2);
 
     // Define all possible spawn locations (6 directions for variety)
     const allSpawnLocations = [
@@ -161,32 +195,37 @@ export function getSpawnPositions() {
         ],
         // North-West
         [
-            { q: -Math.floor(offset * 0.7), r: -Math.floor(offset * 0.7) },
-            { q: -Math.floor(offset * 0.7) + 1, r: -Math.floor(offset * 0.7) },
-            { q: -Math.floor(offset * 0.7), r: -Math.floor(offset * 0.7) + 1 }
+            { q: -Math.floor(offset * 0.6), r: -Math.floor(offset * 0.6) },
+            { q: -Math.floor(offset * 0.6) + 1, r: -Math.floor(offset * 0.6) },
+            { q: -Math.floor(offset * 0.6), r: -Math.floor(offset * 0.6) + 1 }
         ],
         // North-East
         [
-            { q: Math.floor(offset * 0.7), r: -offset },
-            { q: Math.floor(offset * 0.7) - 1, r: -offset + 1 },
-            { q: Math.floor(offset * 0.7), r: -offset + 1 }
+            { q: Math.floor(offset * 0.6), r: -Math.floor(offset * 0.8) },
+            { q: Math.floor(offset * 0.6) - 1, r: -Math.floor(offset * 0.8) + 1 },
+            { q: Math.floor(offset * 0.6), r: -Math.floor(offset * 0.8) + 1 }
         ],
         // South-West
         [
-            { q: -Math.floor(offset * 0.7), r: offset },
-            { q: -Math.floor(offset * 0.7), r: offset - 1 },
-            { q: -Math.floor(offset * 0.7) + 1, r: offset - 1 }
+            { q: -Math.floor(offset * 0.6), r: Math.floor(offset * 0.8) },
+            { q: -Math.floor(offset * 0.6), r: Math.floor(offset * 0.8) - 1 },
+            { q: -Math.floor(offset * 0.6) + 1, r: Math.floor(offset * 0.8) - 1 }
         ],
         // South-East
         [
-            { q: Math.floor(offset * 0.7), r: Math.floor(offset * 0.7) },
-            { q: Math.floor(offset * 0.7) - 1, r: Math.floor(offset * 0.7) },
-            { q: Math.floor(offset * 0.7), r: Math.floor(offset * 0.7) - 1 }
+            { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) },
+            { q: Math.floor(offset * 0.6) - 1, r: Math.floor(offset * 0.6) },
+            { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) - 1 }
         ]
     ];
 
+    // Validate and clamp all spawn positions to be within map bounds
+    const validatedLocations = allSpawnLocations.map(playerSpawns =>
+        playerSpawns.map(pos => clampSpawnPosition(pos, radius))
+    );
+
     // Shuffle spawn locations for variety
-    const shuffled = shuffleArray(allSpawnLocations);
+    const shuffled = shuffleArray(validatedLocations);
 
     // Return only the number of spawns needed for active players
     return shuffled.slice(0, 4);

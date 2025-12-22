@@ -4,7 +4,7 @@ import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath } from './state.js';
 import { hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits, getEffectiveRange } from './units.js';
+import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
@@ -187,7 +187,63 @@ function seededRandom(seed) {
 }
 
 /**
+ * Collect foreground elements (trees, large rocks) for 2.5D depth sorting
+ * Returns array of objects with draw function and y-position
+ */
+function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
+    const elements = [];
+    const s = size * 0.45;
+    const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
+
+    if (type === 'forest') {
+        // Trees are foreground elements - make them bigger for 2.5D effect
+        const treeCount = 1 + Math.abs(baseSeed % 2);
+        for (let i = 0; i < treeCount; i++) {
+            const tx = cx + (seededRandom(baseSeed + i * 10) - 0.5) * s * 0.6;
+            const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.4;
+            // Make trees 2x bigger for proper 2.5D effect
+            const treeSize = s * (1.4 + seededRandom(baseSeed + i * 10 + 2) * 0.6);
+            const treeType = Math.floor(seededRandom(baseSeed + i * 10 + 3) * 3);
+
+            elements.push({
+                type: 'tree',
+                x: tx,
+                y: ty,
+                // Sort by base of tree (where it touches ground)
+                sortY: ty + treeSize * 0.5,
+                draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i)
+            });
+        }
+    } else if (type === 'grass') {
+        // Large bushes on grass are foreground elements
+        const grassType = Math.abs(baseSeed) % 100;
+        if (grassType < 15) {
+            const bushSize = s * 0.8;
+            elements.push({
+                type: 'bush',
+                x: cx,
+                y: cy,
+                sortY: cy + bushSize * 0.3,
+                draw: () => drawBush2D5(cx, cy, bushSize, baseSeed)
+            });
+        }
+    } else if (type === 'rock') {
+        // Rock formations are foreground elements
+        elements.push({
+            type: 'rock',
+            x: cx,
+            y: cy,
+            sortY: cy + s * 0.3,
+            draw: () => drawRockFormation2D5(cx, cy, s * 1.3, baseSeed)
+        });
+    }
+
+    return elements;
+}
+
+/**
  * Draw enhanced terrain pattern on a hex - optimized for performance
+ * Now only draws ground-level details, foreground elements are collected separately
  */
 function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     const s = size * 0.45;
@@ -198,31 +254,27 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            // Simplified grass - just a few blades and occasional decoration
+            // Draw ground-level grass blades
             drawGrassBlades(cx, cy, s, baseSeed);
 
-            // Only 30% of grass hexes get extra decoration
+            // Small flowers stay on ground level
             const grassType = Math.abs(baseSeed) % 100;
-            if (grassType < 15) {
-                drawBush(cx, cy, s * 0.4, baseSeed);
-            } else if (grassType < 30) {
+            if (grassType >= 15 && grassType < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
             }
             break;
 
         case 'forest':
-            // Simplified forest - fewer trees
-            const treeCount = 1 + Math.abs(baseSeed % 2);
-            for (let i = 0; i < treeCount; i++) {
-                const tx = cx + (seededRandom(baseSeed + i * 10) - 0.5) * s * 0.8;
-                const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.6;
-                const treeSize = s * (0.7 + seededRandom(baseSeed + i * 10 + 2) * 0.4);
-                drawTree(tx, ty, treeSize, 0, baseSeed + i);
-            }
+            // Draw forest floor (leaves, small plants) - trees are drawn as foreground
+            drawForestFloor(cx, cy, s, baseSeed);
             break;
 
         case 'rock':
-            drawRockFormation(cx, cy, s, baseSeed);
+            // Ground shadow for rocks - actual rocks are foreground
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(cx + 2, cy + s * 0.3, s * 0.7, s * 0.25, 0, 0, Math.PI * 2);
+            ctx.fill();
             break;
 
         case 'water':
@@ -252,6 +304,177 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'river':
             drawRiverDetails(cx, cy, s, baseSeed);
             break;
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw a tree with 2.5D depth effect - larger and more detailed
+ */
+function drawTree2D5(x, y, size, treeType, seed) {
+    ctx.save();
+
+    // Ground shadow - larger and more visible
+    ctx.fillStyle = 'rgba(0, 20, 10, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.55, size * 0.5, size * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Trunk - thicker for bigger trees
+    ctx.fillStyle = '#3d2817';
+    const trunkWidth = size * 0.15;
+    const trunkHeight = size * 0.5;
+    ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
+
+    // Trunk detail/bark
+    ctx.strokeStyle = '#2a1a0f';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - trunkWidth * 0.25, y + size * 0.1);
+    ctx.lineTo(x - trunkWidth * 0.15, y + trunkHeight * 0.8);
+    ctx.moveTo(x + trunkWidth * 0.2, y + size * 0.15);
+    ctx.lineTo(x + trunkWidth * 0.1, y + trunkHeight * 0.7);
+    ctx.stroke();
+
+    if (treeType === 0) {
+        // Pine tree - larger layers
+        const layers = 5;
+        for (let i = layers - 1; i >= 0; i--) {
+            const layerY = y - size * 0.05 - i * size * 0.18;
+            const layerWidth = size * (0.55 - i * 0.08);
+
+            ctx.fillStyle = `rgb(${15 + i * 7}, ${45 + i * 10}, ${25 + i * 5})`;
+            ctx.beginPath();
+            ctx.moveTo(x, layerY - size * 0.28);
+            ctx.lineTo(x - layerWidth, layerY + size * 0.12);
+            ctx.lineTo(x + layerWidth, layerY + size * 0.12);
+            ctx.closePath();
+            ctx.fill();
+        }
+    } else if (treeType === 1) {
+        // Round/deciduous tree - larger canopy
+        const foliageColors = ['#1a4d2e', '#165a32', '#1e6b3a', '#2a7a45'];
+        for (let i = 0; i < 4; i++) {
+            const fx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.35;
+            const fy = y - size * 0.3 + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.25;
+            const fSize = size * (0.4 + seededRandom(seed + i * 5 + 2) * 0.2);
+
+            ctx.fillStyle = foliageColors[i % foliageColors.length];
+            ctx.beginPath();
+            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else {
+        // Oak-style tree - larger and fuller
+        ctx.fillStyle = '#1a4d2e';
+        ctx.beginPath();
+        ctx.ellipse(x, y - size * 0.25, size * 0.55, size * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#165a32';
+        ctx.beginPath();
+        ctx.ellipse(x - size * 0.18, y - size * 0.38, size * 0.35, size * 0.28, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#1e6b3a';
+        ctx.beginPath();
+        ctx.ellipse(x + size * 0.15, y - size * 0.42, size * 0.3, size * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Light highlight on foliage
+    ctx.fillStyle = 'rgba(150, 200, 120, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.18, y - size * 0.4, size * 0.18, size * 0.14, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Draw a bush with 2.5D depth effect - larger
+ */
+function drawBush2D5(x, y, size, seed) {
+    ctx.save();
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 30, 10, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.35, size * 0.6, size * 0.18, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bush layers - larger
+    const layers = 4;
+    for (let i = layers - 1; i >= 0; i--) {
+        const layerSize = size * (0.5 + i * 0.18);
+        const yOff = -i * size * 0.1;
+        const shade = 0.55 + i * 0.12;
+        ctx.fillStyle = `rgb(${Math.floor(30 * shade)}, ${Math.floor(70 * shade)}, ${Math.floor(35 * shade)})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y + yOff, layerSize, layerSize * 0.65, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Highlight
+    ctx.fillStyle = 'rgba(100, 160, 80, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.18, y - size * 0.2, size * 0.28, size * 0.22, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Draw a rock formation with 2.5D depth effect
+ */
+function drawRockFormation2D5(cx, cy, s, seed) {
+    ctx.save();
+
+    // Main rock shadow - larger
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.ellipse(cx + 4, cy + s * 0.2, s * 0.9, s * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Main rock - larger
+    ctx.fillStyle = '#5a5a6a';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + s * 0.08, s * 0.9, s * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Secondary rocks - more prominent
+    ctx.fillStyle = '#6a6a7a';
+    ctx.beginPath();
+    ctx.ellipse(cx - s * 0.3, cy - s * 0.18, s * 0.5, s * 0.35, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#757585';
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 0.35, cy - s * 0.08, s * 0.4, s * 0.28, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Cracks
+    ctx.strokeStyle = 'rgba(40, 40, 50, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.35, cy);
+    ctx.lineTo(cx - s * 0.12, cy + s * 0.18);
+    ctx.lineTo(cx + s * 0.12, cy + s * 0.12);
+    ctx.stroke();
+
+    // Highlights
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(cx - s * 0.4, cy - s * 0.25, s * 0.18, s * 0.12, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Moss patches
+    if (seededRandom(seed) > 0.4) {
+        ctx.fillStyle = 'rgba(60, 100, 50, 0.6)';
+        ctx.beginPath();
+        ctx.ellipse(cx + s * 0.25, cy - s * 0.28, s * 0.18, s * 0.12, 0.5, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     ctx.restore();
@@ -529,6 +752,56 @@ function drawWildMeadow(cx, cy, s, seed) {
             ctx.fill();
         }
     }
+}
+
+/**
+ * Draw forest floor - leaves, fallen branches, small plants
+ */
+function drawForestFloor(cx, cy, s, seed) {
+    // Fallen leaves scattered on ground
+    const leafCount = 4 + (seed % 4);
+    for (let i = 0; i < leafCount; i++) {
+        const lx = cx + (seededRandom(seed + i * 11) - 0.5) * s * 1.6;
+        const ly = cy + (seededRandom(seed + i * 11 + 1) - 0.5) * s * 1.2;
+        const leafSize = s * (0.08 + seededRandom(seed + i * 11 + 2) * 0.06);
+        const rotation = seededRandom(seed + i * 11 + 3) * Math.PI * 2;
+
+        const shade = 0.4 + seededRandom(seed + i * 11 + 4) * 0.3;
+        ctx.fillStyle = `rgba(${Math.floor(80 * shade)}, ${Math.floor(60 * shade)}, ${Math.floor(30 * shade)}, 0.6)`;
+        ctx.save();
+        ctx.translate(lx, ly);
+        ctx.rotate(rotation);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, leafSize, leafSize * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Small ferns/plants
+    const fernCount = 2 + (seed % 2);
+    for (let i = 0; i < fernCount; i++) {
+        const fx = cx + (seededRandom(seed + i * 17) - 0.5) * s * 1.2;
+        const fy = cy + (seededRandom(seed + i * 17 + 1) - 0.5) * s * 0.8;
+        const fernSize = s * (0.15 + seededRandom(seed + i * 17 + 2) * 0.1);
+
+        ctx.strokeStyle = 'rgba(35, 80, 45, 0.7)';
+        ctx.lineWidth = 1.5;
+
+        // Draw small fern fronds
+        for (let j = 0; j < 3; j++) {
+            const angle = -Math.PI / 2 + (j - 1) * 0.4;
+            ctx.beginPath();
+            ctx.moveTo(fx, fy);
+            ctx.lineTo(fx + Math.cos(angle) * fernSize, fy + Math.sin(angle) * fernSize);
+            ctx.stroke();
+        }
+    }
+
+    // Darker ground patches (shade from trees)
+    ctx.fillStyle = 'rgba(0, 20, 10, 0.15)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, s * 0.5, s * 0.3, seededRandom(seed + 50) * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 /**
@@ -1177,7 +1450,7 @@ function drawGhostIndicator(cx, cy, ghost) {
 /**
  * Draw a human unit with equipment
  */
-function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
+function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
     const size = state.hexSize * 0.65;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
@@ -1256,6 +1529,27 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
         ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
         ctx.fillText('🛡️', cx, cy - size - 5);
         ctx.shadowBlur = 0;
+    }
+
+    // Hiding/Cover indicator - unit is in cover
+    if (unit.hiding) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 12;
+        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🌲', cx - size * 0.5, cy - size - 5);
+        ctx.shadowBlur = 0;
+
+        // Draw cover effect around unit
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
     }
 
     // Cloak indicator (visible to owner)
@@ -1368,6 +1662,37 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
         ctx.stroke();
     }
 
+    // Blocked target indicator - in range but no line of sight
+    if (isBlocked && !isSelected) {
+        // Dimmed ring
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // "No LOS" indicator with crossed lines
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
+        ctx.lineWidth = 3;
+        const xSize = 8;
+        const xY = cy - size - 15;
+        ctx.beginPath();
+        ctx.moveTo(cx - xSize, xY - xSize);
+        ctx.lineTo(cx + xSize, xY + xSize);
+        ctx.moveTo(cx + xSize, xY - xSize);
+        ctx.lineTo(cx - xSize, xY + xSize);
+        ctx.stroke();
+
+        // Show what's blocking (icon)
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const blockIcon = blockedInfo && blockedInfo.blockedBy === 'rock' ? '🪨' : '🌲';
+        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - 15);
+    }
+
     ctx.restore();
 }
 
@@ -1426,11 +1751,15 @@ export function render() {
     // Always show reachable hexes when a unit is selected (point-and-click system)
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
+    const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
 
     // Get max move cost for path visualization (consistent with getReachableHexes)
     const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
 
-    // Draw hexes
+    // Collect all foreground elements for 2.5D depth sorting
+    const foregroundElements = [];
+
+    // Draw hexes (ground layer)
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
@@ -1459,9 +1788,13 @@ export function render() {
         const terrainData = fogLevel === 'visible' ? terrain : null;
         drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
 
-        // Draw terrain details (always when visible - landscape decorations)
+        // Draw terrain details (ground-level only)
         if (fogLevel === 'visible') {
             drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+
+            // Collect foreground elements for 2.5D sorting (trees, large rocks, bushes)
+            const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            foregroundElements.push(...elements);
         }
 
 
@@ -1478,20 +1811,32 @@ export function render() {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && !hex.unit) {
-                // Draw simple movement range highlight (green)
+                // Check if this hex offers cover
+                const hexTerrain = TERRAIN[hex.type];
+                const offersCover = hexTerrain && hexTerrain.canHide;
+
+                // Draw simple movement range highlight (green, or darker green for cover)
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.85);
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+                ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.25)' : 'rgba(34, 197, 94, 0.15)';
                 ctx.fill();
 
                 // Subtle border with cost indicator for high-cost terrain
-                ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
-                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = offersCover ? 'rgba(16, 185, 129, 0.6)' : 'rgba(34, 197, 94, 0.4)';
+                ctx.lineWidth = offersCover ? 2 : 1.5;
                 ctx.stroke();
+
+                // Show cover icon for hexes that offer hiding
+                if (offersCover) {
+                    ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🛡️', sx, sy - state.hexSize * 0.25);
+                }
 
                 // Show movement cost on each hex for better clarity
                 if (pathData.cost > 0) {
-                    ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
+                    ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.9)' : 'rgba(34, 197, 94, 0.9)';
                     ctx.font = `bold ${Math.round(state.hexSize * 0.25)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -1748,12 +2093,12 @@ export function render() {
         drawGhostIndicator(sx, sy, ghost);
     });
 
-    // Draw units (sorted by y position for proper layering)
+    // Combine units and foreground elements for 2.5D depth sorting
     const visibleUnits = state.units
-        .filter(unit => unit.alive && isUnitVisible(unit))
-        .sort((a, b) => a.r - b.r);
+        .filter(unit => unit.alive && isUnitVisible(unit));
 
-    visibleUnits.forEach(unit => {
+    // Convert units to drawable objects with sortY
+    const unitDrawables = visibleUnits.map(unit => {
         const pos = hexToPixel(unit.q, unit.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
@@ -1761,8 +2106,26 @@ export function render() {
         const isSelected = currentUnit && unit.id === currentUnit.id;
         const isTargeted = state.targetedUnit && unit.id === state.targetedUnit.id;
         const isAttackable = attackableUnits.some(u => u.id === unit.id);
+        const blockedInfo = blockedTargets.find(b => b.unit.id === unit.id);
+        const isBlocked = !!blockedInfo;
 
-        drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable);
+        return {
+            type: 'unit',
+            x: sx,
+            y: sy,
+            sortY: sy + state.hexSize * 0.4, // Sort by feet position
+            draw: () => drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable, isBlocked, blockedInfo),
+            unit: unit
+        };
+    });
+
+    // Combine all drawable elements and sort by Y position (bottom-to-top)
+    const allDrawables = [...foregroundElements, ...unitDrawables];
+    allDrawables.sort((a, b) => a.sortY - b.sortY);
+
+    // Draw all elements in sorted order
+    allDrawables.forEach(drawable => {
+        drawable.draw();
     });
 
     // Draw attack range indicator when targeting an enemy
