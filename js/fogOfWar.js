@@ -60,6 +60,9 @@ export function updateVisibility() {
             state.exploredHexes.add(key); // Mark as explored for THIS player only
         });
     }
+
+    // Update spotted status for current player's units
+    updateSpottedStatus();
 }
 
 /**
@@ -163,4 +166,58 @@ export function getFogLevel(q, r) {
     }
 
     return 'hidden';
+}
+
+/**
+ * Check if a unit would be visible to enemy players
+ * Used to show "spotted" indicator on own units
+ */
+export function checkUnitSpotted(unit) {
+    if (!unit || !unit.alive) return false;
+
+    // Cloaked units can't be spotted
+    if (unit.cloaked) return false;
+
+    // Check if any enemy unit has line of sight to this unit
+    const enemyPlayers = [];
+    for (let p = 0; p < state.settings.players; p++) {
+        if (p !== unit.player) {
+            enemyPlayers.push(p);
+        }
+    }
+
+    for (const enemyPlayer of enemyPlayers) {
+        const enemyUnits = getPlayerUnits(enemyPlayer);
+        for (const enemy of enemyUnits) {
+            const visionRange = enemy.vision || CONFIG.VISION_RANGE;
+            const distance = hexDistance({ q: enemy.q, r: enemy.r }, { q: unit.q, r: unit.r });
+
+            if (distance <= visionRange) {
+                const los = hasLineOfSight(enemy.q, enemy.r, unit.q, unit.r);
+                if (los.clear) {
+                    // Hiding units are harder to detect
+                    if (unit.hiding) {
+                        if (distance <= 2) {
+                            return true; // Close enough to detect
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Update spotted status for all units of current player
+ */
+export function updateSpottedStatus() {
+    const currentUnits = getPlayerUnits(state.currentPlayer);
+
+    for (const unit of currentUnits) {
+        unit.spotted = checkUnitSpotted(unit);
+    }
 }
