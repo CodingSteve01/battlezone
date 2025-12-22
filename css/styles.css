@@ -1124,6 +1124,13 @@ button:focus:not(:focus-visible),
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%);
 }
 
+.toast.info {
+    border-color: #22d3d1;
+    color: #22d3d1;
+    background: linear-gradient(135deg, rgba(34, 211, 209, 0.15) 0%, rgba(20, 184, 166, 0.1) 100%);
+    box-shadow: var(--shadow-lg), 0 0 30px rgba(34, 211, 209, 0.3);
+}
+
 /* ===== SHIELD INDICATOR ON UNIT ===== */
 .unit-shield {
     position: absolute;

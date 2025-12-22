@@ -1,9 +1,9 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits } from './state.js';
+import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
-import { updateVisibility } from './fogOfWar.js';
+import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
@@ -36,6 +36,22 @@ export function startTurn() {
 
     // Update fog of war
     updateVisibility();
+
+    // Initialize enemy tracking for this player's turn
+    const visibleEnemies = getVisibleEnemies();
+    updatePreviouslyVisibleEnemies(visibleEnemies.map(e => e.id));
+
+    // Check if selected unit has a queued path
+    const currentUnit = units[0];
+    if (currentUnit) {
+        const queuedPath = getQueuedPath(currentUnit.id);
+        if (queuedPath && queuedPath.path) {
+            // Show notification about queued path
+            setTimeout(() => {
+                showToast('📍 Gespeicherter Wegpunkt vorhanden', 'info');
+            }, 500);
+        }
+    }
 
     // Check if this is an AI player
     if (isAIPlayer()) {

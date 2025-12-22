@@ -56,6 +56,17 @@ export const state = {
     cameraX: 0,
     cameraY: 0,
 
+    // Zoom
+    zoomLevel: 1.0,
+    minZoom: 0.5,
+    maxZoom: 2.0,
+
+    // Queued path for multi-turn movement
+    queuedPaths: {},  // unitId -> { path: [{q, r}, ...], targetQ, targetR }
+
+    // Previously visible enemies (for detection alerts)
+    previouslyVisibleEnemies: new Set(),
+
     // Canvas dimensions
     canvasWidth: 0,
     canvasHeight: 0
@@ -105,6 +116,9 @@ export function resetState() {
     state.ghostIndicators = [];
     state.cameraX = 0;
     state.cameraY = 0;
+    state.zoomLevel = 1.0;
+    state.queuedPaths = {};
+    state.previouslyVisibleEnemies = new Set();
 
     // Initialize per-player explored hexes
     state.playerExploredHexes = [];
@@ -202,4 +216,39 @@ export function isHexVisible(q, r) {
  */
 export function isHexExplored(q, r) {
     return state.exploredHexes.has(`${q},${r}`);
+}
+
+/**
+ * Set queued path for a unit
+ */
+export function setQueuedPath(unitId, path, targetQ, targetR) {
+    state.queuedPaths[unitId] = { path, targetQ, targetR };
+}
+
+/**
+ * Get queued path for a unit
+ */
+export function getQueuedPath(unitId) {
+    return state.queuedPaths[unitId] || null;
+}
+
+/**
+ * Clear queued path for a unit
+ */
+export function clearQueuedPath(unitId) {
+    delete state.queuedPaths[unitId];
+}
+
+/**
+ * Update the set of previously visible enemies
+ */
+export function updatePreviouslyVisibleEnemies(visibleEnemyIds) {
+    state.previouslyVisibleEnemies = new Set(visibleEnemyIds);
+}
+
+/**
+ * Get the set of previously visible enemies
+ */
+export function getPreviouslyVisibleEnemies() {
+    return state.previouslyVisibleEnemies;
 }
