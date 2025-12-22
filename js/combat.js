@@ -14,10 +14,23 @@ import { checkEventMiss } from './events.js';
 export function calculateHitChance(attacker, defender) {
     let chance = 70; // Base hit chance
 
-    // Defender in cover (forest)
+    // Get terrain info for both units
+    const attHex = getHex(attacker.q, attacker.r);
     const defHex = getHex(defender.q, defender.r);
+
+    // Defender in cover (forest) - harder to hit
     if (defHex && defHex.cover) {
         chance -= 25;
+    }
+
+    // Attacker on hills - better accuracy (high ground)
+    if (attHex && attHex.type === 'hills') {
+        chance += 15;
+    }
+
+    // Defender on hills - harder to hit (defensive position)
+    if (defHex && defHex.type === 'hills') {
+        chance -= 10;
     }
 
     // Scout accuracy bonus

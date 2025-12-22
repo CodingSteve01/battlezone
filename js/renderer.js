@@ -4,7 +4,7 @@ import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts } from './state.js';
 import { hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits } from './units.js';
+import { getAttackableUnits, getEffectiveRange } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
@@ -233,9 +233,79 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'swamp':
             drawSwampDetails(cx, cy, s, baseSeed);
             break;
+
+        case 'hills':
+            drawHillsDetails(cx, cy, s, baseSeed);
+            break;
     }
 
     ctx.restore();
+}
+
+/**
+ * Draw hills terrain details
+ */
+function drawHillsDetails(cx, cy, s, seed) {
+    // Draw rolling hill contours
+    ctx.strokeStyle = 'rgba(80, 100, 70, 0.4)';
+    ctx.lineWidth = 2;
+
+    // Multiple contour lines to show elevation
+    for (let i = 0; i < 3; i++) {
+        const yOffset = (i - 1) * s * 0.35;
+        const xWobble = (seededRandom(seed + i * 17) - 0.5) * s * 0.3;
+
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.8, cy + yOffset + s * 0.1);
+        ctx.bezierCurveTo(
+            cx - s * 0.3 + xWobble, cy + yOffset - s * 0.15,
+            cx + s * 0.3 - xWobble, cy + yOffset - s * 0.1,
+            cx + s * 0.8, cy + yOffset + s * 0.05
+        );
+        ctx.stroke();
+    }
+
+    // Add some rocks on the hills
+    const rockCount = 1 + (seed % 2);
+    for (let i = 0; i < rockCount; i++) {
+        const rx = cx + (seededRandom(seed + i * 23) - 0.5) * s * 1.2;
+        const ry = cy + (seededRandom(seed + i * 23 + 1) - 0.5) * s * 0.8;
+        const rSize = s * (0.12 + seededRandom(seed + i * 23 + 2) * 0.1);
+
+        // Rock shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.beginPath();
+        ctx.ellipse(rx + 1, ry + 1, rSize, rSize * 0.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rock
+        const grayVal = 100 + seededRandom(seed + i * 23 + 3) * 30;
+        ctx.fillStyle = `rgb(${grayVal}, ${grayVal - 5}, ${grayVal - 10})`;
+        ctx.beginPath();
+        ctx.ellipse(rx, ry, rSize, rSize * 0.6, seededRandom(seed + i) * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Sparse grass on hills
+    for (let i = 0; i < 3; i++) {
+        const gx = cx + (seededRandom(seed + i * 31) - 0.5) * s * 1.4;
+        const gy = cy + (seededRandom(seed + i * 31 + 1) - 0.5) * s * 1.1;
+        const height = s * (0.12 + seededRandom(seed + i * 31 + 2) * 0.08);
+
+        ctx.strokeStyle = 'rgba(70, 100, 60, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(gx, gy);
+        ctx.lineTo(gx + (seededRandom(seed + i * 31 + 3) - 0.5) * s * 0.08, gy - height);
+        ctx.stroke();
+    }
+
+    // Height indicator icon (small mountain symbol)
+    ctx.fillStyle = 'rgba(90, 110, 80, 0.5)';
+    ctx.font = `${Math.round(s * 0.35)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⛰', cx, cy);
 }
 
 /**
@@ -1275,14 +1345,14 @@ export function render() {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && fogLevel === 'visible' && !hex.unit) {
-                // Draw movement range highlight - use explicit fill
+                // Draw movement range highlight - use explicit fill (green)
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.85);
-                ctx.fillStyle = 'rgba(250, 204, 21, 0.25)';
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
                 ctx.fill();
 
-                // Draw border to make it clearer
-                ctx.strokeStyle = 'rgba(250, 204, 21, 0.6)';
+                // Draw border to make it clearer (green)
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
@@ -1294,7 +1364,7 @@ export function render() {
                     ctx.arc(sx + state.hexSize * 0.3, sy - state.hexSize * 0.3, 11, 0, Math.PI * 2);
                     ctx.fill();
 
-                    ctx.fillStyle = cost <= currentUnit.ap ? '#fbbf24' : '#ef4444';
+                    ctx.fillStyle = cost <= currentUnit.ap ? '#22c55e' : '#ef4444';
                     ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -1304,8 +1374,8 @@ export function render() {
         }
     });
 
-    // Draw path preview - show full path with color coding (yellow=reachable, red=too far)
-    if (state.currentPath && state.selectedAction === 'move' && currentUnit) {
+    // Draw path preview - show full path with color coding (green=reachable, red=too far)
+    if (state.currentPath && state.currentPath.length >= 2 && state.selectedAction === 'move' && currentUnit) {
         const maxCost = Math.min(currentUnit.ap, currentUnit.move);
 
         // Calculate cumulative costs along path
@@ -1313,18 +1383,25 @@ export function render() {
         const pathWithCosts = state.currentPath.map((point, index) => {
             if (index > 0) {
                 const hex = getHex(point.q, point.r);
-                if (hex) {
+                if (hex && TERRAIN[hex.type]) {
                     cumulativeCost += TERRAIN[hex.type].moveCost;
                 }
             }
             return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
         });
 
-        // Find where the path exceeds AP
+        // Find where the path exceeds AP (check for blocked hexes too)
         let lastReachableIndex = 0;
         for (let i = 1; i < pathWithCosts.length; i++) {
+            const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
+            // Stop if hex is occupied by another unit
+            if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) {
+                break;
+            }
             if (pathWithCosts[i].totalCost <= maxCost) {
                 lastReachableIndex = i;
+            } else {
+                break; // Stop at first unreachable
             }
         }
 
@@ -1385,11 +1462,16 @@ export function render() {
             ctx.stroke();
         }
 
-        // Draw the REACHABLE portion (yellow, solid)
-        if (lastReachableIndex > 0) {
-            // Draw the path line (yellow)
-            ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
-            ctx.lineWidth = 5;
+        // Draw the REACHABLE portion (green, solid) - always draw if we have a valid path
+        if (lastReachableIndex >= 1) {
+            // Draw the path line (green) with shadow for better visibility
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 4;
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.95)';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.setLineDash([]);
             ctx.beginPath();
 
@@ -1403,6 +1485,7 @@ export function render() {
                 else ctx.lineTo(sx, sy);
             }
             ctx.stroke();
+            ctx.restore();
 
             // Draw dots at each step with cost
             for (let i = 1; i <= lastReachableIndex; i++) {
@@ -1411,15 +1494,20 @@ export function render() {
                 const sx = state.offsetX + pos.x;
                 const sy = state.offsetY + pos.y;
 
-                // Yellow/green circle
-                ctx.fillStyle = i === lastReachableIndex ? '#22c55e' : 'rgba(250, 204, 21, 0.95)';
+                // Green circle with border (darker for destination)
+                ctx.fillStyle = i === lastReachableIndex ? '#16a34a' : 'rgba(34, 197, 94, 0.95)';
                 ctx.beginPath();
-                ctx.arc(sx, sy, 14, 0, Math.PI * 2);
+                ctx.arc(sx, sy, 15, 0, Math.PI * 2);
                 ctx.fill();
 
+                // White border for better visibility
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
                 // Cost number
-                ctx.fillStyle = i === lastReachableIndex ? '#ffffff' : '#000000';
-                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(point.totalCost, sx, sy);
@@ -1440,37 +1528,55 @@ export function render() {
                 // Pulsing effect for tap-to-confirm
                 const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
 
-                // Large pulsing circle behind flag
-                ctx.fillStyle = `rgba(34, 197, 94, ${0.3 * pulse})`;
+                // Large pulsing glow circle
+                ctx.fillStyle = `rgba(34, 197, 94, ${0.25 * pulse})`;
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, state.hexSize * 0.7 * pulse, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Pulsing ring
-                ctx.strokeStyle = `rgba(34, 197, 94, ${0.8 * pulse})`;
+                // Green checkmark button circle
+                const btnSize = state.hexSize * 0.55;
+                ctx.fillStyle = `rgba(22, 163, 74, ${0.9 + 0.1 * pulse})`;
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pulsing ring around button
+                ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * pulse})`;
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.5, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, btnSize + 4, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Flag icon - larger and pulsing
-                ctx.font = `${Math.round(22 * pulse)}px sans-serif`;
-                ctx.fillText('🚩', endSx, endSy - 25);
+                // Draw checkmark ✓
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                const checkSize = btnSize * 0.5;
+                ctx.moveTo(endSx - checkSize * 0.5, endSy);
+                ctx.lineTo(endSx - checkSize * 0.1, endSy + checkSize * 0.4);
+                ctx.lineTo(endSx + checkSize * 0.5, endSy - checkSize * 0.4);
+                ctx.stroke();
 
-                // "Tippen zum Laufen" hint
+                // "Bestätigen" hint below
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
                 ctx.beginPath();
-                ctx.roundRect(endSx - 55, endSy + state.hexSize * 0.4, 110, 24, 6);
+                ctx.roundRect(endSx - 45, endSy + btnSize + 10, 90, 22, 6);
                 ctx.fill();
 
                 ctx.fillStyle = '#22c55e';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('⬆ Tippen zum Laufen', endSx, endSy + state.hexSize * 0.4 + 13);
+                ctx.textBaseline = 'middle';
+                ctx.fillText('✓ Bestätigen', endSx, endSy + btnSize + 21);
             } else {
-                // Normal flag icon
-                ctx.font = '16px sans-serif';
-                ctx.fillText('🚩', endSx, endSy - 22);
+                // Small destination marker (not yet confirmed)
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
+                ctx.beginPath();
+                ctx.arc(endSx, endSy, 8, 0, Math.PI * 2);
+                ctx.fill();
             }
 
             // Show remaining AP after move
@@ -1546,7 +1652,7 @@ export function render() {
         const pos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
-        const rangeRadius = currentUnit.range * state.hexSize * 1.75;
+        const rangeRadius = getEffectiveRange(currentUnit) * state.hexSize * 1.75;
 
         // Gradient range circle
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';

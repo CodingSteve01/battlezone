@@ -582,8 +582,19 @@ function setupActionButtons() {
                 const unit = getCurrentUnit();
                 if (unit && unit.ap >= 2 && !unit.usedSpecial) {
                     useSpecialAbility(unit);
-                    render();
-                    updateUI();
+
+                    // Auto-switch to appropriate action based on ability type
+                    // Assault (Powershot) -> switch to attack
+                    // Scout (Sprint), Ninja (Schleichen) -> switch to move (movement bonus)
+                    // Medic, Sniper -> stay in current mode (healing done, cloak for positioning)
+                    if (unit.class === 'assault') {
+                        selectAction('attack');
+                    } else if (unit.class === 'scout' || unit.class === 'ninja') {
+                        selectAction('move');
+                    } else {
+                        render();
+                        updateUI();
+                    }
                 }
             } else {
                 selectAction(action);
