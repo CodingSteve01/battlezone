@@ -12,6 +12,7 @@ import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
+import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -124,7 +125,10 @@ function generateUnitCards() {
             <div class="unit-special">✨ ${classData.special}: ${classData.specialDesc}</div>
         `;
 
-        card.onclick = () => toggleUnitSelection(classKey, card);
+        card.onclick = () => {
+            playClick();
+            toggleUnitSelection(classKey, card);
+        };
         grid.appendChild(card);
     });
 }
@@ -239,6 +243,11 @@ function confirmTeamSelection() {
  * Start a new game with selected teams
  */
 function startGameWithTeams() {
+    // Initialize audio on game start (requires user interaction)
+    initAudio();
+    resumeAudio();
+    startAmbient();
+
     // Reset state (but keep teamSelections and singlePlayer setting)
     const savedSelections = [...state.teamSelections];
     const singlePlayer = state.settings.singlePlayer;
@@ -378,6 +387,43 @@ function init() {
             helpToggle.classList.toggle('active');
             helpPanel.classList.toggle('show');
         };
+    }
+
+    // Setup audio controls
+    const volumeSlider = document.getElementById('volume-slider');
+    const muteBtn = document.getElementById('mute-btn');
+
+    if (volumeSlider) {
+        volumeSlider.value = audioSettings.masterVolume * 100;
+        volumeSlider.addEventListener('input', (e) => {
+            const volume = parseInt(e.target.value) / 100;
+            setMasterVolume(volume);
+            // Update mute button icon
+            if (muteBtn) {
+                muteBtn.textContent = volume === 0 ? '🔇' : (volume < 0.5 ? '🔉' : '🔊');
+                muteBtn.classList.toggle('muted', volume === 0);
+            }
+        });
+    }
+
+    if (muteBtn) {
+        muteBtn.addEventListener('click', () => {
+            const isMuted = audioSettings.masterVolume === 0;
+            if (isMuted) {
+                // Unmute - restore to previous or default
+                setMasterVolume(0.7);
+                if (volumeSlider) volumeSlider.value = 70;
+                muteBtn.textContent = '🔊';
+                muteBtn.classList.remove('muted');
+            } else {
+                // Mute
+                setMasterVolume(0);
+                if (volumeSlider) volumeSlider.value = 0;
+                muteBtn.textContent = '🔇';
+                muteBtn.classList.add('muted');
+            }
+            playClick();
+        });
     }
 
     // Setup team confirm button

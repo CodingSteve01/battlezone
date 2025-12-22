@@ -7,6 +7,10 @@ import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
 import { checkEventMiss } from './events.js';
+import {
+    playWeaponSound, playHit, playCriticalHit, playMiss, playDeath, playShieldBlock,
+    playHeal, playSprint, playPowershot, playCloak, playCover
+} from './audio.js';
 
 /**
  * Check if a unit can take cover on their current hex
@@ -32,6 +36,7 @@ export function takeCover(unit) {
 
     unit.hiding = true;
     unit.ap -= 1;
+    playCover();
     showToast('🌲 Deckung genommen!', 'special');
     return true;
 }
@@ -320,9 +325,13 @@ export function executeAttack(attacker, defender) {
     const roll = Math.random() * 100;
     let hit = roll < hitChance;
 
+    // Play weapon sound
+    playWeaponSound(attacker.class);
+
     // Check for event-based miss (storm)
     if (hit && checkEventMiss()) {
         hit = false;
+        playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
         attacker.ap -= 1;
         return { hit: false, damage: 0, killed: false, eventMiss: true };
@@ -335,6 +344,7 @@ export function executeAttack(attacker, defender) {
         // Check for shield (from power-up)
         if (defender.shield) {
             defender.shield = false;
+            playShieldBlock();
             showToast('🛡️ Schild blockiert Angriff!', 'special');
             return { hit: true, damage: 0, killed: false, blocked: true };
         }
@@ -380,16 +390,19 @@ export function executeAttack(attacker, defender) {
             showFloatingDamage(screenX, screenY, damage, crit.isCrit);
         }
 
-        // Show appropriate message
+        // Play hit sound and show message
         if (crit.isCrit) {
+            playCriticalHit();
             showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
         } else {
+            playHit();
             showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
         }
 
         // Check for kill
         if (defender.currentHp <= 0) {
             killUnit(defender);
+            playDeath();
 
             // Award XP for kill and assists
             const levelUps = awardKillXP(attacker, defender);
@@ -401,6 +414,7 @@ export function executeAttack(attacker, defender) {
             // Show level up notifications
             levelUps.forEach((levelUp, i) => {
                 setTimeout(() => {
+                    import('./audio.js').then(audio => audio.playLevelUp());
                     showToast(`⭐ ${UNIT_CLASSES[levelUp.unit.class].name} → ${levelUp.rank}!`, 'levelup');
                 }, 1600 + i * 800);
             });
@@ -410,6 +424,7 @@ export function executeAttack(attacker, defender) {
 
         return { hit: true, damage, killed: false, crit: crit.isCrit };
     } else {
+        playMiss();
         showToast('💨 Verfehlt!', 'miss');
         return { hit: false, damage: 0, killed: false };
     }
@@ -446,6 +461,8 @@ export function useSpecialAbility(unit) {
 function useMedicSpecial(unit) {
     const allies = getPlayerUnits(unit.player);
     let totalHealed = 0;
+
+    playHeal();
 
     allies.forEach(ally => {
         const dist = hexDistance(
@@ -486,6 +503,7 @@ function useMedicSpecial(unit) {
  */
 function useScoutSpecial(unit) {
     unit.move += 3;
+    playSprint();
     showToast('🎯 Sprint aktiviert!', 'special');
     return true;
 }
@@ -495,6 +513,7 @@ function useScoutSpecial(unit) {
  */
 function useAssaultSpecial(unit) {
     unit.damage += 20;
+    playPowershot();
     showToast('💥 Powershot bereit!', 'special');
     return true;
 }
@@ -504,6 +523,7 @@ function useAssaultSpecial(unit) {
  */
 function useSniperSpecial(unit) {
     unit.cloaked = true;
+    playCloak();
     showToast('🔫 Getarnt!', 'special');
     return true;
 }
@@ -514,6 +534,7 @@ function useSniperSpecial(unit) {
 function useNinjaSpecial(unit) {
     unit.cloaked = true;
     unit.move += 2;  // Bonus movement
+    playCloak();
     showToast('🥷 Schleichen aktiviert!', 'special');
     return true;
 }

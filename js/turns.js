@@ -11,6 +11,7 @@ import { centerOnCurrentUnit } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
+import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 /**
  * Start a player's turn
@@ -67,6 +68,9 @@ export function startTurn() {
         return;
     }
 
+    // Play round start sound
+    playRoundStart();
+
     // Show turn screen for human players
     const turnBadge = document.getElementById('turn-badge');
     if (turnBadge) {
@@ -97,6 +101,7 @@ export function startTurn() {
  * End current turn
  */
 export function endTurn() {
+    playTurnEnd();
     nextPlayer();
 }
 
@@ -121,6 +126,7 @@ export function nextPlayer() {
         const event = rollRoundEvent();
         if (event) {
             setTimeout(() => {
+                playEvent();
                 showEventBanner(event);
             }, 500);
         }
@@ -173,6 +179,25 @@ export function handleReady() {
  */
 export function endGame(winner) {
     state.gameOver = true;
+
+    // Stop ambient sounds
+    stopAmbient();
+
+    // Play victory or defeat sound
+    if (winner !== null) {
+        // In single player, check if human won
+        if (state.settings.singlePlayer) {
+            if (winner === 0) {
+                playVictory();
+            } else {
+                playDefeat();
+            }
+        } else {
+            playVictory();
+        }
+    } else {
+        playDefeat();  // Draw
+    }
 
     const winnerText = document.getElementById('winner-text');
     if (winnerText) {

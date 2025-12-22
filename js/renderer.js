@@ -203,7 +203,8 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.4;
             // Make trees 2x bigger for proper 2.5D effect
             const treeSize = s * (1.4 + seededRandom(baseSeed + i * 10 + 2) * 0.6);
-            const treeType = Math.floor(seededRandom(baseSeed + i * 10 + 3) * 3);
+            // Now includes 5 tree types: 0=pine, 1=round, 2=birch, 3=willow, 4=oak
+            const treeType = Math.floor(seededRandom(baseSeed + i * 10 + 3) * 5);
 
             elements.push({
                 type: 'tree',
@@ -212,6 +213,22 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 // Sort by base of tree (where it touches ground)
                 sortY: ty + treeSize * 0.5,
                 draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i)
+            });
+        }
+
+        // Add small shrubs/undergrowth around the trees
+        const shrubChance = seededRandom(baseSeed + 100);
+        if (shrubChance > 0.4) {
+            const shrubX = cx + (seededRandom(baseSeed + 101) - 0.5) * s * 1.2;
+            const shrubY = cy + (seededRandom(baseSeed + 102) - 0.5) * s * 0.8;
+            const shrubSize = s * (0.5 + seededRandom(baseSeed + 103) * 0.3);
+
+            elements.push({
+                type: 'shrub',
+                x: shrubX,
+                y: shrubY,
+                sortY: shrubY + shrubSize * 0.2,
+                draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + 104)
             });
         }
     } else if (type === 'grass') {
@@ -365,6 +382,66 @@ function drawTree2D5(x, y, size, treeType, seed) {
             ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
             ctx.fill();
         }
+    } else if (treeType === 2) {
+        // Birch tree - white bark, lighter foliage
+        // White trunk with dark marks
+        ctx.fillStyle = '#e8e4dc';
+        ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
+
+        // Birch bark markings (horizontal dark lines)
+        ctx.fillStyle = '#3a3530';
+        for (let m = 0; m < 4; m++) {
+            const markY = y + trunkHeight * (0.1 + m * 0.22);
+            const markWidth = trunkWidth * (0.4 + seededRandom(seed + m * 3) * 0.4);
+            ctx.fillRect(x - markWidth / 2, markY, markWidth, 2);
+        }
+
+        // Lighter, more delicate foliage
+        const birchColors = ['#3d7a4a', '#4a8f58', '#5aa368', '#68b575'];
+        for (let i = 0; i < 5; i++) {
+            const fx = x + (seededRandom(seed + i * 7) - 0.5) * size * 0.5;
+            const fy = y - size * 0.35 + (seededRandom(seed + i * 7 + 1) - 0.5) * size * 0.35;
+            const fSize = size * (0.25 + seededRandom(seed + i * 7 + 2) * 0.15);
+
+            ctx.fillStyle = birchColors[i % birchColors.length];
+            ctx.beginPath();
+            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else if (treeType === 3) {
+        // Willow tree - drooping branches
+        ctx.fillStyle = '#4a3520';
+        ctx.fillRect(x - trunkWidth * 0.6, y, trunkWidth * 1.2, trunkHeight * 0.8);
+
+        // Drooping willow branches
+        ctx.strokeStyle = '#2d5a35';
+        ctx.lineWidth = 2;
+        for (let b = 0; b < 8; b++) {
+            const branchStartX = x + (seededRandom(seed + b * 5) - 0.5) * size * 0.7;
+            const branchStartY = y - size * 0.2;
+            const branchEndX = branchStartX + (seededRandom(seed + b * 5 + 1) - 0.5) * size * 0.4;
+            const branchEndY = y + size * 0.3;
+
+            ctx.beginPath();
+            ctx.moveTo(branchStartX, branchStartY);
+            ctx.bezierCurveTo(
+                branchStartX, branchStartY + size * 0.3,
+                branchEndX, branchEndY - size * 0.2,
+                branchEndX, branchEndY
+            );
+            ctx.stroke();
+
+            // Leaves along the branch
+            ctx.fillStyle = '#3d6b42';
+            for (let l = 0; l < 5; l++) {
+                const t = 0.2 + l * 0.18;
+                const lx = branchStartX + (branchEndX - branchStartX) * t;
+                const ly = branchStartY + (branchEndY - branchStartY) * t * t;
+                ctx.beginPath();
+                ctx.ellipse(lx, ly, size * 0.06, size * 0.03, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
     } else {
         // Oak-style tree - larger and fuller
         ctx.fillStyle = '#1a4d2e';
@@ -421,6 +498,49 @@ function drawBush2D5(x, y, size, seed) {
     ctx.beginPath();
     ctx.ellipse(x - size * 0.18, y - size * 0.2, size * 0.28, size * 0.22, -0.3, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Draw a small shrub/undergrowth - lower vegetation for forest floors
+ */
+function drawSmallShrub(x, y, size, seed) {
+    ctx.save();
+
+    // Small shadow
+    ctx.fillStyle = 'rgba(0, 30, 10, 0.3)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.15, size * 0.4, size * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Multiple small leaf clusters
+    const colors = ['#2a5a35', '#345f3a', '#3d6b42', '#467348'];
+    const clusterCount = 3 + Math.floor(seededRandom(seed) * 3);
+
+    for (let i = 0; i < clusterCount; i++) {
+        const cx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.6;
+        const cy = y + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.4;
+        const cSize = size * (0.2 + seededRandom(seed + i * 5 + 2) * 0.15);
+
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, cSize, cSize * 0.7, seededRandom(seed + i * 5 + 3) * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Small berries or flowers occasionally
+    if (seededRandom(seed + 50) > 0.6) {
+        const berryColor = seededRandom(seed + 51) > 0.5 ? '#8b3a3a' : '#a04080';
+        ctx.fillStyle = berryColor;
+        for (let b = 0; b < 3; b++) {
+            const bx = x + (seededRandom(seed + b * 7 + 60) - 0.5) * size * 0.5;
+            const by = y + (seededRandom(seed + b * 7 + 61) - 0.5) * size * 0.3;
+            ctx.beginPath();
+            ctx.arc(bx, by, size * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
 
     ctx.restore();
 }

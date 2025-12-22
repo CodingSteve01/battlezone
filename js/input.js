@@ -11,6 +11,7 @@ import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
 import { render, resizeCanvas } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
+import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
 
 let canvas;
 let pendingMoveAnimationId = null;
@@ -452,6 +453,7 @@ function handleTapOrClick(clientX, clientY) {
             state.targetedUnit = null;
             state.pendingHealTarget = null;
             state.selectedAction = 'move';  // Reset to move mode
+            playSelect();
             updateUI();
             render();
             showToast(`${hex.unit.name} ausgewählt`, 'info');
@@ -503,12 +505,14 @@ function handleEnemyClick(unit, hex) {
             state.targetedUnit = enemy;
             state.pendingMoveDestination = null;
             state.currentPath = null;
+            playTarget();
             render();
             updateUI();
             showToast(`🎯 ${enemy.name} anvisiert - nochmal tippen zum Angriff`, 'warning');
         }
     } else {
         // Enemy not in range - show message
+        playError();
         if (unit.ap < 1) {
             showToast('❌ Keine AP für Angriff!', 'warning');
         } else {
@@ -636,6 +640,9 @@ function handleMoveClick(unit, hex) {
         state.pendingMoveDestination = null;
         state.currentPath = null;
 
+        // Play move start sound
+        playMoveStart();
+
         // Reveal from cover when moving
         if (unit.hiding) {
             unit.hiding = false;
@@ -657,6 +664,9 @@ function handleMoveClick(unit, hex) {
 
         // Animate the movement
         animateUnitMovement(unit, reachablePath, totalCost, () => {
+            // Play move end sound
+            playMoveEnd();
+
             // Check for power-up pickup after animation
             const pickup = checkPowerupPickup(unit);
             if (pickup) {
