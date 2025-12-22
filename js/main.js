@@ -11,7 +11,7 @@ import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
-import { isAIPlayer, executeAITurn } from './ai.js';
+import { isAIPlayer, executeAITurn, resetAIMemory } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 
 // Team selection state
@@ -252,6 +252,7 @@ function startGameWithTeams() {
     const savedSelections = [...state.teamSelections];
     const singlePlayer = state.settings.singlePlayer;
     resetState();
+    resetAIMemory();  // Reset AI's strategic memory for new game
     state.teamSelections = savedSelections;
     state.settings.singlePlayer = singlePlayer;
 

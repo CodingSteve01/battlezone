@@ -1,15 +1,44 @@
 // ===== AI OPPONENT =====
+// Advanced tactical AI with memory, planning, and unit coordination
 
 import { state, getHex, getPlayerUnits } from './state.js';
-import { hexDistance, hexToPixel } from './hexMath.js';
+import { hexDistance, hexToPixel, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, moveUnitInstant } from './units.js';
-import { executeAttack, useSpecialAbility } from './combat.js';
+import { executeAttack, useSpecialAbility, calculateHitChance } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI, showToast } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
-import { TERRAIN } from './config.js';
+import { TERRAIN, UNIT_CLASSES } from './config.js';
+
+// ===== AI MEMORY SYSTEM =====
+// Stores information about enemy positions, even when not visible
+
+const aiMemory = {
+    lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence }
+    searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
+    threatAssessment: new Map(),     // unitId -> threat level
+    huntMode: false,                 // True when actively hunting remaining enemies
+    lastContactRound: 0,             // Last round we saw an enemy
+    playerCenterEstimate: null,      // Estimated center of player forces
+    searchPattern: 'expand',         // 'expand', 'sweep', 'pincer'
+    assignedTargets: new Map(),      // unitId -> targetUnitId (for focus fire)
+};
+
+/**
+ * Reset AI memory for new game
+ */
+export function resetAIMemory() {
+    aiMemory.lastKnownPositions.clear();
+    aiMemory.searchedAreas.clear();
+    aiMemory.threatAssessment.clear();
+    aiMemory.huntMode = false;
+    aiMemory.lastContactRound = 0;
+    aiMemory.playerCenterEstimate = null;
+    aiMemory.searchPattern = 'expand';
+    aiMemory.assignedTargets.clear();
+}
 
 /**
  * Check if current player is AI controlled
@@ -43,7 +72,7 @@ function showAIThinking() {
     overlay.className = 'ai-thinking';
     overlay.innerHTML = `
         <div class="ai-icon">🤖</div>
-        <div class="ai-text">KI denkt nach...</div>
+        <div class="ai-text">KI plant Strategie...</div>
     `;
     document.body.appendChild(overlay);
 }
@@ -56,210 +85,406 @@ function hideAIThinking() {
     if (overlay) overlay.remove();
 }
 
+// ===== STRATEGIC PLANNING =====
+
+/**
+ * Analyze the battlefield and create a strategic plan
+ */
+function analyzeAndPlan() {
+    const aiUnits = getPlayerUnits(state.currentPlayer);
+    const visibleEnemies = findAllVisibleEnemies();
+
+    // Update AI memory with visible enemies
+    updateMemoryWithVisibleEnemies(visibleEnemies);
+
+    // Calculate threat assessment
+    updateThreatAssessment(visibleEnemies);
+
+    // Estimate player position if no enemies visible
+    if (visibleEnemies.length === 0) {
+        estimatePlayerPosition();
+    } else {
+        aiMemory.lastContactRound = state.round;
+        aiMemory.huntMode = false;
+    }
+
+    // Enter hunt mode if we haven't seen enemies for a while
+    if (state.round - aiMemory.lastContactRound >= 2) {
+        aiMemory.huntMode = true;
+    }
+
+    // Decide search pattern based on situation
+    decideSearchPattern(aiUnits, visibleEnemies);
+
+    // Assign targets for focus fire
+    assignTargets(aiUnits, visibleEnemies);
+
+    return {
+        aiUnits,
+        visibleEnemies,
+        knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
+        inHuntMode: aiMemory.huntMode,
+        searchPattern: aiMemory.searchPattern
+    };
+}
+
+/**
+ * Update memory with currently visible enemies
+ */
+function updateMemoryWithVisibleEnemies(enemies) {
+    for (const enemy of enemies) {
+        aiMemory.lastKnownPositions.set(enemy.id, {
+            q: enemy.q,
+            r: enemy.r,
+            round: state.round,
+            confidence: 1.0,  // 100% confidence for visible enemies
+            unitClass: enemy.class,
+            hp: enemy.currentHp,
+            maxHp: enemy.maxHp
+        });
+    }
+
+    // Decay confidence for old positions
+    aiMemory.lastKnownPositions.forEach((pos, id) => {
+        if (pos.round < state.round) {
+            pos.confidence *= 0.7;  // Reduce confidence each round
+            if (pos.confidence < 0.1) {
+                aiMemory.lastKnownPositions.delete(id);
+            }
+        }
+    });
+}
+
+/**
+ * Calculate threat level for each enemy
+ */
+function updateThreatAssessment(enemies) {
+    aiMemory.threatAssessment.clear();
+
+    for (const enemy of enemies) {
+        let threat = 0;
+
+        // Base threat by class
+        const classThreat = {
+            sniper: 90,   // High damage at range
+            ninja: 85,    // High damage, stealth
+            assault: 70,  // High damage, tanky
+            medic: 80,    // Force multiplier - healing
+            scout: 50     // Lower threat but mobile
+        };
+        threat += classThreat[enemy.class] || 50;
+
+        // HP factor - low HP enemies are less threatening but good targets
+        const hpPercent = enemy.currentHp / enemy.maxHp;
+        threat *= hpPercent;
+
+        // Position factor - enemies near our units are more threatening
+        const aiUnits = getPlayerUnits(state.currentPlayer);
+        const minDist = Math.min(...aiUnits.map(u =>
+            hexDistance({ q: u.q, r: u.r }, { q: enemy.q, r: enemy.r })
+        ));
+        if (minDist <= 2) threat *= 1.5;
+        else if (minDist <= 4) threat *= 1.2;
+
+        aiMemory.threatAssessment.set(enemy.id, threat);
+    }
+}
+
+/**
+ * Estimate where player forces might be based on last known positions
+ */
+function estimatePlayerPosition() {
+    const positions = Array.from(aiMemory.lastKnownPositions.values());
+
+    if (positions.length === 0) {
+        // No information - estimate based on spawn area (opposite side of map)
+        const aiUnits = getPlayerUnits(state.currentPlayer);
+        if (aiUnits.length > 0) {
+            const avgQ = aiUnits.reduce((sum, u) => sum + u.q, 0) / aiUnits.length;
+            const avgR = aiUnits.reduce((sum, u) => sum + u.r, 0) / aiUnits.length;
+            // Player is likely on opposite side
+            aiMemory.playerCenterEstimate = { q: -avgQ * 0.8, r: -avgR * 0.8 };
+        }
+        return;
+    }
+
+    // Weight positions by confidence
+    let totalWeight = 0;
+    let weightedQ = 0;
+    let weightedR = 0;
+
+    for (const pos of positions) {
+        totalWeight += pos.confidence;
+        weightedQ += pos.q * pos.confidence;
+        weightedR += pos.r * pos.confidence;
+    }
+
+    if (totalWeight > 0) {
+        aiMemory.playerCenterEstimate = {
+            q: weightedQ / totalWeight,
+            r: weightedR / totalWeight
+        };
+    }
+}
+
+/**
+ * Decide the best search pattern
+ */
+function decideSearchPattern(aiUnits, visibleEnemies) {
+    if (visibleEnemies.length > 0) {
+        aiMemory.searchPattern = 'engage';
+        return;
+    }
+
+    // Calculate AI force spread
+    if (aiUnits.length < 2) {
+        aiMemory.searchPattern = 'expand';
+        return;
+    }
+
+    const avgQ = aiUnits.reduce((sum, u) => sum + u.q, 0) / aiUnits.length;
+    const avgR = aiUnits.reduce((sum, u) => sum + u.r, 0) / aiUnits.length;
+    const spread = aiUnits.reduce((sum, u) =>
+        sum + hexDistance({ q: u.q, r: u.r }, { q: avgQ, r: avgR }), 0
+    ) / aiUnits.length;
+
+    if (spread > 4) {
+        // Units are spread out - use sweep pattern
+        aiMemory.searchPattern = 'sweep';
+    } else if (aiMemory.huntMode && spread < 3) {
+        // Units grouped and hunting - use pincer
+        aiMemory.searchPattern = 'pincer';
+    } else {
+        aiMemory.searchPattern = 'expand';
+    }
+}
+
+/**
+ * Assign targets to units for coordinated attacks (focus fire)
+ */
+function assignTargets(aiUnits, enemies) {
+    aiMemory.assignedTargets.clear();
+
+    if (enemies.length === 0) return;
+
+    // Sort enemies by threat (highest first)
+    const sortedEnemies = [...enemies].sort((a, b) =>
+        (aiMemory.threatAssessment.get(b.id) || 0) - (aiMemory.threatAssessment.get(a.id) || 0)
+    );
+
+    // Calculate how many units needed to kill each enemy
+    for (const enemy of sortedEnemies) {
+        let remainingHp = enemy.currentHp;
+
+        // Find units that can attack this enemy
+        for (const unit of aiUnits) {
+            if (aiMemory.assignedTargets.has(unit.id)) continue;
+
+            const dist = hexDistance({ q: unit.q, r: unit.r }, { q: enemy.q, r: enemy.r });
+
+            // Check if unit can reach and attack
+            if (dist <= unit.range || dist <= unit.range + unit.move) {
+                aiMemory.assignedTargets.set(unit.id, enemy.id);
+                remainingHp -= unit.damage;
+
+                // Stop assigning to this enemy once we can kill it
+                if (remainingHp <= 0) break;
+            }
+        }
+    }
+}
+
+// ===== MAIN AI EXECUTION =====
+
 /**
  * Perform all AI actions for current turn
  */
 async function performAIActions() {
-    const units = getPlayerUnits(state.currentPlayer);
-
     // In single-player, ensure human player's visibility is set for rendering
     if (state.settings.singlePlayer) {
         updateVisibilityForPlayer(0);
-        render(); // Initial render showing human player's units and fog of war
+        render();
     }
 
-    // Sort units: scouts first (best vision + movement for reconnaissance)
-    // Then snipers (high vision), then others
-    const sortedUnits = [...units].sort((a, b) => {
-        const priority = { scout: 0, sniper: 1, ninja: 2, medic: 3, assault: 4 };
-        return (priority[a.class] ?? 5) - (priority[b.class] ?? 5);
-    });
+    // Strategic analysis and planning
+    const plan = analyzeAndPlan();
+
+    // Sort units by role priority for this turn
+    const sortedUnits = sortUnitsForExecution(plan);
 
     for (const unit of sortedUnits) {
         if (!unit.alive) continue;
 
-        // Give each unit some time between actions
-        await performUnitAI(unit);
+        await performUnitAI(unit, plan);
         await delay(400);
     }
 
     hideAIThinking();
 
-    // End turn after all actions
     setTimeout(() => {
         endTurn();
     }, 500);
 }
 
 /**
- * Perform AI for a single unit
- * In single-player mode, render from human perspective - AI units only visible when in human's view
+ * Sort units based on strategic role
  */
-async function performUnitAI(unit) {
-    // Find visible enemies
-    const enemies = findVisibleEnemies(unit);
+function sortUnitsForExecution(plan) {
+    const units = [...plan.aiUnits];
 
-    // In single-player, we now render from human perspective
-    // AI units will only appear when they enter the human player's field of view
+    return units.sort((a, b) => {
+        // If enemies visible, prioritize attackers
+        if (plan.visibleEnemies.length > 0) {
+            // Units with assigned targets go first
+            const aHasTarget = aiMemory.assignedTargets.has(a.id);
+            const bHasTarget = aiMemory.assignedTargets.has(b.id);
+            if (aHasTarget && !bHasTarget) return -1;
+            if (bHasTarget && !aHasTarget) return 1;
+
+            // Then by damage potential
+            return b.damage - a.damage;
+        }
+
+        // In exploration mode, scouts and snipers first (vision)
+        const explorePriority = { scout: 0, sniper: 1, ninja: 2, medic: 4, assault: 3 };
+        return (explorePriority[a.class] ?? 5) - (explorePriority[b.class] ?? 5);
+    });
+}
+
+/**
+ * Perform AI for a single unit with strategic awareness
+ */
+async function performUnitAI(unit, plan) {
     const isSinglePlayer = state.settings.singlePlayer;
 
-    // Helper: render if unit is visible to human player (or always in multiplayer)
     const renderIfVisible = () => {
         if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
             render();
         }
     };
 
-    // Priority 1: Attack if enemy in range
+    // Check current situation
     const attackable = getAttackableUnits(unit);
-    if (attackable.length > 0 && unit.ap >= 1) {
+    const assignedTargetId = aiMemory.assignedTargets.get(unit.id);
+    const enemies = plan.visibleEnemies;
+
+    // Tactical decision tree
+
+    // 1. Should we retreat? (Low HP, enemies nearby)
+    if (shouldRetreat(unit, enemies)) {
+        await executeRetreat(unit, enemies);
+        return;
+    }
+
+    // 2. Attack assigned target if possible (focus fire)
+    if (assignedTargetId && attackable.some(t => t.id === assignedTargetId)) {
+        const target = attackable.find(t => t.id === assignedTargetId);
+        await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
+    } else if (attackable.length > 0 && unit.ap >= 1) {
+        // 3. Attack best available target
         const target = selectBestTarget(unit, attackable);
         if (target) {
-            state.targetedUnit = target;
-            renderIfVisible();
-            await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
-            executeAttack(unit, target);
-            state.targetedUnit = null;
-            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
-                updateUI();
-                render();
-            }
-            await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+            await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
         }
     }
 
-    // Priority 2: Use special ability if beneficial
-    if (unit.ap >= 2 && !unit.usedSpecial) {
-        if (shouldUseSpecial(unit, enemies)) {
-            useSpecialAbility(unit);
-            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
-                updateUI();
-                render();
-            }
-            await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+    // 4. Use special ability if beneficial
+    if (unit.ap >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
+        useSpecialAbility(unit);
+        if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+            updateUI();
+            render();
         }
+        await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
     }
 
-    // Priority 3: Move towards enemy or explore
+    // 5. Move strategically
     if (unit.ap >= 1) {
-        const moveTarget = selectMoveTarget(unit, enemies);
+        const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget);
         }
     }
 
-    // Priority 4: Attack again after moving
+    // 6. Attack again after moving
     const attackableAfterMove = getAttackableUnits(unit);
     if (attackableAfterMove.length > 0 && unit.ap >= 1) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
-            state.targetedUnit = target;
-            renderIfVisible();
-            await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
-            executeAttack(unit, target);
-            state.targetedUnit = null;
-            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
-                updateUI();
-                render();
-            }
+            await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
         }
     }
 }
 
 /**
- * Find enemies visible to the AI
- * Uses the same visibility logic as the renderer for consistency
+ * Execute attack with proper rendering
  */
-function findVisibleEnemies(unit) {
-    return state.units.filter(u =>
-        u.alive &&
-        u.player !== unit.player &&
-        isUnitVisible(u)
-    );
-}
+async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer) {
+    state.targetedUnit = target;
+    renderIfVisible();
+    await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
+    executeAttack(unit, target);
+    state.targetedUnit = null;
 
-/**
- * Select best target to attack
- */
-function selectBestTarget(attacker, targets) {
-    if (targets.length === 0) return null;
-
-    // Prioritize: low HP > medics > closest
-    return targets.sort((a, b) => {
-        // Kill targets first (can be killed in one hit)
-        const aCanKill = a.currentHp <= attacker.damage;
-        const bCanKill = b.currentHp <= attacker.damage;
-        if (aCanKill && !bCanKill) return -1;
-        if (bCanKill && !aCanKill) return 1;
-
-        // Then medics (high value targets)
-        if (a.class === 'medic' && b.class !== 'medic') return -1;
-        if (b.class === 'medic' && a.class !== 'medic') return 1;
-
-        // Then snipers (dangerous)
-        if (a.class === 'sniper' && b.class !== 'sniper') return -1;
-        if (b.class === 'sniper' && a.class !== 'sniper') return 1;
-
-        // Then ninjas (dangerous in melee)
-        if (a.class === 'ninja' && b.class !== 'ninja') return -1;
-        if (b.class === 'ninja' && a.class !== 'ninja') return 1;
-
-        // Then by HP (low HP first)
-        return a.currentHp - b.currentHp;
-    })[0];
-}
-
-/**
- * Decide if special ability should be used
- */
-function shouldUseSpecial(unit, enemies) {
-    switch (unit.class) {
-        case 'medic':
-            // Heal if allies are damaged
-            const allies = getPlayerUnits(unit.player);
-            const needsHealing = allies.some(a =>
-                a.currentHp < a.maxHp * 0.7 &&
-                hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= 3
-            );
-            return needsHealing;
-
-        case 'scout':
-            // Sprint if enemies are visible but far
-            return enemies.length > 0 && enemies.every(e =>
-                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) > unit.range
-            );
-
-        case 'assault':
-            // Powershot if enemy is close
-            return enemies.some(e =>
-                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
-            );
-
-        case 'sniper':
-            // Cloak if not cloaked and enemies nearby
-            return !unit.cloaked && enemies.length > 0;
-
-        case 'ninja':
-            // Stealth if not cloaked and enemies are close
-            if (unit.cloaked) return false;
-            return enemies.some(e =>
-                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= 4
-            );
-
-        default:
-            return false;
+    // Update memory if enemy killed
+    if (!target.alive) {
+        aiMemory.lastKnownPositions.delete(target.id);
+        aiMemory.assignedTargets.forEach((tid, uid) => {
+            if (tid === target.id) aiMemory.assignedTargets.delete(uid);
+        });
     }
+
+    if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+        updateUI();
+        render();
+    }
+    await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+}
+
+// ===== TACTICAL DECISIONS =====
+
+/**
+ * Check if unit should retreat
+ */
+function shouldRetreat(unit, enemies) {
+    if (enemies.length === 0) return false;
+
+    const hpPercent = unit.currentHp / unit.maxHp;
+
+    // Medics should retreat earlier (they're valuable)
+    if (unit.class === 'medic' && hpPercent < 0.5) return true;
+
+    // Snipers shouldn't be in close combat
+    if (unit.class === 'sniper') {
+        const closestEnemy = enemies.reduce((min, e) => {
+            const d = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+            return d < min ? d : min;
+        }, Infinity);
+        if (closestEnemy <= 2 && hpPercent < 0.6) return true;
+    }
+
+    // General retreat threshold
+    if (hpPercent < 0.3) return true;
+
+    // Surrounded by multiple enemies
+    const nearbyEnemies = enemies.filter(e =>
+        hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= 3
+    );
+    if (nearbyEnemies.length >= 3 && hpPercent < 0.5) return true;
+
+    return false;
 }
 
 /**
- * Select best hex to move to
+ * Execute retreat - move away from enemies
  */
-function selectMoveTarget(unit, enemies) {
+async function executeRetreat(unit, enemies) {
     const reachable = getReachableHexes(unit);
-    if (reachable.size === 0) return null;
+    if (reachable.size === 0) return;
 
     const maxCost = Math.min(unit.ap, unit.move);
-    const candidates = [];
+    let bestHex = null;
+    let bestScore = -Infinity;
 
     reachable.forEach((data, key) => {
         if (data.cost > maxCost) return;
@@ -270,81 +495,368 @@ function selectMoveTarget(unit, enemies) {
 
         let score = 0;
 
-        // Prefer moving towards enemies
+        // Maximize distance from enemies
+        for (const enemy of enemies) {
+            score += hexDistance({ q, r }, { q: enemy.q, r: enemy.r }) * 10;
+        }
+
+        // Prefer cover
+        if (hex.cover) score += 30;
+
+        // Move towards allies (for protection/healing)
+        const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+        if (allies.length > 0) {
+            const closestAlly = Math.min(...allies.map(a =>
+                hexDistance({ q, r }, { q: a.q, r: a.r })
+            ));
+            score += (10 - closestAlly) * 5;
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestHex = { q, r, cost: data.cost };
+        }
+    });
+
+    if (bestHex) {
+        await executeAIMove(unit, bestHex);
+    }
+}
+
+/**
+ * Find all enemies visible to any AI unit
+ */
+function findAllVisibleEnemies() {
+    return state.units.filter(u =>
+        u.alive &&
+        u.player !== state.currentPlayer &&
+        isUnitVisible(u)
+    );
+}
+
+/**
+ * Select best target considering focus fire assignments
+ */
+function selectBestTarget(attacker, targets) {
+    if (targets.length === 0) return null;
+
+    return targets.sort((a, b) => {
+        // Priority 1: Kill shots (finish off low HP)
+        const aCanKill = a.currentHp <= attacker.damage;
+        const bCanKill = b.currentHp <= attacker.damage;
+        if (aCanKill && !bCanKill) return -1;
+        if (bCanKill && !aCanKill) return 1;
+
+        // Priority 2: Assigned target
+        const assignedId = aiMemory.assignedTargets.get(attacker.id);
+        if (a.id === assignedId) return -1;
+        if (b.id === assignedId) return 1;
+
+        // Priority 3: Threat level
+        const aThreat = aiMemory.threatAssessment.get(a.id) || 50;
+        const bThreat = aiMemory.threatAssessment.get(b.id) || 50;
+        if (aThreat !== bThreat) return bThreat - aThreat;
+
+        // Priority 4: High value targets (medics)
+        if (a.class === 'medic' && b.class !== 'medic') return -1;
+        if (b.class === 'medic' && a.class !== 'medic') return 1;
+
+        // Priority 5: Dangerous units (snipers, ninjas)
+        const dangerClasses = ['sniper', 'ninja'];
+        const aIsDanger = dangerClasses.includes(a.class);
+        const bIsDanger = dangerClasses.includes(b.class);
+        if (aIsDanger && !bIsDanger) return -1;
+        if (bIsDanger && !aIsDanger) return 1;
+
+        // Priority 6: Lower HP first
+        return a.currentHp - b.currentHp;
+    })[0];
+}
+
+/**
+ * Decide if special ability should be used
+ */
+function shouldUseSpecial(unit, enemies, plan) {
+    switch (unit.class) {
+        case 'medic': {
+            const allies = getPlayerUnits(unit.player);
+            const woundedNearby = allies.filter(a =>
+                a.currentHp < a.maxHp * 0.7 &&
+                hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= 3
+            );
+            // Heal if multiple wounded or anyone critically wounded
+            return woundedNearby.length >= 2 ||
+                   woundedNearby.some(a => a.currentHp < a.maxHp * 0.4);
+        }
+
+        case 'scout':
+            // Sprint to close distance or escape
+            if (enemies.length > 0) {
+                const closestEnemy = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                return closestEnemy > unit.range && closestEnemy <= unit.range + unit.move + 3;
+            }
+            // Sprint during hunt mode for faster search
+            return plan.inHuntMode;
+
+        case 'assault':
+            // Powershot on high-value targets
+            if (enemies.length > 0) {
+                const inRange = enemies.filter(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
+                );
+                return inRange.some(e => e.class === 'medic' || e.class === 'sniper');
+            }
+            return false;
+
+        case 'sniper':
+            // Cloak for stealth approach or when enemies nearby
+            if (unit.cloaked) return false;
+            return enemies.length > 0 || plan.inHuntMode;
+
+        case 'ninja':
+            // Stealth for ambush
+            if (unit.cloaked) return false;
+            if (enemies.length > 0) {
+                const closestEnemy = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                return closestEnemy <= 5;
+            }
+            return plan.inHuntMode;
+
+        default:
+            return false;
+    }
+}
+
+/**
+ * Select strategic move target based on plan
+ */
+function selectStrategicMoveTarget(unit, plan) {
+    const reachable = getReachableHexes(unit);
+    if (reachable.size === 0) return null;
+
+    const maxCost = Math.min(unit.ap, unit.move);
+    const candidates = [];
+    const enemies = plan.visibleEnemies;
+
+    reachable.forEach((data, key) => {
+        if (data.cost > maxCost) return;
+
+        const [q, r] = key.split(',').map(Number);
+        const hex = getHex(q, r);
+        if (!hex || hex.unit) return;
+
+        let score = 0;
+
         if (enemies.length > 0) {
-            const closestEnemy = enemies.reduce((closest, e) => {
-                const dist = hexDistance({ q, r }, { q: e.q, r: e.r });
-                return dist < closest.dist ? { enemy: e, dist } : closest;
-            }, { enemy: null, dist: Infinity });
-
-            // Get closer to attack range
-            const idealDist = unit.range;
-            const distToIdeal = Math.abs(closestEnemy.dist - idealDist);
-            score -= distToIdeal * 10;
-
-            // Bonus for being in attack range
-            if (closestEnemy.dist <= unit.range) {
-                score += 50;
-            }
+            // Combat mode - position for attack
+            score = scoreCombatPosition(unit, q, r, enemies, plan);
+        } else if (plan.knownEnemyPositions.length > 0) {
+            // Hunt mode - move towards last known positions
+            score = scoreHuntPosition(unit, q, r, plan);
         } else {
-            // Explore: strategically search for enemies
-
-            // Strong bonus for moving toward map center (most likely encounter zone)
-            const distToCenter = Math.sqrt(q * q + r * r);
-            const currentDistToCenter = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
-            if (distToCenter < currentDistToCenter) {
-                score += (currentDistToCenter - distToCenter) * 15; // Big bonus for getting closer to center
-            }
-
-            // Prefer hexes we haven't explored yet
-            const hexKey = `${q},${r}`;
-            if (!state.exploredHexes?.[unit.player]?.has(hexKey)) {
-                score += 25; // Bonus for unexplored territory
-            }
-
-            // Hills give vision advantage - prioritize for scouts/snipers
-            if (hex.type === 'hills') {
-                score += 20;
-            }
-
-            // Roads lead somewhere interesting
-            if (hex.type === 'road' || hex.type === 'path') {
-                score += 10;
-            }
-
-            // Small random factor to avoid predictable patterns
-            score += Math.random() * 10;
+            // Search mode - systematic exploration
+            score = scoreSearchPosition(unit, q, r, plan);
         }
 
-        // Prefer cover (forest)
-        if (hex.cover) {
-            score += 15;
-        }
-
-        // Avoid expensive terrain
-        score -= TERRAIN[hex.type].moveCost * 5;
+        // Universal terrain preferences
+        const terrainData = TERRAIN[hex.type];
+        if (hex.cover) score += 15;
+        score -= terrainData.moveCost * 3;
 
         candidates.push({ q, r, score, cost: data.cost });
     });
 
     if (candidates.length === 0) return null;
 
-    // Sort by score and return best
     candidates.sort((a, b) => b.score - a.score);
     return candidates[0];
 }
 
 /**
- * Execute AI movement
- * In single-player, render only if unit becomes visible to human player
+ * Score position for combat situations
+ */
+function scoreCombatPosition(unit, q, r, enemies, plan) {
+    let score = 0;
+
+    // Get assigned target or closest enemy
+    const assignedId = aiMemory.assignedTargets.get(unit.id);
+    const primaryTarget = assignedId
+        ? enemies.find(e => e.id === assignedId)
+        : enemies[0];
+
+    if (primaryTarget) {
+        const distToTarget = hexDistance({ q, r }, { q: primaryTarget.q, r: primaryTarget.r });
+
+        // Ideal distance based on unit type
+        let idealDist = unit.range;
+        if (unit.class === 'sniper') idealDist = Math.max(4, unit.range - 1);
+        if (unit.class === 'ninja') idealDist = 1;
+        if (unit.class === 'assault') idealDist = Math.min(2, unit.range);
+
+        // Score based on distance to ideal range
+        const distDiff = Math.abs(distToTarget - idealDist);
+        score -= distDiff * 15;
+
+        // Bonus for being in attack range
+        if (distToTarget <= unit.range) {
+            score += 60;
+
+            // Extra bonus for optimal range
+            if (distToTarget === idealDist) score += 30;
+        }
+    }
+
+    // Flanking bonus - attack from different angle than allies
+    const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+    if (primaryTarget && allies.length > 0) {
+        const avgAllyAngle = allies.reduce((sum, a) => {
+            return sum + Math.atan2(a.r - primaryTarget.r, a.q - primaryTarget.q);
+        }, 0) / allies.length;
+
+        const myAngle = Math.atan2(r - primaryTarget.r, q - primaryTarget.q);
+        const angleDiff = Math.abs(myAngle - avgAllyAngle);
+
+        // Bonus for flanking (attacking from different side)
+        if (angleDiff > Math.PI / 3) score += 25;
+    }
+
+    // Avoid clustering with allies (spread out to avoid AoE)
+    for (const ally of allies) {
+        const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+        if (distToAlly <= 1) score -= 20;
+        else if (distToAlly <= 2) score -= 10;
+    }
+
+    return score;
+}
+
+/**
+ * Score position for hunting known enemy positions
+ */
+function scoreHuntPosition(unit, q, r, plan) {
+    let score = 0;
+
+    // Move towards highest confidence last known position
+    const positions = plan.knownEnemyPositions
+        .sort((a, b) => b.confidence - a.confidence);
+
+    if (positions.length > 0) {
+        const target = positions[0];
+        const dist = hexDistance({ q, r }, { q: target.q, r: target.r });
+
+        // Closer is better, but not too close (might be ambush)
+        if (dist <= 3) {
+            score += (10 - dist) * 20;
+        } else {
+            score -= dist * 5;
+        }
+    }
+
+    // Also consider estimated player center
+    if (aiMemory.playerCenterEstimate) {
+        const distToCenter = hexDistance({ q, r }, aiMemory.playerCenterEstimate);
+        score -= distToCenter * 3;
+    }
+
+    // Prefer high ground for vision
+    const hex = getHex(q, r);
+    if (hex && hex.type === 'hills') {
+        score += 30;
+    }
+
+    return score;
+}
+
+/**
+ * Score position for systematic search
+ */
+function scoreSearchPosition(unit, q, r, plan) {
+    let score = 0;
+    const hexKey = `${q},${r}`;
+
+    // Exploration bonuses
+    const aiExplored = state.playerExploredHexes[state.currentPlayer];
+    if (!aiExplored || !aiExplored.has(hexKey)) {
+        score += 40;  // Big bonus for unexplored territory
+    }
+
+    // Recently searched penalty
+    if (aiMemory.searchedAreas.has(hexKey)) {
+        score -= 30;
+    }
+
+    // Search pattern specific scoring
+    switch (plan.searchPattern) {
+        case 'expand':
+            // Move outward from current position toward map edges
+            const distFromStart = Math.sqrt(q * q + r * r);
+            const currentDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
+            if (distFromStart > currentDist) {
+                score += 15;
+            }
+            break;
+
+        case 'sweep':
+            // Move in coordinated line
+            const allies = getPlayerUnits(unit.player);
+            const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
+            // Stay roughly aligned with allies
+            score -= Math.abs(r - avgAllyR) * 5;
+            // But push forward
+            score += q * 2;
+            break;
+
+        case 'pincer':
+            // Move to flank estimated enemy position
+            if (aiMemory.playerCenterEstimate) {
+                const estPos = aiMemory.playerCenterEstimate;
+                const distToEst = hexDistance({ q, r }, estPos);
+                // Get closer but approach from sides
+                if (distToEst > 2) {
+                    score -= distToEst * 3;
+                }
+                // Bonus for being at angles
+                const angle = Math.atan2(r - estPos.r, q - estPos.q);
+                const unitIndex = getPlayerUnits(unit.player).indexOf(unit);
+                const targetAngle = (unitIndex / getPlayerUnits(unit.player).length) * 2 * Math.PI;
+                const angleDiff = Math.abs(angle - targetAngle);
+                score += (Math.PI - angleDiff) * 10;
+            }
+            break;
+    }
+
+    // Move towards map center (higher chance of finding enemies)
+    const distToCenter = Math.sqrt(q * q + r * r);
+    score -= distToCenter * 2;
+
+    // Hills for vision
+    const hex = getHex(q, r);
+    if (hex && hex.type === 'hills') {
+        // Extra value for scouts and snipers
+        const visionBonus = (unit.class === 'scout' || unit.class === 'sniper') ? 40 : 20;
+        score += visionBonus;
+    }
+
+    // Small random factor
+    score += Math.random() * 8;
+
+    return score;
+}
+
+// ===== MOVEMENT EXECUTION =====
+
+/**
+ * Execute AI movement with proper rendering
  */
 async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
     if (!targetHex) return;
 
     const isSinglePlayer = state.settings.singlePlayer;
-
-    // Check if unit was visible before moving
     const wasVisible = isUnitVisibleToViewer(unit);
 
     // Clear old position
@@ -357,19 +869,23 @@ async function executeAIMove(unit, target) {
     targetHex.unit = unit;
     unit.ap -= target.cost;
 
-    // Always update visibility so AI can see enemies after moving
-    // This is needed for subsequent AI units to have correct visibility info
-    updateVisibility();
+    // Mark this area as searched
+    aiMemory.searchedAreas.add(`${target.q},${target.r}`);
 
-    // In single-player, also keep human player's visibility updated for rendering
+    // Clear old searched areas (keep last 20)
+    if (aiMemory.searchedAreas.size > 20) {
+        const first = aiMemory.searchedAreas.values().next().value;
+        aiMemory.searchedAreas.delete(first);
+    }
+
+    // Update visibility
+    updateVisibility();
     if (isSinglePlayer) {
         updateVisibilityForPlayer(0);
     }
 
-    // Check if unit is now visible to human player
     const isNowVisible = isUnitVisibleToViewer(unit);
 
-    // Render if: multiplayer, or unit became visible, or unit was already visible
     if (!isSinglePlayer || wasVisible || isNowVisible) {
         render();
         updateUI();
