@@ -1014,47 +1014,6 @@ function drawFern(x, y, size, seed) {
     }
 }
 
-/**
- * Draw forest floor details
- */
-function drawForestFloor(cx, cy, s, seed) {
-    // Fallen leaves
-    const leafColors = ['#5a4030', '#4a3525', '#6a5040', '#3d2a1a'];
-    for (let i = 0; i < 6; i++) {
-        const lx = cx + (seededRandom(seed + i * 23) - 0.5) * s * 1.8;
-        const ly = cy + (seededRandom(seed + i * 23 + 1) - 0.5) * s * 1.5;
-        const colorIdx = Math.floor(seededRandom(seed + i * 23 + 2) * leafColors.length);
-
-        ctx.fillStyle = leafColors[colorIdx];
-        ctx.beginPath();
-        ctx.ellipse(lx, ly, 3 + seededRandom(seed + i) * 2, 2 + seededRandom(seed + i + 1) * 1.5,
-            seededRandom(seed + i * 23 + 3) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Mushroom (rare)
-    if (seededRandom(seed + 999) > 0.7) {
-        const mx = cx + (seededRandom(seed + 1000) - 0.5) * s * 0.8;
-        const my = cy + (seededRandom(seed + 1001) - 0.5) * s * 0.6;
-
-        // Stem
-        ctx.fillStyle = '#e8e0d5';
-        ctx.fillRect(mx - 2, my, 4, 6);
-
-        // Cap
-        ctx.fillStyle = '#c0392b';
-        ctx.beginPath();
-        ctx.ellipse(mx, my, 5, 3, 0, Math.PI, 2 * Math.PI);
-        ctx.fill();
-
-        // White spots
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(mx - 2, my - 1, 1, 0, Math.PI * 2);
-        ctx.arc(mx + 1, my - 2, 0.8, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
 
 /**
  * Draw a tree with type variation

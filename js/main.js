@@ -334,6 +334,42 @@ function init() {
         });
     });
 
+    // Setup player count buttons
+    document.querySelectorAll('[data-players]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            document.querySelectorAll('[data-players]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            state.settings.players = parseInt(btn.dataset.players, 10);
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
+    });
+
+    // Setup map size buttons
+    document.querySelectorAll('[data-size]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            document.querySelectorAll('[data-size]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            state.settings.size = btn.dataset.size;
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
+    });
+
     // Setup help toggle
     const helpToggle = document.getElementById('help-toggle');
     const helpPanel = document.getElementById('help-panel');
