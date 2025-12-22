@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
 import { calculateHitChance, getCoverInfo } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
@@ -41,6 +41,7 @@ export function updateUI() {
     updateUnitTabs(units);
     updateActionButtons(unit);
     updateTargetInfo(unit);
+    updateCompassIndicator();
 }
 
 /**
@@ -449,6 +450,53 @@ export function showPowerupPickup(powerup, result) {
     playPowerup();
     const message = `${powerup.icon} ${powerup.name} aufgesammelt!`;
     showToast(message, 'powerup');
+}
+
+/**
+ * Update compass indicator (shows direction to enemies after 3 rounds without contact)
+ */
+function updateCompassIndicator() {
+    // Remove existing compass
+    const existing = document.querySelector('.compass-indicator');
+    if (existing) existing.remove();
+
+    // Don't show compass for AI player or if game is over
+    if (state.gameOver || (state.settings.singlePlayer && state.currentPlayer > 0)) {
+        return;
+    }
+
+    const direction = getEnemyDirection();
+    if (!direction) return;
+
+    // Arrow icons for each direction
+    const arrows = {
+        'N': '⬆️',
+        'NE': '↗️',
+        'E': '➡️',
+        'SE': '↘️',
+        'S': '⬇️',
+        'SW': '↙️',
+        'W': '⬅️',
+        'NW': '↖️'
+    };
+
+    const compass = document.createElement('div');
+    compass.className = 'compass-indicator';
+    compass.innerHTML = `
+        <div class="compass-arrow">${arrows[direction.direction]}</div>
+        <div class="compass-text">
+            <div class="compass-direction">Feinde im ${direction.directionName}</div>
+            <div class="compass-info">~${direction.distance} Hexfelder entfernt</div>
+            <div class="compass-hint">${direction.roundsSearching} Runden ohne Kontakt</div>
+        </div>
+    `;
+
+    document.body.appendChild(compass);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        compass.classList.add('show');
+    });
 }
 
 /**

@@ -76,6 +76,10 @@ export const state = {
     // Previously visible enemies (for detection alerts)
     previouslyVisibleEnemies: new Set(),
 
+    // Enemy tracking for compass feature
+    lastEnemyContactRound: 0,       // Last round when any enemy was spotted
+    roundsWithoutContact: 0,        // Consecutive rounds without seeing enemies
+
     // Canvas dimensions
     canvasWidth: 0,
     canvasHeight: 0
@@ -129,6 +133,8 @@ export function resetState() {
     state.zoomLevel = 1.0;
     state.queuedPaths = {};
     state.previouslyVisibleEnemies = new Set();
+    state.lastEnemyContactRound = 0;
+    state.roundsWithoutContact = 0;
 
     // Initialize per-player explored hexes
     state.playerExploredHexes = [];
@@ -261,4 +267,94 @@ export function updatePreviouslyVisibleEnemies(visibleEnemyIds) {
  */
 export function getPreviouslyVisibleEnemies() {
     return state.previouslyVisibleEnemies;
+}
+
+/**
+ * Mark that an enemy was spotted this round
+ */
+export function markEnemyContact() {
+    state.lastEnemyContactRound = state.round;
+    state.roundsWithoutContact = 0;
+}
+
+/**
+ * Update contact tracking at end of round
+ */
+export function updateContactTracking(enemiesVisible) {
+    if (enemiesVisible) {
+        state.lastEnemyContactRound = state.round;
+        state.roundsWithoutContact = 0;
+    } else {
+        state.roundsWithoutContact = state.round - state.lastEnemyContactRound;
+    }
+}
+
+/**
+ * Get direction to nearest enemy (for compass feature)
+ * Returns { direction: 'N'|'NE'|'E'|'SE'|'S'|'SW'|'W'|'NW', distance: number } or null
+ */
+export function getEnemyDirection() {
+    // Only show compass after 3 rounds without contact
+    if (state.roundsWithoutContact < 3) return null;
+
+    const myUnits = getPlayerUnits(state.currentPlayer);
+    if (myUnits.length === 0) return null;
+
+    // Calculate center of my units
+    const myCenter = myUnits.reduce((acc, u) => ({
+        q: acc.q + u.q / myUnits.length,
+        r: acc.r + u.r / myUnits.length
+    }), { q: 0, r: 0 });
+
+    // Find all enemy units (even hidden ones - this is the "compass magic")
+    const enemies = state.units.filter(u =>
+        u.alive && u.player !== state.currentPlayer
+    );
+
+    if (enemies.length === 0) return null;
+
+    // Find nearest enemy
+    let nearestDist = Infinity;
+    let nearestEnemy = null;
+
+    for (const enemy of enemies) {
+        const dq = enemy.q - myCenter.q;
+        const dr = enemy.r - myCenter.r;
+        const dist = Math.sqrt(dq * dq + dr * dr);
+        if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestEnemy = enemy;
+        }
+    }
+
+    if (!nearestEnemy) return null;
+
+    // Calculate direction
+    const dq = nearestEnemy.q - myCenter.q;
+    const dr = nearestEnemy.r - myCenter.r;
+    const angle = Math.atan2(dr, dq) * 180 / Math.PI;
+
+    // Convert angle to compass direction (8 directions)
+    const directions = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
+    const index = Math.round((angle + 180) / 45) % 8;
+    const direction = directions[index];
+
+    // German direction names
+    const directionNames = {
+        'N': 'Norden',
+        'NE': 'Nordosten',
+        'E': 'Osten',
+        'SE': 'Südosten',
+        'S': 'Süden',
+        'SW': 'Südwesten',
+        'W': 'Westen',
+        'NW': 'Nordwesten'
+    };
+
+    return {
+        direction,
+        directionName: directionNames[direction],
+        distance: Math.round(nearestDist),
+        roundsSearching: state.roundsWithoutContact
+    };
 }

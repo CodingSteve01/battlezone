@@ -7,7 +7,7 @@ export const CONFIG = {
     UNITS_PER_PLAYER: 3,
     AP_PER_TURN: 4,
     MAX_ROUNDS: 15,
-    VISION_RANGE: 5,  // Fog of War vision range
+    VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
 
     // Map sizes (radius in hexes)
     MAP_SIZES: {
@@ -16,11 +16,11 @@ export const CONFIG = {
         large: 16
     },
 
-    // Spawn distance from edge
+    // Spawn distance from center (reduced for faster encounters)
     SPAWN_OFFSET: {
-        small: 6,
-        medium: 10,
-        large: 14
+        small: 4,    // Was 6 - now teams start closer
+        medium: 7,   // Was 10 - reduces ~6 hexes of search distance
+        large: 10    // Was 14 - still big, but manageable
     }
 };
 
@@ -132,7 +132,7 @@ export const UNIT_CLASSES = {
         damage: 18,
         range: 4,
         move: 5,
-        vision: 6,
+        vision: 7,          // Increased from 6 - best at finding enemies
         special: 'Sprint',
         specialDesc: '+3 Bewegung'
     },
@@ -143,7 +143,7 @@ export const UNIT_CLASSES = {
         damage: 35,
         range: 2,
         move: 3,
-        vision: 4,
+        vision: 5,          // Increased from 4
         special: 'Powershot',
         specialDesc: '+20 Schaden'
     },
@@ -154,7 +154,7 @@ export const UNIT_CLASSES = {
         damage: 12,
         range: 2,
         move: 4,
-        vision: 5,
+        vision: 6,          // Increased from 5
         special: 'Heilung',
         specialDesc: 'Heilt Team +30 HP'
     },
@@ -165,7 +165,7 @@ export const UNIT_CLASSES = {
         damage: 45,
         range: 6,
         move: 2,
-        vision: 7,
+        vision: 8,          // Increased from 7 - excellent spotter
         special: 'Tarnung',
         specialDesc: 'Unsichtbar für 1 Runde',
         stealthDetectionRange: 2
@@ -177,7 +177,7 @@ export const UNIT_CLASSES = {
         damage: 40,
         range: 1,           // Nahkampf
         move: 4,
-        vision: 5,
+        vision: 5,          // Kept at 5 - relies on stealth, not vision
         special: 'Schleichen',
         specialDesc: 'Tarnung + Bonus-Bewegung',
         stealthDetectionRange: 1,  // Noch schwerer zu entdecken

@@ -1,7 +1,7 @@
 // ===== FOG OF WAR SYSTEM =====
 
 import { hexDistance, getHexesInRange } from './hexMath.js';
-import { state, getHex, getPlayerUnits, isHexVisible } from './state.js';
+import { state, getHex, getPlayerUnits, isHexVisible, markEnemyContact } from './state.js';
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 import { hasLineOfSight } from './combat.js';
@@ -143,11 +143,18 @@ export function isUnitVisible(unit) {
  * Get all visible enemy units
  */
 export function getVisibleEnemies() {
-    return state.units.filter(unit => {
+    const visible = state.units.filter(unit => {
         if (!unit.alive) return false;
         if (unit.player === state.currentPlayer) return false;
         return isUnitVisible(unit);
     });
+
+    // Track enemy contact for compass feature
+    if (visible.length > 0) {
+        markEnemyContact();
+    }
+
+    return visible;
 }
 
 /**
