@@ -115,8 +115,8 @@ export function isUnitVisible(unit) {
         return detected;
     }
 
-    // Sniper/Ninja stealth: harder to detect at range
-    if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive !== false) {
+    // Sniper/Ninja stealth: harder to detect at range (only when stealthActive is explicitly true)
+    if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive === true) {
         const classData = UNIT_CLASSES[unit.class];
         const detectionRange = classData.stealthDetectionRange || 2;
 
