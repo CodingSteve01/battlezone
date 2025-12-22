@@ -7,7 +7,7 @@ import { getAttackableUnits, moveUnit, animateUnitMovement } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
-import { updateUI, selectAction, showScreen, showToast, showPowerupPickup } from './ui.js';
+import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
 import { render, resizeCanvas } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
@@ -400,7 +400,10 @@ function applyZoom(zoomDelta, screenX, screenY) {
 }
 
 /**
- * Handle tap or click at position
+ * Handle tap or click at position - Unified Point-and-Click system
+ * - Click own unit: Select it
+ * - Click enemy: Attack if in range, otherwise move toward them
+ * - Click empty hex: Move there
  */
 function handleTapOrClick(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -412,32 +415,87 @@ function handleTapOrClick(clientX, clientY) {
     const hex = getHex(hexCoord.q, hexCoord.r);
     if (!hex) return;
 
-    // Check if clicking on own unit to select it
+    const unit = getCurrentUnit();
+
+    // 1. Check if clicking on own unit to select it
     if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
         const playerUnits = getPlayerUnits(state.currentPlayer);
         const unitIndex = playerUnits.findIndex(u => u.id === hex.unit.id);
-        if (unitIndex >= 0 && unitIndex !== state.selectedUnit) {
+        if (unitIndex >= 0) {
+            // If clicking on already selected unit, do nothing special
+            if (unitIndex === state.selectedUnit) {
+                return;
+            }
             // Select this unit
             state.selectedUnit = unitIndex;
             state.pendingMoveDestination = null;
             state.currentPath = null;
             state.targetedUnit = null;
+            state.selectedAction = 'move';  // Reset to move mode
             updateUI();
             render();
-
-            // Show toast about unit selection
             showToast(`${hex.unit.name} ausgewählt`, 'info');
             return;
         }
     }
 
-    const unit = getCurrentUnit();
     if (!unit) return;
 
-    if (state.selectedAction === 'move') {
+    // 2. Check if clicking on enemy unit
+    if (hex.unit && hex.unit.player !== state.currentPlayer && hex.unit.alive) {
+        handleEnemyClick(unit, hex);
+        return;
+    }
+
+    // 3. Click on empty/walkable hex - move there
+    if (hex.walkable && !hex.unit) {
         handleMoveClick(unit, hex);
-    } else if (state.selectedAction === 'attack') {
-        handleAttackClick(unit, hex);
+    }
+}
+
+/**
+ * Handle click on enemy unit - auto-attack or move toward
+ */
+function handleEnemyClick(unit, hex) {
+    const enemy = hex.unit;
+
+    // Check if enemy is in attack range
+    const attackable = getAttackableUnits(unit);
+    const canAttack = attackable.some(u => u.id === enemy.id);
+
+    if (canAttack && unit.ap >= 1) {
+        // Enemy is in range - attack!
+        if (state.targetedUnit && state.targetedUnit.id === enemy.id) {
+            // Second tap on same enemy - execute attack
+            const result = executeAttack(unit, enemy);
+            state.targetedUnit = null;
+            state.pendingMoveDestination = null;
+            state.currentPath = null;
+
+            if (result.killed) {
+                checkWinCondition();
+            }
+
+            render();
+            updateUI();
+        } else {
+            // First tap - target this enemy
+            state.targetedUnit = enemy;
+            state.pendingMoveDestination = null;
+            state.currentPath = null;
+            render();
+            updateUI();
+            showToast(`🎯 ${enemy.name} anvisiert - nochmal tippen zum Angriff`, 'warning');
+        }
+    } else {
+        // Enemy not in range - show message
+        if (unit.ap < 1) {
+            showToast('❌ Keine AP für Angriff!', 'warning');
+        } else {
+            showToast('❌ Feind außer Reichweite!', 'warning');
+        }
+        state.targetedUnit = null;
+        render();
     }
 }
 
@@ -445,7 +503,9 @@ function handleTapOrClick(clientX, clientY) {
  * Handle path preview on hover (mouse only)
  */
 function handlePathPreview(clientX, clientY) {
-    if (state.gameOver || state.selectedAction !== 'move') return;
+    if (state.gameOver) return;
+    // Don't show path preview if targeting an enemy
+    if (state.targetedUnit) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = clientX - rect.left - state.offsetX;
@@ -870,31 +930,20 @@ function setupMenuButtons() {
  * Setup action buttons
  */
 function setupActionButtons() {
-    document.querySelectorAll('.action-btn').forEach(btn => {
-        btn.onclick = () => {
-            const action = btn.dataset.action;
-
-            if (action === 'special') {
-                const unit = getCurrentUnit();
-                if (unit && unit.ap >= 2 && !unit.usedSpecial) {
-                    useSpecialAbility(unit);
-
-                    // Auto-switch to appropriate action based on ability type
-                    // Assault (Powershot) -> switch to attack
-                    // Scout (Sprint), Ninja (Schleichen) -> switch to move (movement bonus)
-                    // Medic, Sniper -> stay in current mode (healing done, cloak for positioning)
-                    if (unit.class === 'assault') {
-                        selectAction('attack');
-                    } else if (unit.class === 'scout' || unit.class === 'ninja') {
-                        selectAction('move');
-                    } else {
-                        render();
-                        updateUI();
-                    }
-                }
-            } else {
-                selectAction(action);
+    // Special ability button - simplified UI
+    const specialBtn = document.querySelector('.action-btn[data-action="special"]');
+    if (specialBtn) {
+        specialBtn.onclick = () => {
+            const unit = getCurrentUnit();
+            if (unit && unit.ap >= 2 && !unit.usedSpecial) {
+                useSpecialAbility(unit);
+                render();
+                updateUI();
+            } else if (unit && unit.usedSpecial) {
+                showToast('❌ Spezialfähigkeit bereits benutzt!', 'warning');
+            } else if (unit && unit.ap < 2) {
+                showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
             }
         };
-    });
+    }
 }

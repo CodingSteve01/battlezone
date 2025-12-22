@@ -153,22 +153,29 @@ function updateUnitTabs(units) {
  * Update action buttons state
  */
 function updateActionButtons(unit) {
-    document.querySelectorAll('.action-btn').forEach(btn => {
-        btn.classList.remove('selected', 'disabled');
-        const action = btn.dataset.action;
+    // Update special ability button
+    const specialBtn = document.querySelector('.action-btn[data-action="special"]');
+    if (specialBtn) {
+        specialBtn.classList.remove('disabled');
 
-        if (action === state.selectedAction) {
-            btn.classList.add('selected');
-        }
+        const labelEl = document.getElementById('special-label');
 
         if (!unit) {
-            btn.classList.add('disabled');
+            specialBtn.classList.add('disabled');
+            if (labelEl) labelEl.textContent = 'Spezial';
         } else {
-            if (action === 'move' && unit.ap < 1) btn.classList.add('disabled');
-            if (action === 'attack' && unit.ap < 1) btn.classList.add('disabled');
-            if (action === 'special' && (unit.ap < 2 || unit.usedSpecial)) btn.classList.add('disabled');
+            // Update label with unit's special ability name
+            const unitClass = UNIT_CLASSES[unit.class];
+            if (labelEl && unitClass) {
+                labelEl.textContent = unitClass.special || 'Spezial';
+            }
+
+            // Disable if not enough AP or already used
+            if (unit.ap < 2 || unit.usedSpecial) {
+                specialBtn.classList.add('disabled');
+            }
         }
-    });
+    }
 }
 
 /**
@@ -178,7 +185,8 @@ function updateTargetInfo(unit) {
     const infoEl = document.getElementById('target-info');
     if (!infoEl) return;
 
-    if (state.targetedUnit && state.selectedAction === 'attack' && unit) {
+    // Show target info when an enemy is targeted
+    if (state.targetedUnit && unit) {
         const chance = calculateHitChance(unit, state.targetedUnit);
         const effectiveDamage = getEffectiveDamage(unit);
 

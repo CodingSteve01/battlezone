@@ -841,7 +841,34 @@ button:focus:not(:focus-visible),
     border: 2px solid rgba(0,0,0,0.1);
 }
 
+/* Special ability button - larger with label */
+.action-btn.special-btn {
+    flex: 2;
+    gap: 8px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border-color: var(--purple);
+}
+
+.action-btn.special-btn:hover {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(139, 92, 246, 0.2) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.action-btn.special-btn .label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--purple-light);
+}
+
+.action-btn.special-btn.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
 .end-turn-btn {
+    flex: 1;
     padding: 14px 20px;
     background: linear-gradient(135deg, var(--red) 0%, #dc2626 100%);
     border: none;
