@@ -1340,43 +1340,28 @@ export function render() {
             }
         }
 
-        // Highlight reachable hexes for movement - always visible when unit selected
+        // Highlight reachable hexes for movement - simple green overlay
         if (state.selectedAction === 'move' && reachableHexes.size > 0) {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && fogLevel === 'visible' && !hex.unit) {
-                // Draw movement range highlight - use explicit fill (green)
+                // Draw simple movement range highlight (green)
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.85);
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.2)';
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
                 ctx.fill();
 
-                // Draw border to make it clearer (green)
-                ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
-                ctx.lineWidth = 2;
+                // Subtle border
+                ctx.strokeStyle = 'rgba(34, 197, 94, 0.4)';
+                ctx.lineWidth = 1.5;
                 ctx.stroke();
-
-                // Show AP cost in corner for each reachable hex
-                const cost = pathData.cost;
-                if (cost > 0) {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.beginPath();
-                    ctx.arc(sx + state.hexSize * 0.3, sy - state.hexSize * 0.3, 11, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = cost <= currentUnit.ap ? '#22c55e' : '#ef4444';
-                    ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(cost, sx + state.hexSize * 0.3, sy - state.hexSize * 0.3);
-                }
             }
         }
     });
 
-    // Draw path preview - show full path with color coding (green=reachable, red=too far)
+    // Draw path preview - clean simple path line with destination marker
     if (state.currentPath && state.currentPath.length >= 2 && state.selectedAction === 'move' && currentUnit) {
-        const maxCost = Math.min(currentUnit.ap, currentUnit.move);
+        const maxCost = currentUnit.ap;
 
         // Calculate cumulative costs along path
         let cumulativeCost = 0;
@@ -1390,89 +1375,27 @@ export function render() {
             return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
         });
 
-        // Find where the path exceeds AP (check for blocked hexes too)
+        // Find last reachable point
         let lastReachableIndex = 0;
         for (let i = 1; i < pathWithCosts.length; i++) {
             const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
-            // Stop if hex is occupied by another unit
-            if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) {
-                break;
-            }
+            if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
             if (pathWithCosts[i].totalCost <= maxCost) {
                 lastReachableIndex = i;
             } else {
-                break; // Stop at first unreachable
+                break;
             }
         }
 
-        // Draw the UNREACHABLE portion first (red, dashed)
-        if (pathWithCosts.length > lastReachableIndex + 1) {
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
-            ctx.lineWidth = 4;
-            ctx.setLineDash([8, 6]);
-            ctx.beginPath();
-
-            // Start from last reachable point
-            const startPoint = pathWithCosts[Math.max(0, lastReachableIndex)];
-            const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
-            ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
-
-            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Draw red dots for unreachable hexes with cost
-            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                const sx = state.offsetX + pos.x;
-                const sy = state.offsetY + pos.y;
-
-                // Red circle with cost
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-                ctx.beginPath();
-                ctx.arc(sx, sy, 14, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Cost number in red circle
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 11px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(point.totalCost, sx, sy);
-            }
-
-            // X mark at final unreachable destination
-            const finalPoint = pathWithCosts[pathWithCosts.length - 1];
-            const finalPos = hexToPixel(finalPoint.q, finalPoint.r, state.hexSize);
-            const finalSx = state.offsetX + finalPos.x;
-            const finalSy = state.offsetY + finalPos.y;
-
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(finalSx - 5, finalSy - 24);
-            ctx.lineTo(finalSx + 5, finalSy - 14);
-            ctx.moveTo(finalSx + 5, finalSy - 24);
-            ctx.lineTo(finalSx - 5, finalSy - 14);
-            ctx.stroke();
-        }
-
-        // Draw the REACHABLE portion (green, solid) - always draw if we have a valid path
+        // Draw the path line (green, solid)
         if (lastReachableIndex >= 1) {
-            // Draw the path line (green) with shadow for better visibility
             ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 4;
-            ctx.strokeStyle = 'rgba(34, 197, 94, 0.95)';
-            ctx.lineWidth = 6;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            ctx.shadowBlur = 3;
+            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+            ctx.lineWidth = 5;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.setLineDash([]);
             ctx.beginPath();
 
             for (let i = 0; i <= lastReachableIndex; i++) {
@@ -1480,118 +1403,71 @@ export function render() {
                 const pos = hexToPixel(point.q, point.r, state.hexSize);
                 const sx = state.offsetX + pos.x;
                 const sy = state.offsetY + pos.y;
-
                 if (i === 0) ctx.moveTo(sx, sy);
                 else ctx.lineTo(sx, sy);
             }
             ctx.stroke();
             ctx.restore();
 
-            // Draw dots at each step with cost
-            for (let i = 1; i <= lastReachableIndex; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                const sx = state.offsetX + pos.x;
-                const sy = state.offsetY + pos.y;
-
-                // Green circle with border (darker for destination)
-                ctx.fillStyle = i === lastReachableIndex ? '#16a34a' : 'rgba(34, 197, 94, 0.95)';
-                ctx.beginPath();
-                ctx.arc(sx, sy, 15, 0, Math.PI * 2);
-                ctx.fill();
-
-                // White border for better visibility
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // Cost number
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(point.totalCost, sx, sy);
-            }
-
-            // Draw endpoint marker at the last reachable position
+            // Destination marker
             const endPoint = pathWithCosts[lastReachableIndex];
             const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
             const endSx = state.offsetX + endPos.x;
             const endSy = state.offsetY + endPos.y;
 
-            // Check if this is a pending move destination (tap-to-confirm)
+            // Check if pending confirmation
             const isPending = state.pendingMoveDestination &&
                 state.pendingMoveDestination.q === endPoint.q &&
                 state.pendingMoveDestination.r === endPoint.r;
 
             if (isPending) {
-                // Pulsing effect for tap-to-confirm
+                // Pulsing confirmation marker
                 const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
 
-                // Large pulsing glow circle
-                ctx.fillStyle = `rgba(34, 197, 94, ${0.25 * pulse})`;
+                ctx.fillStyle = `rgba(34, 197, 94, ${0.2 * pulse})`;
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.7 * pulse, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Green checkmark button circle
-                const btnSize = state.hexSize * 0.55;
-                ctx.fillStyle = `rgba(22, 163, 74, ${0.9 + 0.1 * pulse})`;
+                // Confirm button
+                const btnSize = state.hexSize * 0.45;
+                ctx.fillStyle = `rgba(22, 163, 74, ${0.85 + 0.15 * pulse})`;
                 ctx.beginPath();
                 ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Pulsing ring around button
-                ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 * pulse})`;
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.arc(endSx, endSy, btnSize + 4, 0, Math.PI * 2);
-                ctx.stroke();
-
-                // Draw checkmark ✓
+                // Checkmark
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 3;
                 ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
                 ctx.beginPath();
-                const checkSize = btnSize * 0.5;
-                ctx.moveTo(endSx - checkSize * 0.5, endSy);
-                ctx.lineTo(endSx - checkSize * 0.1, endSy + checkSize * 0.4);
-                ctx.lineTo(endSx + checkSize * 0.5, endSy - checkSize * 0.4);
+                const s = btnSize * 0.4;
+                ctx.moveTo(endSx - s * 0.5, endSy);
+                ctx.lineTo(endSx - s * 0.1, endSy + s * 0.4);
+                ctx.lineTo(endSx + s * 0.5, endSy - s * 0.4);
                 ctx.stroke();
 
-                // "Bestätigen" hint below
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                // Cost badge
+                const cost = pathWithCosts[lastReachableIndex].totalCost;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
                 ctx.beginPath();
-                ctx.roundRect(endSx - 45, endSy + btnSize + 10, 90, 22, 6);
+                ctx.roundRect(endSx - 18, endSy + btnSize + 8, 36, 18, 4);
                 ctx.fill();
-
                 ctx.fillStyle = '#22c55e';
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('✓ Bestätigen', endSx, endSy + btnSize + 21);
+                ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 17);
             } else {
-                // Small destination marker (not yet confirmed)
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.8)';
+                // Simple destination dot
+                ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
                 ctx.beginPath();
-                ctx.arc(endSx, endSy, 8, 0, Math.PI * 2);
+                ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
             }
-
-            // Show remaining AP after move
-            const remainingAP = currentUnit.ap - pathWithCosts[lastReachableIndex].totalCost;
-
-            // AP remaining badge
-            ctx.fillStyle = remainingAP > 0 ? 'rgba(34, 197, 94, 0.9)' : 'rgba(107, 114, 128, 0.9)';
-            ctx.beginPath();
-            ctx.roundRect(endSx + 16, endSy - 10, 38, 20, 5);
-            ctx.fill();
-
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 11px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${remainingAP}⚡`, endSx + 35, endSy);
         }
     }
 

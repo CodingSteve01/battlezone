@@ -363,9 +363,9 @@ function handleMoveClick(unit, hex) {
     // Don't allow movement during animation
     if (state.animating) return;
 
-    const maxMoveCost = Math.min(unit.ap, unit.move);
-    const maxPossibleCost = unit.move * 3;
-    const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
+    // Use all available AP for movement
+    const maxMoveCost = unit.ap;
+    const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxMoveCost);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
         // Clear pending destination if tapping on invalid hex

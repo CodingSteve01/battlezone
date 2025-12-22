@@ -110,7 +110,8 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
  * Returns Map of "q,r" -> { hex, cost, path }
  */
 export function getReachableHexes(unit) {
-    const maxCost = Math.min(unit.ap, unit.move);
+    // Use all available AP for movement (terrain cost determines actual reach)
+    const maxCost = unit.ap;
     const startKey = `${unit.q},${unit.r}`;
 
     const frontier = new PriorityQueue();
