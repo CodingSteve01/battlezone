@@ -221,6 +221,31 @@ export function killUnit(unit) {
 }
 
 /**
+ * Check if unit can automatically take cover at current position
+ */
+export function canAutoTakeCover(unit) {
+    if (!unit || !unit.alive) return false;
+    if (unit.hiding) return false;
+
+    const hex = getHex(unit.q, unit.r);
+    if (!hex) return false;
+
+    const terrain = TERRAIN[hex.type];
+    return terrain && terrain.canHide;
+}
+
+/**
+ * Automatically take cover if standing on a valid terrain
+ * Returns true if cover was taken
+ */
+export function autoTakeCover(unit) {
+    if (!canAutoTakeCover(unit)) return false;
+
+    unit.hiding = true;
+    return true;
+}
+
+/**
  * Get unit at position
  */
 export function getUnitAt(q, r) {

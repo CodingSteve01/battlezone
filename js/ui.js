@@ -156,7 +156,7 @@ function updateActionButtons(unit) {
     // Update cover button
     const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
     if (coverBtn) {
-        coverBtn.classList.remove('disabled', 'active');
+        coverBtn.classList.remove('disabled', 'active', 'suggested');
         const coverLabel = document.getElementById('cover-label');
 
         if (!unit) {
@@ -178,6 +178,10 @@ function updateActionButtons(unit) {
                 coverBtn.classList.add('disabled');
                 if (coverLabel) coverLabel.textContent = 'Deckung';
             } else {
+                // Can take cover - highlight as suggested if unit has low HP or is in danger
+                if (unit.currentHp < unit.maxHp * 0.5) {
+                    coverBtn.classList.add('suggested');
+                }
                 if (coverLabel) coverLabel.textContent = 'Deckung';
             }
         }
@@ -186,13 +190,15 @@ function updateActionButtons(unit) {
     // Update special ability button
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {
-        specialBtn.classList.remove('disabled');
+        specialBtn.classList.remove('disabled', 'suggested');
 
         const labelEl = document.getElementById('special-label');
+        const tipEl = document.getElementById('special-tip');
 
         if (!unit) {
             specialBtn.classList.add('disabled');
             if (labelEl) labelEl.textContent = 'Spezial';
+            if (tipEl) tipEl.textContent = '';
         } else {
             // Update label with unit's special ability name
             const unitClass = UNIT_CLASSES[unit.class];
@@ -200,9 +206,53 @@ function updateActionButtons(unit) {
                 labelEl.textContent = unitClass.special || 'Spezial';
             }
 
+            // Generate contextual tip based on unit class
+            let tip = '';
+            let shouldSuggest = false;
+
+            if (!unit.usedSpecial && unit.ap >= 2) {
+                switch (unit.class) {
+                    case 'medic':
+                        // Check if allies need healing
+                        const allies = getPlayerUnits(state.currentPlayer);
+                        const injuredAllies = allies.filter(a => a.currentHp < a.maxHp && a.id !== unit.id);
+                        if (injuredAllies.length > 0) {
+                            tip = `💚 ${injuredAllies.length} Verbündete verletzt!`;
+                            shouldSuggest = true;
+                        }
+                        break;
+                    case 'sniper':
+                    case 'ninja':
+                        // Suggest cloaking if not hidden
+                        if (!unit.cloaked && !unit.hiding) {
+                            tip = '👁️ Tarnung empfohlen!';
+                            shouldSuggest = true;
+                        }
+                        break;
+                    case 'scout':
+                        // Suggest sprint if there's AP but no movement yet
+                        if (unit.ap >= 3) {
+                            tip = '🏃 Sprint für +3 Bewegung!';
+                            shouldSuggest = true;
+                        }
+                        break;
+                    case 'assault':
+                        // Suggest powershot before attacking
+                        if (unit.ap >= 3) {
+                            tip = '💥 Powershot für +20 Schaden!';
+                            shouldSuggest = true;
+                        }
+                        break;
+                }
+            }
+
+            if (tipEl) tipEl.textContent = tip;
+            if (shouldSuggest) specialBtn.classList.add('suggested');
+
             // Disable if not enough AP or already used
             if (unit.ap < 2 || unit.usedSpecial) {
                 specialBtn.classList.add('disabled');
+                if (tipEl) tipEl.textContent = unit.usedSpecial ? 'Bereits benutzt' : 'Nicht genug AP';
             }
         }
     }

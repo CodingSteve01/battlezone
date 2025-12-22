@@ -900,6 +900,37 @@ button:focus:not(:focus-visible),
     pointer-events: none;
 }
 
+/* Suggested action - pulsing animation to draw attention */
+.action-btn.suggested {
+    animation: suggestPulse 1.5s ease-in-out infinite;
+    border-color: #fbbf24 !important;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+.action-btn.suggested::before {
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.15) 0%, transparent 50%);
+}
+
+@keyframes suggestPulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 15px rgba(251, 191, 36, 0.3);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 0 25px rgba(251, 191, 36, 0.5);
+    }
+}
+
+/* Special tip text under button */
+.special-tip {
+    font-size: 9px;
+    color: #fbbf24;
+    margin-top: 2px;
+    opacity: 0.9;
+    text-align: center;
+}
+
 .end-turn-btn {
     flex: 1;
     padding: 14px 20px;
