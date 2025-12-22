@@ -8,8 +8,16 @@ export const state = {
     settings: {
         players: 2,
         size: 'medium',
-        singlePlayer: false
+        singlePlayer: false,
+        renderQuality: 'auto'  // 'low', 'medium', 'high', 'auto'
     },
+
+    // Performance tracking for auto-quality
+    frameCount: 0,
+    lastFrameTime: 0,
+    currentFps: 60,
+    lowPerfFrames: 0,
+    effectiveQuality: 'high',  // Actual quality being used
 
     // Map data
     hexes: [],          // Array of hex objects

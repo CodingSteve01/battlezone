@@ -209,16 +209,26 @@ function handleTouchMove(e) {
         if (newZoom !== state.zoomLevel) {
             const center = getPinchCenter(e.touches);
             const rect = canvas.getBoundingClientRect();
-            const centerX = center.x - rect.left - state.offsetX;
-            const centerY = center.y - rect.top - state.offsetY;
+
+            // Calculate pinch center relative to canvas center
+            const screenX = center.x - rect.left;
+            const screenY = center.y - rect.top;
+            const canvasCenterX = rect.width / 2;
+            const canvasCenterY = rect.height / 2;
+
+            // Position relative to canvas center
+            const relX = screenX - canvasCenterX;
+            const relY = screenY - canvasCenterY;
 
             const oldZoom = state.zoomLevel;
-            state.zoomLevel = newZoom;
+            const zoomRatio = newZoom / oldZoom;
 
             // Adjust camera to keep the pinch center stationary
-            const zoomRatio = newZoom / oldZoom;
-            state.cameraX = state.cameraX * zoomRatio - centerX * (zoomRatio - 1);
-            state.cameraY = state.cameraY * zoomRatio - centerY * (zoomRatio - 1);
+            // Formula: newCameraX = relX * (1 - zoomRatio) + oldCameraX * zoomRatio
+            state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
+            state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
+
+            state.zoomLevel = newZoom;
 
             limitCameraBounds();
             updateCameraOffset();
@@ -382,18 +392,21 @@ function applyZoom(zoomDelta, screenX, screenY) {
 
     if (newZoom === oldZoom) return;
 
-    // Get the world position under the mouse before zoom
+    // Calculate mouse position relative to canvas center
     const rect = canvas.getBoundingClientRect();
-    const mouseX = screenX - rect.left - state.offsetX;
-    const mouseY = screenY - rect.top - state.offsetY;
+    const canvasCenterX = rect.width / 2;
+    const canvasCenterY = rect.height / 2;
+    const relX = screenX - rect.left - canvasCenterX;
+    const relY = screenY - rect.top - canvasCenterY;
 
-    // Apply zoom
-    state.zoomLevel = newZoom;
+    const zoomRatio = newZoom / oldZoom;
 
     // Adjust camera to keep the point under the mouse stationary
-    const zoomRatio = newZoom / oldZoom;
-    state.cameraX = state.cameraX * zoomRatio - mouseX * (zoomRatio - 1);
-    state.cameraY = state.cameraY * zoomRatio - mouseY * (zoomRatio - 1);
+    // Formula: newCameraX = relX * (1 - zoomRatio) + oldCameraX * zoomRatio
+    state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
+    state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
+
+    state.zoomLevel = newZoom;
 
     limitCameraBounds();
     updateCameraOffset();

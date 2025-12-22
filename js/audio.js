@@ -21,7 +21,7 @@ let ambientGain = null;
  * Initialisiert das Audio-System (muss nach User-Interaktion aufgerufen werden)
  */
 export function initAudio() {
-    if (initialized) return;
+    if (initialized) return true;
 
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -30,18 +30,40 @@ export function initAudio() {
         masterGain.gain.value = audioSettings.masterVolume;
         initialized = true;
         console.log('Audio-System initialisiert');
+        return true;
     } catch (e) {
         console.warn('Web Audio API nicht verfügbar:', e);
+        return false;
     }
 }
 
 /**
  * Stellt sicher, dass AudioContext läuft (nach User-Interaktion)
+ * Gibt true zurück wenn Audio bereit ist
  */
 export function resumeAudio() {
-    if (audioContext && audioContext.state === 'suspended') {
-        audioContext.resume();
+    if (!initialized) {
+        initAudio();
     }
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().catch(e => console.warn('Audio resume failed:', e));
+    }
+    return initialized && audioContext && audioContext.state === 'running';
+}
+
+/**
+ * Hilfsfunktion: Stellt sicher, dass Audio bereit ist bevor Sound abgespielt wird
+ * Sollte bei jeder Sound-Wiedergabe aufgerufen werden
+ */
+function ensureAudioReady() {
+    if (!initialized) {
+        initAudio();
+    }
+    if (audioContext && audioContext.state === 'suspended') {
+        // Try to resume - this will only work after user interaction
+        audioContext.resume().catch(() => {});
+    }
+    return audioContext && audioContext.state === 'running';
 }
 
 /**
@@ -70,7 +92,9 @@ export function toggleAudio(enabled) {
  * Erstellt einen Oszillator mit Envelope
  */
 function createOscillator(frequency, type = 'sine', duration = 0.1) {
-    if (!audioContext || !audioSettings.enabled) return null;
+    // Ensure audio is ready - this will try to init/resume if needed
+    if (!ensureAudioReady() || !audioSettings.enabled) return null;
+    if (!audioContext || !masterGain) return null;
 
     const osc = audioContext.createOscillator();
     const gain = audioContext.createGain();
@@ -106,7 +130,8 @@ function playTone(frequency, type = 'sine', duration = 0.1, volume = 0.3, attack
  * Spielt weißes Rauschen (für Explosionen, Schüsse)
  */
 function playNoise(duration = 0.1, volume = 0.2, filterFreq = 1000) {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
+    if (!audioContext || !masterGain) return;
 
     const bufferSize = audioContext.sampleRate * duration;
     const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
@@ -143,7 +168,7 @@ function playNoise(duration = 0.1, volume = 0.2, filterFreq = 1000) {
  * Schuss-Sound für Scout (leichtes Gewehr)
  */
 export function playScoutShot() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Schneller, heller Schuss
     playNoise(0.08, 0.25, 3000);
@@ -157,7 +182,7 @@ export function playScoutShot() {
  * Schuss-Sound für Assault (schweres Gewehr)
  */
 export function playAssaultShot() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Tiefer, kraftvoller Schuss
     playNoise(0.15, 0.4, 800);
@@ -172,7 +197,7 @@ export function playAssaultShot() {
  * Schuss-Sound für Sniper (präziser Schuss)
  */
 export function playSniperShot() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Scharfer, durchdringender Schuss
     playNoise(0.05, 0.35, 4000);
@@ -190,7 +215,7 @@ export function playSniperShot() {
  * Schuss-Sound für Medic (leichte Waffe)
  */
 export function playMedicShot() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Leichter, schneller Schuss
     playNoise(0.06, 0.2, 2500);
@@ -201,7 +226,8 @@ export function playMedicShot() {
  * Angriffs-Sound für Ninja (Nahkampf)
  */
 export function playNinjaAttack() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
+    if (!audioContext || !masterGain) return;
 
     // Schneller Schwung-Sound
     const now = audioContext.currentTime;
@@ -258,7 +284,7 @@ export function playWeaponSound(unitClass) {
  * Treffer-Sound
  */
 export function playHit() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playNoise(0.08, 0.3, 600);
     playTone(200, 'sine', 0.1, 0.2);
@@ -268,7 +294,7 @@ export function playHit() {
  * Kritischer Treffer
  */
 export function playCriticalHit() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Intensiverer Treffer
     playNoise(0.12, 0.4, 800);
@@ -283,7 +309,8 @@ export function playCriticalHit() {
  * Verfehlt-Sound
  */
 export function playMiss() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
+    if (!audioContext || !masterGain) return;
 
     // Vorbeizischen
     const now = audioContext.currentTime;
@@ -309,7 +336,8 @@ export function playMiss() {
  * Einheit stirbt
  */
 export function playDeath() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
+    if (!audioContext || !masterGain) return;
 
     // Fallender Ton
     const now = audioContext.currentTime;
@@ -337,7 +365,7 @@ export function playDeath() {
  * Schild blockiert
  */
 export function playShieldBlock() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Metallisches Abprallen
     playTone(800, 'triangle', 0.1, 0.3);
@@ -351,7 +379,7 @@ export function playShieldBlock() {
  * Heilung
  */
 export function playHeal() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Aufsteigender, warmer Ton
     const now = audioContext.currentTime;
@@ -367,7 +395,8 @@ export function playHeal() {
  * Sprint aktiviert
  */
 export function playSprint() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
+    if (!audioContext || !masterGain) return;
 
     // Schneller aufsteigender Ton
     const now = audioContext.currentTime;
@@ -393,7 +422,7 @@ export function playSprint() {
  * Powershot aktiviert
  */
 export function playPowershot() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Kraftvolles Aufladen
     playTone(150, 'sawtooth', 0.2, 0.25);
@@ -405,7 +434,7 @@ export function playPowershot() {
  * Tarnung aktiviert
  */
 export function playCloak() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Mysteriöser, abfallender Ton
     const now = audioContext.currentTime;
@@ -434,7 +463,7 @@ export function playCloak() {
  * Deckung genommen
  */
 export function playCover() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Rascheln/Ducken
     playNoise(0.1, 0.2, 800);
@@ -447,7 +476,7 @@ export function playCover() {
  * Schritt-Sound
  */
 export function playFootstep() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Leiser Schritt
     playNoise(0.05, 0.1, 300 + Math.random() * 200);
@@ -457,7 +486,7 @@ export function playFootstep() {
  * Bewegung starten
  */
 export function playMoveStart() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(300, 'sine', 0.05, 0.1);
     playNoise(0.03, 0.1, 400);
@@ -467,7 +496,7 @@ export function playMoveStart() {
  * Bewegung beenden
  */
 export function playMoveEnd() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(250, 'sine', 0.08, 0.12);
     playNoise(0.05, 0.12, 350);
@@ -479,7 +508,7 @@ export function playMoveEnd() {
  * Button-Klick
  */
 export function playClick() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(600, 'sine', 0.04, 0.15);
 }
@@ -488,7 +517,7 @@ export function playClick() {
  * Einheit auswählen
  */
 export function playSelect() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(400, 'sine', 0.06, 0.12);
     setTimeout(() => playTone(600, 'sine', 0.06, 0.1), 50);
@@ -498,7 +527,7 @@ export function playSelect() {
  * Ziel auswählen
  */
 export function playTarget() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(800, 'square', 0.03, 0.15);
     playTone(1000, 'square', 0.03, 0.1);
@@ -508,7 +537,7 @@ export function playTarget() {
  * Fehler/Ungültige Aktion
  */
 export function playError() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(200, 'square', 0.1, 0.2);
     setTimeout(() => playTone(150, 'square', 0.15, 0.2), 100);
@@ -518,7 +547,7 @@ export function playError() {
  * Erfolg/Bestätigung
  */
 export function playSuccess() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(400, 'sine', 0.08, 0.15);
     setTimeout(() => playTone(600, 'sine', 0.08, 0.15), 80);
@@ -529,7 +558,7 @@ export function playSuccess() {
  * Level Up
  */
 export function playLevelUp() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Triumphaler aufsteigender Ton
     const notes = [400, 500, 600, 800, 1000];
@@ -547,7 +576,7 @@ export function playLevelUp() {
  * Power-Up aufsammeln
  */
 export function playPowerup() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(600, 'sine', 0.1, 0.2);
     setTimeout(() => playTone(900, 'sine', 0.1, 0.18), 80);
@@ -560,7 +589,7 @@ export function playPowerup() {
  * Runde startet
  */
 export function playRoundStart() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(300, 'sine', 0.1, 0.15);
     setTimeout(() => playTone(400, 'sine', 0.1, 0.15), 100);
@@ -571,7 +600,7 @@ export function playRoundStart() {
  * Zug beenden
  */
 export function playTurnEnd() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(500, 'sine', 0.1, 0.15);
     setTimeout(() => playTone(400, 'sine', 0.1, 0.12), 100);
@@ -582,7 +611,7 @@ export function playTurnEnd() {
  * Spiel gewonnen
  */
 export function playVictory() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Fanfare
     const melody = [
@@ -606,7 +635,7 @@ export function playVictory() {
  * Spiel verloren
  */
 export function playDefeat() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Trauriger absteigender Ton
     const melody = [
@@ -629,7 +658,7 @@ export function playDefeat() {
  * Ereignis-Sound (allgemein)
  */
 export function playEvent() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     playTone(600, 'triangle', 0.1, 0.2);
     setTimeout(() => playTone(800, 'triangle', 0.1, 0.18), 100);
@@ -640,7 +669,7 @@ export function playEvent() {
  * Sturm-Ereignis
  */
 export function playStorm() {
-    if (!audioContext || !audioSettings.enabled) return;
+    if (!ensureAudioReady() || !audioSettings.enabled) return;
 
     // Donner-ähnlicher Sound
     playNoise(0.5, 0.3, 200);

@@ -1934,31 +1934,119 @@ function darkenColor(color, percent) {
 }
 
 /**
+ * Desaturate and darken a color for shadow effect
+ * @param color - Hex color string
+ * @param saturation - 0 = grayscale, 1 = full saturation
+ * @param brightness - 0 = black, 1 = original brightness
+ */
+function desaturateAndDarken(color, saturation, brightness) {
+    const num = parseInt(color.replace('#', ''), 16);
+    let R = (num >> 16) & 0xFF;
+    let G = (num >> 8) & 0xFF;
+    let B = num & 0xFF;
+
+    // Calculate grayscale value (luminance-based)
+    const gray = Math.round(0.299 * R + 0.587 * G + 0.114 * B);
+
+    // Blend between grayscale and original color
+    R = Math.round(gray + (R - gray) * saturation);
+    G = Math.round(gray + (G - gray) * saturation);
+    B = Math.round(gray + (B - gray) * saturation);
+
+    // Apply brightness
+    R = Math.round(R * brightness);
+    G = Math.round(G * brightness);
+    B = Math.round(B * brightness);
+
+    return `rgb(${R},${G},${B})`;
+}
+
+/**
+ * Update performance tracking and determine effective quality
+ */
+function updatePerformance() {
+    const now = performance.now();
+
+    if (state.lastFrameTime > 0) {
+        const delta = now - state.lastFrameTime;
+        const fps = 1000 / delta;
+
+        // Smooth FPS calculation
+        state.currentFps = state.currentFps * 0.9 + fps * 0.1;
+        state.frameCount++;
+
+        // Auto quality adjustment every 30 frames
+        if (state.settings.renderQuality === 'auto' && state.frameCount % 30 === 0) {
+            if (state.currentFps < 20) {
+                state.lowPerfFrames++;
+                if (state.lowPerfFrames > 2) {
+                    state.effectiveQuality = 'low';
+                }
+            } else if (state.currentFps < 35) {
+                state.effectiveQuality = 'medium';
+                state.lowPerfFrames = Math.max(0, state.lowPerfFrames - 1);
+            } else if (state.currentFps > 50 && state.lowPerfFrames === 0) {
+                state.effectiveQuality = 'high';
+            }
+        } else if (state.settings.renderQuality !== 'auto') {
+            state.effectiveQuality = state.settings.renderQuality;
+        }
+    }
+
+    state.lastFrameTime = now;
+}
+
+/**
+ * Check if terrain details should be rendered based on quality settings
+ */
+function shouldRenderDetails() {
+    return state.effectiveQuality === 'high';
+}
+
+/**
+ * Check if foreground elements (trees, rocks) should be rendered
+ */
+function shouldRenderForeground() {
+    return state.effectiveQuality !== 'low';
+}
+
+/**
  * Main render function
  */
 export function render() {
     if (!canvas || !ctx) return;
 
+    // Track performance for auto-quality adjustment
+    updatePerformance();
+
     const w = canvas.width / window.devicePixelRatio;
     const h = canvas.height / window.devicePixelRatio;
 
-    // Background with modern gradient
-    const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
-    bgGradient.addColorStop(0, '#1a1a3e');
-    bgGradient.addColorStop(0.5, '#12122b');
-    bgGradient.addColorStop(1, '#0c0c1d');
-    ctx.fillStyle = bgGradient;
-    ctx.fillRect(0, 0, w, h);
+    // Background - simplified on low quality
+    if (state.effectiveQuality === 'low') {
+        ctx.fillStyle = '#12122b';
+        ctx.fillRect(0, 0, w, h);
+    } else {
+        // Background with modern gradient
+        const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
+        bgGradient.addColorStop(0, '#1a1a3e');
+        bgGradient.addColorStop(0.5, '#12122b');
+        bgGradient.addColorStop(1, '#0c0c1d');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, w, h);
 
-    // Subtle ambient glow
-    ctx.save();
-    ctx.globalAlpha = 0.1;
-    const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
-    ambientGlow.addColorStop(0, '#10b981');
-    ambientGlow.addColorStop(1, 'transparent');
-    ctx.fillStyle = ambientGlow;
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
+        // Subtle ambient glow - only on high quality
+        if (state.effectiveQuality === 'high') {
+            ctx.save();
+            ctx.globalAlpha = 0.1;
+            const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
+            ambientGlow.addColorStop(0, '#10b981');
+            ambientGlow.addColorStop(1, 'transparent');
+            ctx.fillStyle = ambientGlow;
+            ctx.fillRect(0, 0, w, h);
+            ctx.restore();
+        }
+    }
 
     const currentUnit = getCurrentUnit();
     // Always show reachable hexes when a unit is selected (point-and-click system)
@@ -1994,8 +2082,8 @@ export function render() {
             // Completely black/unexplored - mysterious and dark
             fillColor = '#000000';
         } else if (fogLevel === 'explored') {
-            // Previously seen but not currently visible - shadowy memory effect
-            fillColor = darkenColor(terrain.color, 65);
+            // Previously seen but not currently visible - keep terrain recognizable but desaturated
+            fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
         }
 
         // Draw hex with texture and 3D effect - always keep natural terrain colors
@@ -2003,13 +2091,33 @@ export function render() {
         const terrainData = fogLevel === 'visible' ? terrain : null;
         drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
 
-        // Add fog overlay for explored but not visible hexes (shadow/memory effect)
+        // Add realistic shadow overlay for explored but not visible hexes
         if (fogLevel === 'explored') {
             ctx.save();
             ctx.beginPath();
             drawHexPath(sx, sy, state.hexSize * 0.95);
-            ctx.fillStyle = 'rgba(0, 0, 20, 0.55)';
+
+            // Create a realistic shadow gradient from top-left (light blocked)
+            const shadowGradient = ctx.createLinearGradient(
+                sx - state.hexSize * 0.5, sy - state.hexSize * 0.5,
+                sx + state.hexSize * 0.5, sy + state.hexSize * 0.5
+            );
+            shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
+            shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
+            shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
+            ctx.fillStyle = shadowGradient;
             ctx.fill();
+
+            // Add subtle vignette effect for depth
+            const vignetteGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
+            vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignetteGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.05)');
+            vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
+            ctx.beginPath();
+            drawHexPath(sx, sy, state.hexSize * 0.95);
+            ctx.fillStyle = vignetteGradient;
+            ctx.fill();
+
             ctx.restore();
         }
 
@@ -2027,17 +2135,24 @@ export function render() {
             ctx.restore();
         }
 
-        // Draw terrain details (ground-level only)
+        // Draw terrain details (ground-level only) - based on quality settings
         if (fogLevel === 'visible') {
-            drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            // Only draw detailed terrain decorations on high quality
+            if (shouldRenderDetails()) {
+                drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            }
 
             // Collect foreground elements for 2.5D sorting (trees, large rocks, bushes)
-            const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
-            foregroundElements.push(...elements);
+            // Skip on low quality for better performance
+            if (shouldRenderForeground()) {
+                const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+                foregroundElements.push(...elements);
+            }
         }
 
         // Draw silhouette terrain for explored hexes (show what was there, but shadowy)
-        if (fogLevel === 'explored') {
+        // Skip on low quality
+        if (fogLevel === 'explored' && shouldRenderDetails()) {
             ctx.save();
             ctx.globalAlpha = 0.3;
             drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
