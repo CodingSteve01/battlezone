@@ -31,6 +31,7 @@ export const TERRAIN = {
         colorDark: '#1e4030',
         walkable: true,
         cover: false,
+        canHide: false,
         moveCost: 1,
         name: 'Gras'
     },
@@ -40,6 +41,7 @@ export const TERRAIN = {
         colorDark: '#143525',
         walkable: true,
         cover: true,
+        canHide: true,  // Units can hide in forest
         moveCost: 2,
         name: 'Wald'
     },
@@ -89,6 +91,36 @@ export const TERRAIN = {
         cover: false,
         moveCost: 3,
         name: 'Sumpf'
+    },
+    road: {
+        color: '#6a5a4a',
+        colorLight: '#7a6a5a',
+        colorDark: '#5a4a3a',
+        walkable: true,
+        cover: false,
+        canHide: false,
+        moveCost: 0.5,  // Fast movement on roads (half cost)
+        name: 'Straße'
+    },
+    path: {
+        color: '#5a5040',
+        colorLight: '#6a6050',
+        colorDark: '#4a4030',
+        walkable: true,
+        cover: false,
+        canHide: false,
+        moveCost: 1,  // Normal movement cost (but good for visual variety)
+        name: 'Pfad'
+    },
+    river: {
+        color: '#2a5a80',
+        colorLight: '#3a6a95',
+        colorDark: '#1a4a65',
+        walkable: true,  // Can cross, but expensive
+        cover: false,
+        canHide: false,
+        moveCost: 3,  // Expensive to cross
+        name: 'Fluss'
     }
 };
 

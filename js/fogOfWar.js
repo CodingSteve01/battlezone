@@ -113,6 +113,22 @@ export function isUnitVisible(unit) {
         return false;
     }
 
+    // Units hiding in cover are harder to detect (need to be within 2 hexes)
+    if (unit.hiding) {
+        const playerUnits = getPlayerUnits(state.currentPlayer);
+        const hidingDetectionRange = 2; // Can only detect hiding units within 2 hexes
+
+        const detected = playerUnits.some(friendlyUnit => {
+            const dist = hexDistance(
+                { q: friendlyUnit.q, r: friendlyUnit.r },
+                { q: unit.q, r: unit.r }
+            );
+            return dist <= hidingDetectionRange;
+        });
+
+        return detected;
+    }
+
     // Sniper/Ninja stealth: harder to detect at range
     if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive !== false) {
         const playerUnits = getPlayerUnits(state.currentPlayer);

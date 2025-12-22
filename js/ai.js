@@ -80,10 +80,14 @@ async function performAIActions() {
 
 /**
  * Perform AI for a single unit
+ * In single-player mode, we don't render during AI actions to avoid revealing AI positions
  */
 async function performUnitAI(unit) {
     // Find visible enemies
     const enemies = findVisibleEnemies(unit);
+
+    // In single-player, don't render during AI turn to hide AI positions
+    const shouldRender = !state.settings.singlePlayer;
 
     // Priority 1: Attack if enemy in range
     const attackable = getAttackableUnits(unit);
@@ -91,13 +95,15 @@ async function performUnitAI(unit) {
         const target = selectBestTarget(unit, attackable);
         if (target) {
             state.targetedUnit = target;
-            render();
-            await delay(300);
+            if (shouldRender) render();
+            await delay(shouldRender ? 300 : 100);
             executeAttack(unit, target);
             state.targetedUnit = null;
-            updateUI();
-            render();
-            await delay(400);
+            if (shouldRender) {
+                updateUI();
+                render();
+            }
+            await delay(shouldRender ? 400 : 100);
         }
     }
 
@@ -105,9 +111,11 @@ async function performUnitAI(unit) {
     if (unit.ap >= 2 && !unit.usedSpecial) {
         if (shouldUseSpecial(unit, enemies)) {
             useSpecialAbility(unit);
-            updateUI();
-            render();
-            await delay(400);
+            if (shouldRender) {
+                updateUI();
+                render();
+            }
+            await delay(shouldRender ? 400 : 100);
         }
     }
 
@@ -115,7 +123,7 @@ async function performUnitAI(unit) {
     if (unit.ap >= 1) {
         const moveTarget = selectMoveTarget(unit, enemies);
         if (moveTarget) {
-            await executeAIMove(unit, moveTarget);
+            await executeAIMove(unit, moveTarget, shouldRender);
         }
     }
 
@@ -125,12 +133,14 @@ async function performUnitAI(unit) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
             state.targetedUnit = target;
-            render();
-            await delay(300);
+            if (shouldRender) render();
+            await delay(shouldRender ? 300 : 100);
             executeAttack(unit, target);
             state.targetedUnit = null;
-            updateUI();
-            render();
+            if (shouldRender) {
+                updateUI();
+                render();
+            }
         }
     }
 }
@@ -279,8 +289,9 @@ function selectMoveTarget(unit, enemies) {
 
 /**
  * Execute AI movement
+ * @param {boolean} shouldRender - Whether to render (false in single-player to hide AI)
  */
-async function executeAIMove(unit, target) {
+async function executeAIMove(unit, target, shouldRender = true) {
     const targetHex = getHex(target.q, target.r);
     if (!targetHex) return;
 
@@ -294,9 +305,12 @@ async function executeAIMove(unit, target) {
     targetHex.unit = unit;
     unit.ap -= target.cost;
 
-    updateVisibility();
-    render();
-    updateUI();
+    // In single-player, don't update visibility/render to hide AI positions
+    if (shouldRender) {
+        updateVisibility();
+        render();
+        updateUI();
+    }
 }
 
 /**

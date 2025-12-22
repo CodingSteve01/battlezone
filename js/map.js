@@ -240,6 +240,15 @@ function addMapFeatures(radius) {
 
     // Add water bodies - smaller
     addWaterBodies(Math.floor(radius / 5), radius);
+
+    // Add rivers flowing across the map
+    addRivers(1, radius);
+
+    // Add roads connecting areas
+    addRoads(radius);
+
+    // Add dirt paths for variety
+    addPaths(2, radius);
 }
 
 /**
@@ -295,6 +304,109 @@ function addWaterBodies(count, radius) {
                         hex.moveCost = Infinity;
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Add rivers that flow across the map
+ */
+function addRivers(count, radius) {
+    for (let i = 0; i < count; i++) {
+        // Start from a random edge
+        const startAngle = Math.random() * Math.PI * 2;
+        const startDist = radius * 0.6;
+        let q = Math.round(Math.cos(startAngle) * startDist);
+        let r = Math.round(Math.sin(startAngle) * startDist * 0.866);
+
+        // Flow toward opposite side with meandering
+        const targetAngle = startAngle + Math.PI + (Math.random() - 0.5) * 0.8;
+        const targetDist = radius * 0.6;
+        const targetQ = Math.round(Math.cos(targetAngle) * targetDist);
+        const targetR = Math.round(Math.sin(targetAngle) * targetDist * 0.866);
+
+        const riverLength = hexDistance({ q, r }, { q: targetQ, r: targetR });
+
+        for (let step = 0; step <= riverLength; step++) {
+            const t = step / riverLength;
+            const baseQ = q + (targetQ - q) * t;
+            const baseR = r + (targetR - r) * t;
+
+            // Add meandering
+            const meander = Math.sin(step * 0.5) * 2;
+            const perpQ = Math.round(baseQ + meander * Math.cos(startAngle + Math.PI / 2));
+            const perpR = Math.round(baseR + meander * Math.sin(startAngle + Math.PI / 2) * 0.866);
+
+            const hex = getHex(perpQ, perpR);
+            if (hex && hex.walkable && hex.type !== 'road') {
+                hex.type = 'river';
+                hex.walkable = true;
+                hex.cover = false;
+                hex.moveCost = TERRAIN.river.moveCost;
+            }
+        }
+    }
+}
+
+/**
+ * Add roads connecting spawn areas through center
+ */
+function addRoads(radius) {
+    const spawns = getSpawnPositions();
+    const center = { q: 0, r: 0 };
+
+    // Create road from center outward in several directions
+    const roadAngles = [0, Math.PI / 3, 2 * Math.PI / 3, Math.PI, 4 * Math.PI / 3, 5 * Math.PI / 3];
+
+    for (let i = 0; i < Math.min(3, roadAngles.length); i++) {
+        const angle = roadAngles[i] + (Math.random() - 0.5) * 0.3;
+        const length = radius * 0.5;
+
+        for (let d = 0; d < length; d++) {
+            const q = Math.round(Math.cos(angle) * d);
+            const r = Math.round(Math.sin(angle) * d * 0.866);
+
+            const hex = getHex(q, r);
+            if (hex && hex.walkable && hex.type !== 'river') {
+                hex.type = 'road';
+                hex.walkable = true;
+                hex.cover = false;
+                hex.moveCost = TERRAIN.road.moveCost;
+            }
+        }
+    }
+}
+
+/**
+ * Add dirt paths for visual variety
+ */
+function addPaths(count, radius) {
+    for (let i = 0; i < count; i++) {
+        // Random start and end points
+        const startAngle = Math.random() * Math.PI * 2;
+        const startDist = radius * 0.3 + Math.random() * radius * 0.2;
+        const startQ = Math.round(Math.cos(startAngle) * startDist);
+        const startR = Math.round(Math.sin(startAngle) * startDist * 0.866);
+
+        const endAngle = startAngle + Math.PI / 2 + (Math.random() - 0.5);
+        const endDist = radius * 0.3 + Math.random() * radius * 0.2;
+        const endQ = Math.round(Math.cos(endAngle) * endDist);
+        const endR = Math.round(Math.sin(endAngle) * endDist * 0.866);
+
+        const pathLength = hexDistance({ q: startQ, r: startR }, { q: endQ, r: endR });
+
+        for (let step = 0; step <= pathLength; step++) {
+            const t = step / pathLength;
+            const q = Math.round(startQ + (endQ - startQ) * t);
+            const r = Math.round(startR + (endR - startR) * t);
+
+            const hex = getHex(q, r);
+            if (hex && hex.walkable && hex.type === 'grass') {
+                hex.type = 'path';
+                hex.walkable = true;
+                hex.cover = false;
+                hex.moveCost = TERRAIN.path.moveCost;
             }
         }
     }
