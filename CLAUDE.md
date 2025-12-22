@@ -220,14 +220,15 @@ main.js
 
 ## GitHub Pages Deployment
 
-### Static Deployment (GitHub Actions)
+### Automatic Cache-Busting (GitHub Actions)
 
-The project uses a simple GitHub Actions pipeline (`.github/workflows/static.yml`) that:
+The project uses a GitHub Actions pipeline (`.github/workflows/static.yml`) that:
 
 1. Triggers on push to `main` branch
-2. Deploys all static files directly to GitHub Pages
+2. Replaces version strings with the git commit hash (e.g., `?v=fa38f5d`)
+3. Deploys all static files to GitHub Pages
 
-**Just push to `main` and wait ~1-2 minutes for deployment!**
+**No manual version updates needed!** Just push to `main` and wait ~1-2 minutes.
 
 ### Testing After Deployment
 
