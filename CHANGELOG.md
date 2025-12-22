@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/CodingSteve01/battlezone/compare/v1.1.0...v1.1.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* remove duplicate menu handlers and add dynamic visibility updates ([#35](https://github.com/CodingSteve01/battlezone/issues/35)) ([54b5625](https://github.com/CodingSteve01/battlezone/commit/54b56258114babc088b010bdb5e2c0c29d8de11a))
+
 ## [1.1.0](https://github.com/CodingSteve01/battlezone/compare/v1.0.2...v1.1.0) (2025-12-22)
 
 
