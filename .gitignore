@@ -20,3 +20,8 @@ npm-debug.log*
 
 # Build artifacts
 dist/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
