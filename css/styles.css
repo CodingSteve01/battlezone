@@ -1604,18 +1604,31 @@ button:focus:not(:focus-visible),
 }
 
 .help-toggle {
-    width: 44px;
-    height: 44px;
+    width: 100%;
+    padding: 16px 12px;
     margin: 16px auto 0;
-    background: transparent;
-    border: 1px solid var(--border-subtle);
-    border-radius: 50%;
-    color: var(--dim);
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+    border: 2px solid var(--border-subtle);
+    border-radius: 14px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
+}
+
+.help-toggle::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .help-toggle span {
@@ -1625,17 +1638,20 @@ button:focus:not(:focus-visible),
 
 .help-toggle:hover {
     border-color: var(--border-light);
-    color: var(--text-secondary);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }
 
 .help-toggle.active {
     border-color: var(--green);
-    color: var(--green);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+    color: var(--green-light);
+    box-shadow: 0 0 25px var(--green-glow), inset 0 0 20px rgba(16, 185, 129, 0.1);
 }
 
 .help-toggle.active span {
-    background: var(--green);
-    color: white;
+    color: var(--green-light);
 }
 
 .help-panel {
