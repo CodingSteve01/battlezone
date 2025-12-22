@@ -1,9 +1,10 @@
 // ===== FOG OF WAR SYSTEM =====
 
-import { hexDistance, getHexesInRange, hexLine } from './hexMath.js';
+import { hexDistance, getHexesInRange } from './hexMath.js';
 import { state, getHex, getPlayerUnits, isHexVisible } from './state.js';
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
+import { hasLineOfSight } from './combat.js';
 
 /**
  * Calculate visible hexes for a single unit
@@ -25,47 +26,14 @@ function getUnitVisibleHexes(unit) {
         const distance = hexDistance({ q: unit.q, r: unit.r }, pos);
         if (distance > visionRange) continue;
 
-        // Check line of sight
-        if (hasLineOfSight(unit.q, unit.r, pos.q, pos.r)) {
+        // Check line of sight using shared combat.js function
+        const los = hasLineOfSight(unit.q, unit.r, pos.q, pos.r);
+        if (los.clear) {
             visible.add(`${pos.q},${pos.r}`);
         }
     }
 
     return visible;
-}
-
-/**
- * Check if there's line of sight between two hexes
- * Blocked by rocks and reduced through forests
- */
-export function hasLineOfSight(fromQ, fromR, toQ, toR) {
-    const line = hexLine({ q: fromQ, r: fromR }, { q: toQ, r: toR });
-
-    let forestCount = 0;
-    const maxForests = 2; // Can see through up to 2 forest hexes
-
-    // Skip first (starting position) and check each hex in line
-    for (let i = 1; i < line.length - 1; i++) {
-        const pos = line[i];
-        const hex = getHex(pos.q, pos.r);
-
-        if (!hex) return false;
-
-        // Rocks block line of sight completely
-        if (hex.type === 'rock') {
-            return false;
-        }
-
-        // Forests reduce visibility
-        if (hex.type === 'forest') {
-            forestCount++;
-            if (forestCount > maxForests) {
-                return false;
-            }
-        }
-    }
-
-    return true;
 }
 
 /**
@@ -96,6 +64,7 @@ export function updateVisibility() {
 
 /**
  * Check if an enemy unit is visible to current player
+ * Considers line of sight - can't see enemies behind rocks/dense forests
  */
 export function isUnitVisible(unit) {
     // Own units are always visible
@@ -113,9 +82,19 @@ export function isUnitVisible(unit) {
         return false;
     }
 
-    // Units hiding in cover are harder to detect (need to be within 2 hexes)
+    // Check if at least one friendly unit has line of sight to this enemy
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    const hasAnyLOS = playerUnits.some(friendlyUnit => {
+        const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+        return los.clear;
+    });
+
+    if (!hasAnyLOS) {
+        return false;
+    }
+
+    // Units hiding in cover are harder to detect (need to be within 2 hexes with LOS)
     if (unit.hiding) {
-        const playerUnits = getPlayerUnits(state.currentPlayer);
         const hidingDetectionRange = 2; // Can only detect hiding units within 2 hexes
 
         const detected = playerUnits.some(friendlyUnit => {
@@ -123,7 +102,11 @@ export function isUnitVisible(unit) {
                 { q: friendlyUnit.q, r: friendlyUnit.r },
                 { q: unit.q, r: unit.r }
             );
-            return dist <= hidingDetectionRange;
+            if (dist > hidingDetectionRange) return false;
+
+            // Also need clear LOS
+            const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+            return los.clear;
         });
 
         return detected;
@@ -131,17 +114,20 @@ export function isUnitVisible(unit) {
 
     // Sniper/Ninja stealth: harder to detect at range
     if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive !== false) {
-        const playerUnits = getPlayerUnits(state.currentPlayer);
         const classData = UNIT_CLASSES[unit.class];
         const detectionRange = classData.stealthDetectionRange || 2;
 
-        // Check if any friendly unit is close enough to detect
+        // Check if any friendly unit is close enough to detect with LOS
         const detected = playerUnits.some(friendlyUnit => {
             const dist = hexDistance(
                 { q: friendlyUnit.q, r: friendlyUnit.r },
                 { q: unit.q, r: unit.r }
             );
-            return dist <= detectionRange;
+            if (dist > detectionRange) return false;
+
+            // Also need clear LOS
+            const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+            return los.clear;
         });
 
         return detected;

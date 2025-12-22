@@ -48,6 +48,48 @@ export function revealFromCover(unit) {
 }
 
 /**
+ * Check if there is a clear line of sight between two hex positions
+ * Returns { clear: boolean, blockedBy: string|null, blockingHex: {q,r}|null }
+ * Rocks completely block LOS, multiple forests heavily obstruct
+ */
+export function hasLineOfSight(fromQ, fromR, toQ, toR) {
+    const line = hexLine(
+        { q: fromQ, r: fromR },
+        { q: toQ, r: toR }
+    );
+
+    let forestCount = 0;
+
+    // Check hexes between start and end (excluding start and end)
+    for (let i = 1; i < line.length - 1; i++) {
+        const hex = getHex(line[i].q, line[i].r);
+        if (hex) {
+            // Rocks completely block line of sight
+            if (hex.type === 'rock') {
+                return {
+                    clear: false,
+                    blockedBy: 'rock',
+                    blockingHex: { q: line[i].q, r: line[i].r }
+                };
+            }
+            // Multiple forests block line of sight (simulates dense vegetation)
+            if (hex.type === 'forest') {
+                forestCount++;
+                if (forestCount >= 2) {
+                    return {
+                        clear: false,
+                        blockedBy: 'forest',
+                        blockingHex: { q: line[i].q, r: line[i].r }
+                    };
+                }
+            }
+        }
+    }
+
+    return { clear: true, blockedBy: null, blockingHex: null };
+}
+
+/**
  * Calculate how much cover is on the line of sight between attacker and defender
  * Returns an object with cover information
  */

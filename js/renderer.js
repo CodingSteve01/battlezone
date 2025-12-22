@@ -4,7 +4,7 @@ import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath } from './state.js';
 import { hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits, getEffectiveRange } from './units.js';
+import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
@@ -1450,7 +1450,7 @@ function drawGhostIndicator(cx, cy, ghost) {
 /**
  * Draw a human unit with equipment
  */
-function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
+function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
     const size = state.hexSize * 0.65;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
@@ -1662,6 +1662,37 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable) {
         ctx.stroke();
     }
 
+    // Blocked target indicator - in range but no line of sight
+    if (isBlocked && !isSelected) {
+        // Dimmed ring
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // "No LOS" indicator with crossed lines
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
+        ctx.lineWidth = 3;
+        const xSize = 8;
+        const xY = cy - size - 15;
+        ctx.beginPath();
+        ctx.moveTo(cx - xSize, xY - xSize);
+        ctx.lineTo(cx + xSize, xY + xSize);
+        ctx.moveTo(cx + xSize, xY - xSize);
+        ctx.lineTo(cx - xSize, xY + xSize);
+        ctx.stroke();
+
+        // Show what's blocking (icon)
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const blockIcon = blockedInfo && blockedInfo.blockedBy === 'rock' ? '🪨' : '🌲';
+        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - 15);
+    }
+
     ctx.restore();
 }
 
@@ -1720,6 +1751,7 @@ export function render() {
     // Always show reachable hexes when a unit is selected (point-and-click system)
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
+    const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
 
     // Get max move cost for path visualization (consistent with getReachableHexes)
     const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
@@ -2074,13 +2106,15 @@ export function render() {
         const isSelected = currentUnit && unit.id === currentUnit.id;
         const isTargeted = state.targetedUnit && unit.id === state.targetedUnit.id;
         const isAttackable = attackableUnits.some(u => u.id === unit.id);
+        const blockedInfo = blockedTargets.find(b => b.unit.id === unit.id);
+        const isBlocked = !!blockedInfo;
 
         return {
             type: 'unit',
             x: sx,
             y: sy,
             sortY: sy + state.hexSize * 0.4, // Sort by feet position
-            draw: () => drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable),
+            draw: () => drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable, isBlocked, blockedInfo),
             unit: unit
         };
     });
