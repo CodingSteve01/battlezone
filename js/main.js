@@ -5,7 +5,7 @@ import { CONFIG, UNIT_CLASSES } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
-import { initRenderer, resizeCanvas, render } from './renderer.js';
+import { initRenderer, resizeCanvas, render, clearRenderCaches } from './renderer.js';
 import { updateUI, showScreen } from './ui.js';
 import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -254,6 +254,9 @@ function startGameWithTeams() {
     resetState();
     state.teamSelections = savedSelections;
     state.settings.singlePlayer = singlePlayer;
+
+    // Clear cached hex tiles since map is regenerating
+    clearRenderCaches();
 
     // Reset camera position
     state.cameraX = 0;

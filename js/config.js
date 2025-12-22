@@ -7,16 +7,16 @@ export const CONFIG = {
     UNITS_PER_PLAYER: 3,
     AP_PER_TURN: 4,
     MAX_ROUNDS: 15,
-    VISION_RANGE: 5,  // Fog of War Sichtweite
+    VISION_RANGE: 5,  // Fog of War vision range
 
-    // Map-Größen (Radius)
+    // Map sizes (radius in hexes)
     MAP_SIZES: {
         small: 8,
         medium: 12,
         large: 16
     },
 
-    // Spawn-Abstände vom Rand
+    // Spawn distance from edge
     SPAWN_OFFSET: {
         small: 6,
         medium: 10,
@@ -53,8 +53,8 @@ export const TERRAIN = {
         cover: false,
         moveCost: 2,
         name: 'Hügel',
-        rangeBonus: 1,      // +1 Reichweite für Angriffe
-        defenseBonus: 10    // +10% Trefferchance beim Verteidigen (Höhenvorteil)
+        rangeBonus: 1,      // +1 range for attacks
+        defenseBonus: 10    // +10% hit chance when defending (height advantage)
     },
     rock: {
         color: '#4a4a5a',
