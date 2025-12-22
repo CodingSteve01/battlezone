@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/CodingSteve01/battlezone/compare/v1.2.0...v1.3.0) (2025-12-22)
+
+
+### Features
+
+* implement proper fog of war during AI turns ([#39](https://github.com/CodingSteve01/battlezone/issues/39)) ([976f67f](https://github.com/CodingSteve01/battlezone/commit/976f67fc35e38a93919cafd381ab2e2458d01683))
+
 ## [1.2.0](https://github.com/CodingSteve01/battlezone/compare/v1.1.1...v1.2.0) (2025-12-22)
 
 
