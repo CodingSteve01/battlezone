@@ -28,6 +28,7 @@ export const state = {
 
     // Current turn state
     currentPlayer: 0,
+    viewingPlayer: 0,  // Player whose perspective is used for rendering (always human in single-player)
     selectedUnit: null,
     selectedAction: 'move',
     hoveredHex: null,
@@ -45,9 +46,10 @@ export const state = {
     movementAnimation: null,  // { unit, path, currentStep, startTime }
 
     // Fog of War (per player)
-    visibleHexes: new Set(),  // Set of "q,r" keys for currently visible hexes
+    visibleHexes: new Set(),  // Set of "q,r" keys for currently visible hexes (current player)
     exploredHexes: new Set(), // Current player's explored hexes
     playerExploredHexes: [],  // Array of Sets, one per player - stores explored hexes per player
+    playerVisibleHexes: [],   // Array of Sets, one per player - stores currently visible hexes per player
 
     // Ghost indicators for cloaked enemy attacks (per player)
     // Format: { unitId, q, r, player, class, timestamp }
@@ -115,6 +117,7 @@ export function resetState() {
     state.hexMap.clear();
     state.units = [];
     state.currentPlayer = 0;
+    state.viewingPlayer = 0;
     state.selectedUnit = null;
     state.selectedAction = 'move';
     state.hoveredHex = null;
@@ -136,10 +139,12 @@ export function resetState() {
     state.lastEnemyContactRound = 0;
     state.roundsWithoutContact = 0;
 
-    // Initialize per-player explored hexes
+    // Initialize per-player explored hexes and visible hexes
     state.playerExploredHexes = [];
+    state.playerVisibleHexes = [];
     for (let i = 0; i < state.settings.players; i++) {
         state.playerExploredHexes.push(new Set());
+        state.playerVisibleHexes.push(new Set());
     }
 }
 
@@ -225,6 +230,22 @@ export function getCurrentUnit() {
  */
 export function isHexVisible(q, r) {
     return state.visibleHexes.has(`${q},${r}`);
+}
+
+/**
+ * Check if a hex is visible to a specific player
+ */
+export function isHexVisibleToPlayer(q, r, player) {
+    const playerVisible = state.playerVisibleHexes[player];
+    if (!playerVisible) return false;
+    return playerVisible.has(`${q},${r}`);
+}
+
+/**
+ * Check if a hex is visible to the viewing player (for rendering)
+ */
+export function isHexVisibleToViewer(q, r) {
+    return isHexVisibleToPlayer(q, r, state.viewingPlayer);
 }
 
 /**

@@ -5,7 +5,7 @@ import { hexDistance, hexToPixel } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, moveUnitInstant } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
-import { updateVisibility, isUnitVisible } from './fogOfWar.js';
+import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI, showToast } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
@@ -62,6 +62,12 @@ function hideAIThinking() {
 async function performAIActions() {
     const units = getPlayerUnits(state.currentPlayer);
 
+    // In single-player, ensure human player's visibility is set for rendering
+    if (state.settings.singlePlayer) {
+        updateVisibilityForPlayer(0);
+        render(); // Initial render showing human player's units and fog of war
+    }
+
     // Sort units: scouts first (best vision + movement for reconnaissance)
     // Then snipers (high vision), then others
     const sortedUnits = [...units].sort((a, b) => {
@@ -87,14 +93,22 @@ async function performAIActions() {
 
 /**
  * Perform AI for a single unit
- * In single-player mode, we don't render during AI actions to avoid revealing AI positions
+ * In single-player mode, render from human perspective - AI units only visible when in human's view
  */
 async function performUnitAI(unit) {
     // Find visible enemies
     const enemies = findVisibleEnemies(unit);
 
-    // In single-player, don't render during AI turn to hide AI positions
-    const shouldRender = !state.settings.singlePlayer;
+    // In single-player, we now render from human perspective
+    // AI units will only appear when they enter the human player's field of view
+    const isSinglePlayer = state.settings.singlePlayer;
+
+    // Helper: render if unit is visible to human player (or always in multiplayer)
+    const renderIfVisible = () => {
+        if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+            render();
+        }
+    };
 
     // Priority 1: Attack if enemy in range
     const attackable = getAttackableUnits(unit);
@@ -102,15 +116,15 @@ async function performUnitAI(unit) {
         const target = selectBestTarget(unit, attackable);
         if (target) {
             state.targetedUnit = target;
-            if (shouldRender) render();
-            await delay(shouldRender ? 300 : 100);
+            renderIfVisible();
+            await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
             executeAttack(unit, target);
             state.targetedUnit = null;
-            if (shouldRender) {
+            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
                 updateUI();
                 render();
             }
-            await delay(shouldRender ? 400 : 100);
+            await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
         }
     }
 
@@ -118,11 +132,11 @@ async function performUnitAI(unit) {
     if (unit.ap >= 2 && !unit.usedSpecial) {
         if (shouldUseSpecial(unit, enemies)) {
             useSpecialAbility(unit);
-            if (shouldRender) {
+            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
                 updateUI();
                 render();
             }
-            await delay(shouldRender ? 400 : 100);
+            await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
         }
     }
 
@@ -130,7 +144,7 @@ async function performUnitAI(unit) {
     if (unit.ap >= 1) {
         const moveTarget = selectMoveTarget(unit, enemies);
         if (moveTarget) {
-            await executeAIMove(unit, moveTarget, shouldRender);
+            await executeAIMove(unit, moveTarget);
         }
     }
 
@@ -140,11 +154,11 @@ async function performUnitAI(unit) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
             state.targetedUnit = target;
-            if (shouldRender) render();
-            await delay(shouldRender ? 300 : 100);
+            renderIfVisible();
+            await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
             executeAttack(unit, target);
             state.targetedUnit = null;
-            if (shouldRender) {
+            if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
                 updateUI();
                 render();
             }
@@ -322,11 +336,16 @@ function selectMoveTarget(unit, enemies) {
 
 /**
  * Execute AI movement
- * @param {boolean} shouldRender - Whether to render (false in single-player to hide AI)
+ * In single-player, render only if unit becomes visible to human player
  */
-async function executeAIMove(unit, target, shouldRender = true) {
+async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
     if (!targetHex) return;
+
+    const isSinglePlayer = state.settings.singlePlayer;
+
+    // Check if unit was visible before moving
+    const wasVisible = isUnitVisibleToViewer(unit);
 
     // Clear old position
     const oldHex = getHex(unit.q, unit.r);
@@ -342,8 +361,16 @@ async function executeAIMove(unit, target, shouldRender = true) {
     // This is needed for subsequent AI units to have correct visibility info
     updateVisibility();
 
-    // Only render in multiplayer to hide AI positions from human player
-    if (shouldRender) {
+    // In single-player, also keep human player's visibility updated for rendering
+    if (isSinglePlayer) {
+        updateVisibilityForPlayer(0);
+    }
+
+    // Check if unit is now visible to human player
+    const isNowVisible = isUnitVisibleToViewer(unit);
+
+    // Render if: multiplayer, or unit became visible, or unit was already visible
+    if (!isSinglePlayer || wasVisible || isNowVisible) {
         render();
         updateUI();
     }
