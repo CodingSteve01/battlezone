@@ -228,13 +228,13 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             });
         }
     } else if (type === 'rock') {
-        // Rock formations are foreground elements
+        // Rock formations are foreground elements - make them much bigger for proper cover
         elements.push({
             type: 'rock',
             x: cx,
             y: cy,
-            sortY: cy + s * 0.3,
-            draw: () => drawRockFormation2D5(cx, cy, s * 1.3, baseSeed)
+            sortY: cy + s * 0.5,
+            draw: () => drawRockFormation2D5(cx, cy, s * 2.2, baseSeed)
         });
     }
 
@@ -426,56 +426,96 @@ function drawBush2D5(x, y, size, seed) {
 }
 
 /**
- * Draw a rock formation with 2.5D depth effect
+ * Draw a rock formation with 2.5D depth effect - large enough to provide cover
  */
 function drawRockFormation2D5(cx, cy, s, seed) {
     ctx.save();
 
-    // Main rock shadow - larger
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    // Large main rock shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.ellipse(cx + 4, cy + s * 0.2, s * 0.9, s * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 6, cy + s * 0.35, s * 0.75, s * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Main rock - larger
+    // Main large boulder - tall enough to hide behind
+    ctx.fillStyle = '#4a4a5a';
+    ctx.beginPath();
+    // Draw as a tall irregular polygon for more rock-like appearance
+    ctx.moveTo(cx - s * 0.5, cy + s * 0.25);
+    ctx.lineTo(cx - s * 0.55, cy - s * 0.1);
+    ctx.lineTo(cx - s * 0.35, cy - s * 0.45);
+    ctx.lineTo(cx + s * 0.1, cy - s * 0.55);
+    ctx.lineTo(cx + s * 0.45, cy - s * 0.35);
+    ctx.lineTo(cx + s * 0.5, cy + s * 0.05);
+    ctx.lineTo(cx + s * 0.4, cy + s * 0.3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Add 3D shading to the rock
+    const rockGradient = ctx.createLinearGradient(cx - s * 0.5, cy - s * 0.5, cx + s * 0.5, cy + s * 0.3);
+    rockGradient.addColorStop(0, 'rgba(100, 100, 120, 0.6)');
+    rockGradient.addColorStop(0.5, 'rgba(70, 70, 85, 0.3)');
+    rockGradient.addColorStop(1, 'rgba(30, 30, 40, 0.5)');
+    ctx.fillStyle = rockGradient;
+    ctx.fill();
+
+    // Secondary rock pillar
     ctx.fillStyle = '#5a5a6a';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + s * 0.08, s * 0.9, s * 0.55, 0, 0, Math.PI * 2);
+    ctx.moveTo(cx + s * 0.2, cy + s * 0.25);
+    ctx.lineTo(cx + s * 0.15, cy - s * 0.2);
+    ctx.lineTo(cx + s * 0.35, cy - s * 0.4);
+    ctx.lineTo(cx + s * 0.55, cy - s * 0.25);
+    ctx.lineTo(cx + s * 0.6, cy + s * 0.15);
+    ctx.closePath();
     ctx.fill();
 
-    // Secondary rocks - more prominent
-    ctx.fillStyle = '#6a6a7a';
+    // Small rock in front
+    ctx.fillStyle = '#656575';
     ctx.beginPath();
-    ctx.ellipse(cx - s * 0.3, cy - s * 0.18, s * 0.5, s * 0.35, -0.2, 0, Math.PI * 2);
+    ctx.ellipse(cx - s * 0.25, cy + s * 0.2, s * 0.25, s * 0.15, 0.2, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#757585';
+    // Rock face details - cracks
+    ctx.strokeStyle = 'rgba(30, 30, 40, 0.7)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.ellipse(cx + s * 0.35, cy - s * 0.08, s * 0.4, s * 0.28, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cracks
-    ctx.strokeStyle = 'rgba(40, 40, 50, 0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.35, cy);
-    ctx.lineTo(cx - s * 0.12, cy + s * 0.18);
-    ctx.lineTo(cx + s * 0.12, cy + s * 0.12);
+    ctx.moveTo(cx - s * 0.2, cy - s * 0.4);
+    ctx.lineTo(cx - s * 0.15, cy - s * 0.1);
+    ctx.lineTo(cx - s * 0.05, cy + s * 0.15);
     ctx.stroke();
 
-    // Highlights
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.beginPath();
-    ctx.ellipse(cx - s * 0.4, cy - s * 0.25, s * 0.18, s * 0.12, -0.3, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(cx + s * 0.2, cy - s * 0.3);
+    ctx.lineTo(cx + s * 0.25, cy + s * 0.05);
+    ctx.stroke();
 
-    // Moss patches
-    if (seededRandom(seed) > 0.4) {
-        ctx.fillStyle = 'rgba(60, 100, 50, 0.6)';
+    // Edge highlights (top-left lit)
+    ctx.strokeStyle = 'rgba(150, 150, 170, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - s * 0.35, cy - s * 0.45);
+    ctx.lineTo(cx + s * 0.1, cy - s * 0.55);
+    ctx.lineTo(cx + s * 0.45, cy - s * 0.35);
+    ctx.stroke();
+
+    // Moss patches for natural look
+    if (seededRandom(seed) > 0.3) {
+        ctx.fillStyle = 'rgba(50, 90, 45, 0.7)';
         ctx.beginPath();
-        ctx.ellipse(cx + s * 0.25, cy - s * 0.28, s * 0.18, s * 0.12, 0.5, 0, Math.PI * 2);
+        ctx.ellipse(cx - s * 0.3, cy - s * 0.15, s * 0.12, s * 0.08, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(cx + s * 0.35, cy - s * 0.1, s * 0.1, s * 0.06, -0.2, 0, Math.PI * 2);
         ctx.fill();
     }
+
+    // Cover indicator icon (shield symbol)
+    ctx.fillStyle = 'rgba(100, 100, 120, 0.6)';
+    ctx.font = `${Math.round(s * 0.25)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🪨', cx, cy - s * 0.65);
 
     ctx.restore();
 }
@@ -1407,6 +1447,57 @@ function drawGhostIndicator(cx, cy, ghost) {
 }
 
 /**
+ * Draw a speech bubble with text above a unit
+ */
+function drawSpeechBubble(ctx, x, y, text, color, size) {
+    ctx.save();
+
+    const padding = size * 0.15;
+    const fontSize = Math.round(size * 0.28);
+    ctx.font = `bold ${fontSize}px sans-serif`;
+    const textWidth = ctx.measureText(text).width;
+    const bubbleWidth = textWidth + padding * 2;
+    const bubbleHeight = fontSize + padding * 1.5;
+
+    // Bubble background with rounded corners
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(x - bubbleWidth / 2, y - bubbleHeight / 2, bubbleWidth, bubbleHeight, 6);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Speech bubble pointer (triangle pointing down)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + bubbleHeight / 2);
+    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
+    ctx.lineTo(x + 8, y + bubbleHeight / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Pointer border
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + bubbleHeight / 2);
+    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
+    ctx.lineTo(x + 8, y + bubbleHeight / 2);
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+
+    ctx.restore();
+}
+
+/**
  * Draw a human unit with equipment
  */
 function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
@@ -1501,6 +1592,11 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         ctx.fillText('🌲', cx - size * 0.5, cy - size - 5);
         ctx.shadowBlur = 0;
 
+        // Draw speech bubble for cover status (only for current player's units)
+        if (unit.player === state.currentPlayer) {
+            drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'In Deckung', '#22c55e', size);
+        }
+
         // Draw cover effect around unit
         ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
         ctx.lineWidth = 2;
@@ -1511,13 +1607,43 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         ctx.setLineDash([]);
     }
 
-    // Cloak indicator (visible to owner)
+    // Cloak indicator (visible to owner) with speech bubble
     if (unit.cloaked && unit.player === state.currentPlayer) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#a855f7';
         ctx.shadowBlur = 15;
+
+        // Draw speech bubble for stealth status
+        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'Getarnt!', '#a855f7', size);
+
         ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Sprint active indicator (Scout)
+    if (unit.usedSpecial && unit.class === 'scout') {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🏃', cx + size * 0.6, cy - size * 0.8);
+        ctx.shadowBlur = 0;
+    }
+
+    // Powershot active indicator (Assault)
+    if (unit.usedSpecial && unit.class === 'assault' && unit.damage > UNIT_CLASSES.assault.damage) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💥', cx + size * 0.6, cy - size * 0.8);
         ctx.shadowBlur = 0;
     }
 
@@ -1525,7 +1651,15 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     if (unit.damageBoost && unit.damageBoost > 0) {
         ctx.fillStyle = '#ef4444';
         ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
+    }
+
+    // "Spotted!" indicator - shown when enemy unit can be seen (for own units that might be detected)
+    if (unit.spotted && unit.player === state.currentPlayer) {
+        ctx.globalAlpha = 1;
+        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.4, 'Entdeckt!', '#ef4444', size);
     }
 
     // HP bar with gradient
@@ -1735,17 +1869,43 @@ export function render() {
         let fillColor = terrain.color;
         const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
 
-        // Fog of war overlay
+        // Fog of war overlay - enhanced visual distinction
         if (fogLevel === 'hidden') {
-            fillColor = '#0a0a12';
+            // Completely black/unexplored - mysterious and dark
+            fillColor = '#000000';
         } else if (fogLevel === 'explored') {
-            fillColor = darkenColor(terrain.color, 50);
+            // Previously seen but not currently visible - shadowy memory effect
+            fillColor = darkenColor(terrain.color, 65);
         }
 
         // Draw hex with texture and 3D effect - always keep natural terrain colors
-        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.03)';
+        const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' : (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
         const terrainData = fogLevel === 'visible' ? terrain : null;
         drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
+
+        // Add fog overlay for explored but not visible hexes (shadow/memory effect)
+        if (fogLevel === 'explored') {
+            ctx.save();
+            ctx.beginPath();
+            drawHexPath(sx, sy, state.hexSize * 0.95);
+            ctx.fillStyle = 'rgba(0, 0, 20, 0.55)';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Add dense fog overlay for hidden hexes
+        if (fogLevel === 'hidden') {
+            ctx.save();
+            ctx.beginPath();
+            drawHexPath(sx, sy, state.hexSize * 0.95);
+            // Create a subtle noise pattern for fog effect
+            const fogGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
+            fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
+            fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
+            ctx.fillStyle = fogGradient;
+            ctx.fill();
+            ctx.restore();
+        }
 
         // Draw terrain details (ground-level only)
         if (fogLevel === 'visible') {
@@ -1754,6 +1914,14 @@ export function render() {
             // Collect foreground elements for 2.5D sorting (trees, large rocks, bushes)
             const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
             foregroundElements.push(...elements);
+        }
+
+        // Draw silhouette terrain for explored hexes (show what was there, but shadowy)
+        if (fogLevel === 'explored') {
+            ctx.save();
+            ctx.globalAlpha = 0.3;
+            drawTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            ctx.restore();
         }
 
 
