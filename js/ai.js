@@ -62,7 +62,14 @@ function hideAIThinking() {
 async function performAIActions() {
     const units = getPlayerUnits(state.currentPlayer);
 
-    for (const unit of units) {
+    // Sort units: scouts first (best vision + movement for reconnaissance)
+    // Then snipers (high vision), then others
+    const sortedUnits = [...units].sort((a, b) => {
+        const priority = { scout: 0, sniper: 1, ninja: 2, medic: 3, assault: 4 };
+        return (priority[a.class] ?? 5) - (priority[b.class] ?? 5);
+    });
+
+    for (const unit of sortedUnits) {
         if (!unit.alive) continue;
 
         // Give each unit some time between actions
@@ -266,8 +273,33 @@ function selectMoveTarget(unit, enemies) {
                 score += 50;
             }
         } else {
-            // Explore: prefer moving towards unexplored areas
-            score += Math.random() * 20;
+            // Explore: strategically search for enemies
+
+            // Strong bonus for moving toward map center (most likely encounter zone)
+            const distToCenter = Math.sqrt(q * q + r * r);
+            const currentDistToCenter = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
+            if (distToCenter < currentDistToCenter) {
+                score += (currentDistToCenter - distToCenter) * 15; // Big bonus for getting closer to center
+            }
+
+            // Prefer hexes we haven't explored yet
+            const hexKey = `${q},${r}`;
+            if (!state.exploredHexes?.[unit.player]?.has(hexKey)) {
+                score += 25; // Bonus for unexplored territory
+            }
+
+            // Hills give vision advantage - prioritize for scouts/snipers
+            if (hex.type === 'hills') {
+                score += 20;
+            }
+
+            // Roads lead somewhere interesting
+            if (hex.type === 'road' || hex.type === 'path') {
+                score += 10;
+            }
+
+            // Small random factor to avoid predictable patterns
+            score += Math.random() * 10;
         }
 
         // Prefer cover (forest)
