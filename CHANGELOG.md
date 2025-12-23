@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/CodingSteve01/battlezone/compare/v1.4.0...v1.5.0) (2025-12-23)
+
+
+### Features
+
+* implement shared movement pool system ([#44](https://github.com/CodingSteve01/battlezone/issues/44)) ([f7319aa](https://github.com/CodingSteve01/battlezone/commit/f7319aa5e06b6be2b1c9efafbdfa3992315b93a5))
+
 ## [1.4.0](https://github.com/CodingSteve01/battlezone/compare/v1.3.0...v1.4.0) (2025-12-23)
 
 
