@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/CodingSteve01/battlezone/compare/v1.8.0...v1.8.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* correct terrain blending edges and limit grid to movement range ([#55](https://github.com/CodingSteve01/battlezone/issues/55)) ([63aeb97](https://github.com/CodingSteve01/battlezone/commit/63aeb97875e1f46255b6aa52c2f7cd07505a3b67))
+
 ## [1.8.0](https://github.com/CodingSteve01/battlezone/compare/v1.7.0...v1.8.0) (2025-12-23)
 
 
