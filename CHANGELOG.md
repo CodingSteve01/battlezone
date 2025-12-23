@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/CodingSteve01/battlezone/compare/v1.8.4...v1.9.0) (2025-12-23)
+
+
+### Features
+
+* add eslint-plugin-import for improved import/export validation ([886f62b](https://github.com/CodingSteve01/battlezone/commit/886f62b38aa77def63e9c466d3cf913780af5998))
+
 ## [1.8.4](https://github.com/CodingSteve01/battlezone/compare/v1.8.3...v1.8.4) (2025-12-23)
 
 
