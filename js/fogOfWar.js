@@ -106,9 +106,44 @@ export function isUnitVisibleToPlayer(unit, viewerPlayer) {
         return true;
     }
 
-    // Cloaked units are invisible
+    // Units revealed after attacking are visible until end of their turn
+    if (unit.revealedUntilEndOfTurn) {
+        // Still need to be in visible hex with LOS
+        if (!isHexVisibleToPlayer(unit.q, unit.r, viewerPlayer)) {
+            return false;
+        }
+        const viewerUnits = getPlayerUnits(viewerPlayer);
+        const hasAnyLOS = viewerUnits.some(friendlyUnit => {
+            const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+            return los.clear;
+        });
+        return hasAnyLOS;
+    }
+
+    // Cloaked units can be detected if very close (proximity detection)
     if (unit.cloaked) {
-        return false;
+        const viewerUnits = getPlayerUnits(viewerPlayer);
+        const classData = UNIT_CLASSES[unit.class];
+        // Base detection range is 1 for ninja, 2 for others
+        const baseDetectionRange = classData.stealthDetectionRange || 2;
+
+        // Check if any viewer unit is close enough to detect
+        const detected = viewerUnits.some(friendlyUnit => {
+            const dist = hexDistance(
+                { q: friendlyUnit.q, r: friendlyUnit.r },
+                { q: unit.q, r: unit.r }
+            );
+            // Must be within detection range AND have line of sight
+            if (dist > baseDetectionRange) return false;
+            const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+            return los.clear;
+        });
+
+        // If not detected by proximity, cloaked unit is invisible
+        if (!detected) {
+            return false;
+        }
+        // If detected, continue to check visibility normally
     }
 
     // Enemy units only visible if in viewer's visible hex
@@ -277,4 +312,49 @@ export function updateSpottedStatus() {
     for (const unit of currentUnits) {
         unit.spotted = checkUnitSpotted(unit);
     }
+}
+
+/**
+ * Calculate visibility alpha for a cloaked enemy unit based on distance to viewer's units.
+ * Closer units are more visible (higher alpha).
+ * @param {Object} cloakedUnit - The cloaked enemy unit
+ * @param {number} viewerPlayer - The player viewing the unit
+ * @returns {number} Alpha value between 0.15 (barely visible) and 0.7 (quite visible)
+ */
+export function getEnemyCloakedVisibilityAlpha(cloakedUnit, viewerPlayer) {
+    const viewerUnits = getPlayerUnits(viewerPlayer);
+    const classData = UNIT_CLASSES[cloakedUnit.class];
+    const detectionRange = classData.stealthDetectionRange || 2;
+
+    // Find the nearest viewer unit with LOS
+    let minDistance = Infinity;
+    for (const unit of viewerUnits) {
+        const distance = hexDistance(
+            { q: cloakedUnit.q, r: cloakedUnit.r },
+            { q: unit.q, r: unit.r }
+        );
+        if (distance <= detectionRange) {
+            const los = hasLineOfSight(unit.q, unit.r, cloakedUnit.q, cloakedUnit.r);
+            if (los.clear) {
+                minDistance = Math.min(minDistance, distance);
+            }
+        }
+    }
+
+    // If no unit in range with LOS, return 0 (shouldn't happen if called correctly)
+    if (minDistance === Infinity) {
+        return 0;
+    }
+
+    // Distance 0 (same hex, shouldn't happen) = 0.7 alpha
+    // Distance 1 = 0.55 alpha
+    // Distance 2 = 0.35 alpha
+    // Higher distances (for extended detection) = lower alpha
+    const maxAlpha = 0.7;
+    const minAlpha = 0.2;
+    const alphaRange = maxAlpha - minAlpha;
+
+    // Linear interpolation based on distance
+    const alpha = maxAlpha - (minDistance / detectionRange) * alphaRange;
+    return Math.max(minAlpha, Math.min(maxAlpha, alpha));
 }

@@ -218,6 +218,10 @@ export function resetUnitsForTurn(player) {
     units.forEach(unit => {
         unit.ap = CONFIG.AP_PER_TURN;
 
+        // Reset revealed state - unit that attacked while cloaked is no longer marked
+        // This happens at start of their turn, so enemies had a chance to see them
+        unit.revealedUntilEndOfTurn = false;
+
         // Reset special ability modifiers
         if (unit.class === 'assault') {
             unit.damage = UNIT_CLASSES.assault.damage;

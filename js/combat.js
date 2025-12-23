@@ -310,9 +310,10 @@ export function executeAttack(attacker, defender) {
         addGhostIndicator(attacker);
     }
 
-    // Remove cloak when attacking
+    // Remove cloak when attacking, but stay partially visible until end of turn
     if (attacker.cloaked) {
         attacker.cloaked = false;
+        attacker.revealedUntilEndOfTurn = true;  // Stay semi-visible until turn ends
         showToast('🔫 Tarnung aufgehoben!', 'special');
     }
 
