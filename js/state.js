@@ -9,7 +9,9 @@ export const state = {
         players: 2,
         size: 'medium',
         singlePlayer: false,
-        renderQuality: 'auto'  // 'low', 'medium', 'high', 'auto'
+        renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
+        gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
+        particleQuality: 'high' // 'low', 'medium', 'high' - Partikelanzahl
     },
 
     // Performance tracking for auto-quality
