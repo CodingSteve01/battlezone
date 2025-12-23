@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/CodingSteve01/battlezone/compare/v1.9.0...v1.9.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* ci, imports ([#64](https://github.com/CodingSteve01/battlezone/issues/64)) ([2da7840](https://github.com/CodingSteve01/battlezone/commit/2da784099ce2d43ec18eff1315b57e002785c306))
+
 ## [1.9.0](https://github.com/CodingSteve01/battlezone/compare/v1.8.4...v1.9.0) (2025-12-23)
 
 
