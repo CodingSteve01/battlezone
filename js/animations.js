@@ -1,6 +1,5 @@
 // ===== TERRAIN & CHARACTER ANIMATION SYSTEM =====
 
-import { state } from './state.js';
 import { TERRAIN } from './config.js';
 
 // Animation state
@@ -208,7 +207,6 @@ export function drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, alpha = 1, terrain
  * Draw wheat field stalks
  */
 export function drawWheatField(ctx, cx, cy, hexSize, q, r, alpha = 1) {
-    const key = `${q},${r}`;
     const seed = q * 1000 + r;
 
     ctx.save();
@@ -382,7 +380,7 @@ export function drawShallowWater(ctx, cx, cy, hexSize, q, r) {
         const stoneY = cy + (seededRandom(seed + i * 2 + 1) - 0.5) * hexSize * 1.2;
         const stoneSize = 2 + seededRandom(seed + i * 3) * 4;
 
-        ctx.fillStyle = `rgba(100, 90, 70, 0.4)`;
+        ctx.fillStyle = 'rgba(100, 90, 70, 0.4)';
         ctx.beginPath();
         ctx.ellipse(stoneX, stoneY, stoneSize, stoneSize * 0.7, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -652,7 +650,7 @@ export function drawDustMotes(ctx, cx, cy, hexSize) {
         const mx = cx + (mote.x - 0.5) * hexSize * 1.8;
         const my = cy + (mote.y - 0.5) * hexSize * 1.8;
 
-        ctx.fillStyle = `rgba(200, 180, 140, 0.25)`;
+        ctx.fillStyle = 'rgba(200, 180, 140, 0.25)';
         ctx.beginPath();
         ctx.arc(mx, my, mote.size, 0, Math.PI * 2);
         ctx.fill();
@@ -876,7 +874,7 @@ export function drawGravel(ctx, cx, cy, hexSize, q, r) {
 /**
  * Draw farmland details (plowed furrows)
  */
-export function drawFarmland(ctx, cx, cy, hexSize, q, r) {
+export function drawFarmland(ctx, cx, cy, hexSize, _q, _r) {
     ctx.save();
 
     ctx.strokeStyle = 'rgba(90, 75, 50, 0.4)';
@@ -974,7 +972,7 @@ export function setCharacterAnimation(unitId, animState) {
  * Update character animations
  */
 function updateCharacterAnimations(deltaTime) {
-    for (const [unitId, anim] of animationState.unitAnimations) {
+    for (const [_unitId, anim] of animationState.unitAnimations) {
         anim.time += deltaTime;
 
         // Idle breathing
@@ -991,7 +989,7 @@ function updateCharacterAnimations(deltaTime) {
                 anim.bobOffset = Math.abs(Math.sin(anim.time * 0.012)) * 3.5;
                 break;
 
-            case CHAR_ANIM.ATTACK:
+            case CHAR_ANIM.ATTACK: {
                 // Attack animation
                 const attackProgress = Math.min(1, anim.time / 300);
                 anim.weaponAngle = Math.sin(attackProgress * Math.PI) * 0.4;
@@ -999,8 +997,9 @@ function updateCharacterAnimations(deltaTime) {
                     anim.state = CHAR_ANIM.IDLE;
                 }
                 break;
+            }
 
-            case CHAR_ANIM.HIT:
+            case CHAR_ANIM.HIT: {
                 // Hit recoil
                 const hitProgress = Math.min(1, anim.time / 200);
                 anim.bobOffset = Math.sin(hitProgress * Math.PI * 2) * 4;
@@ -1008,14 +1007,16 @@ function updateCharacterAnimations(deltaTime) {
                     anim.state = CHAR_ANIM.IDLE;
                 }
                 break;
+            }
 
-            case CHAR_ANIM.DEATH:
+            case CHAR_ANIM.DEATH: {
                 // Death animation (stays in this state)
                 const deathProgress = Math.min(1, anim.time / 500);
                 anim.bobOffset = deathProgress * 18;
                 break;
+            }
 
-            case CHAR_ANIM.SPECIAL:
+            case CHAR_ANIM.SPECIAL: {
                 // Special ability effect
                 const specialProgress = Math.min(1, anim.time / 400);
                 anim.bobOffset = Math.sin(specialProgress * Math.PI * 3) * 2.5;
@@ -1023,6 +1024,7 @@ function updateCharacterAnimations(deltaTime) {
                     anim.state = CHAR_ANIM.IDLE;
                 }
                 break;
+            }
         }
     }
 }
@@ -1037,7 +1039,7 @@ export function getCharacterAnimState(unitId) {
 /**
  * Apply character animation to drawing context
  */
-export function applyCharacterAnimation(ctx, unitId, baseY) {
+export function applyCharacterAnimation(ctx, unitId, _baseY) {
     const anim = getCharacterAnimState(unitId);
 
     // Apply breathing/bob offset
@@ -1074,7 +1076,7 @@ export function getNeighborTerrains(hexMap, q, r) {
 }
 
 /**
- * Draw terrain transition/blend effects
+ * Draw enhanced terrain transition/blend effects with organic edges
  */
 export function drawTerrainBlend(ctx, cx, cy, hexSize, currentType, neighbors) {
     ctx.save();
@@ -1085,11 +1087,7 @@ export function drawTerrainBlend(ctx, cx, cy, hexSize, currentType, neighbors) {
         return;
     }
 
-    const directions = [
-        [1, 0], [1, -1], [0, -1],
-        [-1, 0], [-1, 1], [0, 1]
-    ];
-
+    // Process each neighbor for blending
     for (let i = 0; i < 6; i++) {
         const neighborType = neighbors[i];
         if (!neighborType || neighborType === currentType) continue;
@@ -1097,33 +1095,77 @@ export function drawTerrainBlend(ctx, cx, cy, hexSize, currentType, neighbors) {
         const neighborTerrain = TERRAIN[neighborType];
         if (!neighborTerrain) continue;
 
-        // Calculate edge position
+        // Calculate edge positions with soft organic curves
         const angle = (Math.PI / 3) * i;
         const nextAngle = (Math.PI / 3) * ((i + 1) % 6);
 
-        const x1 = cx + Math.cos(angle) * hexSize * 0.92;
-        const y1 = cy + Math.sin(angle) * hexSize * 0.92;
-        const x2 = cx + Math.cos(nextAngle) * hexSize * 0.92;
-        const y2 = cy + Math.sin(nextAngle) * hexSize * 0.92;
+        // Edge points
+        const x1 = cx + Math.cos(angle) * hexSize * 0.98;
+        const y1 = cy + Math.sin(angle) * hexSize * 0.98;
+        const x2 = cx + Math.cos(nextAngle) * hexSize * 0.98;
+        const y2 = cy + Math.sin(nextAngle) * hexSize * 0.98;
 
-        // Create gradient from edge to center
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
+        // Mid-edge point (extends outward for organic feel)
+        const midAngle = (angle + nextAngle) / 2;
+        const midX = cx + Math.cos(midAngle) * hexSize * 0.98;
+        const midY = cy + Math.sin(midAngle) * hexSize * 0.98;
 
-        const gradient = ctx.createLinearGradient(midX, midY, cx, cy);
-        gradient.addColorStop(0, neighborTerrain.color);
-        gradient.addColorStop(0.25, `${neighborTerrain.color}60`);
-        gradient.addColorStop(0.5, `${neighborTerrain.color}15`);
-        gradient.addColorStop(1, 'transparent');
+        // Create multi-layer blending for realistic transition
+        for (let layer = 0; layer < 3; layer++) {
+            const blendDepth = 0.3 + layer * 0.15;
+            const alpha = 0.25 - layer * 0.07;
 
-        // Draw blend
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.lineTo(cx, cy);
-        ctx.closePath();
-        ctx.fill();
+            // Inner control points for curved blend
+            const innerX1 = cx + (x1 - cx) * (1 - blendDepth);
+            const innerY1 = cy + (y1 - cy) * (1 - blendDepth);
+            const innerX2 = cx + (x2 - cx) * (1 - blendDepth);
+            const innerY2 = cy + (y2 - cy) * (1 - blendDepth);
+            const innerMidX = cx + (midX - cx) * (1 - blendDepth * 0.8);
+            const innerMidY = cy + (midY - cy) * (1 - blendDepth * 0.8);
+
+            // Create gradient from neighbor color to transparent
+            const gradient = ctx.createLinearGradient(midX, midY, innerMidX, innerMidY);
+            gradient.addColorStop(0, neighborTerrain.color);
+            gradient.addColorStop(0.4, `${neighborTerrain.color}${Math.floor(alpha * 255).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(1, 'transparent');
+
+            // Draw curved blend region
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(midX + (innerMidX - midX) * 0.3, midY + (innerMidY - midY) * 0.3, x2, y2);
+            ctx.lineTo(innerX2, innerY2);
+            ctx.quadraticCurveTo(innerMidX, innerMidY, innerX1, innerY1);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Add noise-based edge detail for organic transition
+        const edgeNoise = seededRandom(cx * 100 + cy + i * 50);
+        for (let j = 0; j < 5; j++) {
+            const t = j / 4;
+            const noiseOffset = seededRandom(i * 100 + j * 30 + cx) * 0.15;
+
+            // Position along edge
+            const edgeX = x1 + (x2 - x1) * t;
+            const edgeY = y1 + (y2 - y1) * t;
+
+            // Small organic blob
+            const blobSize = hexSize * (0.08 + noiseOffset);
+            const blobDepth = hexSize * (0.12 + edgeNoise * 0.08);
+
+            const blobX = edgeX + (cx - edgeX) * (blobDepth / hexSize);
+            const blobY = edgeY + (cy - edgeY) * (blobDepth / hexSize);
+
+            const gradient = ctx.createRadialGradient(blobX, blobY, 0, blobX, blobY, blobSize);
+            gradient.addColorStop(0, `${neighborTerrain.color}40`);
+            gradient.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(blobX, blobY, blobSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     ctx.restore();

@@ -157,12 +157,17 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
         fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
     }
 
-    // Draw hex with texture
-    const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
-        (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
+    // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
     const terrainData = fogLevel === 'visible' ? terrain : null;
 
-    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData, hex.q, hex.r);
+    // Pass null for strokeColor - grid overlay is drawn separately when needed
+    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
+
+    // Add terrain blending for seamless transitions between terrain types
+    if (fogLevel === 'visible' && terrainData) {
+        const neighbors = getNeighborTerrains(state.hexMap, hex.q, hex.r);
+        drawTerrainBlend(tileCtx, cx, cy, hexSize * 0.95, hex.type, neighbors);
+    }
 
     // Add fog overlays
     if (fogLevel === 'explored') {
@@ -288,22 +293,8 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.fill();
     }
 
-    if (terrain) {
-        context.save();
-        context.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * 0.85 * Math.cos(angle);
-            const py = cy + size * 0.85 * Math.sin(angle);
-            if (i === 0) context.moveTo(px, py);
-            else context.lineTo(px, py);
-        }
-        context.closePath();
-        context.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-        context.lineWidth = 1.5;
-        context.stroke();
-        context.restore();
-    }
+    // Removed inner hex highlight for seamless terrain appearance
+    // Grid overlay is now drawn separately only when needed
 
     if (strokeColor) {
         context.strokeStyle = strokeColor;
@@ -506,23 +497,8 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.fill();
     }
 
-    // Inner highlight for depth - hexagon shape
-    if (terrain) {
-        ctx.save();
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * 0.85 * Math.cos(angle);
-            const py = cy + size * 0.85 * Math.sin(angle);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.restore();
-    }
+    // Removed inner hex highlight for seamless terrain appearance
+    // Grid overlay is now drawn separately only when needed
 
     if (strokeColor) {
         ctx.strokeStyle = strokeColor;
@@ -784,172 +760,399 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 function drawTree2D5(x, y, size, treeType, seed) {
     ctx.save();
 
-    // Ground shadow - larger and more visible
-    ctx.fillStyle = 'rgba(0, 20, 10, 0.5)';
+    // Enhanced ground shadow with soft edges
+    const shadowGradient = ctx.createRadialGradient(x + 3, y + size * 0.55, 0, x + 3, y + size * 0.55, size * 0.6);
+    shadowGradient.addColorStop(0, 'rgba(0, 15, 5, 0.55)');
+    shadowGradient.addColorStop(0.6, 'rgba(0, 20, 10, 0.3)');
+    shadowGradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = shadowGradient;
     ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.55, size * 0.5, size * 0.18, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 3, y + size * 0.55, size * 0.6, size * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Trunk - thicker for bigger trees
-    ctx.fillStyle = '#3d2817';
-    const trunkWidth = size * 0.15;
-    const trunkHeight = size * 0.5;
-    ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
+    // Trunk with realistic bark texture
+    const trunkWidth = size * 0.18;
+    const trunkHeight = size * 0.55;
 
-    // Trunk detail/bark
-    ctx.strokeStyle = '#2a1a0f';
-    ctx.lineWidth = 2;
+    // Trunk gradient for 3D effect
+    const trunkGradient = ctx.createLinearGradient(x - trunkWidth, y, x + trunkWidth, y);
+    trunkGradient.addColorStop(0, '#2a1a0f');
+    trunkGradient.addColorStop(0.3, '#4a3520');
+    trunkGradient.addColorStop(0.5, '#5a4030');
+    trunkGradient.addColorStop(0.7, '#4a3520');
+    trunkGradient.addColorStop(1, '#2a1a0f');
+    ctx.fillStyle = trunkGradient;
+
+    // Draw trunk as rounded rectangle
     ctx.beginPath();
-    ctx.moveTo(x - trunkWidth * 0.25, y + size * 0.1);
-    ctx.lineTo(x - trunkWidth * 0.15, y + trunkHeight * 0.8);
-    ctx.moveTo(x + trunkWidth * 0.2, y + size * 0.15);
-    ctx.lineTo(x + trunkWidth * 0.1, y + trunkHeight * 0.7);
-    ctx.stroke();
+    ctx.moveTo(x - trunkWidth * 0.4, y + trunkHeight);
+    ctx.lineTo(x - trunkWidth * 0.55, y + trunkHeight * 0.1);
+    ctx.quadraticCurveTo(x - trunkWidth * 0.5, y, x, y);
+    ctx.quadraticCurveTo(x + trunkWidth * 0.5, y, x + trunkWidth * 0.55, y + trunkHeight * 0.1);
+    ctx.lineTo(x + trunkWidth * 0.4, y + trunkHeight);
+    ctx.closePath();
+    ctx.fill();
+
+    // Detailed bark texture
+    ctx.strokeStyle = 'rgba(30, 15, 5, 0.6)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 8; i++) {
+        const barkY = y + trunkHeight * (0.1 + i * 0.1) + seededRandom(seed + i * 10) * 5;
+        const barkStartX = x - trunkWidth * 0.4 * (1 - i * 0.05);
+        const barkEndX = x + trunkWidth * 0.35 * (1 - i * 0.03);
+        ctx.beginPath();
+        ctx.moveTo(barkStartX, barkY);
+        ctx.quadraticCurveTo(x + seededRandom(seed + i * 11) * 4, barkY + 3, barkEndX, barkY + seededRandom(seed + i * 12) * 4);
+        ctx.stroke();
+    }
+
+    // Bark highlights
+    ctx.strokeStyle = 'rgba(100, 70, 40, 0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+        const hY = y + trunkHeight * (0.15 + i * 0.2);
+        ctx.beginPath();
+        ctx.moveTo(x - trunkWidth * 0.2, hY);
+        ctx.lineTo(x - trunkWidth * 0.1, hY + 8);
+        ctx.stroke();
+    }
 
     if (treeType === 0) {
-        // Pine tree - larger layers
-        const layers = 5;
+        // Realistic Pine tree with detailed needles
+        const layers = 6;
         for (let i = layers - 1; i >= 0; i--) {
-            const layerY = y - size * 0.05 - i * size * 0.18;
-            const layerWidth = size * (0.55 - i * 0.08);
+            const layerY = y - size * 0.08 - i * size * 0.16;
+            const layerWidth = size * (0.6 - i * 0.07);
 
-            ctx.fillStyle = `rgb(${15 + i * 7}, ${45 + i * 10}, ${25 + i * 5})`;
+            // Shadow layer
+            ctx.fillStyle = `rgb(${8 + i * 4}, ${30 + i * 6}, ${15 + i * 3})`;
             ctx.beginPath();
-            ctx.moveTo(x, layerY - size * 0.28);
-            ctx.lineTo(x - layerWidth, layerY + size * 0.12);
-            ctx.lineTo(x + layerWidth, layerY + size * 0.12);
+            ctx.moveTo(x, layerY - size * 0.22);
+            ctx.lineTo(x - layerWidth * 1.05, layerY + size * 0.12);
+            ctx.lineTo(x + layerWidth * 1.05, layerY + size * 0.12);
             ctx.closePath();
+            ctx.fill();
+
+            // Main foliage layer
+            ctx.fillStyle = `rgb(${15 + i * 6}, ${45 + i * 10}, ${25 + i * 5})`;
+            ctx.beginPath();
+            ctx.moveTo(x, layerY - size * 0.25);
+            ctx.lineTo(x - layerWidth, layerY + size * 0.1);
+            ctx.lineTo(x + layerWidth, layerY + size * 0.1);
+            ctx.closePath();
+            ctx.fill();
+
+            // Needle details
+            ctx.strokeStyle = `rgba(${25 + i * 8}, ${55 + i * 12}, ${35 + i * 6}, 0.5)`;
+            ctx.lineWidth = 1;
+            for (let n = 0; n < 6; n++) {
+                const nx = x + (seededRandom(seed + i * 100 + n) - 0.5) * layerWidth * 1.5;
+                const ny = layerY + seededRandom(seed + i * 100 + n + 1) * size * 0.08;
+                ctx.beginPath();
+                ctx.moveTo(nx, ny);
+                ctx.lineTo(nx + (seededRandom(seed + i * 100 + n + 2) - 0.5) * 6, ny - 4);
+                ctx.stroke();
+            }
+        }
+
+        // Snow on tips (subtle)
+        if (seededRandom(seed + 500) > 0.7) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.arc(x, y - size * 0.85, size * 0.08, 0, Math.PI * 2);
             ctx.fill();
         }
     } else if (treeType === 1) {
-        // Round/deciduous tree - larger canopy
-        const foliageColors = ['#1a4d2e', '#165a32', '#1e6b3a', '#2a7a45'];
-        for (let i = 0; i < 4; i++) {
-            const fx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.35;
-            const fy = y - size * 0.3 + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.25;
-            const fSize = size * (0.4 + seededRandom(seed + i * 5 + 2) * 0.2);
+        // Realistic deciduous tree with leaf clusters
+        const foliageBaseColors = [
+            { r: 25, g: 75, b: 40 },
+            { r: 30, g: 85, b: 45 },
+            { r: 35, g: 95, b: 50 },
+            { r: 40, g: 105, b: 55 }
+        ];
 
-            ctx.fillStyle = foliageColors[i % foliageColors.length];
-            ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
-            ctx.fill();
+        // Draw overlapping leaf clusters for depth
+        for (let layer = 0; layer < 3; layer++) {
+            const clusterCount = 5 + layer * 2;
+            for (let i = 0; i < clusterCount; i++) {
+                const fx = x + (seededRandom(seed + layer * 100 + i * 5) - 0.5) * size * (0.5 + layer * 0.1);
+                const fy = y - size * (0.25 + layer * 0.08) + (seededRandom(seed + layer * 100 + i * 5 + 1) - 0.5) * size * 0.3;
+                const fSize = size * (0.2 + seededRandom(seed + layer * 100 + i * 5 + 2) * 0.15 - layer * 0.02);
+
+                const colorIdx = Math.floor(seededRandom(seed + layer * 100 + i * 5 + 3) * foliageBaseColors.length);
+                const color = foliageBaseColors[colorIdx];
+                const shade = 0.7 + layer * 0.15;
+
+                // Soft gradient for each cluster
+                const clusterGrad = ctx.createRadialGradient(fx - fSize * 0.3, fy - fSize * 0.3, 0, fx, fy, fSize);
+                clusterGrad.addColorStop(0, `rgb(${Math.floor(color.r * shade * 1.2)}, ${Math.floor(color.g * shade * 1.2)}, ${Math.floor(color.b * shade * 1.2)})`);
+                clusterGrad.addColorStop(0.7, `rgb(${Math.floor(color.r * shade)}, ${Math.floor(color.g * shade)}, ${Math.floor(color.b * shade)})`);
+                clusterGrad.addColorStop(1, `rgb(${Math.floor(color.r * shade * 0.7)}, ${Math.floor(color.g * shade * 0.7)}, ${Math.floor(color.b * shade * 0.7)})`);
+
+                ctx.fillStyle = clusterGrad;
+                ctx.beginPath();
+                ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Individual leaf hints
+                ctx.fillStyle = `rgba(${color.r + 30}, ${color.g + 40}, ${color.b + 20}, 0.3)`;
+                for (let l = 0; l < 4; l++) {
+                    const lx = fx + (seededRandom(seed + i * 50 + l * 7) - 0.5) * fSize;
+                    const ly = fy + (seededRandom(seed + i * 50 + l * 7 + 1) - 0.5) * fSize;
+                    ctx.beginPath();
+                    ctx.ellipse(lx, ly, fSize * 0.15, fSize * 0.1, seededRandom(seed + i * 50 + l * 7 + 2) * Math.PI, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
         }
     } else if (treeType === 2) {
-        // Birch tree - white bark, lighter foliage
-        // White trunk with dark marks
-        ctx.fillStyle = '#e8e4dc';
+        // Realistic Birch tree
+        // White trunk with characteristic bark
+        const birchTrunkGrad = ctx.createLinearGradient(x - trunkWidth, y, x + trunkWidth, y);
+        birchTrunkGrad.addColorStop(0, '#c8c4bc');
+        birchTrunkGrad.addColorStop(0.3, '#f0ece4');
+        birchTrunkGrad.addColorStop(0.5, '#f8f6f0');
+        birchTrunkGrad.addColorStop(0.7, '#f0ece4');
+        birchTrunkGrad.addColorStop(1, '#c8c4bc');
+        ctx.fillStyle = birchTrunkGrad;
         ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
 
-        // Birch bark markings (horizontal dark lines)
-        ctx.fillStyle = '#3a3530';
-        for (let m = 0; m < 4; m++) {
-            const markY = y + trunkHeight * (0.1 + m * 0.22);
-            const markWidth = trunkWidth * (0.4 + seededRandom(seed + m * 3) * 0.4);
-            ctx.fillRect(x - markWidth / 2, markY, markWidth, 2);
-        }
+        // Characteristic horizontal dark markings
+        for (let m = 0; m < 6; m++) {
+            const markY = y + trunkHeight * (0.08 + m * 0.15);
+            const markWidth = trunkWidth * (0.3 + seededRandom(seed + m * 3) * 0.5);
+            const markHeight = 1.5 + seededRandom(seed + m * 3 + 1) * 2;
 
-        // Lighter, more delicate foliage
-        const birchColors = ['#3d7a4a', '#4a8f58', '#5aa368', '#68b575'];
-        for (let i = 0; i < 5; i++) {
-            const fx = x + (seededRandom(seed + i * 7) - 0.5) * size * 0.5;
-            const fy = y - size * 0.35 + (seededRandom(seed + i * 7 + 1) - 0.5) * size * 0.35;
-            const fSize = size * (0.25 + seededRandom(seed + i * 7 + 2) * 0.15);
-
-            ctx.fillStyle = birchColors[i % birchColors.length];
+            ctx.fillStyle = `rgba(40, 35, 30, ${0.5 + seededRandom(seed + m * 3 + 2) * 0.3})`;
             ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+            ctx.ellipse(x + (seededRandom(seed + m * 4) - 0.5) * trunkWidth * 0.3, markY, markWidth / 2, markHeight, 0, 0, Math.PI * 2);
             ctx.fill();
         }
-    } else if (treeType === 3) {
-        // Willow tree - drooping branches
-        ctx.fillStyle = '#4a3520';
-        ctx.fillRect(x - trunkWidth * 0.6, y, trunkWidth * 1.2, trunkHeight * 0.8);
 
-        // Drooping willow branches
-        ctx.strokeStyle = '#2d5a35';
-        ctx.lineWidth = 2;
-        for (let b = 0; b < 8; b++) {
-            const branchStartX = x + (seededRandom(seed + b * 5) - 0.5) * size * 0.7;
-            const branchStartY = y - size * 0.2;
-            const branchEndX = branchStartX + (seededRandom(seed + b * 5 + 1) - 0.5) * size * 0.4;
-            const branchEndY = y + size * 0.3;
+        // Delicate birch foliage with many small leaves
+        const birchColors = [
+            { r: 60, g: 120, b: 70 },
+            { r: 70, g: 140, b: 80 },
+            { r: 80, g: 155, b: 95 },
+            { r: 100, g: 170, b: 110 }
+        ];
+
+        for (let layer = 0; layer < 3; layer++) {
+            for (let i = 0; i < 8; i++) {
+                const fx = x + (seededRandom(seed + layer * 50 + i * 7) - 0.5) * size * 0.6;
+                const fy = y - size * 0.3 - layer * size * 0.1 + (seededRandom(seed + layer * 50 + i * 7 + 1) - 0.5) * size * 0.3;
+                const fSize = size * (0.15 + seededRandom(seed + layer * 50 + i * 7 + 2) * 0.1);
+
+                const color = birchColors[i % birchColors.length];
+                ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                ctx.beginPath();
+                ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    } else if (treeType === 3) {
+        // Realistic Willow with graceful drooping branches
+        ctx.fillStyle = '#4a3520';
+        ctx.beginPath();
+        ctx.moveTo(x - trunkWidth * 0.5, y + trunkHeight);
+        ctx.lineTo(x - trunkWidth * 0.6, y);
+        ctx.quadraticCurveTo(x, y - trunkHeight * 0.1, x + trunkWidth * 0.6, y);
+        ctx.lineTo(x + trunkWidth * 0.5, y + trunkHeight);
+        ctx.closePath();
+        ctx.fill();
+
+        // Many drooping branches with leaves
+        for (let b = 0; b < 12; b++) {
+            const branchStartX = x + (seededRandom(seed + b * 5) - 0.5) * size * 0.8;
+            const branchStartY = y - size * 0.15;
+            const branchMidX = branchStartX + (seededRandom(seed + b * 5 + 1) - 0.5) * size * 0.3;
+            const branchEndX = branchMidX + (seededRandom(seed + b * 5 + 2) - 0.5) * size * 0.2;
+            const branchEndY = y + size * (0.3 + seededRandom(seed + b * 5 + 3) * 0.2);
+
+            // Branch gradient for depth
+            const branchColor = `rgb(${40 + seededRandom(seed + b) * 20}, ${80 + seededRandom(seed + b + 1) * 30}, ${50 + seededRandom(seed + b + 2) * 15})`;
+            ctx.strokeStyle = branchColor;
+            ctx.lineWidth = 2.5 - b * 0.1;
+            ctx.lineCap = 'round';
 
             ctx.beginPath();
             ctx.moveTo(branchStartX, branchStartY);
             ctx.bezierCurveTo(
-                branchStartX, branchStartY + size * 0.3,
-                branchEndX, branchEndY - size * 0.2,
+                branchStartX + (branchMidX - branchStartX) * 0.3, branchStartY + size * 0.2,
+                branchMidX, branchEndY - size * 0.15,
                 branchEndX, branchEndY
             );
             ctx.stroke();
 
-            // Leaves along the branch
-            ctx.fillStyle = '#3d6b42';
-            for (let l = 0; l < 5; l++) {
-                const t = 0.2 + l * 0.18;
-                const lx = branchStartX + (branchEndX - branchStartX) * t;
-                const ly = branchStartY + (branchEndY - branchStartY) * t * t;
+            // Leaves along branch
+            ctx.fillStyle = `rgba(${50 + seededRandom(seed + b * 10) * 20}, ${100 + seededRandom(seed + b * 10 + 1) * 30}, ${60 + seededRandom(seed + b * 10 + 2) * 15}, 0.8)`;
+            for (let l = 0; l < 8; l++) {
+                const t = 0.15 + l * 0.1;
+                const tt = t * t;
+                const lx = branchStartX + (branchEndX - branchStartX) * t + (branchMidX - branchStartX) * t * (1 - t) * 2;
+                const ly = branchStartY + (branchEndY - branchStartY) * tt;
                 ctx.beginPath();
-                ctx.ellipse(lx, ly, size * 0.06, size * 0.03, Math.PI / 4, 0, Math.PI * 2);
+                ctx.ellipse(lx, ly, size * 0.04, size * 0.015, Math.PI / 3 + seededRandom(seed + b * 10 + l) * 0.5, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
     } else {
-        // Oak-style tree - larger and fuller
-        ctx.fillStyle = '#1a4d2e';
+        // Realistic Oak tree with massive canopy
+        // Draw large overlapping foliage masses
+        const oakColors = [
+            { r: 20, g: 60, b: 35 },
+            { r: 25, g: 75, b: 40 },
+            { r: 30, g: 85, b: 45 },
+            { r: 35, g: 95, b: 50 }
+        ];
+
+        // Background mass
+        ctx.fillStyle = `rgb(${oakColors[0].r}, ${oakColors[0].g}, ${oakColors[0].b})`;
         ctx.beginPath();
-        ctx.ellipse(x, y - size * 0.25, size * 0.55, size * 0.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(x, y - size * 0.2, size * 0.65, size * 0.45, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#165a32';
-        ctx.beginPath();
-        ctx.ellipse(x - size * 0.18, y - size * 0.38, size * 0.35, size * 0.28, 0, 0, Math.PI * 2);
-        ctx.fill();
+        // Overlapping foliage clusters
+        for (let layer = 0; layer < 4; layer++) {
+            for (let i = 0; i < 5 - layer; i++) {
+                const fx = x + (seededRandom(seed + layer * 30 + i * 6) - 0.5) * size * (0.7 - layer * 0.1);
+                const fy = y - size * (0.2 + layer * 0.12) + (seededRandom(seed + layer * 30 + i * 6 + 1) - 0.5) * size * 0.25;
+                const fSize = size * (0.35 - layer * 0.05 + seededRandom(seed + layer * 30 + i * 6 + 2) * 0.1);
 
-        ctx.fillStyle = '#1e6b3a';
-        ctx.beginPath();
-        ctx.ellipse(x + size * 0.15, y - size * 0.42, size * 0.3, size * 0.22, 0, 0, Math.PI * 2);
-        ctx.fill();
+                const color = oakColors[Math.min(layer, oakColors.length - 1)];
+                const oakGrad = ctx.createRadialGradient(fx - fSize * 0.3, fy - fSize * 0.3, 0, fx, fy, fSize);
+                oakGrad.addColorStop(0, `rgb(${color.r + 20}, ${color.g + 30}, ${color.b + 15})`);
+                oakGrad.addColorStop(0.7, `rgb(${color.r}, ${color.g}, ${color.b})`);
+                oakGrad.addColorStop(1, `rgb(${color.r - 10}, ${color.g - 15}, ${color.b - 8})`);
+
+                ctx.fillStyle = oakGrad;
+                ctx.beginPath();
+                ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
     }
 
-    // Light highlight on foliage
-    ctx.fillStyle = 'rgba(150, 200, 120, 0.2)';
+    // Light highlights on foliage (sunlight effect)
+    ctx.fillStyle = 'rgba(180, 220, 140, 0.15)';
     ctx.beginPath();
-    ctx.ellipse(x - size * 0.18, y - size * 0.4, size * 0.18, size * 0.14, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - size * 0.2, y - size * 0.45, size * 0.2, size * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(200, 240, 160, 0.1)';
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.15, y - size * 0.55, size * 0.12, size * 0.08, -0.2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.restore();
 }
 
 /**
- * Draw a bush with 2.5D depth effect - larger
+ * Draw a realistic bush with 2.5D depth effect
  */
 function drawBush2D5(x, y, size, seed) {
     ctx.save();
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 30, 10, 0.4)';
+    // Enhanced shadow with soft edges
+    const shadowGrad = ctx.createRadialGradient(x + 2, y + size * 0.35, 0, x + 2, y + size * 0.35, size * 0.7);
+    shadowGrad.addColorStop(0, 'rgba(0, 20, 8, 0.45)');
+    shadowGrad.addColorStop(0.6, 'rgba(0, 25, 10, 0.25)');
+    shadowGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = shadowGrad;
     ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.35, size * 0.6, size * 0.18, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + 2, y + size * 0.35, size * 0.7, size * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Bush layers - larger
-    const layers = 4;
-    for (let i = layers - 1; i >= 0; i--) {
-        const layerSize = size * (0.5 + i * 0.18);
-        const yOff = -i * size * 0.1;
-        const shade = 0.55 + i * 0.12;
-        ctx.fillStyle = `rgb(${Math.floor(30 * shade)}, ${Math.floor(70 * shade)}, ${Math.floor(35 * shade)})`;
+    // Bush colors with natural variation
+    const bushColors = [
+        { r: 25, g: 60, b: 30 },
+        { r: 30, g: 70, b: 35 },
+        { r: 35, g: 80, b: 40 },
+        { r: 40, g: 90, b: 45 },
+        { r: 50, g: 100, b: 55 }
+    ];
+
+    // Draw base mass first (darker, larger)
+    const baseGrad = ctx.createRadialGradient(x, y + size * 0.1, 0, x, y + size * 0.1, size * 0.6);
+    baseGrad.addColorStop(0, `rgb(${bushColors[1].r}, ${bushColors[1].g}, ${bushColors[1].b})`);
+    baseGrad.addColorStop(1, `rgb(${bushColors[0].r}, ${bushColors[0].g}, ${bushColors[0].b})`);
+    ctx.fillStyle = baseGrad;
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.1, size * 0.55, size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Multiple overlapping leaf clusters for realistic appearance
+    for (let layer = 0; layer < 4; layer++) {
+        const clusterCount = 5 + layer;
+        for (let i = 0; i < clusterCount; i++) {
+            const angle = (i / clusterCount) * Math.PI * 2 + seededRandom(seed + layer * 100 + i) * 0.8;
+            const dist = size * (0.15 + layer * 0.1) * (0.6 + seededRandom(seed + layer * 100 + i + 1) * 0.4);
+            const cx = x + Math.cos(angle) * dist;
+            const cy = y - layer * size * 0.08 + Math.sin(angle) * dist * 0.6;
+            const clusterSize = size * (0.2 + seededRandom(seed + layer * 100 + i + 2) * 0.15 - layer * 0.02);
+
+            const colorIdx = Math.min(layer + 1, bushColors.length - 1);
+            const color = bushColors[colorIdx];
+
+            // Gradient for each cluster
+            const clusterGrad = ctx.createRadialGradient(cx - clusterSize * 0.3, cy - clusterSize * 0.3, 0, cx, cy, clusterSize);
+            clusterGrad.addColorStop(0, `rgb(${color.r + 15}, ${color.g + 20}, ${color.b + 10})`);
+            clusterGrad.addColorStop(0.6, `rgb(${color.r}, ${color.g}, ${color.b})`);
+            clusterGrad.addColorStop(1, `rgb(${color.r - 10}, ${color.g - 15}, ${color.b - 8})`);
+
+            ctx.fillStyle = clusterGrad;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, clusterSize, clusterSize * 0.75, seededRandom(seed + layer * 100 + i + 3) * Math.PI * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Add small leaf details on the surface
+    ctx.fillStyle = 'rgba(60, 110, 55, 0.4)';
+    for (let i = 0; i < 12; i++) {
+        const lAngle = seededRandom(seed + i * 20) * Math.PI * 2;
+        const lDist = size * (0.1 + seededRandom(seed + i * 20 + 1) * 0.35);
+        const lx = x + Math.cos(lAngle) * lDist;
+        const ly = y - size * 0.1 + Math.sin(lAngle) * lDist * 0.5;
+        const lSize = size * 0.06 + seededRandom(seed + i * 20 + 2) * size * 0.04;
+
         ctx.beginPath();
-        ctx.ellipse(x, y + yOff, layerSize, layerSize * 0.65, 0, 0, Math.PI * 2);
+        ctx.ellipse(lx, ly, lSize, lSize * 0.5, lAngle, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Highlight
-    ctx.fillStyle = 'rgba(100, 160, 80, 0.35)';
+    // Light highlight (sunlight)
+    const highlightGrad = ctx.createRadialGradient(x - size * 0.2, y - size * 0.15, 0, x - size * 0.2, y - size * 0.15, size * 0.3);
+    highlightGrad.addColorStop(0, 'rgba(140, 200, 100, 0.25)');
+    highlightGrad.addColorStop(0.5, 'rgba(120, 180, 90, 0.12)');
+    highlightGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = highlightGrad;
     ctx.beginPath();
-    ctx.ellipse(x - size * 0.18, y - size * 0.2, size * 0.28, size * 0.22, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(x - size * 0.15, y - size * 0.12, size * 0.35, size * 0.25, -0.3, 0, Math.PI * 2);
     ctx.fill();
+
+    // Occasional berries or flowers
+    if (seededRandom(seed + 200) > 0.5) {
+        const berryColor = seededRandom(seed + 201) > 0.5 ? '#a83232' : '#c85090';
+        ctx.fillStyle = berryColor;
+        for (let b = 0; b < 4; b++) {
+            const bAngle = seededRandom(seed + b * 30 + 300) * Math.PI * 2;
+            const bDist = size * (0.15 + seededRandom(seed + b * 30 + 301) * 0.25);
+            const bx = x + Math.cos(bAngle) * bDist;
+            const by = y - size * 0.05 + Math.sin(bAngle) * bDist * 0.5;
+
+            ctx.beginPath();
+            ctx.arc(bx, by, size * 0.03, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Berry highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(bx - size * 0.01, by - size * 0.01, size * 0.012, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = berryColor;
+        }
+    }
 
     ctx.restore();
 }
@@ -2517,6 +2720,44 @@ function shouldShowHexGrid() {
 }
 
 /**
+ * Draw hex grid overlay on top of seamless terrain
+ * Only called when grid should be visible (movement/attack planning)
+ */
+function drawHexGridOverlay(w, h) {
+    ctx.save();
+
+    state.hexes.forEach(hex => {
+        const pos = hexToPixel(hex.q, hex.r, state.hexSize);
+        const sx = state.offsetX + pos.x;
+        const sy = state.offsetY + pos.y;
+
+        // Skip if off screen
+        if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
+            sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+            return;
+        }
+
+        const fogLevel = getFogLevel(hex.q, hex.r);
+
+        // Draw subtle grid lines based on fog level
+        ctx.beginPath();
+        drawHexPath(sx, sy, state.hexSize * 0.95);
+
+        if (fogLevel === 'visible') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        } else if (fogLevel === 'explored') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        } else {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        }
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+
+    ctx.restore();
+}
+
+/**
  * Main render function
  */
 export function render() {
@@ -2703,6 +2944,11 @@ export function render() {
             }
         }
     });
+
+    // Draw hex grid overlay only when planning movement or attack
+    if (showGrid) {
+        drawHexGridOverlay(w, h);
+    }
 
     // Draw path preview - clean simple path line with destination marker (point-and-click system)
     if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {
