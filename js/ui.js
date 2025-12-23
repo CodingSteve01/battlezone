@@ -332,6 +332,14 @@ export function showScreen(id) {
     }
     // Update state.screen to match - critical for render loop!
     state.screen = id;
+
+    // Update pointer-events on game-area based on screen state
+    // When a menu/screen is active, disable pointer events on game-area
+    // to prevent the canvas from intercepting clicks meant for buttons
+    const gameArea = document.getElementById('game-area');
+    if (gameArea) {
+        gameArea.style.pointerEvents = id !== null ? 'none' : 'auto';
+    }
 }
 
 /**
