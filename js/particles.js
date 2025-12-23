@@ -541,6 +541,7 @@ class ParticleManager {
      * Erstellt einen Muzzle-Flash-Effekt
      */
     muzzleFlash(x, y, direction) {
+        console.log(`[Particles] muzzleFlash at (${x}, ${y}), active: ${this.activeParticles.length}`);
         this.spawn('muzzleFlash', x, y, direction);
         this.burst('spark', x, y, 3, direction, Math.PI * 0.3);
     }
@@ -602,6 +603,12 @@ class ParticleManager {
      * Zeichnet alle Partikel
      */
     draw(ctx, offsetX, offsetY) {
+        // Debug: Log every 2 seconds
+        if (this.activeParticles.length > 0 && (!this._lastDebugLog || Date.now() - this._lastDebugLog > 2000)) {
+            console.log(`[Particles] Drawing ${this.activeParticles.length} particles, offset: (${offsetX}, ${offsetY})`);
+            this._lastDebugLog = Date.now();
+        }
+
         // Boden-Partikel zuerst (unter allem)
         for (const particle of this.groundParticles) {
             particle.draw(ctx, offsetX, offsetY);
