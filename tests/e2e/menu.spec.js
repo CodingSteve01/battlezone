@@ -35,7 +35,8 @@ test.describe('Menu Functionality', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const menu = page.locator('#main-menu');
+    // The menu element has id="menu", not "main-menu"
+    const menu = page.locator('#menu');
     await expect(menu).toBeVisible();
   });
 
@@ -67,11 +68,15 @@ test.describe('Menu Functionality', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const singlePlayerBtn = page.locator('#single-player-btn');
+    // Single player button uses data-mode="single" attribute
+    const singlePlayerBtn = page.locator('[data-mode="single"]');
     await expect(singlePlayerBtn).toBeVisible();
 
     await singlePlayerBtn.click();
     expect(errors).toEqual([]);
+
+    // Verify button is selected after click
+    await expect(singlePlayerBtn).toHaveClass(/selected/);
   });
 
   test('multiplayer button works', async ({ page }) => {
@@ -81,11 +86,15 @@ test.describe('Menu Functionality', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const multiplayerBtn = page.locator('#multiplayer-btn');
+    // Multiplayer button uses data-mode="multi" attribute
+    const multiplayerBtn = page.locator('[data-mode="multi"]');
     await expect(multiplayerBtn).toBeVisible();
 
     await multiplayerBtn.click();
     expect(errors).toEqual([]);
+
+    // Verify button is selected after click
+    await expect(multiplayerBtn).toHaveClass(/selected/);
   });
 
   test('map size buttons work', async ({ page }) => {
@@ -97,10 +106,12 @@ test.describe('Menu Functionality', () => {
 
     // Test small map button
     const smallBtn = page.locator('[data-size="small"]');
-    if (await smallBtn.isVisible()) {
-      await smallBtn.click();
-      expect(errors).toEqual([]);
-    }
+    await expect(smallBtn).toBeVisible();
+    await smallBtn.click();
+    expect(errors).toEqual([]);
+
+    // Verify button is selected after click
+    await expect(smallBtn).toHaveClass(/selected/);
   });
 
   test('full game flow - start single player game', async ({ page }) => {
@@ -110,12 +121,11 @@ test.describe('Menu Functionality', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Select single player
-    const singlePlayerBtn = page.locator('#single-player-btn');
-    if (await singlePlayerBtn.isVisible()) {
-      await singlePlayerBtn.click();
-      await page.waitForTimeout(300);
-    }
+    // Select single player using correct selector
+    const singlePlayerBtn = page.locator('[data-mode="single"]');
+    await expect(singlePlayerBtn).toBeVisible();
+    await singlePlayerBtn.click();
+    await page.waitForTimeout(300);
 
     // Click start
     const startBtn = page.locator('#start-btn');
@@ -124,10 +134,39 @@ test.describe('Menu Functionality', () => {
 
     await page.waitForTimeout(500);
 
+    // Team selection should appear
+    const teamSelect = page.locator('#team-select');
+    await expect(teamSelect).toBeVisible();
+
     // Verify no JS errors occurred during the flow
     if (errors.length > 0) {
       console.log('Errors found:', errors);
     }
+    expect(errors).toEqual([]);
+  });
+
+  test('player count buttons work in multiplayer mode', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Ensure multiplayer mode is selected (should be default)
+    const multiplayerBtn = page.locator('[data-mode="multi"]');
+    await multiplayerBtn.click();
+
+    // Test player count buttons
+    const threePlayerBtn = page.locator('[data-players="3"]');
+    await expect(threePlayerBtn).toBeVisible();
+    await threePlayerBtn.click();
+    await expect(threePlayerBtn).toHaveClass(/selected/);
+
+    const fourPlayerBtn = page.locator('[data-players="4"]');
+    await expect(fourPlayerBtn).toBeVisible();
+    await fourPlayerBtn.click();
+    await expect(fourPlayerBtn).toHaveClass(/selected/);
+
     expect(errors).toEqual([]);
   });
 });

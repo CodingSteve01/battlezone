@@ -312,6 +312,9 @@ export function checkAITurn() {
  * Initialize the application
  */
 async function init() {
+    // Show menu first to ensure it's visible while loading
+    showScreen('menu');
+
     // Initialize asset loader (loads static assets if available)
     await initAssetLoader();
 
@@ -505,14 +508,14 @@ async function init() {
         rematchBtn.onclick = startGame;
     }
 
-    // Initialize renderer
-    initRenderer();
+    // Initialize renderer (await to ensure canvas is properly set up)
+    await initRenderer();
 
     // Initialize input handlers
     initInput();
 
-    // Show menu
-    showScreen('menu');
+    // Menu is already shown at the start of init()
+    // showScreen() now automatically handles pointer-events on game-area
 
     console.log('Shadow Squad initialized');
 }
