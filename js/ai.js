@@ -8,7 +8,7 @@ import { getAttackableUnits } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
-import { render } from './pixiRenderer.js';
+import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
 

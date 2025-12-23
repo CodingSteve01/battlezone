@@ -167,7 +167,7 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
 
     const terrain = TERRAIN[hex.type];
     let fillColor = terrain.color;
-    const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
+    const texture = fogLevel === 'visible' ? getTexture(hex.type, hex.q, hex.r) : null;
 
     // Fog of war overlay
     if (fogLevel === 'hidden') {
@@ -507,7 +507,7 @@ function calculateHexSize() {
     const availableHeight = rect.height - padding * 2;
 
     // Calculate hex size to fit
-    let hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
+    const hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
 
     // Clamp to reasonable range - larger minimum for better visuals
     const baseSize = Math.max(30, Math.min(65, hexSize));
@@ -909,7 +909,7 @@ function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
  */
 function drawStaticWaterSurface(cx, cy, hexSize, seed, isDeep = false) {
     // Static wave lines
-    ctx.strokeStyle = `rgba(120, 180, 220, 0.15)`;
+    ctx.strokeStyle = 'rgba(120, 180, 220, 0.15)';
     ctx.lineWidth = 1.5;
 
     for (let i = 0; i < 4; i++) {
@@ -1759,7 +1759,7 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     ctx.fill();
 
     // HP bar fill with gradient
-    let barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
+    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
     if (hpPct > 0.5) {
         barGradient.addColorStop(0, '#22c55e');
         barGradient.addColorStop(1, '#16a34a');
@@ -2145,7 +2145,7 @@ export function render() {
         } else {
             // Fallback: draw directly (low quality mode or cache miss)
             let fillColor = terrain.color;
-            const texture = fogLevel === 'visible' ? getTexture(hex.type) : null;
+            const texture = fogLevel === 'visible' ? getTexture(hex.type, hex.q, hex.r) : null;
 
             if (fogLevel === 'hidden') {
                 fillColor = '#000000';
@@ -2249,8 +2249,8 @@ export function render() {
 
     // Draw path preview - clean simple path line with destination marker (point-and-click system)
     if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {
-        // Use the lesser of AP or move stat (consistent with movement calculation)
-        const maxCost = Math.min(currentUnit.ap, currentUnit.move);
+        // Use same budget as movement logic: remaining move capacity vs shared AP
+        const maxCost = Math.min(getRemainingMoveCapacity(currentUnit), state.sharedAP);
 
         // Calculate cumulative costs along path
         let cumulativeCost = 0;

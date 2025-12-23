@@ -16,7 +16,7 @@ import { initTextures, getTexture as getRuntimeTexture, drawHumanSprite, drawAPI
 import { CONFIG } from './config.js';
 
 // Asset caches
-const textureCache = new Map();
+const textureCache = new Map(); // terrain type -> array of Image variants
 const spriteCache = new Map();
 const detailCache = new Map();
 
@@ -67,13 +67,32 @@ async function checkStaticAssets() {
  * Load all terrain textures
  */
 async function loadTerrainTextures() {
+    const maxVariants = CONFIG.TERRAIN_VARIANTS || 0;
+
     const loadPromises = TERRAIN_TYPES.map(async (type) => {
+        const variants = [];
+
+        // Base texture
         try {
-            const img = await loadImage(`${TERRAIN_PATH}/${type}.png`);
-            textureCache.set(type, img);
+            const base = await loadImage(`${TERRAIN_PATH}/${type}.png`);
+            variants.push(base);
         } catch {
-            // Will fallback to runtime generation
             console.warn(`Static terrain texture not found: ${type}`);
+        }
+
+        // Optional variant textures: type_v1.png, type_v2.png, ...
+        for (let i = 1; i <= maxVariants; i++) {
+            try {
+                const variant = await loadImage(`${TERRAIN_PATH}/${type}_v${i}.png`);
+                variants.push(variant);
+            } catch {
+                // Stop attempting more variants once one is missing to reduce noise
+                break;
+            }
+        }
+
+        if (variants.length > 0) {
+            textureCache.set(type, variants);
         }
     });
 
@@ -196,10 +215,16 @@ export async function initAssetLoader() {
  * Get a terrain texture
  * Returns static image if available, otherwise runtime-generated canvas
  */
-export function getTexture(type) {
+export function getTexture(type, q = 0, r = 0) {
     // Try static asset first
     if (textureCache.has(type)) {
-        return textureCache.get(type);
+        const variants = textureCache.get(type);
+        if (Array.isArray(variants) && variants.length > 0) {
+            if (variants.length === 1) return variants[0];
+            // Deterministic variant selection per hex
+            const hash = Math.abs(((q * 73856093) ^ (r * 19349663)) % variants.length);
+            return variants[hash];
+        }
     }
 
     // Fallback to runtime generation

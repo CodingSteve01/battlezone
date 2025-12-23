@@ -1118,14 +1118,30 @@
             const total = Object.keys(generators).length;
             let count = 0;
 
+            // How many variants per terrain type
+            const variants = 3;
+
             for (const [name, generator] of Object.entries(generators)) {
-                const canvas = generator();
-                assets.terrain.push({ name: `${name}.png`, canvas });
-                addPreview('terrain-preview', canvas, `${name}.png`);
+                // Base
+                const baseCanvas = generator(0);
+                assets.terrain.push({ name: `${name}.png`, canvas: baseCanvas });
+                addPreview('terrain-preview', baseCanvas, `${name}.png`);
                 count++;
                 setProgress((count / total) * 100);
                 log(`Generated terrain: ${name}.png`, 'success');
                 await new Promise(resolve => setTimeout(resolve, 50));
+
+                // Variants
+                for (let v = 1; v <= variants; v++) {
+                    const variantCanvas = generator(v);
+                    const variantName = `${name}_v${v}.png`;
+                    assets.terrain.push({ name: variantName, canvas: variantCanvas });
+                    addPreview('terrain-preview', variantCanvas, variantName);
+                    count++;
+                    setProgress((count / total) * 100);
+                    log(`Generated terrain variant: ${variantName}`, 'success');
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                }
             }
 
             log(`Terrain generation complete! ${assets.terrain.length} textures`, 'success');

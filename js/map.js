@@ -356,8 +356,8 @@ function addRivers(count, radius) {
         // Start from a random edge
         const startAngle = Math.random() * Math.PI * 2;
         const startDist = radius * 0.6;
-        let q = Math.round(Math.cos(startAngle) * startDist);
-        let r = Math.round(Math.sin(startAngle) * startDist * 0.866);
+        const q = Math.round(Math.cos(startAngle) * startDist);
+        const r = Math.round(Math.sin(startAngle) * startDist * 0.866);
 
         // Flow toward opposite side with meandering
         const targetAngle = startAngle + Math.PI + (Math.random() - 0.5) * 0.8;

@@ -3,7 +3,7 @@
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getRemainingMoveCapacity } from './state.js';
 import { calculateHitChance, getCoverInfo } from './combat.js';
-import { render, resizeCanvas } from './pixiRenderer.js';
+import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';

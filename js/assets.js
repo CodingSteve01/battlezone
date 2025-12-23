@@ -1419,7 +1419,7 @@ function drawTexturedCircle(ctx, cx, cy, rx, ry, baseColor, options = {}) {
     }
 
     // Edge definition
-    ctx.strokeStyle = `rgba(0,0,0,0.25)`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
@@ -1437,7 +1437,7 @@ function drawFabricRect(ctx, x, y, w, h, baseColor, seed = 0) {
     ctx.fillRect(x, y, w, h);
 
     // Fabric weave pattern
-    ctx.strokeStyle = `rgba(0,0,0,0.08)`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 0.5;
     for (let py = 0; py < h; py += 3) {
         ctx.beginPath();
@@ -1624,7 +1624,7 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
     ctx.shadowBlur = 0;
 
     // Stripe highlight
-    ctx.fillStyle = `rgba(255,255,255,0.3)`;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.fillRect(-13, -9, 3, 2);
     ctx.fillRect(10, -9, 3, 2);
 
@@ -1639,7 +1639,7 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
     ctx.fill();
 
     // Chest emblem (class icon area)
-    ctx.fillStyle = `rgba(0,0,0,0.2)`;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
     ctx.arc(0, -2, 5, 0, Math.PI * 2);
     ctx.fill();

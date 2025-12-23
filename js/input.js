@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCo
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas } from './pixiRenderer.js';
+import { render, resizeCanvas } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
@@ -605,7 +605,7 @@ function handleMoveClick(unit, hex) {
     const maxMoveCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
 
     // First try to find the full path
-    let pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxExtendedCost);
+    const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxExtendedCost);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
         // Clear pending destination if tapping on invalid hex
@@ -618,7 +618,7 @@ function handleMoveClick(unit, hex) {
 
     // Calculate the reachable portion of the path this turn
     let cumulativeCost = 0;
-    let reachablePath = [pathResult.path[0]]; // Start with current position
+    const reachablePath = [pathResult.path[0]]; // Start with current position
     let totalCost = 0;
     let lastReachableIndex = 0;
 
@@ -811,7 +811,7 @@ export function continueQueuedPath(unit) {
 
     // Calculate reachable portion
     let cumulativeCost = 0;
-    let reachablePath = [pathResult.path[0]];
+    const reachablePath = [pathResult.path[0]];
     let totalCost = 0;
     let lastReachableIndex = 0;
 
