@@ -236,6 +236,9 @@ export function resetUnitsForTurn(player) {
             unit.damage = UNIT_CLASSES.sniper.damage;
             // Cloak expires at end of round (handled in resetSpecialAbilities)
         }
+        if (unit.class === 'ninja') {
+            unit.move = UNIT_CLASSES.ninja.move;  // Reset stealth movement bonus
+        }
     });
 }
 
