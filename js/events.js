@@ -69,26 +69,25 @@ export const ROUND_EVENTS = {
             state.fogModifier = 0;
         }
     },
-    tremor: {
-        name: 'Erdbeben',
-        icon: '🌋',
-        description: 'Einige Felsen werden passierbar!',
-        color: '#a855f7',
+    flare: {
+        name: 'Leuchtrakete',
+        icon: '🔦',
+        description: 'Getarnte Einheiten werden kurz sichtbar!',
+        color: '#f59e0b',
         effect: () => {
-            const rocksToConvert = state.hexes.filter(h => h.type === 'rock');
-            const convertCount = Math.ceil(rocksToConvert.length * 0.3);
-
-            for (let i = 0; i < convertCount; i++) {
-                const idx = Math.floor(Math.random() * rocksToConvert.length);
-                const hex = rocksToConvert[idx];
-                if (hex) {
-                    hex.type = 'sand';
-                    hex.walkable = true;
-                    hex.cover = false;
-                    hex.moveCost = 1;
-                    rocksToConvert.splice(idx, 1);
+            // Reveal all cloaked units temporarily
+            state.units.forEach(unit => {
+                if (unit.alive && unit.cloaked) {
+                    unit.flareRevealed = true;
                 }
-            }
+            });
+            state.flareActive = true;
+        },
+        cleanup: () => {
+            state.units.forEach(unit => {
+                unit.flareRevealed = false;
+            });
+            state.flareActive = false;
         }
     },
     storm: {

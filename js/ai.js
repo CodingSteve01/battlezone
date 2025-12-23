@@ -612,20 +612,30 @@ function shouldUseSpecial(unit, enemies, plan) {
             return false;
 
         case 'sniper':
-            // Cloak for stealth approach or when enemies nearby
+            // Cloak only when tactically beneficial (not always)
             if (unit.cloaked) return false;
-            return enemies.length > 0 || plan.inHuntMode;
+            if (enemies.length > 0) {
+                // Only cloak if in danger - enemies within 3 hexes
+                const closestEnemy = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                return closestEnemy <= 3 && unit.currentHp < unit.maxHp * 0.7;
+            }
+            // In hunt mode, only cloak 30% of the time (not always)
+            return plan.inHuntMode && Math.random() < 0.3;
 
         case 'ninja':
-            // Stealth for ambush
+            // Stealth for ambush - but not constantly
             if (unit.cloaked) return false;
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                return closestEnemy <= 5;
+                // Only stealth if close enough to ambush (within 3 hexes)
+                return closestEnemy <= 3 && closestEnemy > 1;
             }
-            return plan.inHuntMode;
+            // In hunt mode, only cloak 20% of the time
+            return plan.inHuntMode && Math.random() < 0.2;
 
         default:
             return false;

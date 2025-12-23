@@ -332,6 +332,74 @@ function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
 }
 
 /**
+ * Draw a subtle terrain-colored shimmer for enemy cloaked units
+ * This makes them visible if you look carefully, but camouflaged with the terrain
+ * @param {number} cx - Center X position
+ * @param {number} cy - Center Y position
+ * @param {number} size - Unit size
+ * @param {Object} unit - The cloaked unit
+ */
+function drawCamouflageShimmer(cx, cy, size, unit) {
+    // Get terrain at unit's position
+    const hex = getHex(unit.q, unit.r);
+    if (!hex) return;
+
+    const terrainData = TERRAIN[hex.type];
+    const baseColor = terrainData?.color || '#2d5a40';
+
+    // Parse base color
+    const r = parseInt(baseColor.slice(1, 3), 16);
+    const g = parseInt(baseColor.slice(3, 5), 16);
+    const b = parseInt(baseColor.slice(5, 7), 16);
+
+    // Create a subtle shimmer effect using animated noise
+    const time = Date.now() * 0.002;
+    const shimmerIntensity = 0.15 + Math.sin(time + unit.q * 0.5 + unit.r * 0.7) * 0.05;
+
+    ctx.save();
+
+    // Draw a subtle distortion/heat-wave effect
+    // Base camouflage shape (humanoid silhouette)
+    ctx.globalAlpha = shimmerIntensity;
+
+    // Create gradient that matches terrain
+    const shimmerGrad = ctx.createRadialGradient(
+        cx, cy - size * 0.3, 0,
+        cx, cy, size * 0.8
+    );
+    shimmerGrad.addColorStop(0, `rgba(${r + 30}, ${g + 30}, ${b + 30}, 0.3)`);
+    shimmerGrad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.15)`);
+    shimmerGrad.addColorStop(1, 'transparent');
+
+    ctx.fillStyle = shimmerGrad;
+
+    // Draw subtle humanoid shape
+    ctx.beginPath();
+    // Head
+    ctx.arc(cx, cy - size * 0.5, size * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body (oval)
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, size * 0.25, size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add subtle shimmer lines (like heat distortion)
+    ctx.strokeStyle = `rgba(${r + 40}, ${g + 40}, ${b + 40}, ${shimmerIntensity * 0.5})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+        const offsetY = (i - 1) * size * 0.3;
+        const wave = Math.sin(time * 2 + i) * size * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(cx - size * 0.2 + wave, cy + offsetY);
+        ctx.quadraticCurveTo(cx + wave * 2, cy + offsetY - size * 0.1, cx + size * 0.2 + wave, cy + offsetY);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
  * Calculate stealth unit visibility alpha based on distance to nearest friendly unit.
  * Stealth units become more visible the closer they are to friendly non-cloaked units.
  * @param {Object} stealthUnit - The cloaked unit to calculate visibility for
@@ -1093,15 +1161,29 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Cloaked units visibility based on distance to nearest friendly unit
     // Closer = more visible, farther = more transparent
+    let isCamouflagedEnemy = false;
     if (unit.cloaked && unit.player === state.viewingPlayer) {
         // Own cloaked units - visibility based on distance to own non-cloaked units
         ctx.globalAlpha = getStealthVisibilityAlpha(unit);
     } else if (unit.cloaked && unit.player !== state.viewingPlayer) {
         // Enemy cloaked unit detected by proximity - show semi-transparent
-        ctx.globalAlpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
+        const alpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
+        if (alpha > 0) {
+            ctx.globalAlpha = alpha;
+        } else {
+            // Even invisible enemies show as terrain-colored shimmer (subtle)
+            isCamouflagedEnemy = true;
+        }
     } else if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
         // Unit that attacked while cloaked - visible but semi-transparent until turn ends
         ctx.globalAlpha = 0.6;
+    }
+
+    // Draw terrain camouflage shimmer for enemy cloaked units not in detection range
+    if (isCamouflagedEnemy) {
+        drawCamouflageShimmer(cx, cy, size, unit);
+        ctx.restore();
+        return; // Don't draw the actual unit sprite
     }
 
     // Selection glow effect
