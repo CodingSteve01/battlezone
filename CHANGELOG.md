@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.3](https://github.com/CodingSteve01/battlezone/compare/v1.8.2...v1.8.3) (2025-12-23)
+
+
+### Bug Fixes
+
+* menu buttons not clickable due to PixiJS canvas event capture ([#59](https://github.com/CodingSteve01/battlezone/issues/59)) ([0d3a237](https://github.com/CodingSteve01/battlezone/commit/0d3a23753651f1727cb8e844c1512758a2cf15e6))
+
 ## [1.8.2](https://github.com/CodingSteve01/battlezone/compare/v1.8.1...v1.8.2) (2025-12-23)
 
 
