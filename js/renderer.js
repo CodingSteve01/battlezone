@@ -39,6 +39,12 @@ const foregroundCache = new Map();
 let cachedQualityLevel = null;
 
 /**
+ * Base hex size for caching - tiles are cached at this size and scaled when drawn
+ * This prevents cache invalidation during zoom operations
+ */
+const CACHE_BASE_HEX_SIZE = 60;
+
+/**
  * Maximum number of cached tiles to prevent memory issues
  */
 const MAX_CACHE_SIZE = 1000;
@@ -54,12 +60,13 @@ export function clearRenderCaches() {
 
 /**
  * Get or create a cached hex tile with terrain details
+ * Tiles are cached at a fixed base size and scaled when drawn to avoid
+ * cache invalidation during zoom operations
  * @param {Object} hex - The hex object
  * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @param {number} hexSize - Current hex size for rendering
- * @returns {HTMLCanvasElement|null} Cached canvas or null if caching disabled
+ * @returns {Object|null} { canvas, scale } or null if caching disabled
  */
-function getCachedHexTile(hex, fogLevel, hexSize) {
+function getCachedHexTile(hex, fogLevel) {
     // Only cache on medium/high quality - low quality is simple enough
     if (state.effectiveQuality === 'low') {
         return null;
@@ -72,7 +79,8 @@ function getCachedHexTile(hex, fogLevel, hexSize) {
         cachedQualityLevel = state.effectiveQuality;
     }
 
-    const cacheKey = `${hex.q},${hex.r}_${fogLevel}_${state.effectiveQuality}_${Math.round(hexSize)}`;
+    // Use fixed base size for caching - zoom independent!
+    const cacheKey = `${hex.q},${hex.r}_${fogLevel}_${state.effectiveQuality}`;
 
     if (hexTileCache.has(cacheKey)) {
         return hexTileCache.get(cacheKey);
@@ -85,11 +93,12 @@ function getCachedHexTile(hex, fogLevel, hexSize) {
         keysToRemove.forEach(key => hexTileCache.delete(key));
     }
 
-    // Create new cached tile
-    const tileCanvas = createHexTileCanvas(hex, fogLevel, hexSize);
-    hexTileCache.set(cacheKey, tileCanvas);
+    // Create new cached tile at fixed base size
+    const tileCanvas = createHexTileCanvas(hex, fogLevel, CACHE_BASE_HEX_SIZE);
+    const cacheEntry = { canvas: tileCanvas, baseSize: CACHE_BASE_HEX_SIZE };
+    hexTileCache.set(cacheKey, cacheEntry);
 
-    return tileCanvas;
+    return cacheEntry;
 }
 
 /**
@@ -2434,15 +2443,21 @@ export function render() {
         const terrain = TERRAIN[hex.type];
 
         // Try to use cached tile for better performance
-        const cachedTile = getCachedHexTile(hex, fogLevel, state.hexSize);
+        const cacheEntry = getCachedHexTile(hex, fogLevel);
 
-        if (cachedTile) {
-            // Draw cached tile - much faster than individual draw calls
+        if (cacheEntry) {
+            // Draw cached tile with scaling - prevents cache invalidation during zoom
+            const { canvas: cachedTile, baseSize } = cacheEntry;
+            const scale = state.hexSize / baseSize;
             const tileSize = cachedTile.width;
+            const scaledSize = tileSize * scale;
+
             ctx.drawImage(
                 cachedTile,
-                sx - tileSize / 2,
-                sy - tileSize / 2
+                sx - scaledSize / 2,
+                sy - scaledSize / 2,
+                scaledSize,
+                scaledSize
             );
         } else {
             // Fallback: draw directly (low quality mode or cache miss)

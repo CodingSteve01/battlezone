@@ -43,6 +43,7 @@ export const state = {
     sharedAP: 0,              // Current AP in the pool
     maxSharedAP: 0,           // Maximum AP for this turn (for UI display)
     unitMovedThisTurn: {},    // Track how much each unit has moved: unitId -> distance moved
+    unitAttacksThisTurn: {},  // Track attacks per unit per turn: unitId -> attack count
 
     // Game progress
     round: 1,
@@ -148,6 +149,7 @@ export function resetState() {
     state.sharedAP = 0;
     state.maxSharedAP = 0;
     state.unitMovedThisTurn = {};
+    state.unitAttacksThisTurn = {};
 
     // Initialize per-player explored hexes and visible hexes
     state.playerExploredHexes = [];
@@ -235,7 +237,8 @@ export function initSharedAPPool(player) {
     const poolSize = units.length * CONFIG.AP_PER_TURN;
     state.sharedAP = poolSize;
     state.maxSharedAP = poolSize;
-    state.unitMovedThisTurn = {};  // Reset movement tracking
+    state.unitMovedThisTurn = {};    // Reset movement tracking
+    state.unitAttacksThisTurn = {};  // Reset attack tracking
 }
 
 /**
@@ -265,6 +268,29 @@ export function getRemainingMoveCapacity(unit) {
 export function trackUnitMovement(unit, distance) {
     const current = state.unitMovedThisTurn[unit.id] || 0;
     state.unitMovedThisTurn[unit.id] = current + distance;
+}
+
+/**
+ * Track an attack for a unit
+ */
+export function trackUnitAttack(unit) {
+    const current = state.unitAttacksThisTurn[unit.id] || 0;
+    state.unitAttacksThisTurn[unit.id] = current + 1;
+}
+
+/**
+ * Get remaining attacks for a unit this turn
+ */
+export function getRemainingAttacks(unit) {
+    const attacksSoFar = state.unitAttacksThisTurn[unit.id] || 0;
+    return Math.max(0, CONFIG.MAX_ATTACKS_PER_UNIT - attacksSoFar);
+}
+
+/**
+ * Check if unit can still attack this turn
+ */
+export function canUnitAttack(unit) {
+    return getRemainingAttacks(unit) > 0;
 }
 
 /**

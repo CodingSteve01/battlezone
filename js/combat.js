@@ -1,6 +1,6 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine, getNeighbors } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -348,11 +348,23 @@ export function executeAttack(attacker, defender) {
         playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
         spendSharedAP(1);  // Spend from shared pool
+        trackUnitAttack(attacker);  // Still counts as an attack
         return { hit: false, damage: 0, killed: false, eventMiss: true };
     }
 
     // Consume AP from shared pool
     spendSharedAP(1);
+
+    // Track this attack for the unit
+    trackUnitAttack(attacker);
+
+    // Show remaining attacks if limited
+    const remaining = getRemainingAttacks(attacker);
+    if (remaining === 0) {
+        setTimeout(() => {
+            showToast(`⚔️ ${UNIT_CLASSES[attacker.class].name}: Keine Angriffe mehr möglich`, 'info');
+        }, 500);
+    }
 
     if (hit) {
         // Check for shield (from power-up)

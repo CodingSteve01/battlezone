@@ -18,10 +18,10 @@ export const PARTICLE_TYPES = {
     spark: {
         color: '#ffdd44',
         colorVariance: ['#ffaa00', '#ffff66', '#ffffff'],
-        size: { min: 2, max: 5 },
-        lifetime: { min: 200, max: 400 },
-        speed: { min: 80, max: 200 },
-        gravity: 150,
+        size: { min: 1, max: 2.5 },  // Smaller, more detailed
+        lifetime: { min: 150, max: 350 },
+        speed: { min: 60, max: 150 },
+        gravity: 120,
         fadeOut: true,
         glow: true
     },
@@ -30,10 +30,10 @@ export const PARTICLE_TYPES = {
     star: {
         color: '#ffffff',
         colorVariance: ['#ffffaa', '#aaffff', '#ffaaff'],
-        size: { min: 4, max: 8 },
-        lifetime: { min: 400, max: 700 },
-        speed: { min: 40, max: 100 },
-        gravity: -20, // Schweben nach oben
+        size: { min: 2, max: 4 },  // Smaller stars
+        lifetime: { min: 300, max: 600 },
+        speed: { min: 30, max: 70 },
+        gravity: -15, // Schweben nach oben
         fadeOut: true,
         glow: true,
         rotate: true
@@ -43,24 +43,24 @@ export const PARTICLE_TYPES = {
     muzzleFlash: {
         color: '#ffff88',
         colorVariance: ['#ffffff', '#ffaa44'],
-        size: { min: 8, max: 15 },
-        lifetime: { min: 50, max: 100 },
-        speed: { min: 0, max: 20 },
+        size: { min: 4, max: 8 },  // Smaller flash
+        lifetime: { min: 40, max: 80 },
+        speed: { min: 0, max: 15 },
         gravity: 0,
         fadeOut: true,
         glow: true,
-        scale: { start: 1.5, end: 0.3 }
+        scale: { start: 1.2, end: 0.2 }
     },
 
     // Impact-Ring (Einschlag)
     impactRing: {
-        color: 'rgba(255, 200, 100, 0.6)',
-        size: { min: 5, max: 10 },
-        lifetime: { min: 200, max: 300 },
+        color: 'rgba(255, 200, 100, 0.5)',
+        size: { min: 3, max: 6 },  // Smaller ring start
+        lifetime: { min: 150, max: 250 },
         speed: { min: 0, max: 0 },
         gravity: 0,
         fadeOut: true,
-        expandRate: 80 // Ring expandiert
+        expandRate: 60 // Ring expandiert (slightly slower)
     },
 
     // === BLUT-EFFEKTE (Nur wenn Gore aktiviert) ===
@@ -68,10 +68,10 @@ export const PARTICLE_TYPES = {
     blood: {
         color: '#cc2222',
         colorVariance: ['#aa1111', '#dd3333', '#881111'],
-        size: { min: 3, max: 7 },
-        lifetime: { min: 300, max: 600 },
-        speed: { min: 60, max: 150 },
-        gravity: 250,
+        size: { min: 1.5, max: 4 },  // Smaller droplets
+        lifetime: { min: 250, max: 500 },
+        speed: { min: 50, max: 120 },
+        gravity: 200,
         fadeOut: true,
         glow: false,
         requiresGore: true // Nur mit Gore-Setting
@@ -79,8 +79,8 @@ export const PARTICLE_TYPES = {
 
     bloodSplatter: {
         color: '#aa1111',
-        size: { min: 8, max: 15 },
-        lifetime: { min: 800, max: 1500 },
+        size: { min: 4, max: 8 },  // Smaller splatter
+        lifetime: { min: 600, max: 1200 },
         speed: { min: 0, max: 0 },
         gravity: 0,
         fadeOut: true,
@@ -94,22 +94,22 @@ export const PARTICLE_TYPES = {
     heal: {
         color: '#44ff88',
         colorVariance: ['#22dd66', '#66ffaa', '#88ffcc'],
-        size: { min: 3, max: 6 },
-        lifetime: { min: 600, max: 1000 },
-        speed: { min: 20, max: 60 },
-        gravity: -40, // Schweben nach oben
+        size: { min: 1.5, max: 3 },  // Smaller healing particles
+        lifetime: { min: 500, max: 800 },
+        speed: { min: 15, max: 45 },
+        gravity: -30, // Schweben nach oben
         fadeOut: true,
         glow: true
     },
 
     healAura: {
-        color: 'rgba(68, 255, 136, 0.4)',
-        size: { min: 20, max: 30 },
-        lifetime: { min: 400, max: 600 },
+        color: 'rgba(68, 255, 136, 0.3)',
+        size: { min: 10, max: 18 },  // Smaller aura
+        lifetime: { min: 350, max: 500 },
         speed: { min: 0, max: 0 },
         gravity: 0,
         fadeOut: true,
-        expandRate: 50
+        expandRate: 35
     },
 
     // === BEWEGUNGS-EFFEKTE ===
@@ -117,19 +117,19 @@ export const PARTICLE_TYPES = {
     dust: {
         color: '#aa9977',
         colorVariance: ['#998866', '#bbaa88', '#ccbb99'],
-        size: { min: 4, max: 10 },
-        lifetime: { min: 400, max: 800 },
-        speed: { min: 10, max: 40 },
-        gravity: -10,
+        size: { min: 2, max: 5 },  // Smaller dust
+        lifetime: { min: 300, max: 600 },
+        speed: { min: 8, max: 30 },
+        gravity: -8,
         fadeOut: true,
         glow: false
     },
 
     sprintTrail: {
-        color: 'rgba(100, 200, 255, 0.5)',
-        size: { min: 8, max: 15 },
-        lifetime: { min: 200, max: 400 },
-        speed: { min: 0, max: 10 },
+        color: 'rgba(100, 200, 255, 0.4)',
+        size: { min: 4, max: 8 },  // Smaller trail
+        lifetime: { min: 150, max: 300 },
+        speed: { min: 0, max: 8 },
         gravity: 0,
         fadeOut: true,
         glow: true
@@ -138,12 +138,12 @@ export const PARTICLE_TYPES = {
     // === SPEZIAL-FÄHIGKEITEN ===
 
     cloak: {
-        color: 'rgba(150, 100, 255, 0.6)',
-        colorVariance: ['rgba(100, 50, 200, 0.5)', 'rgba(200, 150, 255, 0.5)'],
-        size: { min: 5, max: 12 },
-        lifetime: { min: 500, max: 900 },
-        speed: { min: 15, max: 40 },
-        gravity: -30,
+        color: 'rgba(150, 100, 255, 0.5)',
+        colorVariance: ['rgba(100, 50, 200, 0.4)', 'rgba(200, 150, 255, 0.4)'],
+        size: { min: 2.5, max: 6 },  // Smaller cloak particles
+        lifetime: { min: 400, max: 700 },
+        speed: { min: 12, max: 30 },
+        gravity: -25,
         fadeOut: true,
         glow: true
     },
@@ -151,9 +151,9 @@ export const PARTICLE_TYPES = {
     powershot: {
         color: '#ff6644',
         colorVariance: ['#ff4422', '#ffaa44', '#ffffff'],
-        size: { min: 4, max: 10 },
-        lifetime: { min: 300, max: 600 },
-        speed: { min: 50, max: 120 },
+        size: { min: 2, max: 5 },  // Smaller powershot
+        lifetime: { min: 250, max: 500 },
+        speed: { min: 40, max: 100 },
         gravity: 0,
         fadeOut: true,
         glow: true
@@ -164,7 +164,7 @@ export const PARTICLE_TYPES = {
     leaf: {
         color: '#55aa44',
         colorVariance: ['#448833', '#66bb55', '#779944'],
-        size: { min: 3, max: 6 },
+        size: { min: 2, max: 4 },  // Smaller leaves
         lifetime: { min: 2000, max: 4000 },
         speed: { min: 5, max: 20 },
         gravity: 15,
@@ -177,7 +177,7 @@ export const PARTICLE_TYPES = {
     firefly: {
         color: '#aaffaa',
         colorVariance: ['#88ff88', '#ccffcc'],
-        size: { min: 2, max: 4 },
+        size: { min: 1, max: 2.5 },  // Smaller fireflies
         lifetime: { min: 3000, max: 6000 },
         speed: { min: 5, max: 15 },
         gravity: 0,
@@ -581,8 +581,12 @@ class ParticleManager {
      */
     update() {
         const now = performance.now();
-        const deltaTime = now - this.lastUpdate;
+        let deltaTime = now - this.lastUpdate;
         this.lastUpdate = now;
+
+        // Clamp deltaTime to avoid killing particles on first frame after long pause
+        // Max 50ms = 20fps minimum, prevents particles from dying instantly
+        deltaTime = Math.min(deltaTime, 50);
 
         // Aktive Partikel updaten
         for (let i = this.activeParticles.length - 1; i >= 0; i--) {
