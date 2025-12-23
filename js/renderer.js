@@ -6,7 +6,8 @@ import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
-import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
+import { initTextures, drawAPIndicator } from './assets.js';
+import { getTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
@@ -1977,8 +1978,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     ctx.shadowBlur = 0;
 
-    // Draw the human sprite
-    drawHumanSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, isSelected);
+    // Draw the human sprite (uses static asset if available, otherwise runtime)
+    drawUnitSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, isSelected, unit.player);
 
     // Player number badge
     ctx.fillStyle = playerColor;

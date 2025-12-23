@@ -41,7 +41,6 @@ export function createUnits() {
                 specialDesc: classData.specialDesc,
                 q: spawn.q,
                 r: spawn.r,
-                ap: CONFIG.AP_PER_TURN,
                 alive: true,
                 usedSpecial: false,
                 cloaked: false,           // Sniper stealth (active cloak ability)
@@ -219,8 +218,6 @@ export function resetUnitsForTurn(player) {
     const units = getPlayerUnits(player);
 
     units.forEach(unit => {
-        unit.ap = CONFIG.AP_PER_TURN;
-
         // Reset revealed state - unit that attacked while cloaked is no longer marked
         // This happens at start of their turn, so enemies had a chance to see them
         unit.revealedUntilEndOfTurn = false;

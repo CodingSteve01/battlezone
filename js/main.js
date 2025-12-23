@@ -13,6 +13,7 @@ import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
+import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -309,7 +310,16 @@ export function checkAITurn() {
 /**
  * Initialize the application
  */
-function init() {
+async function init() {
+    // Initialize asset loader (loads static assets if available)
+    await initAssetLoader();
+
+    if (isUsingStaticAssets()) {
+        console.log('Using pre-generated static assets');
+    } else {
+        console.log('Using runtime-generated assets');
+    }
+
     // Setup start button
     const startBtn = document.getElementById('start-btn');
     if (startBtn) {
