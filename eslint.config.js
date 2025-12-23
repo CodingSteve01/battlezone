@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import importPlugin from 'eslint-plugin-import';
 
 export default [
     js.configs.recommended,
@@ -10,6 +11,16 @@ export default [
             globals: {
                 ...globals.browser,
                 ...globals.es2021
+            }
+        },
+        plugins: {
+            import: importPlugin
+        },
+        settings: {
+            'import/resolver': {
+                node: {
+                    extensions: ['.js']
+                }
             }
         },
         rules: {
@@ -27,7 +38,10 @@ export default [
             'curly': 'off', // Existing code style
             'no-var': 'warn',
             'prefer-const': 'warn',
-            'no-case-declarations': 'warn' // Common pattern in switch statements
+            'no-case-declarations': 'warn', // Common pattern in switch statements
+            // Fail CI on broken imports/exports
+            'import/no-unresolved': ['error', { commonjs: false, caseSensitive: true }],
+            'import/named': 'error'
         }
     },
     {

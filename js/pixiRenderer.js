@@ -5,9 +5,8 @@
 
 import { Application, Container, Graphics, Text, TextStyle, Sprite, Texture, RenderTexture, Assets } from 'pixi.js';
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit } from './state.js';
+import { state, getHex, getCurrentUnit, isHexVisible, isHexExplored } from './state.js';
 import { hexToPixel, pixelToHex } from './hexMath.js';
-import { isHexVisible, isHexExplored } from './fogOfWar.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
 import { getPowerupAt } from './powerups.js';
