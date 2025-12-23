@@ -576,6 +576,46 @@ button:focus:not(:focus-visible),
     border: 1px solid var(--border-subtle);
 }
 
+/* Shared AP Pool Display */
+.ap-pool-display {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
+    border: 2px solid var(--yellow);
+    border-radius: 12px;
+    box-shadow: 0 0 20px var(--yellow-glow);
+}
+
+.ap-pool-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ap-pool-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--yellow-light);
+    text-shadow: 0 0 15px var(--yellow-glow);
+    min-width: 30px;
+    text-align: center;
+}
+
+.ap-pool-max {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.ap-pool-icon {
+    font-size: 18px;
+    margin-left: 2px;
+}
+
 /* Canvas Container */
 .canvas-container {
     flex: 1;
@@ -867,6 +907,60 @@ button:focus:not(:focus-visible),
 
 .unit-tab .ap-number:has(+ .ap-fill.low),
 .unit-tab.selected .ap-fill.low + .ap-number {
+    color: var(--red-light);
+}
+
+/* Movement Bar in Unit Tabs (replaces AP bar for shared pool system) */
+.unit-tab .move-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.unit-tab .move-bar {
+    flex: 1;
+    height: 5px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 3px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.unit-tab .move-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan) 0%, var(--blue-light) 100%);
+    transition: width 0.3s ease;
+    border-radius: 3px;
+    box-shadow: 0 0 8px var(--blue-glow);
+}
+
+.unit-tab .move-fill.medium {
+    background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+}
+
+.unit-tab .move-fill.low {
+    background: linear-gradient(90deg, var(--red) 0%, var(--red-light) 100%);
+    box-shadow: 0 0 8px var(--red-glow);
+}
+
+.unit-tab .move-fill.depleted {
+    background: var(--bg-glass);
+    box-shadow: none;
+    width: 0 !important;
+}
+
+.unit-tab .move-number {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--blue-light);
+    min-width: 36px;
+    text-align: right;
+}
+
+.unit-tab .move-fill.low ~ .move-number,
+.unit-tab .move-fill.depleted ~ .move-number {
     color: var(--red-light);
 }
 

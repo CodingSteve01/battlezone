@@ -1,6 +1,6 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine, getNeighbors } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -18,7 +18,7 @@ import {
 export function canTakeCover(unit) {
     if (!unit || !unit.alive) return false;
     if (unit.hiding) return false; // Already hiding
-    if (unit.ap < 1) return false; // Needs 1 AP
+    if (state.sharedAP < 1) return false; // Needs 1 AP from shared pool
 
     const hex = getHex(unit.q, unit.r);
     if (!hex) return false;
@@ -35,7 +35,7 @@ export function takeCover(unit) {
     if (!canTakeCover(unit)) return false;
 
     unit.hiding = true;
-    unit.ap -= 1;
+    spendSharedAP(1);  // Spend from shared pool
     playCover();
     showToast('🌲 Deckung genommen!', 'special');
     return true;
@@ -334,12 +334,12 @@ export function executeAttack(attacker, defender) {
         hit = false;
         playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
-        attacker.ap -= 1;
+        spendSharedAP(1);  // Spend from shared pool
         return { hit: false, damage: 0, killed: false, eventMiss: true };
     }
 
-    // Consume AP
-    attacker.ap -= 1;
+    // Consume AP from shared pool
+    spendSharedAP(1);
 
     if (hit) {
         // Check for shield (from power-up)
@@ -435,9 +435,9 @@ export function executeAttack(attacker, defender) {
  * Use special ability
  */
 export function useSpecialAbility(unit) {
-    if (unit.ap < 2 || unit.usedSpecial) return false;
+    if (state.sharedAP < 2 || unit.usedSpecial) return false;
 
-    unit.ap -= 2;
+    spendSharedAP(2);  // Spend from shared pool
     unit.usedSpecial = true;
 
     switch (unit.class) {

@@ -37,6 +37,11 @@ export const state = {
     pendingMoveDestination: null,  // Hex for tap-to-confirm movement
     pendingHealTarget: null,  // For context-sensitive healing action
 
+    // Shared AP Pool - all units share one pool per turn
+    sharedAP: 0,              // Current AP in the pool
+    maxSharedAP: 0,           // Maximum AP for this turn (for UI display)
+    unitMovedThisTurn: {},    // Track how much each unit has moved: unitId -> distance moved
+
     // Game progress
     round: 1,
     gameOver: false,
@@ -138,6 +143,9 @@ export function resetState() {
     state.previouslyVisibleEnemies = new Set();
     state.lastEnemyContactRound = 0;
     state.roundsWithoutContact = 0;
+    state.sharedAP = 0;
+    state.maxSharedAP = 0;
+    state.unitMovedThisTurn = {};
 
     // Initialize per-player explored hexes and visible hexes
     state.playerExploredHexes = [];
@@ -214,6 +222,47 @@ export function switchPlayerFog() {
  */
 export function getPlayerUnits(player) {
     return state.units.filter(u => u.player === player && u.alive);
+}
+
+/**
+ * Initialize the shared AP pool for a player's turn
+ * Pool = sum of all living units' AP_PER_TURN
+ */
+export function initSharedAPPool(player) {
+    const units = getPlayerUnits(player);
+    const poolSize = units.length * CONFIG.AP_PER_TURN;
+    state.sharedAP = poolSize;
+    state.maxSharedAP = poolSize;
+    state.unitMovedThisTurn = {};  // Reset movement tracking
+}
+
+/**
+ * Spend AP from the shared pool
+ * Returns true if successful, false if not enough AP
+ */
+export function spendSharedAP(amount) {
+    if (state.sharedAP >= amount) {
+        state.sharedAP -= amount;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Get remaining movement capacity for a unit this turn
+ * Based on unit.move stat minus distance already moved
+ */
+export function getRemainingMoveCapacity(unit) {
+    const movedSoFar = state.unitMovedThisTurn[unit.id] || 0;
+    return Math.max(0, unit.move - movedSoFar);
+}
+
+/**
+ * Track movement for a unit
+ */
+export function trackUnitMovement(unit, distance) {
+    const current = state.unitMovedThisTurn[unit.id] || 0;
+    state.unitMovedThisTurn[unit.id] = current + distance;
 }
 
 /**

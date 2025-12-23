@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, getRemainingMoveCapacity } from './state.js';
 import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -2174,9 +2174,10 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     ctx.textBaseline = 'middle';
     ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
 
-    // AP indicators below HP bar
+    // Movement capacity indicator below HP bar (for selected unit)
     if (isSelected) {
-        drawAPIndicator(ctx, cx, barY + barHeight + 16, unit.ap, CONFIG.AP_PER_TURN, 14);
+        const remainingMove = getRemainingMoveCapacity(unit);
+        drawAPIndicator(ctx, cx, barY + barHeight + 16, remainingMove, unit.move, 14);
     }
 
     // Attackable indicator

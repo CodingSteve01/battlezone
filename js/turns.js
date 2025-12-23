@@ -1,6 +1,6 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies } from './state.js';
+import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
@@ -27,6 +27,9 @@ export function startTurn() {
 
     // Reset units for turn
     resetUnitsForTurn(state.currentPlayer);
+
+    // Initialize shared AP pool for this player
+    initSharedAPPool(state.currentPlayer);
 
     // Set initial selection
     state.selectedUnit = 0;

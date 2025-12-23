@@ -42,6 +42,10 @@ describe('combat', () => {
         resetState();
         vi.clearAllMocks();
 
+        // Initialize shared AP pool for tests
+        state.sharedAP = 12;
+        state.maxSharedAP = 12;
+
         // Set up a basic map
         for (let q = -5; q <= 5; q++) {
             for (let r = -5; r <= 5; r++) {
@@ -66,9 +70,10 @@ describe('combat', () => {
             expect(canTakeCover(unit)).toBe(false);
         });
 
-        it('should return false for unit with no AP', () => {
+        it('should return false when shared AP pool is empty', () => {
             setHex({ q: 0, r: 0, type: 'forest', cover: true });
-            const unit = { alive: true, hiding: false, ap: 0, q: 0, r: 0 };
+            state.sharedAP = 0;  // Empty shared pool
+            const unit = { alive: true, hiding: false, q: 0, r: 0 };
             expect(canTakeCover(unit)).toBe(false);
         });
 
@@ -86,26 +91,28 @@ describe('combat', () => {
     });
 
     describe('takeCover', () => {
-        it('should set hiding flag and consume AP', () => {
+        it('should set hiding flag and consume AP from shared pool', () => {
             setHex({ q: 0, r: 0, type: 'forest', cover: true });
-            const unit = { alive: true, hiding: false, ap: 4, q: 0, r: 0 };
+            state.sharedAP = 12;
+            const unit = { alive: true, hiding: false, q: 0, r: 0 };
 
             const result = takeCover(unit);
 
             expect(result).toBe(true);
             expect(unit.hiding).toBe(true);
-            expect(unit.ap).toBe(3);
+            expect(state.sharedAP).toBe(11);  // 12 - 1 = 11
         });
 
         it('should return false if cannot take cover', () => {
             setHex({ q: 0, r: 0, type: 'grass', cover: false });
-            const unit = { alive: true, hiding: false, ap: 4, q: 0, r: 0 };
+            state.sharedAP = 12;
+            const unit = { alive: true, hiding: false, q: 0, r: 0 };
 
             const result = takeCover(unit);
 
             expect(result).toBe(false);
             expect(unit.hiding).toBe(false);
-            expect(unit.ap).toBe(4);
+            expect(state.sharedAP).toBe(12);  // Unchanged
         });
     });
 

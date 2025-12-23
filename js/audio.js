@@ -63,7 +63,9 @@ function ensureAudioReady() {
         // Try to resume - this will only work after user interaction
         audioContext.resume().catch(() => {});
     }
-    return audioContext && audioContext.state === 'running';
+    // Allow playing even if state is 'suspended' - the sound will play once resumed
+    // This fixes the race condition where resume() hasn't completed yet
+    return audioContext !== null;
 }
 
 /**
