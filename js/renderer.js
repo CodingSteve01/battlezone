@@ -321,13 +321,14 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 }
 
 /**
- * Draw terrain details to a specific context (for caching)
+ * Draw STATIC terrain details to a specific context (for caching)
  * This is a wrapper that temporarily swaps the global ctx
+ * Only draws non-animated elements that can be safely cached
  */
 function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
     const originalCtx = ctx;
     ctx = context;
-    drawTerrainDetails(cx, cy, size, type, hexQ, hexR);
+    drawStaticTerrainDetails(cx, cy, size, type, hexQ, hexR);
     ctx = originalCtx;
 }
 
@@ -702,10 +703,10 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
 }
 
 /**
- * Draw enhanced terrain pattern on a hex - optimized for performance
- * Now only draws ground-level details, foreground elements are collected separately
+ * Draw STATIC terrain pattern on a hex (for caching)
+ * Only draws non-animated elements that won't change frame-to-frame
  */
-function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
+function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     const s = size * 0.45;
     ctx.save();
 
@@ -714,10 +715,7 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            // Draw animated grass blades
-            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
-
-            // Small flowers stay on ground level
+            // Small flowers stay on ground level (static)
             const grassType = Math.abs(baseSeed) % 100;
             if (grassType >= 15 && grassType < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
@@ -725,14 +723,8 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
 
         case 'forest':
-            // Draw forest floor (leaves, small plants) - trees are drawn as foreground
+            // Draw forest floor (leaves, small plants) - static ground cover
             drawForestFloor(cx, cy, s, baseSeed);
-            // Add fireflies for atmosphere
-            if (state.effectiveQuality === 'high') {
-                drawFireflies(ctx, cx, cy, size);
-            }
-            // Falling leaves
-            drawFallingLeaves(ctx, cx, cy, size);
             break;
 
         case 'rock':
@@ -744,17 +736,12 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
 
         case 'water':
+            // Static water base details (stones, algae)
             drawWaterDetails(cx, cy, s, baseSeed);
-            // Add animated water overlay
-            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
 
         case 'sand':
             drawSandDetails(cx, cy, s, baseSeed);
-            // Add floating dust particles
-            if (state.effectiveQuality !== 'low') {
-                drawDustMotes(ctx, cx, cy, size);
-            }
             break;
 
         case 'swamp':
@@ -775,11 +762,70 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'river':
             drawRiverDetails(cx, cy, s, baseSeed);
-            // Add flowing water animation
+            break;
+
+        case 'gravel':
+            drawGravel(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'ruins':
+            drawRuins(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'pine':
+            drawForestFloor(cx, cy, s, baseSeed);
+            break;
+
+        case 'farmland':
+            drawFarmland(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'mud':
+            drawMud(ctx, cx, cy, size, hexQ, hexR);
+            break;
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw ANIMATED terrain effects on a hex (called every frame, NOT cached)
+ * These are time-dependent visual effects like swaying grass, flowing water, particles
+ */
+function drawAnimatedTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0, alpha = 1) {
+    if (state.effectiveQuality === 'low') return; // Skip animations on low quality
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    switch (type) {
+        case 'grass':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
+            break;
+
+        case 'forest':
+            // Fireflies for atmosphere
+            if (state.effectiveQuality === 'high') {
+                drawFireflies(ctx, cx, cy, size);
+            }
+            // Falling leaves
+            drawFallingLeaves(ctx, cx, cy, size);
+            break;
+
+        case 'water':
             drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
 
-        // New terrain types with animations
+        case 'sand':
+            if (state.effectiveQuality !== 'low') {
+                drawDustMotes(ctx, cx, cy, size);
+            }
+            break;
+
+        case 'river':
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
+            break;
+
         case 'snow':
             drawSnowDetails(ctx, cx, cy, size, hexQ, hexR);
             drawSnowfall(ctx, cx, cy, size, hexQ, hexR);
@@ -806,32 +852,12 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             drawFlowers(ctx, cx, cy, size, hexQ, hexR);
             break;
 
-        case 'mud':
-            drawMud(ctx, cx, cy, size, hexQ, hexR);
-            break;
-
-        case 'farmland':
-            drawFarmland(ctx, cx, cy, size, hexQ, hexR);
-            break;
-
         case 'wheat':
             drawWheatField(ctx, cx, cy, size, hexQ, hexR);
             break;
 
-        case 'gravel':
-            drawGravel(ctx, cx, cy, size, hexQ, hexR);
-            break;
-
-        case 'ruins':
-            drawRuins(ctx, cx, cy, size, hexQ, hexR);
-            break;
-
         case 'tallgrass':
             drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'tallgrass');
-            break;
-
-        case 'pine':
-            drawForestFloor(cx, cy, s, baseSeed);
             break;
 
         case 'clearing':
@@ -848,13 +874,19 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
     }
 
-    // Add terrain blend effects for all visible terrain
-    if (state.effectiveQuality !== 'low') {
-        const neighbors = getNeighborTerrains(state.hexMap, hexQ, hexR);
-        drawTerrainBlend(ctx, cx, cy, size, type, neighbors);
-    }
-
     ctx.restore();
+}
+
+/**
+ * Check if a terrain type has animated elements
+ */
+function hasAnimatedTerrain(type) {
+    const animatedTypes = [
+        'grass', 'forest', 'water', 'sand', 'river', 'snow', 'ice',
+        'deepwater', 'shallows', 'reeds', 'flowers', 'wheat',
+        'tallgrass', 'clearing', 'heather', 'moss'
+    ];
+    return animatedTypes.includes(type);
 }
 
 /**
@@ -1824,6 +1856,16 @@ export function render() {
                 ctx.fillStyle = fogGradient;
                 ctx.fill();
                 ctx.restore();
+            }
+        }
+
+        // Draw animated terrain effects (grass, water swaying, etc.)
+        // Must be drawn BEFORE movement highlights and power-ups for correct z-order
+        if (state.effectiveQuality !== 'low' && hasAnimatedTerrain(hex.type)) {
+            if (fogLevel === 'visible') {
+                drawAnimatedTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r, 1);
+            } else if (fogLevel === 'explored') {
+                drawAnimatedTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r, 0.3);
             }
         }
 

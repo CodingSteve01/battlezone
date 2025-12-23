@@ -1080,6 +1080,7 @@ export function getNeighborTerrains(hexMap, q, r) {
 
 /**
  * Draw enhanced terrain transition/blend effects with organic edges
+ * Uses full hex size for seamless edge-to-edge transitions
  */
 export function drawTerrainBlend(ctx, cx, cy, hexSize, currentType, neighbors) {
     ctx.save();
@@ -1098,20 +1099,20 @@ export function drawTerrainBlend(ctx, cx, cy, hexSize, currentType, neighbors) {
         const neighborTerrain = TERRAIN[neighborType];
         if (!neighborTerrain) continue;
 
-        // Calculate edge positions with soft organic curves
+        // Calculate edge positions - use FULL hex size for seamless tiling
         const angle = (Math.PI / 3) * i;
         const nextAngle = (Math.PI / 3) * ((i + 1) % 6);
 
-        // Edge points
-        const x1 = cx + Math.cos(angle) * hexSize * 0.98;
-        const y1 = cy + Math.sin(angle) * hexSize * 0.98;
-        const x2 = cx + Math.cos(nextAngle) * hexSize * 0.98;
-        const y2 = cy + Math.sin(nextAngle) * hexSize * 0.98;
+        // Edge points at full hex size for seamless connection
+        const x1 = cx + Math.cos(angle) * hexSize;
+        const y1 = cy + Math.sin(angle) * hexSize;
+        const x2 = cx + Math.cos(nextAngle) * hexSize;
+        const y2 = cy + Math.sin(nextAngle) * hexSize;
 
-        // Mid-edge point (extends outward for organic feel)
+        // Mid-edge point at full hex size
         const midAngle = (angle + nextAngle) / 2;
-        const midX = cx + Math.cos(midAngle) * hexSize * 0.98;
-        const midY = cy + Math.sin(midAngle) * hexSize * 0.98;
+        const midX = cx + Math.cos(midAngle) * hexSize;
+        const midY = cy + Math.sin(midAngle) * hexSize;
 
         // Create multi-layer blending for realistic transition
         for (let layer = 0; layer < 3; layer++) {

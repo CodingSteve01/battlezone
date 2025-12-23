@@ -330,6 +330,8 @@ export function showScreen(id) {
         const screen = document.getElementById(id);
         if (screen) screen.classList.add('active');
     }
+    // Update state.screen to match - critical for render loop!
+    state.screen = id;
 }
 
 /**
