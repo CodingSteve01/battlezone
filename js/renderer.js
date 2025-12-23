@@ -1613,12 +1613,34 @@ function shouldShowHexGrid() {
 
 /**
  * Draw hex grid overlay on top of seamless terrain
- * Only called when grid should be visible (movement/attack planning)
+ * Only draws grid on hexes within movement range or attack range
  */
-function drawHexGridOverlay(w, h) {
+function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) {
     ctx.save();
 
-    state.hexes.forEach(hex => {
+    // Collect all hexes that should show grid (movement range + attack range)
+    const gridHexKeys = new Set();
+
+    // Add all reachable hexes (movement range)
+    for (const key of reachableHexes.keys()) {
+        gridHexKeys.add(key);
+    }
+
+    // Add hexes with attackable units
+    for (const target of attackableUnits) {
+        gridHexKeys.add(`${target.q},${target.r}`);
+    }
+
+    // Add current unit's hex
+    if (currentUnit) {
+        gridHexKeys.add(`${currentUnit.q},${currentUnit.r}`);
+    }
+
+    // Only draw grid on relevant hexes
+    gridHexKeys.forEach(key => {
+        const hex = state.hexMap.get(key);
+        if (!hex) return;
+
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
@@ -1636,9 +1658,9 @@ function drawHexGridOverlay(w, h) {
         drawHexPath(sx, sy, state.hexSize * 0.95);
 
         if (fogLevel === 'visible') {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         } else if (fogLevel === 'explored') {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
         } else {
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         }
@@ -1839,7 +1861,7 @@ export function render() {
 
     // Draw hex grid overlay only when planning movement or attack
     if (showGrid) {
-        drawHexGridOverlay(w, h);
+        drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit);
     }
 
     // Draw path preview - clean simple path line with destination marker (point-and-click system)
