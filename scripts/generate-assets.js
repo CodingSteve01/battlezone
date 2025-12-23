@@ -12,11 +12,32 @@ import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync as fsExists } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ASSETS_DIR = join(__dirname, '..', 'assets');
 const TOOLS_DIR = join(__dirname, '..', 'tools');
+
+function resolveChromiumExecutable() {
+    // Playwright sometimes returns the x64 path even on ARM Macs; pick an existing one.
+    const defaultPath = chromium.executablePath();
+    const armPath = join(
+        process.env.HOME || '',
+        'Library',
+        'Caches',
+        'ms-playwright',
+        'chromium-1200',
+        'chrome-mac-arm64',
+        'Google Chrome for Testing.app',
+        'Contents',
+        'MacOS',
+        'Google Chrome for Testing'
+    );
+
+    if (fsExists(armPath)) return armPath;
+    return defaultPath;
+}
 
 async function generateAssets() {
     console.log('🎨 Shadow Squad Asset Generator\n');
@@ -37,7 +58,12 @@ async function generateAssets() {
     console.log('  Launching Chromium...');
     const browser = await chromium.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        executablePath: resolveChromiumExecutable(),
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-crash-reporter'
+        ]
     });
     const page = await browser.newPage();
 

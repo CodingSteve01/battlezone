@@ -6,7 +6,7 @@ import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
-import { render } from './pixiRenderer.js';
+import { render } from './renderer.js';
 import { centerOnCurrentUnit } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';

@@ -24,7 +24,11 @@ export const CONFIG = {
         small: 4,    // Was 6 - now teams start closer
         medium: 7,   // Was 10 - reduces ~6 hexes of search distance
         large: 10    // Was 14 - still big, but manageable
-    }
+    },
+
+    // Number of pre-generated terrain variants per type (e.g., grass_v1.png)
+    // Set to >0 only if you have generated *_v#.png files in assets/terrain
+    TERRAIN_VARIANTS: 3
 };
 
 export const TERRAIN = {

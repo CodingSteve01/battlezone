@@ -106,7 +106,7 @@ function calculateLineOfSightCover(attacker, defender) {
     );
 
     let coverCount = 0;
-    let blockingTerrain = [];
+    const blockingTerrain = [];
 
     // Check hexes between attacker and defender (excluding start and end)
     for (let i = 1; i < line.length - 1; i++) {
