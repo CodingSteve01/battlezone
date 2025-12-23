@@ -33,9 +33,24 @@ async function generateAssets() {
 
     console.log('\n📦 Starting browser-based generation...\n');
 
-    // Launch browser
-    const browser = await chromium.launch({ headless: true });
+    // Launch browser with better error handling
+    console.log('  Launching Chromium...');
+    const browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
     const page = await browser.newPage();
+
+    // Enable console logging from the page
+    page.on('console', msg => {
+        if (msg.type() === 'error') {
+            console.log(`  [Browser Error] ${msg.text()}`);
+        }
+    });
+
+    page.on('pageerror', err => {
+        console.log(`  [Page Error] ${err.message}`);
+    });
 
     // Load the asset generator HTML
     const htmlPath = `file://${join(TOOLS_DIR, 'asset-generator.html')}`;
@@ -128,11 +143,41 @@ async function generateAssets() {
     await browser.close();
 
     const totalAssets = terrainAssets.length + unitAssets.length + detailAssets.length;
+
+    // Validate that we actually generated assets
+    if (totalAssets === 0) {
+        console.error('\n❌ No assets were generated! Check the asset-generator.html for errors.');
+        process.exit(1);
+    }
+
+    // Expected counts
+    const expectedTerrain = 10;  // grass, forest, rock, water, sand, swamp, hills, road, path, river
+    const expectedUnits = 40;    // 5 classes × 4 players × 2 states (normal + selected)
+    const expectedDetails = 23;  // 5 tree types × 3 variants + 4 bushes + 4 rocks
+
     console.log(`\n✅ Asset generation complete!`);
-    console.log(`   Generated ${totalAssets} PNG files in assets/`);
+    console.log(`   Terrain textures: ${terrainAssets.length}/${expectedTerrain}`);
+    console.log(`   Unit sprites: ${unitAssets.length}/${expectedUnits}`);
+    console.log(`   Terrain details: ${detailAssets.length}/${expectedDetails}`);
+    console.log(`   Total: ${totalAssets} PNG files in assets/`);
+
+    // Warn if counts don't match expected
+    if (terrainAssets.length < expectedTerrain) {
+        console.warn(`\n⚠️ Warning: Expected ${expectedTerrain} terrain textures, got ${terrainAssets.length}`);
+    }
+    if (unitAssets.length < expectedUnits) {
+        console.warn(`\n⚠️ Warning: Expected ${expectedUnits} unit sprites, got ${unitAssets.length}`);
+    }
+    if (detailAssets.length < expectedDetails) {
+        console.warn(`\n⚠️ Warning: Expected ${expectedDetails} detail elements, got ${detailAssets.length}`);
+    }
 }
 
 generateAssets().catch(err => {
     console.error('❌ Error generating assets:', err);
+    console.error('\nTroubleshooting tips:');
+    console.error('  1. Make sure Playwright is installed: npx playwright install chromium');
+    console.error('  2. Try running with DEBUG=pw:api node scripts/generate-assets.js');
+    console.error('  3. Open tools/asset-generator.html in a browser to test manually');
     process.exit(1);
 });

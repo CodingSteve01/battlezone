@@ -198,6 +198,7 @@ The game supports both **runtime-generated** and **pre-generated static** assets
 - `assetLoader.js` - Unified asset loading with automatic fallback
 - `assets.js` - Runtime canvas-based generation (fallback)
 - `tools/asset-generator.html` - Browser-based static asset generator
+- `scripts/generate-assets.js` - Automated Playwright-based generation
 
 **How it works:**
 1. On load, `assetLoader.js` checks if static assets exist in `assets/`
@@ -205,12 +206,26 @@ The game supports both **runtime-generated** and **pre-generated static** assets
 3. If not found, falls back to runtime canvas generation
 4. Both methods are transparent to the renderer
 
-**Generating Static Assets:**
+**CI/CD Asset Generation:**
+Assets are automatically generated during GitHub Pages deployment:
+1. The `static.yml` workflow runs `npm run build` (which calls `generate-assets.js`)
+2. Playwright launches a headless browser to render all assets
+3. Assets are saved to `assets/` and included in the deployment
+4. The repository only contains `.gitkeep` files (assets are generated at deploy time)
+
+**Generating Assets Locally:**
+Option 1 - Automated (requires Playwright):
+```bash
+npm ci
+npx playwright install chromium
+npm run build
+```
+
+Option 2 - Manual (browser-based):
 1. Open `tools/asset-generator.html` in a browser
 2. Click "Generate All Assets" to create previews
 3. Right-click to save individual assets, or use browser dev tools
 4. Save files to the `assets/` directory structure
-5. Commit the generated PNG files to the repository
 
 **Asset Types:**
 - **Terrain textures** (128x128): `assets/terrain/grass.png`, `forest.png`, etc.
@@ -262,13 +277,21 @@ main.js
 
 ## GitHub Pages Deployment
 
-### Automatic Cache-Busting (GitHub Actions)
+### Automatic Deployment Pipeline (GitHub Actions)
 
 The project uses a GitHub Actions pipeline (`.github/workflows/static.yml`) that:
 
 1. Triggers on push to `main` branch
-2. Replaces version strings with the git commit hash (e.g., `?v=fa38f5d`)
-3. Deploys all static files to GitHub Pages
+2. Runs CI checks (lint, tests)
+3. **Generates all static assets** using Playwright (terrain, units, details)
+4. Replaces version strings with semantic version from `package.json` (managed by release-please)
+5. Cache-busts file references with git commit hash (e.g., `?v=fa38f5d`)
+6. Deploys all static files to GitHub Pages
+
+**Version Display:**
+- The in-game version info (bottom of menu) shows: `v1.6.0 • 23.12.2025 14:30`
+- Version comes from `package.json` (updated automatically by release-please)
+- Build date is set at deployment time (Europe/Berlin timezone)
 
 **No manual version updates needed!** Just push to `main` and wait ~1-2 minutes.
 
@@ -279,6 +302,7 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 1. **Hard refresh**: `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (Mac)
 2. **Check DevTools Network tab**: Verify files load fresh (status `200`)
 3. **Use Incognito/Private browsing**: Bypasses all caching
+4. **Check version info**: Should show current version and recent build date
 
 ### GitHub Pages Setup (One-Time)
 

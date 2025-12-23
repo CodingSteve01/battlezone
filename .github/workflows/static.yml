@@ -68,16 +68,18 @@ jobs:
 
       - name: Cache-bust with git hash
         run: |
-          VERSION=$(git rev-parse --short HEAD)
-          echo "Version: $VERSION"
-          sed -i "s/\?v=[^\"']*/\?v=$VERSION/g" index.html
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          echo "Commit Hash: $COMMIT_HASH"
+          sed -i "s/\?v=[^\"']*/\?v=$COMMIT_HASH/g" index.html
 
       - name: Update version info display
         run: |
-          VERSION=$(git rev-parse --short HEAD)
+          # Read version from package.json (managed by release-please)
+          VERSION=$(node -p "require('./package.json').version")
+          COMMIT_HASH=$(git rev-parse --short HEAD)
           BUILD_DATE=$(TZ='Europe/Berlin' date '+%d.%m.%Y %H:%M')
-          echo "Build: $VERSION @ $BUILD_DATE"
-          sed -i "s|Version DEV • Build: --|Version $VERSION • Build: $BUILD_DATE|g" index.html
+          echo "Version: v$VERSION ($COMMIT_HASH) @ $BUILD_DATE"
+          sed -i "s|Version DEV • Build: --|v$VERSION • $BUILD_DATE|g" index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
