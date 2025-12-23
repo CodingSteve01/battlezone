@@ -5,8 +5,7 @@ import { CONFIG, UNIT_CLASSES } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
-// Use PixiJS WebGL renderer for hardware-accelerated graphics
-import { initRenderer, resizeCanvas, render, clearRenderCaches } from './pixiRenderer.js';
+import { initRenderer, resizeCanvas, render, clearRenderCaches } from './renderer.js';
 import { updateUI, showScreen } from './ui.js';
 import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
