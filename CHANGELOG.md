@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/CodingSteve01/battlezone/compare/v1.6.0...v1.6.1) (2025-12-23)
+
+
+### Bug Fixes
+
+* use semantic version from package.json in deployment ([#48](https://github.com/CodingSteve01/battlezone/issues/48)) ([e8566cb](https://github.com/CodingSteve01/battlezone/commit/e8566cb39c43c23f5e1948c1c65a7a644756b729))
+
 ## [1.6.0](https://github.com/CodingSteve01/battlezone/compare/v1.5.0...v1.6.0) (2025-12-23)
 
 
