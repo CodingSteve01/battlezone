@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/CodingSteve01/battlezone/compare/v1.5.0...v1.6.0) (2025-12-23)
+
+
+### Features
+
+* add static asset system with fallback support ([#46](https://github.com/CodingSteve01/battlezone/issues/46)) ([2cc883b](https://github.com/CodingSteve01/battlezone/commit/2cc883b6f9539b26618be42ccb77d90bb7c3c0e6))
+
 ## [1.5.0](https://github.com/CodingSteve01/battlezone/compare/v1.4.0...v1.5.0) (2025-12-23)
 
 
