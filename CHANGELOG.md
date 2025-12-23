@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/CodingSteve01/battlezone/compare/v1.3.0...v1.4.0) (2025-12-23)
+
+
+### Features
+
+* improve stealth visibility with proximity-based detection ([#42](https://github.com/CodingSteve01/battlezone/issues/42)) ([4387728](https://github.com/CodingSteve01/battlezone/commit/4387728b30c49b4d09d26f9ebffea254c1103df2))
+
 ## [1.3.0](https://github.com/CodingSteve01/battlezone/compare/v1.2.0...v1.3.0) (2025-12-22)
 
 
