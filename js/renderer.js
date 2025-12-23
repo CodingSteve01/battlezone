@@ -5,7 +5,7 @@ import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlay
 import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
+import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
 import { initTextures, getTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -1945,8 +1945,15 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Cloaked units visibility based on distance to nearest friendly unit
     // Closer = more visible, farther = more transparent
-    if (unit.cloaked && unit.player === state.currentPlayer) {
+    if (unit.cloaked && unit.player === state.viewingPlayer) {
+        // Own cloaked units - visibility based on distance to own non-cloaked units
         ctx.globalAlpha = getStealthVisibilityAlpha(unit);
+    } else if (unit.cloaked && unit.player !== state.viewingPlayer) {
+        // Enemy cloaked unit detected by proximity - show semi-transparent
+        ctx.globalAlpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
+    } else if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
+        // Unit that attacked while cloaked - visible but semi-transparent until turn ends
+        ctx.globalAlpha = 0.6;
     }
 
     // Selection glow effect
@@ -2046,7 +2053,7 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     }
 
     // Cloak indicator (visible to owner) with speech bubble
-    if (unit.cloaked && unit.player === state.currentPlayer) {
+    if (unit.cloaked && unit.player === state.viewingPlayer) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#a855f7';
         ctx.shadowBlur = 15;
@@ -2058,6 +2065,36 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Enemy cloaked unit detected - show shimmer/distortion indicator
+    if (unit.cloaked && unit.player !== state.viewingPlayer) {
+        ctx.globalAlpha = 0.8;
+        ctx.shadowColor = '#a855f7';
+        ctx.shadowBlur = 10;
+
+        // Pulsing detection indicator
+        const pulse = 0.7 + Math.sin(Date.now() / 300) * 0.3;
+        ctx.strokeStyle = `rgba(168, 85, 247, ${pulse * 0.6})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, size + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
+    }
+
+    // Revealed after attack indicator - enemy can see unit was here
+    if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
+        ctx.globalAlpha = 0.9;
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 8;
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚠️', cx + size * 0.6, cy - size * 0.6);
         ctx.shadowBlur = 0;
     }
 
