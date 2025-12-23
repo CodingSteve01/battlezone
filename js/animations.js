@@ -1060,9 +1060,12 @@ export function applyCharacterAnimation(ctx, unitId, _baseY) {
  * Get neighboring terrain types for blending
  */
 export function getNeighborTerrains(hexMap, q, r) {
+    // Directions ordered to match hex edge indices (starting from angle 0, going clockwise)
+    // Edge 0 (0°-60°) = East, Edge 1 (60°-120°) = Southeast, Edge 2 (120°-180°) = Southwest
+    // Edge 3 (180°-240°) = West, Edge 4 (240°-300°) = Northwest, Edge 5 (300°-360°) = Northeast
     const directions = [
-        [1, 0], [1, -1], [0, -1],
-        [-1, 0], [-1, 1], [0, 1]
+        [1, 0], [0, 1], [-1, 1],
+        [-1, 0], [0, -1], [1, -1]
     ];
 
     const neighbors = [];

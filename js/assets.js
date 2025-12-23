@@ -678,7 +678,7 @@ function createSwampTexture() {
 }
 
 /**
- * Create snow texture
+ * Create highly realistic snow texture with depth and detail
  */
 function createSnowTexture() {
     const canvas = document.createElement('canvas');
@@ -686,31 +686,98 @@ function createSnowTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // White snow base with subtle blue shadows
+    // Multi-layer snow base with blue shadows and warm highlights
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 25, y / 25, 3, 20);
-            const r = Math.floor(230 + n * 25);
-            const g = Math.floor(235 + n * 20);
-            const b = Math.floor(245 + n * 10);
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            const n1 = fractalNoise(x / 25, y / 25, 4, 20);
+            const n2 = fractalNoise(x / 12, y / 12, 3, 45);
+            const n3 = fractalNoise(x / 50, y / 50, 2, 80);
+            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+            // Snow colors - white with subtle blue in shadows
+            const r = Math.floor(225 + combined * 30 - n3 * 10);
+            const g = Math.floor(230 + combined * 25 - n3 * 5);
+            const b = Math.floor(245 + combined * 10);
+            ctx.fillStyle = `rgb(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)})`;
             ctx.fillRect(x, y, 1, 1);
         }
     }
 
-    // Sparkles
-    for (let i = 0; i < 30; i++) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`;
+    // Snow drifts/undulations
+    for (let i = 0; i < 6; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 15 + Math.random() * 25;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(0.5, 'rgba(240, 245, 255, 0.15)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1, 0, Math.PI * 2);
+        ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // Blue shadow patches (depressions in snow)
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 8 + Math.random() * 15;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(180, 200, 230, 0.25)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Snow crystals and sparkles
+    for (let i = 0; i < 60; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const sparkleSize = 0.5 + Math.random() * 1.5;
+        const brightness = 0.4 + Math.random() * 0.6;
+
+        // Sparkle with glow
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, sparkleSize * 2);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${brightness})`);
+        gradient.addColorStop(0.5, `rgba(200, 220, 255, ${brightness * 0.3})`);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, sparkleSize * 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Footprint-like impressions
+    for (let i = 0; i < 3; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.fillStyle = 'rgba(200, 210, 230, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4, 6, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Subtle wind-blown texture lines
+    ctx.strokeStyle = 'rgba(220, 230, 245, 0.2)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 10; i++) {
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        for (let x = 0; x <= TEXTURE_SIZE; x += 8) {
+            ctx.lineTo(x, y + Math.sin(x / 15 + i) * 2);
+        }
+        ctx.stroke();
     }
 
     textureCache.set('snow', canvas);
 }
 
 /**
- * Create ice texture
+ * Create highly realistic ice texture with cracks, bubbles and depth
  */
 function createIceTexture() {
     const canvas = document.createElement('canvas');
@@ -718,35 +785,136 @@ function createIceTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Light blue ice base
-    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-    gradient.addColorStop(0, '#a0d4e8');
-    gradient.addColorStop(0.5, '#c0e8f5');
-    gradient.addColorStop(1, '#90c4d8');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+    // Multi-layer ice base with depth variation
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n1 = fractalNoise(x / 30, y / 30, 4, 25);
+            const n2 = fractalNoise(x / 15, y / 15, 3, 50);
+            const n3 = fractalNoise(x / 60, y / 60, 2, 90);
+            const combined = n1 * 0.4 + n2 * 0.35 + n3 * 0.25;
 
-    // Ice cracks
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 10; i++) {
+            // Ice colors - translucent blues and cyans
+            const r = Math.floor(140 + combined * 60 + n3 * 30);
+            const g = Math.floor(200 + combined * 40 + n2 * 20);
+            const b = Math.floor(230 + combined * 25);
+            ctx.fillStyle = `rgb(${Math.min(255, r)},${Math.min(255, g)},${Math.min(255, b)})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Deep ice patches (darker areas showing depth)
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 20 + Math.random() * 30;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(60, 120, 160, 0.3)');
+        gradient.addColorStop(0.6, 'rgba(80, 150, 190, 0.15)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        let x = Math.random() * TEXTURE_SIZE;
-        let y = Math.random() * TEXTURE_SIZE;
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Frozen bubbles trapped in ice
+    for (let i = 0; i < 25; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 2 + Math.random() * 6;
+
+        // Bubble with refraction effect
+        const gradient = ctx.createRadialGradient(x - size * 0.2, y - size * 0.2, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+        gradient.addColorStop(0.3, 'rgba(200, 230, 255, 0.3)');
+        gradient.addColorStop(0.7, 'rgba(150, 200, 230, 0.15)');
+        gradient.addColorStop(1, 'rgba(100, 170, 210, 0.1)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bubble highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.beginPath();
+        ctx.arc(x - size * 0.3, y - size * 0.3, size * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Ice crack network
+    function drawCrack(startX, startY, depth = 0) {
+        if (depth > 3) return;
+
+        let x = startX;
+        let y = startY;
+        const length = 15 + Math.random() * 25;
+        const angle = Math.random() * Math.PI * 2;
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 - depth * 0.1})`;
+        ctx.lineWidth = 2 - depth * 0.4;
+        ctx.beginPath();
         ctx.moveTo(x, y);
-        for (let j = 0; j < 4; j++) {
-            x += (Math.random() - 0.5) * 30;
-            y += (Math.random() - 0.5) * 30;
+
+        for (let i = 0; i < 5; i++) {
+            const dx = Math.cos(angle + (Math.random() - 0.5) * 0.5) * (length / 5);
+            const dy = Math.sin(angle + (Math.random() - 0.5) * 0.5) * (length / 5);
+            x += dx;
+            y += dy;
             ctx.lineTo(x, y);
+
+            // Branch off
+            if (Math.random() > 0.6 && depth < 2) {
+                drawCrack(x, y, depth + 1);
+            }
         }
         ctx.stroke();
+
+        // Dark line under crack for depth
+        ctx.strokeStyle = `rgba(60, 100, 140, ${0.3 - depth * 0.08})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    for (let i = 0; i < 6; i++) {
+        drawCrack(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE);
+    }
+
+    // Surface frost patterns
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 15; i++) {
+        const cx = Math.random() * TEXTURE_SIZE;
+        const cy = Math.random() * TEXTURE_SIZE;
+        for (let j = 0; j < 6; j++) {
+            const angle = (j / 6) * Math.PI * 2;
+            const len = 5 + Math.random() * 10;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+            ctx.stroke();
+        }
+    }
+
+    // Specular highlights
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 10 + Math.random() * 20;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+        gradient.addColorStop(0.5, 'rgba(220, 240, 255, 0.1)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.4, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     textureCache.set('ice', canvas);
 }
 
 /**
- * Create deep water texture
+ * Create highly realistic deep water texture with abyss feel
  */
 function createDeepwaterTexture() {
     const canvas = document.createElement('canvas');
@@ -754,23 +922,98 @@ function createDeepwaterTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Very dark blue gradient
-    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-    gradient.addColorStop(0, '#0a2540');
-    gradient.addColorStop(0.5, '#051530');
-    gradient.addColorStop(1, '#0a2540');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-
-    // Deep wave patterns
+    // Multi-layer deep ocean base
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 40, y / 40, 3, 10);
-            if (n > 0.6) {
-                ctx.fillStyle = `rgba(50, 100, 150, ${(n - 0.6) * 0.3})`;
-                ctx.fillRect(x, y, 1, 1);
-            }
+            const n1 = fractalNoise(x / 40, y / 40, 4, 10);
+            const n2 = fractalNoise(x / 20, y / 20, 3, 35);
+            const n3 = fractalNoise(x / 70, y / 70, 2, 70);
+            const combined = n1 * 0.4 + n2 * 0.35 + n3 * 0.25;
+
+            // Deep ocean colors - very dark blues with hints of green
+            const r = Math.floor(5 + combined * 20 + n3 * 10);
+            const g = Math.floor(20 + combined * 35 + n2 * 15);
+            const b = Math.floor(45 + combined * 40 + n1 * 20);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
         }
+    }
+
+    // Abyssal depth variations
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 25 + Math.random() * 40;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(0, 5, 15, 0.5)');
+        gradient.addColorStop(0.5, 'rgba(0, 10, 25, 0.3)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Underwater currents (subtle flowing lines)
+    for (let layer = 0; layer < 3; layer++) {
+        ctx.strokeStyle = `rgba(30, 70, 110, ${0.15 - layer * 0.04})`;
+        ctx.lineWidth = 2 - layer * 0.5;
+
+        for (let i = 0; i < 5; i++) {
+            const yBase = (i * 30 + layer * 10) % TEXTURE_SIZE;
+            ctx.beginPath();
+            ctx.moveTo(0, yBase);
+            for (let x = 0; x <= TEXTURE_SIZE; x += 6) {
+                const waveY = yBase + Math.sin(x * 0.04 + layer * 0.8 + i * 0.5) * (8 + layer * 3);
+                ctx.lineTo(x, waveY);
+            }
+            ctx.stroke();
+        }
+    }
+
+    // Bioluminescent particles (rare glowing organisms)
+    for (let i = 0; i < 15; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 1 + Math.random() * 3;
+        const hue = 180 + Math.random() * 60; // Cyan to blue
+
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size * 3);
+        gradient.addColorStop(0, `hsla(${hue}, 80%, 60%, 0.6)`);
+        gradient.addColorStop(0.3, `hsla(${hue}, 70%, 50%, 0.3)`);
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Faint light rays from above
+    for (let i = 0; i < 4; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const width = 15 + Math.random() * 20;
+        const gradient = ctx.createLinearGradient(x, 0, x, TEXTURE_SIZE);
+        gradient.addColorStop(0, 'rgba(40, 80, 120, 0.08)');
+        gradient.addColorStop(0.5, 'rgba(30, 60, 100, 0.04)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(x - width / 2, 0);
+        ctx.lineTo(x + width / 2, 0);
+        ctx.lineTo(x + width, TEXTURE_SIZE);
+        ctx.lineTo(x - width, TEXTURE_SIZE);
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Floating particles/sediment
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.fillStyle = `rgba(60, 90, 120, ${0.1 + Math.random() * 0.15})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 0.5 + Math.random() * 1, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     textureCache.set('deepwater', canvas);
@@ -1020,8 +1263,210 @@ function createMossTexture() {
     textureCache.set('moss', canvas);
 }
 
+// ===== ENHANCED CHARACTER RENDERING =====
+
 /**
- * Draw a human character sprite
+ * Quick noise for inline texture generation
+ */
+function quickNoise(x, y, seed = 0) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.12) * 43758.5453;
+    return (n - Math.floor(n)) * 2 - 1; // -1 to 1
+}
+
+/**
+ * Parse hex color to RGB
+ */
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+}
+
+/**
+ * Draw textured rectangle with noise-based material effect
+ */
+function drawTexturedRect(ctx, x, y, w, h, baseColor, options = {}) {
+    const {
+        noise = 0.15,
+        highlight = 0.2,
+        shadow = 0.3,
+        metallic = false,
+        worn = false,
+        seed = 0
+    } = options;
+
+    const rgb = typeof baseColor === 'string' ? hexToRgb(baseColor) : baseColor;
+
+    // Base fill with gradient
+    const grad = ctx.createLinearGradient(x, y, x + w, y + h);
+    const lightR = Math.min(255, rgb.r + 30);
+    const lightG = Math.min(255, rgb.g + 30);
+    const lightB = Math.min(255, rgb.b + 30);
+    const darkR = Math.max(0, rgb.r - 25);
+    const darkG = Math.max(0, rgb.g - 25);
+    const darkB = Math.max(0, rgb.b - 25);
+
+    grad.addColorStop(0, `rgb(${lightR},${lightG},${lightB})`);
+    grad.addColorStop(0.5, `rgb(${rgb.r},${rgb.g},${rgb.b})`);
+    grad.addColorStop(1, `rgb(${darkR},${darkG},${darkB})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, w, h);
+
+    // Noise texture overlay
+    for (let py = 0; py < h; py += 2) {
+        for (let px = 0; px < w; px += 2) {
+            const n = quickNoise(px + seed, py + seed, seed) * noise;
+            const brightness = metallic ? n * 1.5 : n;
+            if (brightness > 0) {
+                ctx.fillStyle = `rgba(255,255,255,${Math.abs(brightness)})`;
+            } else {
+                ctx.fillStyle = `rgba(0,0,0,${Math.abs(brightness)})`;
+            }
+            ctx.fillRect(x + px, y + py, 2, 2);
+        }
+    }
+
+    // Worn/scratched effect
+    if (worn) {
+        for (let i = 0; i < 3; i++) {
+            const sx = x + quickNoise(i, seed, 1) * w * 0.4 + w * 0.3;
+            const sy = y + quickNoise(i, seed, 2) * h * 0.4 + h * 0.3;
+            const sw = 2 + Math.abs(quickNoise(i, seed, 3)) * 4;
+            ctx.fillStyle = `rgba(${lightR + 40},${lightG + 40},${lightB + 40},0.3)`;
+            ctx.fillRect(sx, sy, sw, 1);
+        }
+    }
+
+    // Top highlight
+    ctx.fillStyle = `rgba(255,255,255,${highlight})`;
+    ctx.fillRect(x + 1, y + 1, w - 2, 2);
+
+    // Bottom shadow
+    ctx.fillStyle = `rgba(0,0,0,${shadow})`;
+    ctx.fillRect(x + 1, y + h - 2, w - 2, 2);
+
+    // Metallic specular
+    if (metallic) {
+        const specGrad = ctx.createLinearGradient(x, y, x + w * 0.3, y + h * 0.3);
+        specGrad.addColorStop(0, 'rgba(255,255,255,0.4)');
+        specGrad.addColorStop(0.5, 'rgba(255,255,255,0.1)');
+        specGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = specGrad;
+        ctx.fillRect(x, y, w * 0.5, h * 0.5);
+    }
+}
+
+/**
+ * Draw textured circle/ellipse with material effect
+ */
+function drawTexturedCircle(ctx, cx, cy, rx, ry, baseColor, options = {}) {
+    const {
+        noise = 0.12,
+        metallic = false,
+        seed = 0
+    } = options;
+
+    const rgb = typeof baseColor === 'string' ? hexToRgb(baseColor) : baseColor;
+
+    // Radial gradient for 3D effect
+    const grad = ctx.createRadialGradient(cx - rx * 0.3, cy - ry * 0.3, 0, cx, cy, Math.max(rx, ry));
+    const lightR = Math.min(255, rgb.r + 45);
+    const lightG = Math.min(255, rgb.g + 45);
+    const lightB = Math.min(255, rgb.b + 45);
+    const darkR = Math.max(0, rgb.r - 30);
+    const darkG = Math.max(0, rgb.g - 30);
+    const darkB = Math.max(0, rgb.b - 30);
+
+    grad.addColorStop(0, `rgb(${lightR},${lightG},${lightB})`);
+    grad.addColorStop(0.6, `rgb(${rgb.r},${rgb.g},${rgb.b})`);
+    grad.addColorStop(1, `rgb(${darkR},${darkG},${darkB})`);
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Noise texture
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    for (let py = -ry; py < ry; py += 2) {
+        for (let px = -rx; px < rx; px += 2) {
+            if (px * px / (rx * rx) + py * py / (ry * ry) <= 1) {
+                const n = quickNoise(px + seed, py + seed, seed) * noise;
+                if (n > 0) {
+                    ctx.fillStyle = `rgba(255,255,255,${n})`;
+                } else {
+                    ctx.fillStyle = `rgba(0,0,0,${-n})`;
+                }
+                ctx.fillRect(cx + px, cy + py, 2, 2);
+            }
+        }
+    }
+    ctx.restore();
+
+    // Metallic highlight
+    if (metallic) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(cx - rx * 0.25, cy - ry * 0.35, rx * 0.4, ry * 0.25, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Edge definition
+    ctx.strokeStyle = `rgba(0,0,0,0.25)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+/**
+ * Draw fabric/cloth texture
+ */
+function drawFabricRect(ctx, x, y, w, h, baseColor, seed = 0) {
+    const rgb = typeof baseColor === 'string' ? hexToRgb(baseColor) : baseColor;
+
+    // Base color
+    ctx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+    ctx.fillRect(x, y, w, h);
+
+    // Fabric weave pattern
+    ctx.strokeStyle = `rgba(0,0,0,0.08)`;
+    ctx.lineWidth = 0.5;
+    for (let py = 0; py < h; py += 3) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + py);
+        ctx.lineTo(x + w, y + py);
+        ctx.stroke();
+    }
+
+    // Subtle noise for fabric texture
+    for (let py = 0; py < h; py += 2) {
+        for (let px = 0; px < w; px += 2) {
+            const n = quickNoise(px + seed, py + seed, seed) * 0.1;
+            ctx.fillStyle = n > 0 ? `rgba(255,255,255,${n})` : `rgba(0,0,0,${-n})`;
+            ctx.fillRect(x + px, y + py, 2, 2);
+        }
+    }
+
+    // Fold shadows
+    const foldGrad = ctx.createLinearGradient(x, y, x, y + h);
+    foldGrad.addColorStop(0, 'rgba(0,0,0,0.1)');
+    foldGrad.addColorStop(0.3, 'transparent');
+    foldGrad.addColorStop(0.7, 'transparent');
+    foldGrad.addColorStop(1, 'rgba(0,0,0,0.15)');
+    ctx.fillStyle = foldGrad;
+    ctx.fillRect(x, y, w, h);
+}
+
+/**
+ * Draw a human character sprite with enhanced details
  */
 export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, direction = 0) {
     ctx.save();
@@ -1030,258 +1475,634 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
     const scale = size / 45;
     ctx.scale(scale, scale);
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    // Generate consistent seed from position for noise
+    const seed = Math.abs(cx * 100 + cy) % 1000;
+
+    // Enhanced shadow with blur effect
+    const shadowGrad = ctx.createRadialGradient(0, 32, 0, 0, 32, 20);
+    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+    shadowGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
+    shadowGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = shadowGrad;
     ctx.beginPath();
-    ctx.ellipse(0, 32, 18, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 32, 20, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Selection glow
+    // Selection glow with pulsing effect
     if (isSelected) {
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = playerColor;
+        ctx.shadowBlur = 25;
+        // Outer glow ring
+        ctx.strokeStyle = playerColor;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 28, 35, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
     }
 
-    // Class-specific colors
-    let bodyColor, armorColor, helmetColor;
+    // Class-specific color palettes with more depth
+    let bodyColor, armorColor, helmetColor, accentColor, skinTone;
     switch (classType) {
         case 'scout':
-            bodyColor = '#2a2a3a';
-            armorColor = '#3a3a4a';
-            helmetColor = '#4a4a5a';
+            bodyColor = { r: 42, g: 42, b: 58 };
+            armorColor = { r: 58, g: 58, b: 74 };
+            helmetColor = { r: 74, g: 74, b: 90 };
+            accentColor = { r: 100, g: 150, b: 200 };
+            skinTone = { r: 201, g: 160, b: 122 };
             break;
         case 'assault':
-            bodyColor = '#3a2a2a';
-            armorColor = '#4a3a3a';
-            helmetColor = '#5a4a4a';
+            bodyColor = { r: 58, g: 42, b: 42 };
+            armorColor = { r: 80, g: 55, b: 55 };
+            helmetColor = { r: 100, g: 70, b: 70 };
+            accentColor = { r: 200, g: 100, b: 80 };
+            skinTone = { r: 180, g: 140, b: 110 };
             break;
         case 'medic':
-            bodyColor = '#2a3a2a';
-            armorColor = '#3a4a3a';
-            helmetColor = '#4a5a4a';
+            bodyColor = { r: 42, g: 58, b: 42 };
+            armorColor = { r: 58, g: 80, b: 58 };
+            helmetColor = { r: 74, g: 100, b: 74 };
+            accentColor = { r: 220, g: 60, b: 60 };
+            skinTone = { r: 210, g: 170, b: 140 };
             break;
         case 'sniper':
-            bodyColor = '#2a2a40';  // Dark blue-purple
-            armorColor = '#3a3a55';
-            helmetColor = '#4a4a65';
+            bodyColor = { r: 42, g: 50, b: 64 };
+            armorColor = { r: 50, g: 60, b: 85 };
+            helmetColor = { r: 60, g: 70, b: 100 };
+            accentColor = { r: 100, g: 140, b: 255 };
+            skinTone = { r: 190, g: 150, b: 120 };
             break;
         case 'ninja':
-            bodyColor = '#1a1a1a';  // Very dark/black
-            armorColor = '#252525';
-            helmetColor = '#303030';
+            bodyColor = { r: 20, g: 20, b: 25 };
+            armorColor = { r: 30, g: 30, b: 35 };
+            helmetColor = { r: 40, g: 40, b: 45 };
+            accentColor = { r: 255, g: 50, b: 50 };
+            skinTone = { r: 60, g: 60, b: 65 }; // Masked
             break;
         default:
-            bodyColor = '#2a2a3a';
-            armorColor = '#3a3a4a';
-            helmetColor = '#4a4a5a';
+            bodyColor = { r: 42, g: 42, b: 58 };
+            armorColor = { r: 58, g: 58, b: 74 };
+            helmetColor = { r: 74, g: 74, b: 90 };
+            accentColor = { r: 100, g: 150, b: 200 };
+            skinTone = { r: 201, g: 160, b: 122 };
     }
 
-    // Legs
-    ctx.fillStyle = bodyColor;
+    // === LEGS ===
+    // Left leg with fabric texture
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(-12, 8, 10, 22, 3);
-    ctx.fill();
+    ctx.clip();
+    drawFabricRect(ctx, -12, 8, 10, 22, bodyColor, seed);
+    ctx.restore();
+
+    // Right leg
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(2, 8, 10, 22, 3);
-    ctx.fill();
+    ctx.clip();
+    drawFabricRect(ctx, 2, 8, 10, 22, bodyColor, seed + 1);
+    ctx.restore();
 
-    // Boots
-    ctx.fillStyle = '#1a1a1a';
+    // Knee pads
+    drawTexturedCircle(ctx, -7, 16, 4, 3, armorColor, { metallic: true, seed: seed + 2 });
+    drawTexturedCircle(ctx, 7, 16, 4, 3, armorColor, { metallic: true, seed: seed + 3 });
+
+    // === BOOTS ===
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(-13, 26, 12, 7, 2);
-    ctx.fill();
+    ctx.clip();
+    drawTexturedRect(ctx, -13, 26, 12, 7, { r: 30, g: 28, b: 25 }, { metallic: false, worn: true, seed: seed + 4 });
+    ctx.restore();
+
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(1, 26, 12, 7, 2);
-    ctx.fill();
+    ctx.clip();
+    drawTexturedRect(ctx, 1, 26, 12, 7, { r: 30, g: 28, b: 25 }, { metallic: false, worn: true, seed: seed + 5 });
+    ctx.restore();
 
-    // Torso/Armor
-    ctx.fillStyle = armorColor;
+    // Boot soles
+    ctx.fillStyle = '#1a1815';
+    ctx.fillRect(-12, 31, 10, 2);
+    ctx.fillRect(2, 31, 10, 2);
+
+    // === TORSO/ARMOR ===
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(-16, -14, 32, 26, 5);
-    ctx.fill();
+    ctx.clip();
+    drawTexturedRect(ctx, -16, -14, 32, 26, armorColor, { metallic: true, worn: true, noise: 0.12, seed: seed + 6 });
 
-    // Player color stripe
-    ctx.fillStyle = playerColor;
-    ctx.fillRect(-14, -10, 5, 18);
-    ctx.fillRect(9, -10, 5, 18);
-
-    // Chest plate highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    // Armor panel lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(-10, -12, 20, 10, 3);
+    ctx.moveTo(-8, -14);
+    ctx.lineTo(-8, 12);
+    ctx.moveTo(8, -14);
+    ctx.lineTo(8, 12);
+    ctx.moveTo(-16, -2);
+    ctx.lineTo(16, -2);
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Player color stripe/insignia with glow
+    const playerRgb = hexToRgb(playerColor);
+    ctx.shadowColor = playerColor;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = playerColor;
+    ctx.beginPath();
+    ctx.roundRect(-14, -10, 5, 16, 1);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(9, -10, 5, 16, 1);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Stripe highlight
+    ctx.fillStyle = `rgba(255,255,255,0.3)`;
+    ctx.fillRect(-13, -9, 3, 2);
+    ctx.fillRect(10, -9, 3, 2);
+
+    // Chest plate center detail
+    const chestGrad = ctx.createLinearGradient(-6, -10, 6, 6);
+    chestGrad.addColorStop(0, `rgba(${armorColor.r + 30},${armorColor.g + 30},${armorColor.b + 30},0.8)`);
+    chestGrad.addColorStop(0.5, `rgba(${armorColor.r},${armorColor.g},${armorColor.b},0.6)`);
+    chestGrad.addColorStop(1, `rgba(${armorColor.r - 20},${armorColor.g - 20},${armorColor.b - 20},0.8)`);
+    ctx.fillStyle = chestGrad;
+    ctx.beginPath();
+    ctx.roundRect(-6, -10, 12, 16, 2);
     ctx.fill();
 
-    // Arms
-    ctx.fillStyle = bodyColor;
+    // Chest emblem (class icon area)
+    ctx.fillStyle = `rgba(0,0,0,0.2)`;
+    ctx.beginPath();
+    ctx.arc(0, -2, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.6)`;
+    ctx.beginPath();
+    ctx.arc(0, -2, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // === ARMS ===
+    // Left arm
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(-24, -12, 10, 20, 3);
-    ctx.fill();
+    ctx.clip();
+    drawFabricRect(ctx, -24, -12, 10, 20, bodyColor, seed + 7);
+    ctx.restore();
+
+    // Right arm
+    ctx.save();
     ctx.beginPath();
     ctx.roundRect(14, -12, 10, 20, 3);
+    ctx.clip();
+    drawFabricRect(ctx, 14, -12, 10, 20, bodyColor, seed + 8);
+    ctx.restore();
+
+    // Arm armor plates
+    drawTexturedRect(ctx, -23, -10, 8, 6, armorColor, { metallic: true, seed: seed + 9 });
+    drawTexturedRect(ctx, 15, -10, 8, 6, armorColor, { metallic: true, seed: seed + 10 });
+
+    // === GLOVES ===
+    drawTexturedCircle(ctx, -19, 10, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 11 });
+    drawTexturedCircle(ctx, 19, 10, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 12 });
+
+    // Glove knuckle details
+    ctx.fillStyle = 'rgba(60,55,50,0.8)';
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.arc(-21 + i * 2.5, 8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(17 + i * 2.5, 8, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === NECK ===
+    if (classType !== 'ninja') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(-5, -20, 10, 8, 2);
+        ctx.clip();
+        // Skin with subtle texture
+        const skinGrad = ctx.createLinearGradient(-5, -20, 5, -12);
+        skinGrad.addColorStop(0, `rgb(${skinTone.r + 15},${skinTone.g + 10},${skinTone.b + 5})`);
+        skinGrad.addColorStop(1, `rgb(${skinTone.r - 20},${skinTone.g - 15},${skinTone.b - 10})`);
+        ctx.fillStyle = skinGrad;
+        ctx.fillRect(-5, -20, 10, 8);
+        ctx.restore();
+
+        // Neck shadow from helmet
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath();
+        ctx.ellipse(0, -15, 5, 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === HELMET ===
+    drawTexturedCircle(ctx, 0, -28, 14, 14, helmetColor, { metallic: true, noise: 0.1, seed: seed + 13 });
+
+    // Helmet ridge/crest
+    ctx.fillStyle = `rgb(${helmetColor.r - 15},${helmetColor.g - 15},${helmetColor.b - 15})`;
+    ctx.beginPath();
+    ctx.ellipse(0, -40, 3, 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gloves
-    ctx.fillStyle = '#1a1a1a';
-    ctx.beginPath();
-    ctx.arc(-19, 10, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(19, 10, 6, 0, Math.PI * 2);
-    ctx.fill();
+    // Helmet vents
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(-8, -36, 2, 4);
+    ctx.fillRect(6, -36, 2, 4);
 
-    // Neck
-    ctx.fillStyle = '#c9a07a';
-    ctx.beginPath();
-    ctx.roundRect(-5, -20, 10, 8, 2);
-    ctx.fill();
-
-    // Head/Helmet
-    ctx.fillStyle = helmetColor;
-    ctx.beginPath();
-    ctx.arc(0, -28, 14, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Visor
-    const visorGradient = ctx.createLinearGradient(-10, -30, 10, -26);
-    visorGradient.addColorStop(0, 'rgba(80, 180, 220, 0.8)');
-    visorGradient.addColorStop(1, 'rgba(40, 120, 180, 0.6)');
+    // === VISOR ===
+    const visorGradient = ctx.createLinearGradient(-10, -32, 10, -24);
+    visorGradient.addColorStop(0, `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.9)`);
+    visorGradient.addColorStop(0.3, `rgba(${accentColor.r + 50},${accentColor.g + 50},${accentColor.b + 50},0.7)`);
+    visorGradient.addColorStop(0.7, `rgba(${accentColor.r - 30},${accentColor.g - 30},${accentColor.b},0.8)`);
+    visorGradient.addColorStop(1, `rgba(${accentColor.r - 50},${accentColor.g - 50},${accentColor.b - 20},0.9)`);
     ctx.fillStyle = visorGradient;
     ctx.beginPath();
     ctx.ellipse(0, -28, 11, 7, 0, 0, Math.PI);
     ctx.fill();
 
-    // Helmet detail
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.lineWidth = 1;
+    // Visor reflection
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.beginPath();
-    ctx.arc(0, -28, 14, 0, Math.PI * 2);
+    ctx.ellipse(-4, -30, 4, 2, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Visor edge
+    ctx.strokeStyle = `rgba(${helmetColor.r + 30},${helmetColor.g + 30},${helmetColor.b + 30},0.8)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(0, -28, 11, 7, 0, 0, Math.PI);
     ctx.stroke();
 
-    // Class-specific equipment
+    // === CLASS-SPECIFIC EQUIPMENT ===
     ctx.shadowBlur = 0;
     switch (classType) {
         case 'scout':
-            // Sniper rifle
-            ctx.fillStyle = '#2a2a2a';
-            ctx.save();
-            ctx.rotate(-0.25);
-            ctx.fillRect(-28, -38, 5, 50);
-            ctx.restore();
-            ctx.fillStyle = '#1a1a1a';
-            ctx.beginPath();
-            ctx.ellipse(-24, -35, 4, 4, 0, 0, Math.PI * 2);
-            ctx.fill();
+            drawScoutEquipment(ctx, armorColor, accentColor, seed);
             break;
-
         case 'assault':
-            // Heavy weapon
-            ctx.fillStyle = '#2a2a2a';
-            ctx.beginPath();
-            ctx.roundRect(16, -4, 24, 8, 2);
-            ctx.fill();
-            ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(36, -2, 10, 4);
-            // Shoulder pads
-            ctx.fillStyle = armorColor;
-            ctx.beginPath();
-            ctx.ellipse(-20, -10, 8, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(20, -10, 8, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
+            drawAssaultEquipment(ctx, armorColor, accentColor, seed);
             break;
-
         case 'medic':
-            // Medical backpack
-            ctx.fillStyle = '#3a4a3a';
-            ctx.beginPath();
-            ctx.roundRect(-22, -18, 12, 24, 4);
-            ctx.fill();
-            // Red cross
-            ctx.fillStyle = '#cc3333';
-            ctx.fillRect(-19, -12, 6, 2);
-            ctx.fillRect(-17, -14, 2, 6);
-            // Medical tool
-            ctx.fillStyle = '#aaaaaa';
-            ctx.beginPath();
-            ctx.roundRect(16, -2, 14, 5, 2);
-            ctx.fill();
+            drawMedicEquipment(ctx, armorColor, accentColor, seed);
             break;
-
         case 'sniper':
-            // Long sniper rifle with scope
-            ctx.fillStyle = '#1a1a1a';
-            ctx.save();
-            ctx.rotate(-0.2);
-            ctx.fillRect(-30, -42, 4, 60);  // Long barrel
-            ctx.restore();
-            // Scope
-            ctx.fillStyle = '#3a3a55';
-            ctx.beginPath();
-            ctx.ellipse(-26, -38, 5, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Scope lens (glowing)
-            ctx.fillStyle = '#6080ff';
-            ctx.beginPath();
-            ctx.arc(-26, -38, 3, 0, Math.PI * 2);
-            ctx.fill();
-            // Ghillie hood detail
-            ctx.fillStyle = '#3a4a3a';
-            ctx.beginPath();
-            ctx.arc(0, -35, 8, Math.PI, 2 * Math.PI);
-            ctx.fill();
-            // Camo stripes on armor
-            ctx.fillStyle = '#2a3a2a';
-            ctx.fillRect(-8, -8, 3, 12);
-            ctx.fillRect(5, -8, 3, 12);
+            drawSniperEquipment(ctx, armorColor, accentColor, seed);
             break;
-
         case 'ninja':
-            // Katana on back
-            ctx.fillStyle = '#1a1a1a';
-            ctx.save();
-            ctx.rotate(0.3);
-            ctx.fillRect(8, -48, 3, 45);  // Blade
-            ctx.restore();
-            // Katana handle
-            ctx.fillStyle = '#4a2020';
-            ctx.save();
-            ctx.rotate(0.3);
-            ctx.fillRect(8, -5, 3, 12);
-            ctx.restore();
-            // Katana guard
-            ctx.fillStyle = '#c0a040';
-            ctx.beginPath();
-            ctx.ellipse(15, -2, 4, 2, 0.3, 0, Math.PI * 2);
-            ctx.fill();
-            // Shuriken on belt
-            ctx.fillStyle = '#606060';
-            ctx.beginPath();
-            ctx.moveTo(-18, 4);
-            for (let i = 0; i < 4; i++) {
-                const angle = (Math.PI / 2) * i;
-                ctx.lineTo(-18 + Math.cos(angle) * 5, 4 + Math.sin(angle) * 5);
-                ctx.lineTo(-18 + Math.cos(angle + Math.PI / 4) * 2, 4 + Math.sin(angle + Math.PI / 4) * 2);
-            }
-            ctx.closePath();
-            ctx.fill();
-            // Mask detail (covering lower face)
-            ctx.fillStyle = '#151515';
-            ctx.beginPath();
-            ctx.arc(0, -24, 10, 0.2 * Math.PI, 0.8 * Math.PI);
-            ctx.fill();
-            // Glowing eyes
-            ctx.fillStyle = '#ff3030';
-            ctx.beginPath();
-            ctx.ellipse(-4, -30, 2, 1.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(4, -30, 2, 1.5, 0, 0, Math.PI * 2);
-            ctx.fill();
+            drawNinjaEquipment(ctx, armorColor, accentColor, seed);
             break;
     }
 
     ctx.restore();
+}
+
+/**
+ * Scout equipment - light rifle, binoculars
+ */
+function drawScoutEquipment(ctx, armorColor, accentColor, seed) {
+    // Compact rifle on back
+    ctx.save();
+    ctx.rotate(-0.25);
+
+    // Rifle body with texture
+    const rifleGrad = ctx.createLinearGradient(-28, -38, -23, -38);
+    rifleGrad.addColorStop(0, '#2a2a2a');
+    rifleGrad.addColorStop(0.5, '#404040');
+    rifleGrad.addColorStop(1, '#252525');
+    ctx.fillStyle = rifleGrad;
+    ctx.beginPath();
+    ctx.roundRect(-28, -38, 5, 45, 1);
+    ctx.fill();
+
+    // Rifle details
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(-27, -35, 3, 8);
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(-27, -20, 3, 5);
+
+    ctx.restore();
+
+    // Scope
+    drawTexturedCircle(ctx, -24, -35, 4, 4, { r: 40, g: 40, b: 50 }, { metallic: true, seed });
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.8)`;
+    ctx.beginPath();
+    ctx.arc(-24, -35, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Binoculars on belt
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    ctx.roundRect(12, 2, 8, 6, 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.6)`;
+    ctx.beginPath();
+    ctx.arc(14, 5, 2, 0, Math.PI * 2);
+    ctx.arc(18, 5, 2, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+/**
+ * Assault equipment - heavy weapon, shoulder pads
+ */
+function drawAssaultEquipment(ctx, armorColor, accentColor, seed) {
+    // Heavy shoulder pads
+    drawTexturedCircle(ctx, -20, -10, 9, 6, armorColor, { metallic: true, seed });
+    drawTexturedCircle(ctx, 20, -10, 9, 6, armorColor, { metallic: true, seed: seed + 1 });
+
+    // Shoulder pad spikes/ridges
+    ctx.fillStyle = `rgb(${armorColor.r - 20},${armorColor.g - 20},${armorColor.b - 20})`;
+    for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-24 + i * 4, -14);
+        ctx.lineTo(-22 + i * 4, -18);
+        ctx.lineTo(-20 + i * 4, -14);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(16 + i * 4, -14);
+        ctx.lineTo(18 + i * 4, -18);
+        ctx.lineTo(20 + i * 4, -14);
+        ctx.fill();
+    }
+
+    // Heavy weapon
+    const weaponGrad = ctx.createLinearGradient(16, -6, 46, -6);
+    weaponGrad.addColorStop(0, '#3a3a3a');
+    weaponGrad.addColorStop(0.3, '#4a4a4a');
+    weaponGrad.addColorStop(0.7, '#353535');
+    weaponGrad.addColorStop(1, '#252525');
+    ctx.fillStyle = weaponGrad;
+    ctx.beginPath();
+    ctx.roundRect(16, -6, 26, 10, 2);
+    ctx.fill();
+
+    // Barrel
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.roundRect(38, -4, 12, 6, 1);
+    ctx.fill();
+
+    // Muzzle glow
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.4)`;
+    ctx.beginPath();
+    ctx.arc(50, -1, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ammo drum
+    drawTexturedCircle(ctx, 26, 2, 6, 6, { r: 50, g: 45, b: 40 }, { metallic: true, seed: seed + 2 });
+
+    // Grenades on belt
+    for (let i = 0; i < 2; i++) {
+        drawTexturedCircle(ctx, -16 + i * 8, 8, 3, 4, { r: 60, g: 80, b: 60 }, { seed: seed + 3 + i });
+    }
+}
+
+/**
+ * Medic equipment - medical backpack, heal tool
+ */
+function drawMedicEquipment(ctx, armorColor, accentColor, seed) {
+    // Medical backpack
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(-24, -16, 14, 26, 4);
+    ctx.clip();
+    drawTexturedRect(ctx, -24, -16, 14, 26, { r: 50, g: 70, b: 50 }, { worn: true, seed });
+    ctx.restore();
+
+    // Backpack straps
+    ctx.fillStyle = '#3a4a3a';
+    ctx.fillRect(-22, -14, 2, 20);
+    ctx.fillRect(-14, -14, 2, 20);
+
+    // Red cross with glow
+    ctx.shadowColor = '#ff3333';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#dd2222';
+    ctx.fillRect(-20, -8, 8, 2);
+    ctx.fillRect(-17, -11, 2, 8);
+    ctx.shadowBlur = 0;
+
+    // Cross highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(-19, -7, 6, 1);
+
+    // Medical scanner/tool
+    const toolGrad = ctx.createLinearGradient(16, -4, 32, -4);
+    toolGrad.addColorStop(0, '#888888');
+    toolGrad.addColorStop(0.5, '#aaaaaa');
+    toolGrad.addColorStop(1, '#777777');
+    ctx.fillStyle = toolGrad;
+    ctx.beginPath();
+    ctx.roundRect(16, -4, 16, 6, 2);
+    ctx.fill();
+
+    // Scanner screen
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.8)`;
+    ctx.fillRect(18, -2, 6, 2);
+
+    // Heartbeat line on screen
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(19, -1);
+    ctx.lineTo(20, -1);
+    ctx.lineTo(21, -3);
+    ctx.lineTo(22, 0);
+    ctx.lineTo(23, -1);
+    ctx.stroke();
+
+    // Med pouches on belt
+    for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = '#4a5a4a';
+        ctx.beginPath();
+        ctx.roundRect(-8 + i * 7, 6, 5, 6, 1);
+        ctx.fill();
+    }
+}
+
+/**
+ * Sniper equipment - long rifle, ghillie elements
+ */
+function drawSniperEquipment(ctx, armorColor, accentColor, seed) {
+    // Long sniper rifle
+    ctx.save();
+    ctx.rotate(-0.2);
+
+    // Rifle body
+    const rifleGrad = ctx.createLinearGradient(-30, -45, -26, -45);
+    rifleGrad.addColorStop(0, '#1a1a1a');
+    rifleGrad.addColorStop(0.5, '#2a2a2a');
+    rifleGrad.addColorStop(1, '#151515');
+    ctx.fillStyle = rifleGrad;
+    ctx.beginPath();
+    ctx.roundRect(-30, -45, 4, 65, 1);
+    ctx.fill();
+
+    // Rifle stock
+    ctx.fillStyle = '#3a3020';
+    ctx.beginPath();
+    ctx.roundRect(-31, 10, 6, 12, 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    // Large scope
+    drawTexturedCircle(ctx, -26, -40, 6, 6, { r: 50, g: 50, b: 70 }, { metallic: true, seed });
+
+    // Scope lens with glow
+    ctx.shadowColor = `rgb(${accentColor.r},${accentColor.g},${accentColor.b})`;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.9)`;
+    ctx.beginPath();
+    ctx.arc(-26, -40, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Lens reflection
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(-27, -41, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ghillie hood strips
+    ctx.fillStyle = '#3a4a3a';
+    for (let i = 0; i < 5; i++) {
+        const angle = -0.4 + i * 0.2;
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.fillRect(-2, -42, 2, 8 + Math.random() * 4);
+        ctx.restore();
+    }
+
+    // Camo stripes on armor
+    ctx.fillStyle = '#2a3a2a';
+    ctx.fillRect(-7, -8, 3, 10);
+    ctx.fillRect(4, -6, 3, 8);
+    ctx.fillStyle = '#4a3a2a';
+    ctx.fillRect(-3, -10, 2, 12);
+}
+
+/**
+ * Ninja equipment - katana, shuriken, mask details
+ */
+function drawNinjaEquipment(ctx, armorColor, accentColor, seed) {
+    // Katana on back
+    ctx.save();
+    ctx.rotate(0.3);
+
+    // Blade with metallic effect
+    const bladeGrad = ctx.createLinearGradient(7, -50, 12, -50);
+    bladeGrad.addColorStop(0, '#c0c0c0');
+    bladeGrad.addColorStop(0.3, '#ffffff');
+    bladeGrad.addColorStop(0.5, '#e0e0e0');
+    bladeGrad.addColorStop(1, '#909090');
+    ctx.fillStyle = bladeGrad;
+    ctx.beginPath();
+    ctx.moveTo(8, -50);
+    ctx.lineTo(11, -50);
+    ctx.lineTo(12, -5);
+    ctx.lineTo(7, -5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Blade edge highlight
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(8, -48);
+    ctx.lineTo(8, -8);
+    ctx.stroke();
+
+    // Handle wrap
+    ctx.fillStyle = '#2a1515';
+    ctx.fillRect(7, -5, 5, 14);
+    // Handle wrap pattern
+    ctx.strokeStyle = '#4a2525';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+        ctx.beginPath();
+        ctx.moveTo(7, -3 + i * 3);
+        ctx.lineTo(12, -3 + i * 3);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+
+    // Tsuba (guard)
+    ctx.fillStyle = '#c0a040';
+    ctx.beginPath();
+    ctx.ellipse(15, -2, 5, 3, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#a08030';
+    ctx.beginPath();
+    ctx.ellipse(15, -2, 3, 2, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shuriken on belt
+    const shurikenGrad = ctx.createRadialGradient(-18, 4, 0, -18, 4, 6);
+    shurikenGrad.addColorStop(0, '#808080');
+    shurikenGrad.addColorStop(0.5, '#606060');
+    shurikenGrad.addColorStop(1, '#404040');
+    ctx.fillStyle = shurikenGrad;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+        const angle = (Math.PI / 2) * i - Math.PI / 4;
+        ctx.lineTo(-18 + Math.cos(angle) * 6, 4 + Math.sin(angle) * 6);
+        ctx.lineTo(-18 + Math.cos(angle + Math.PI / 4) * 2, 4 + Math.sin(angle + Math.PI / 4) * 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Shuriken highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    ctx.arc(-19, 3, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Face mask with texture
+    ctx.fillStyle = '#101010';
+    ctx.beginPath();
+    ctx.arc(0, -24, 11, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.fill();
+
+    // Mask fabric lines
+    ctx.strokeStyle = 'rgba(40,40,40,0.5)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 4; i++) {
+        ctx.beginPath();
+        ctx.arc(0, -24, 8 - i * 1.5, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.stroke();
+    }
+
+    // Glowing eyes
+    ctx.shadowColor = `rgb(${accentColor.r},${accentColor.g},${accentColor.b})`;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = `rgb(${accentColor.r},${accentColor.g},${accentColor.b})`;
+    ctx.beginPath();
+    ctx.ellipse(-5, -30, 3, 2, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(5, -30, 3, 2, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Eye pupils/slits
+    ctx.fillStyle = '#200000';
+    ctx.beginPath();
+    ctx.ellipse(-5, -30, 1.5, 1, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(5, -30, 1.5, 1, 0.1, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 /**
