@@ -582,8 +582,12 @@ class ParticleManager {
      */
     update() {
         const now = performance.now();
-        const deltaTime = now - this.lastUpdate;
+        let deltaTime = now - this.lastUpdate;
         this.lastUpdate = now;
+
+        // Clamp deltaTime to avoid killing particles on first frame after long pause
+        // Max 50ms = 20fps minimum, prevents particles from dying instantly
+        deltaTime = Math.min(deltaTime, 50);
 
         // Aktive Partikel updaten
         for (let i = this.activeParticles.length - 1; i >= 0; i--) {
