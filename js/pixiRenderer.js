@@ -9,7 +9,7 @@ import { state, getHex, getCurrentUnit } from './state.js';
 import { hexToPixel, pixelToHex } from './hexMath.js';
 import { isHexVisible, isHexExplored } from './fogOfWar.js';
 import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits } from './combat.js';
+import { getAttackableUnits } from './units.js';
 import { getPowerupAt } from './powerups.js';
 
 // ===== PIXI APPLICATION =====
