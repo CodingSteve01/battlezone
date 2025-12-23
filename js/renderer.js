@@ -178,12 +178,12 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
     const terrainData = fogLevel === 'visible' ? terrain : null;
 
     // Pass null for strokeColor - grid overlay is drawn separately when needed
-    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
+    drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
 
     // Add terrain blending for seamless transitions between terrain types
     if (fogLevel === 'visible' && terrainData) {
         const neighbors = getNeighborTerrains(state.hexMap, hex.q, hex.r);
-        drawTerrainBlend(tileCtx, cx, cy, hexSize * 0.95, hex.type, neighbors);
+        drawTerrainBlend(tileCtx, cx, cy, hexSize, hex.type, neighbors);
     }
 
     // Add fog overlays
@@ -212,7 +212,7 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
 function drawExploredOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+    drawHexPathToContext(context, cx, cy, hexSize);
 
     const shadowGradient = context.createLinearGradient(
         cx - hexSize * 0.5, cy - hexSize * 0.5,
@@ -229,7 +229,7 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
     vignetteGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.05)');
     vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
     context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+    drawHexPathToContext(context, cx, cy, hexSize);
     context.fillStyle = vignetteGradient;
     context.fill();
 
@@ -242,7 +242,7 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
 function drawHiddenOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize * 0.95);
+    drawHexPathToContext(context, cx, cy, hexSize);
     const fogGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
     fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
     fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
@@ -446,6 +446,8 @@ function getStealthVisibilityAlpha(stealthUnit) {
 /**
  * Initialize renderer
  */
+let animationLoopRunning = false;
+
 export function initRenderer() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
@@ -461,6 +463,26 @@ export function initRenderer() {
     }
 
     resizeCanvas();
+
+    // Start continuous animation loop for smooth animations
+    if (!animationLoopRunning) {
+        animationLoopRunning = true;
+        startAnimationLoop();
+    }
+}
+
+/**
+ * Continuous animation loop for smooth particle/vegetation animations
+ */
+function startAnimationLoop() {
+    function loop() {
+        // Only render if game is active (not in menu)
+        if (state.screen === null && state.hexes.length > 0) {
+            render();
+        }
+        requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
 }
 
 /**
@@ -1655,7 +1677,7 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 
         // Draw subtle grid lines based on fog level
         ctx.beginPath();
-        drawHexPath(sx, sy, state.hexSize * 0.95);
+        drawHexPath(sx, sy, state.hexSize);
 
         if (fogLevel === 'visible') {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
@@ -1775,13 +1797,13 @@ export function render() {
                 (fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
                 (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)')) : null;
             const terrainData = fogLevel === 'visible' ? terrain : null;
-            drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
+            drawHex(sx, sy, state.hexSize, fillColor, strokeColor, 1, texture, terrainData);
 
             // Fog overlays for non-cached rendering
             if (fogLevel === 'explored') {
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize * 0.95);
+                drawHexPath(sx, sy, state.hexSize);
                 const shadowGradient = ctx.createLinearGradient(
                     sx - state.hexSize * 0.5, sy - state.hexSize * 0.5,
                     sx + state.hexSize * 0.5, sy + state.hexSize * 0.5
@@ -1795,7 +1817,7 @@ export function render() {
             } else if (fogLevel === 'hidden') {
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize * 0.95);
+                drawHexPath(sx, sy, state.hexSize);
                 const fogGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
                 fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
                 fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
