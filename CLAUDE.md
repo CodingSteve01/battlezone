@@ -18,25 +18,34 @@ battlezone/
 ├── index.html          # Main entry point, contains all UI screens
 ├── css/
 │   └── styles.css      # Complete styling with CSS variables & animations
-└── js/
-    ├── main.js         # Entry point, game initialization, team selection
-    ├── config.js       # Game constants, unit classes, terrain definitions
-    ├── state.js        # Central game state management
-    ├── map.js          # Procedural hex map generation
-    ├── hexMath.js      # Hex coordinate math utilities
-    ├── renderer.js     # Canvas rendering, terrain details, unit sprites
-    ├── input.js        # Mouse/touch input handling, camera pan/zoom
-    ├── units.js        # Unit creation, movement, animation
-    ├── combat.js       # Attack calculations, special abilities
-    ├── turns.js        # Turn management, round progression
-    ├── pathfinding.js  # A* pathfinding for hex grids
-    ├── fogOfWar.js     # Visibility and exploration system
-    ├── ai.js           # AI opponent logic for single-player
-    ├── ui.js           # UI updates, toasts, screen management
-    ├── powerups.js     # Power-up spawning and effects
-    ├── progression.js  # XP, leveling, rank system
-    ├── events.js       # Random round events (storms, etc.)
-    └── assets.js       # Sprite drawing, texture generation
+├── js/
+│   ├── main.js         # Entry point, game initialization, team selection
+│   ├── config.js       # Game constants, unit classes, terrain definitions
+│   ├── state.js        # Central game state management
+│   ├── map.js          # Procedural hex map generation
+│   ├── hexMath.js      # Hex coordinate math utilities
+│   ├── renderer.js     # Canvas rendering, terrain details, unit sprites
+│   ├── input.js        # Mouse/touch input handling, camera pan/zoom
+│   ├── units.js        # Unit creation, movement, animation
+│   ├── combat.js       # Attack calculations, special abilities
+│   ├── turns.js        # Turn management, round progression
+│   ├── pathfinding.js  # A* pathfinding for hex grids
+│   ├── fogOfWar.js     # Visibility and exploration system
+│   ├── ai.js           # AI opponent logic for single-player
+│   ├── ui.js           # UI updates, toasts, screen management
+│   ├── powerups.js     # Power-up spawning and effects
+│   ├── progression.js  # XP, leveling, rank system
+│   ├── events.js       # Random round events (storms, etc.)
+│   ├── assets.js       # Runtime sprite/texture generation (fallback)
+│   └── assetLoader.js  # Static asset loading with fallback support
+├── assets/             # Pre-generated static PNG assets (optional)
+│   ├── terrain/        # Terrain textures (grass.png, forest.png, etc.)
+│   ├── units/          # Unit sprites (scout_p0.png, assault_p1_selected.png, etc.)
+│   └── details/        # Terrain details (tree_0_0.png, bush_0.png, rock_0.png, etc.)
+├── tools/
+│   └── asset-generator.html  # Browser-based asset generator tool
+└── scripts/
+    └── generate-assets.js    # Playwright-based asset generation (requires browser)
 ```
 
 ## Key Architecture Patterns
@@ -180,6 +189,39 @@ npx http-server
 - Only visible hexes are rendered (off-screen culling)
 - Movement animations use `requestAnimationFrame`
 - Canvas uses device pixel ratio for crisp rendering
+
+### Static Asset System
+
+The game supports both **runtime-generated** and **pre-generated static** assets:
+
+**Architecture:**
+- `assetLoader.js` - Unified asset loading with automatic fallback
+- `assets.js` - Runtime canvas-based generation (fallback)
+- `tools/asset-generator.html` - Browser-based static asset generator
+
+**How it works:**
+1. On load, `assetLoader.js` checks if static assets exist in `assets/`
+2. If found, loads PNG files for textures, sprites, and details
+3. If not found, falls back to runtime canvas generation
+4. Both methods are transparent to the renderer
+
+**Generating Static Assets:**
+1. Open `tools/asset-generator.html` in a browser
+2. Click "Generate All Assets" to create previews
+3. Right-click to save individual assets, or use browser dev tools
+4. Save files to the `assets/` directory structure
+5. Commit the generated PNG files to the repository
+
+**Asset Types:**
+- **Terrain textures** (128x128): `assets/terrain/grass.png`, `forest.png`, etc.
+- **Unit sprites** (130x130): `assets/units/scout_p0.png`, `assault_p1_selected.png`, etc.
+- **Terrain details** (128x128): `assets/details/tree_0_0.png`, `bush_0.png`, `rock_0.png`, etc.
+
+**Benefits of Static Assets:**
+- Faster initial load (no runtime generation)
+- Ability to create more detailed/hand-crafted graphics
+- Reduced CPU usage during gameplay
+- Consistent visuals across devices
 
 ## Common Tasks
 
