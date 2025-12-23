@@ -15,17 +15,14 @@
     "generate-assets": "node scripts/generate-assets.js",
     "build": "npm run generate-assets"
   },
-  "dependencies": {
-    "pixi.js": "^8.6.6"
-  },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@playwright/test": "^1.57.0",
+    "playwright": "^1.57.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.15.0",
     "globals": "^15.12.0",
     "jsdom": "^25.0.0",
-    "playwright": "^1.57.0",
     "vitest": "^2.1.0"
   },
   "keywords": [

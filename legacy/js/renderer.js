@@ -89,9 +89,7 @@ const CACHE_BASE_HEX_SIZE = 60;
 /**
  * Maximum number of cached tiles to prevent memory issues
  */
-// Increased cache size to prevent eviction during scrolling/zoom
-// A large map with full visibility needs ~500 tiles, plus 3 fog levels = 1500
-const MAX_CACHE_SIZE = 2000;
+const MAX_CACHE_SIZE = 1000;
 
 /**
  * Clear all caches (call when map regenerates or quality changes significantly)
@@ -323,14 +321,13 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 }
 
 /**
- * Draw STATIC terrain details to a specific context (for caching)
+ * Draw terrain details to a specific context (for caching)
  * This is a wrapper that temporarily swaps the global ctx
- * Only draws non-animated elements that can be safely cached
  */
 function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
     const originalCtx = ctx;
     ctx = context;
-    drawStaticTerrainDetails(cx, cy, size, type, hexQ, hexR);
+    drawTerrainDetails(cx, cy, size, type, hexQ, hexR);
     ctx = originalCtx;
 }
 
@@ -705,33 +702,41 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
 }
 
 /**
- * Draw STATIC terrain pattern on a hex (for caching)
- * ALL terrain details are cached - no runtime animations for max performance
- * Each hex has unique appearance via seeded random (no visible tiling pattern)
+ * Draw enhanced terrain pattern on a hex - optimized for performance
+ * Now only draws ground-level details, foreground elements are collected separately
  */
-function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
+function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     const s = size * 0.45;
     ctx.save();
 
-    // Create consistent seed for this hex - ensures unique but deterministic appearance
+    // Create consistent seed for this hex
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
 
     switch (type) {
         case 'grass':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass');
-            // Add occasional flowers
-            if ((baseSeed % 100) >= 15 && (baseSeed % 100) < 30) {
+            // Draw animated grass blades
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
+
+            // Small flowers stay on ground level
+            const grassType = Math.abs(baseSeed) % 100;
+            if (grassType >= 15 && grassType < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
             }
             break;
 
         case 'forest':
+            // Draw forest floor (leaves, small plants) - trees are drawn as foreground
             drawForestFloor(cx, cy, s, baseSeed);
-            // Static leaf scatter
-            drawStaticLeafScatter(cx, cy, size, baseSeed);
+            // Add fireflies for atmosphere
+            if (state.effectiveQuality === 'high') {
+                drawFireflies(ctx, cx, cy, size);
+            }
+            // Falling leaves
+            drawFallingLeaves(ctx, cx, cy, size);
             break;
 
         case 'rock':
+            // Ground shadow for rocks - actual rocks are foreground
             ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
             ctx.beginPath();
             ctx.ellipse(cx + 2, cy + s * 0.3, s * 0.7, s * 0.25, 0, 0, Math.PI * 2);
@@ -740,20 +745,16 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'water':
             drawWaterDetails(cx, cy, s, baseSeed);
-            drawStaticWaterSurface(cx, cy, size, baseSeed);
-            break;
-
-        case 'deepwater':
-            drawStaticWaterSurface(cx, cy, size, baseSeed, true);
-            break;
-
-        case 'shallows':
-            drawStaticShallowWater(cx, cy, size, baseSeed);
+            // Add animated water overlay
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
 
         case 'sand':
             drawSandDetails(cx, cy, s, baseSeed);
-            drawStaticDustMotes(cx, cy, size, baseSeed);
+            // Add floating dust particles
+            if (state.effectiveQuality !== 'low') {
+                drawDustMotes(ctx, cx, cy, size);
+            }
             break;
 
         case 'swamp':
@@ -774,45 +775,47 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'river':
             drawRiverDetails(cx, cy, s, baseSeed);
-            drawStaticWaterSurface(cx, cy, size, baseSeed);
+            // Add flowing water animation
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
 
+        // New terrain types with animations
         case 'snow':
-            drawStaticSnowDetails(cx, cy, size, baseSeed);
+            drawSnowDetails(ctx, cx, cy, size, hexQ, hexR);
+            drawSnowfall(ctx, cx, cy, size, hexQ, hexR);
             break;
 
         case 'ice':
-            drawStaticIceDetails(cx, cy, size, baseSeed);
+            drawIceReflections(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'deepwater':
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, true);
+            break;
+
+        case 'shallows':
+            drawShallowWater(ctx, cx, cy, size, hexQ, hexR);
             break;
 
         case 'reeds':
-            drawStaticReeds(cx, cy, size, baseSeed);
+            drawReeds(ctx, cx, cy, size, hexQ, hexR);
             break;
 
         case 'flowers':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass');
-            drawStaticFlowers(cx, cy, size, baseSeed);
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
+            drawFlowers(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'mud':
+            drawMud(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'farmland':
+            drawFarmland(ctx, cx, cy, size, hexQ, hexR);
             break;
 
         case 'wheat':
-            drawStaticWheatField(cx, cy, size, baseSeed);
-            break;
-
-        case 'tallgrass':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'tallgrass');
-            break;
-
-        case 'clearing':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'clearing');
-            break;
-
-        case 'heather':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'heather');
-            drawStaticHeather(cx, cy, size, baseSeed);
-            break;
-
-        case 'moss':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'moss');
+            drawWheatField(ctx, cx, cy, size, hexQ, hexR);
             break;
 
         case 'gravel':
@@ -823,395 +826,35 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             drawRuins(ctx, cx, cy, size, hexQ, hexR);
             break;
 
+        case 'tallgrass':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'tallgrass');
+            break;
+
         case 'pine':
             drawForestFloor(cx, cy, s, baseSeed);
-            drawStaticLeafScatter(cx, cy, size, baseSeed);
             break;
 
-        case 'farmland':
-            drawFarmland(ctx, cx, cy, size, hexQ, hexR);
+        case 'clearing':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'clearing');
             break;
 
-        case 'mud':
-            drawMud(ctx, cx, cy, size, hexQ, hexR);
+        case 'heather':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'heather');
+            drawHeather(ctx, cx, cy, size, hexQ, hexR);
             break;
+
+        case 'moss':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'moss');
+            break;
+    }
+
+    // Add terrain blend effects for all visible terrain
+    if (state.effectiveQuality !== 'low') {
+        const neighbors = getNeighborTerrains(state.hexMap, hexQ, hexR);
+        drawTerrainBlend(ctx, cx, cy, size, type, neighbors);
     }
 
     ctx.restore();
-}
-
-/**
- * Draw static grass blades - cached, unique per hex
- */
-function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
-    const bladeCount = 60;
-
-    // Color settings based on grass type
-    let baseR = 30, baseG = 100, baseB = 35;
-    let heightMult = 1;
-
-    if (grassType === 'tallgrass') {
-        heightMult = 1.8;
-        baseG = 90;
-    } else if (grassType === 'clearing') {
-        baseG = 120;
-        baseB = 45;
-    } else if (grassType === 'heather') {
-        baseR = 90;
-        baseG = 60;
-        baseB = 90;
-    } else if (grassType === 'moss') {
-        baseR = 40;
-        baseG = 80;
-        baseB = 45;
-    }
-
-    for (let i = 0; i < bladeCount; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-        const rand3 = seededRandom(seed + i * 3 + 2);
-
-        // Position within hex
-        const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.75;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-
-        // Blade properties
-        const height = (4 + rand3 * 10) * heightMult;
-        const thickness = 0.4 + rand3 * 0.8;
-
-        // Frozen sway position (based on seed, not time)
-        const swayAmount = (rand1 - 0.5) * 6;
-
-        // Color variation
-        const r = Math.floor(baseR + rand2 * 30);
-        const g = Math.floor(baseG + rand2 * 40);
-        const b = Math.floor(baseB + rand2 * 20);
-
-        ctx.strokeStyle = `rgb(${r},${g},${b})`;
-        ctx.lineWidth = thickness;
-        ctx.lineCap = 'round';
-
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        const tipX = x + swayAmount;
-        const tipY = y - height;
-        const cpX = x + swayAmount * 0.5;
-        const cpY = y - height * 0.6;
-        ctx.quadraticCurveTo(cpX, cpY, tipX, tipY);
-        ctx.stroke();
-    }
-}
-
-/**
- * Draw static water surface details - no animation, unique per hex
- */
-function drawStaticWaterSurface(cx, cy, hexSize, seed, isDeep = false) {
-    // Static wave lines
-    ctx.strokeStyle = `rgba(120, 180, 220, 0.15)`;
-    ctx.lineWidth = 1.5;
-
-    for (let i = 0; i < 4; i++) {
-        const yOffset = (seededRandom(seed + i * 10) - 0.5) * hexSize;
-        const wavePhase = seededRandom(seed + i * 20) * Math.PI * 2;
-
-        ctx.beginPath();
-        for (let x = -hexSize * 0.8; x <= hexSize * 0.8; x += 4) {
-            const waveY = cy + yOffset + Math.sin(x / 15 + wavePhase) * 3;
-            if (x === -hexSize * 0.8) {
-                ctx.moveTo(cx + x, waveY);
-            } else {
-                ctx.lineTo(cx + x, waveY);
-            }
-        }
-        ctx.stroke();
-    }
-
-    // Static sparkle positions
-    const sparkleCount = isDeep ? 2 : 5;
-    for (let i = 0; i < sparkleCount; i++) {
-        const sparkleVisible = seededRandom(seed + i * 100) > 0.6;
-        if (sparkleVisible) {
-            const sx = cx + (seededRandom(seed + i * 7) - 0.5) * hexSize * 1.2;
-            const sy = cy + (seededRandom(seed + i * 11) - 0.5) * hexSize * 1.2;
-            const sparkleSize = 1 + seededRandom(seed + i * 13) * 2;
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-            ctx.beginPath();
-            ctx.arc(sx, sy, sparkleSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw static shallow water
- */
-function drawStaticShallowWater(cx, cy, hexSize, seed) {
-    // Bottom stones
-    for (let i = 0; i < 8; i++) {
-        const stoneX = cx + (seededRandom(seed + i * 2) - 0.5) * hexSize * 1.2;
-        const stoneY = cy + (seededRandom(seed + i * 2 + 1) - 0.5) * hexSize * 1.2;
-        const stoneSize = 2 + seededRandom(seed + i * 3) * 4;
-
-        ctx.fillStyle = 'rgba(100, 90, 70, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(stoneX, stoneY, stoneSize, stoneSize * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    drawStaticWaterSurface(cx, cy, hexSize, seed);
-}
-
-/**
- * Draw static leaf scatter for forest
- */
-function drawStaticLeafScatter(cx, cy, hexSize, seed) {
-    const leafCount = 8;
-    const colors = ['#8B4513', '#D2691E', '#228B22', '#6B8E23'];
-
-    for (let i = 0; i < leafCount; i++) {
-        const x = cx + (seededRandom(seed + i * 5) - 0.5) * hexSize * 1.4;
-        const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 1.4;
-        const size = 2 + seededRandom(seed + i * 5 + 2) * 2;
-        const rotation = seededRandom(seed + i * 5 + 3) * Math.PI * 2;
-        const colorIdx = Math.floor(seededRandom(seed + i * 5 + 4) * colors.length);
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
-        ctx.fillStyle = colors[colorIdx];
-        ctx.globalAlpha = 0.7;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, size, size * 0.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-}
-
-/**
- * Draw static dust motes for sand
- */
-function drawStaticDustMotes(cx, cy, hexSize, seed) {
-    for (let i = 0; i < 10; i++) {
-        const visible = seededRandom(seed + i * 50) > 0.5;
-        if (visible) {
-            const mx = cx + (seededRandom(seed + i * 6) - 0.5) * hexSize * 1.4;
-            const my = cy + (seededRandom(seed + i * 6 + 1) - 0.5) * hexSize * 1.4;
-            const moteSize = 0.5 + seededRandom(seed + i * 6 + 2) * 1;
-
-            ctx.fillStyle = 'rgba(200, 180, 140, 0.3)';
-            ctx.beginPath();
-            ctx.arc(mx, my, moteSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw static snow details
- */
-function drawStaticSnowDetails(cx, cy, hexSize, seed) {
-    // Snow mounds
-    for (let i = 0; i < 5; i++) {
-        const mx = cx + (seededRandom(seed + i * 5) - 0.5) * hexSize * 1.2;
-        const my = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 1.2;
-        const moundSize = 4 + seededRandom(seed + i * 5 + 2) * 8;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(mx, my, moundSize, moundSize * 0.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Shadow areas
-    for (let i = 0; i < 3; i++) {
-        const sx = cx + (seededRandom(seed + i * 7) - 0.5) * hexSize;
-        const sy = cy + (seededRandom(seed + i * 7 + 1) - 0.5) * hexSize;
-
-        ctx.fillStyle = 'rgba(180, 200, 220, 0.15)';
-        ctx.beginPath();
-        ctx.ellipse(sx, sy, 6, 3, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw static ice details
- */
-function drawStaticIceDetails(cx, cy, hexSize, seed) {
-    // Ice cracks
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 0.5;
-
-    for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        let x = cx + (seededRandom(seed + i * 3) - 0.5) * hexSize * 1.1;
-        let y = cy + (seededRandom(seed + i * 3 + 1) - 0.5) * hexSize * 1.1;
-        ctx.moveTo(x, y);
-
-        for (let j = 0; j < 3; j++) {
-            x += (seededRandom(seed + i * 10 + j) - 0.5) * hexSize * 0.35;
-            y += (seededRandom(seed + i * 10 + j + 5) - 0.5) * hexSize * 0.35;
-            ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    }
-
-    // Shimmer spots
-    for (let i = 0; i < 3; i++) {
-        const shimmerVisible = seededRandom(seed + i * 30) > 0.4;
-        if (shimmerVisible) {
-            const sx = cx + (seededRandom(seed + i * 20) - 0.5) * hexSize * 1.3;
-            const sy = cy + (seededRandom(seed + i * 20 + 10) - 0.5) * hexSize * 1.3;
-
-            ctx.fillStyle = 'rgba(200, 230, 255, 0.25)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 3, 1.5, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw static reeds
- */
-function drawStaticReeds(cx, cy, hexSize, seed) {
-    const reedCount = 25;
-
-    for (let i = 0; i < reedCount; i++) {
-        const rand1 = seededRandom(seed + i * 4);
-        const rand2 = seededRandom(seed + i * 4 + 1);
-        const rand3 = seededRandom(seed + i * 4 + 2);
-
-        const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.7;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-
-        const height = 18 + rand3 * 12;
-        const sway = (rand1 - 0.5) * 6;
-
-        // Reed stalk
-        ctx.strokeStyle = `rgb(${70 + rand3 * 20}, ${90 + rand3 * 20}, ${50 + rand3 * 15})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(x + sway * 0.3, y - height * 0.7, x + sway, y - height);
-        ctx.stroke();
-
-        // Reed head
-        if (rand3 > 0.3) {
-            ctx.fillStyle = `rgba(${150 + rand3 * 30}, ${130 + rand3 * 30}, ${100 + rand3 * 20}, 0.8)`;
-            ctx.beginPath();
-            ctx.ellipse(x + sway, y - height - 4, 2.5, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw static flowers
- */
-function drawStaticFlowers(cx, cy, hexSize, seed) {
-    const flowerCount = 15;
-    const colors = ['#ff6b6b', '#ffd93d', '#ffffff', '#ff9ecd', '#b19cd9'];
-
-    for (let i = 0; i < flowerCount; i++) {
-        const angle = seededRandom(seed + i) * Math.PI * 2;
-        const dist = seededRandom(seed + i + 50) * hexSize * 0.65;
-        const fx = cx + Math.cos(angle) * dist;
-        const fy = cy + Math.sin(angle) * dist;
-
-        const colorIdx = Math.floor(seededRandom(seed + i + 100) * colors.length);
-        const size = 1.5 + seededRandom(seed + i + 150) * 2.5;
-        const sway = (seededRandom(seed + i + 200) - 0.5) * 3;
-
-        // Stem
-        ctx.strokeStyle = '#2d6a2d';
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(fx, fy + 3);
-        ctx.quadraticCurveTo(fx + sway * 0.3, fy, fx + sway * 0.5, fy - 4);
-        ctx.stroke();
-
-        // Petals
-        ctx.fillStyle = colors[colorIdx];
-        for (let p = 0; p < 5; p++) {
-            const petalAngle = (p / 5) * Math.PI * 2;
-            const px = fx + Math.cos(petalAngle) * size + sway * 0.4;
-            const py = fy - 4 + Math.sin(petalAngle) * size;
-
-            ctx.beginPath();
-            ctx.ellipse(px, py, size * 0.5, size * 0.25, petalAngle, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Center
-        ctx.fillStyle = '#ffdd00';
-        ctx.beginPath();
-        ctx.arc(fx + sway * 0.4, fy - 4, size * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw static wheat field
- */
-function drawStaticWheatField(cx, cy, hexSize, seed) {
-    const stalkCount = 50;
-
-    for (let i = 0; i < stalkCount; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-        const rand3 = seededRandom(seed + i * 3 + 2);
-
-        const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.7;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-
-        const height = 12 + rand3 * 8;
-        const sway = (rand1 - 0.5) * 5;
-
-        // Stalk
-        const goldenColor = `rgb(${180 + rand3 * 40}, ${150 + rand3 * 30}, ${70 + rand3 * 20})`;
-        ctx.strokeStyle = goldenColor;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(x + sway * 0.5, y - height * 0.6, x + sway, y - height);
-        ctx.stroke();
-
-        // Wheat head
-        ctx.fillStyle = `rgb(${200 + rand3 * 30}, ${170 + rand3 * 30}, ${80 + rand3 * 20})`;
-        ctx.beginPath();
-        ctx.ellipse(x + sway, y - height - 3, 2, 4, sway * 0.1, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw static heather
- */
-function drawStaticHeather(cx, cy, hexSize, seed) {
-    for (let i = 0; i < 30; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-
-        const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.7;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-
-        const sway = (rand1 - 0.5) * 2;
-
-        ctx.fillStyle = `rgb(${140 + rand2 * 50}, ${80 + rand2 * 40}, ${140 + rand2 * 50})`;
-        ctx.beginPath();
-        ctx.arc(x + sway, y, 1 + rand2, 0, Math.PI * 2);
-        ctx.fill();
-    }
 }
 
 /**
@@ -1963,13 +1606,9 @@ function updatePerformance() {
 
 /**
  * Check if terrain details should be rendered based on quality settings
- * Note: Always render base terrain details (grass, water, etc.) for visual consistency
- * Only skip foreground elements (trees, rocks) on low quality
  */
 function shouldRenderDetails() {
-    // Always render terrain details - they are essential for visual identity
-    // Only foreground elements are skipped on low quality
-    return state.effectiveQuality !== 'low';
+    return state.effectiveQuality === 'high';
 }
 
 /**

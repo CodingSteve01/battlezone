@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCo
 import { checkWinCondition, endTurn } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas } from './pixiRenderer.js';
+import { render, resizeCanvas } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
