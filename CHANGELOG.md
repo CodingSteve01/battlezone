@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/CodingSteve01/battlezone/compare/v1.7.0...v1.8.0) (2025-12-23)
+
+
+### Features
+
+* major graphics overhaul with seamless terrain and realistic vegetation ([#53](https://github.com/CodingSteve01/battlezone/issues/53)) ([9339e28](https://github.com/CodingSteve01/battlezone/commit/9339e2822076cb853e601b0234114085ea3395b5))
+
 ## [1.7.0](https://github.com/CodingSteve01/battlezone/compare/v1.6.1...v1.7.0) (2025-12-23)
 
 
