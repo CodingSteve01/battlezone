@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/CodingSteve01/battlezone/compare/v1.6.1...v1.7.0) (2025-12-23)
+
+
+### Features
+
+* add enhanced graphics system with terrain animations and dynamic grid ([#51](https://github.com/CodingSteve01/battlezone/issues/51)) ([f335f1f](https://github.com/CodingSteve01/battlezone/commit/f335f1fb204d8e3d7489b5346874c235e4d22df6))
+
 ## [1.6.1](https://github.com/CodingSteve01/battlezone/compare/v1.6.0...v1.6.1) (2025-12-23)
 
 
