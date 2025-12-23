@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.4](https://github.com/CodingSteve01/battlezone/compare/v1.8.3...v1.8.4) (2025-12-23)
+
+
+### Bug Fixes
+
+* Bugfixs for pixi renderer intergration ([#61](https://github.com/CodingSteve01/battlezone/issues/61)) ([bb5dc1a](https://github.com/CodingSteve01/battlezone/commit/bb5dc1afd389c680a995e781eb2cf77893d9b835))
+
 ## [1.8.3](https://github.com/CodingSteve01/battlezone/compare/v1.8.2...v1.8.3) (2025-12-23)
 
 
