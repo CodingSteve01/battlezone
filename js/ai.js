@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, getRemainingMoveCapacity, trackUnitMovement } from './state.js';
 import { hexDistance, hexToPixel, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, moveUnitInstant } from './units.js';
@@ -380,7 +380,7 @@ async function performUnitAI(unit, plan) {
     if (assignedTargetId && attackable.some(t => t.id === assignedTargetId)) {
         const target = attackable.find(t => t.id === assignedTargetId);
         await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
-    } else if (attackable.length > 0 && unit.ap >= 1) {
+    } else if (attackable.length > 0 && state.sharedAP >= 1) {
         // 3. Attack best available target
         const target = selectBestTarget(unit, attackable);
         if (target) {
@@ -389,7 +389,7 @@ async function performUnitAI(unit, plan) {
     }
 
     // 4. Use special ability if beneficial
-    if (unit.ap >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
+    if (state.sharedAP >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
         useSpecialAbility(unit);
         if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
             updateUI();
@@ -399,7 +399,7 @@ async function performUnitAI(unit, plan) {
     }
 
     // 5. Move strategically
-    if (unit.ap >= 1) {
+    if (state.sharedAP >= 1 && getRemainingMoveCapacity(unit) > 0) {
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget);
@@ -408,7 +408,7 @@ async function performUnitAI(unit, plan) {
 
     // 6. Attack again after moving
     const attackableAfterMove = getAttackableUnits(unit);
-    if (attackableAfterMove.length > 0 && unit.ap >= 1) {
+    if (attackableAfterMove.length > 0 && state.sharedAP >= 1) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
             await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
@@ -482,7 +482,8 @@ async function executeRetreat(unit, enemies) {
     const reachable = getReachableHexes(unit);
     if (reachable.size === 0) return;
 
-    const maxCost = Math.min(unit.ap, unit.move);
+    // Movement limited by remaining move capacity and shared AP pool
+    const maxCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
     let bestHex = null;
     let bestScore = -Infinity;
 
@@ -638,7 +639,8 @@ function selectStrategicMoveTarget(unit, plan) {
     const reachable = getReachableHexes(unit);
     if (reachable.size === 0) return null;
 
-    const maxCost = Math.min(unit.ap, unit.move);
+    // Movement limited by remaining move capacity and shared AP pool
+    const maxCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
     const candidates = [];
     const enemies = plan.visibleEnemies;
 
@@ -867,7 +869,10 @@ async function executeAIMove(unit, target) {
     unit.q = target.q;
     unit.r = target.r;
     targetHex.unit = unit;
-    unit.ap -= target.cost;
+
+    // Spend from shared pool and track movement
+    spendSharedAP(target.cost);
+    trackUnitMovement(unit, target.cost);
 
     // Mark this area as searched
     aiMemory.searchedAreas.add(`${target.q},${target.r}`);

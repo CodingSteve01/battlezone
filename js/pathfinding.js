@@ -1,7 +1,7 @@
 // ===== A* PATHFINDING =====
 
 import { hexDistance, getNeighbors } from './hexMath.js';
-import { getHex, state } from './state.js';
+import { getHex, state, getRemainingMoveCapacity } from './state.js';
 import { TERRAIN } from './config.js';
 
 /**
@@ -108,10 +108,17 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
 /**
  * Get all reachable hexes from a position within a cost budget
  * Returns Map of "q,r" -> { hex, cost, path }
+ *
+ * Uses shared AP pool system:
+ * - Movement is limited by unit's remaining move capacity (unit.move - already moved)
+ * - Movement costs are paid from the shared AP pool
  */
 export function getReachableHexes(unit) {
-    // Use the lesser of AP or move stat (unit's movement capability per turn)
-    const maxCost = Math.min(unit.ap, unit.move);
+    // Movement is limited by:
+    // 1. Unit's remaining move capacity this turn (move stat - distance already moved)
+    // 2. Available AP in the shared pool
+    const remainingMoveCapacity = getRemainingMoveCapacity(unit);
+    const maxCost = Math.min(remainingMoveCapacity, state.sharedAP);
     const startKey = `${unit.q},${unit.r}`;
 
     const frontier = new PriorityQueue();

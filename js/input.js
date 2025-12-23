@@ -1,6 +1,6 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, getRemainingMoveCapacity } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
@@ -452,7 +452,7 @@ function handleTapOrClick(clientX, clientY) {
             // Check if current unit is a Medic and clicking on injured ally (context action: heal)
             if (unit && unit.class === 'medic' && hex.unit.id !== unit.id) {
                 const allyHex = hex.unit;
-                if (allyHex.currentHp < allyHex.maxHp && unit.ap >= 2 && !unit.usedSpecial) {
+                if (allyHex.currentHp < allyHex.maxHp && state.sharedAP >= 2 && !unit.usedSpecial) {
                     // Show healing option
                     showToast(`💚 ${unit.name} kann ${allyHex.name} heilen! Tippe nochmal zum Heilen.`, 'info');
                     if (state.pendingHealTarget && state.pendingHealTarget.id === allyHex.id) {
@@ -511,7 +511,7 @@ function handleEnemyClick(unit, hex) {
     const attackable = getAttackableUnits(unit);
     const canAttack = attackable.some(u => u.id === enemy.id);
 
-    if (canAttack && unit.ap >= 1) {
+    if (canAttack && state.sharedAP >= 1) {
         // Enemy is in range - attack!
         if (state.targetedUnit && state.targetedUnit.id === enemy.id) {
             // Second tap on same enemy - execute attack
@@ -539,7 +539,7 @@ function handleEnemyClick(unit, hex) {
     } else {
         // Enemy not in range - show message
         playError();
-        if (unit.ap < 1) {
+        if (state.sharedAP < 1) {
             showToast('❌ Keine AP für Angriff!', 'warning');
         } else {
             showToast('❌ Feind außer Reichweite!', 'warning');
@@ -601,8 +601,8 @@ function handleMoveClick(unit, hex) {
 
     // Try to find path with extended range for multi-turn movement
     const maxExtendedCost = unit.move * 10; // Allow planning for many turns ahead
-    // Use the lesser of AP or move stat (unit's movement capability per turn)
-    const maxMoveCost = Math.min(unit.ap, unit.move);
+    // Use the lesser of remaining move capacity or shared AP pool
+    const maxMoveCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
 
     // First try to find the full path
     let pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxExtendedCost);
@@ -798,8 +798,8 @@ export function continueQueuedPath(unit) {
     }
 
     // Recalculate path from current position to target
-    // Use the lesser of AP or move stat (unit's movement capability per turn)
-    const maxMoveCost = Math.min(unit.ap, unit.move);
+    // Use the lesser of remaining move capacity or shared AP pool
+    const maxMoveCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
     const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
@@ -995,7 +995,7 @@ function setupActionButtons() {
                 updateUI();
             } else if (unit && unit.hiding) {
                 showToast('❌ Bereits in Deckung!', 'warning');
-            } else if (unit && unit.ap < 1) {
+            } else if (unit && state.sharedAP < 1) {
                 showToast('❌ Nicht genug AP (braucht 1)!', 'warning');
             } else {
                 showToast('❌ Hier keine Deckung möglich!', 'warning');
@@ -1008,13 +1008,13 @@ function setupActionButtons() {
     if (specialBtn) {
         specialBtn.onclick = () => {
             const unit = getCurrentUnit();
-            if (unit && unit.ap >= 2 && !unit.usedSpecial) {
+            if (unit && state.sharedAP >= 2 && !unit.usedSpecial) {
                 useSpecialAbility(unit);
                 render();
                 updateUI();
             } else if (unit && unit.usedSpecial) {
                 showToast('❌ Spezialfähigkeit bereits benutzt!', 'warning');
-            } else if (unit && unit.ap < 2) {
+            } else if (unit && state.sharedAP < 2) {
                 showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
             }
         };

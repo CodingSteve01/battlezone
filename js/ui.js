@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getRemainingMoveCapacity } from './state.js';
 import { calculateHitChance, getCoverInfo } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
@@ -64,18 +64,20 @@ function updateTopBar(unit) {
         roundEl.textContent = state.round;
     }
 
-    // AP display
+    // AP display - now shows shared pool
     const apDisplay = document.getElementById('ap-display');
     if (apDisplay) {
         apDisplay.innerHTML = '';
-        if (unit) {
-            for (let i = 0; i < CONFIG.AP_PER_TURN; i++) {
-                const pip = document.createElement('div');
-                pip.className = 'ap-pip' + (i >= unit.ap ? ' used' : '');
-                pip.textContent = i < unit.ap ? '⚡' : '';
-                apDisplay.appendChild(pip);
-            }
-        }
+        // Show shared AP pool as numeric display
+        const poolDisplay = document.createElement('div');
+        poolDisplay.className = 'ap-pool-display';
+        poolDisplay.innerHTML = `
+            <span class="ap-pool-label">Team AP:</span>
+            <span class="ap-pool-value">${state.sharedAP}</span>
+            <span class="ap-pool-max">/ ${state.maxSharedAP}</span>
+            <span class="ap-pool-icon">⚡</span>
+        `;
+        apDisplay.appendChild(poolDisplay);
     }
 }
 
@@ -108,11 +110,13 @@ function updateUnitTabs(units) {
         const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
         const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
 
-        // AP info
-        const apPct = (unit.ap / CONFIG.AP_PER_TURN) * 100;
-        let apClass = '';
-        if (unit.ap <= 1) apClass = ' low';
-        else if (unit.ap <= 2) apClass = ' medium';
+        // Movement capacity info (how much this unit can still move)
+        const remainingMove = getRemainingMoveCapacity(unit);
+        const movePct = (remainingMove / unit.move) * 100;
+        let moveClass = '';
+        if (remainingMove === 0) moveClass = ' depleted';
+        else if (remainingMove <= unit.move * 0.3) moveClass = ' low';
+        else if (remainingMove <= unit.move * 0.6) moveClass = ' medium';
 
         tab.innerHTML = `
             <div class="class-icon">${UNIT_CLASSES[unit.class].icon}</div>
@@ -121,11 +125,11 @@ function updateUnitTabs(units) {
             <div class="hp-bar">
                 <div class="hp-fill${hpClass}" style="width: ${hpPct * 100}%"></div>
             </div>
-            <div class="ap-bar-container">
-                <div class="ap-bar">
-                    <div class="ap-fill${apClass}" style="width: ${apPct}%"></div>
+            <div class="move-bar-container">
+                <div class="move-bar">
+                    <div class="move-fill${moveClass}" style="width: ${movePct}%"></div>
                 </div>
-                <div class="ap-number">${unit.ap}⚡</div>
+                <div class="move-number">${remainingMove}/${unit.move}🦶</div>
             </div>
             ${!xpProgress.maxLevel ? `
                 <div class="xp-bar">
@@ -177,7 +181,7 @@ function updateActionButtons(unit) {
             } else if (!canHide) {
                 coverBtn.classList.add('disabled');
                 if (coverLabel) coverLabel.textContent = 'Deckung';
-            } else if (unit.ap < 1) {
+            } else if (state.sharedAP < 1) {
                 coverBtn.classList.add('disabled');
                 if (coverLabel) coverLabel.textContent = 'Deckung';
             } else {
@@ -213,7 +217,7 @@ function updateActionButtons(unit) {
             let tip = '';
             let shouldSuggest = false;
 
-            if (!unit.usedSpecial && unit.ap >= 2) {
+            if (!unit.usedSpecial && state.sharedAP >= 2) {
                 switch (unit.class) {
                     case 'medic':
                         // Check if allies need healing
@@ -233,15 +237,15 @@ function updateActionButtons(unit) {
                         }
                         break;
                     case 'scout':
-                        // Suggest sprint if there's AP but no movement yet
-                        if (unit.ap >= 3) {
+                        // Suggest sprint if there's AP in pool
+                        if (state.sharedAP >= 3) {
                             tip = '🏃 Sprint für +3 Bewegung!';
                             shouldSuggest = true;
                         }
                         break;
                     case 'assault':
                         // Suggest powershot before attacking
-                        if (unit.ap >= 3) {
+                        if (state.sharedAP >= 3) {
                             tip = '💥 Powershot für +20 Schaden!';
                             shouldSuggest = true;
                         }
@@ -252,8 +256,8 @@ function updateActionButtons(unit) {
             if (tipEl) tipEl.textContent = tip;
             if (shouldSuggest) specialBtn.classList.add('suggested');
 
-            // Disable if not enough AP or already used
-            if (unit.ap < 2 || unit.usedSpecial) {
+            // Disable if not enough AP in pool or already used
+            if (state.sharedAP < 2 || unit.usedSpecial) {
                 specialBtn.classList.add('disabled');
                 if (tipEl) tipEl.textContent = unit.usedSpecial ? 'Bereits benutzt' : 'Nicht genug AP';
             }

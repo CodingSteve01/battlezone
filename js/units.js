@@ -1,7 +1,7 @@
 // ===== UNIT SYSTEM =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getHex, getPlayerUnits } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, trackUnitMovement } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -79,7 +79,7 @@ export function getEffectiveRange(unit) {
  * Considers range and line of sight (rocks block completely, 2+ forests block)
  */
 export function getAttackableUnits(unit) {
-    if (unit.ap < 1) return [];
+    if (state.sharedAP < 1) return [];  // Need AP in shared pool
 
     const effectiveRange = getEffectiveRange(unit);
 
@@ -104,7 +104,7 @@ export function getAttackableUnits(unit) {
  * Used for UI feedback
  */
 export function getBlockedTargets(unit) {
-    if (unit.ap < 1) return [];
+    if (state.sharedAP < 1) return [];  // Need AP in shared pool
 
     const effectiveRange = getEffectiveRange(unit);
 
@@ -146,12 +146,13 @@ export function moveUnitInstant(unit, targetHex) {
 }
 
 /**
- * Move a unit to a new hex with cost deduction
+ * Move a unit to a new hex with cost deduction from shared pool
  */
 export function moveUnit(unit, targetHex, cost) {
     moveUnitInstant(unit, targetHex);
-    // Deduct AP
-    unit.ap -= cost;
+    // Deduct AP from shared pool and track movement
+    spendSharedAP(cost);
+    trackUnitMovement(unit, cost);
 }
 
 /**
@@ -186,7 +187,9 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
             // Animation complete
             state.animating = false;
             state.movementAnimation = null;
-            unit.ap -= totalCost;
+            // Deduct cost from shared pool and track movement
+            spendSharedAP(totalCost);
+            trackUnitMovement(unit, totalCost);
             if (onComplete) onComplete();
             return;
         }

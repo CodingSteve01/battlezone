@@ -37,14 +37,12 @@ export const ROUND_EVENTS = {
     morale_boost: {
         name: 'Kampfgeist',
         icon: '🔥',
-        description: 'Alle erhalten +1 AP diese Runde!',
+        description: 'Team erhält +3 AP zum Pool!',
         color: '#eab308',
         effect: () => {
-            state.units.forEach(unit => {
-                if (unit.alive) {
-                    unit.ap += 1;
-                }
-            });
+            // Add bonus to shared AP pool instead of individual units
+            state.sharedAP += 3;
+            state.maxSharedAP += 3;  // Also increase max for display
         }
     },
     thick_fog: {

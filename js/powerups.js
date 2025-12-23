@@ -34,7 +34,8 @@ export const POWERUP_TYPES = {
         color: '#eab308',
         description: '+2 AP sofort',
         effect: (unit) => {
-            unit.ap += 2;
+            // Add to shared AP pool instead of unit AP
+            state.sharedAP += 2;
             return { type: 'ap', amount: 2 };
         }
     },
