@@ -53,6 +53,17 @@ export function initTextures() {
     createWaterTexture();
     createSandTexture();
     createSwampTexture();
+    // New terrain textures
+    createSnowTexture();
+    createIceTexture();
+    createDeepwaterTexture();
+    createFlowersTexture();
+    createWheatTexture();
+    createMudTexture();
+    createGravelTexture();
+    createRuinsTexture();
+    createHeatherTexture();
+    createMossTexture();
 }
 
 /**
@@ -427,6 +438,349 @@ function createSwampTexture() {
     }
 
     textureCache.set('swamp', canvas);
+}
+
+/**
+ * Create snow texture
+ */
+function createSnowTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // White snow base with subtle blue shadows
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 25, y / 25, 3, 20);
+            const r = Math.floor(230 + n * 25);
+            const g = Math.floor(235 + n * 20);
+            const b = Math.floor(245 + n * 10);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Sparkles
+    for (let i = 0; i < 30; i++) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.random() * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('snow', canvas);
+}
+
+/**
+ * Create ice texture
+ */
+function createIceTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Light blue ice base
+    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+    gradient.addColorStop(0, '#a0d4e8');
+    gradient.addColorStop(0.5, '#c0e8f5');
+    gradient.addColorStop(1, '#90c4d8');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+
+    // Ice cracks
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        let x = Math.random() * TEXTURE_SIZE;
+        let y = Math.random() * TEXTURE_SIZE;
+        ctx.moveTo(x, y);
+        for (let j = 0; j < 4; j++) {
+            x += (Math.random() - 0.5) * 30;
+            y += (Math.random() - 0.5) * 30;
+            ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+    }
+
+    textureCache.set('ice', canvas);
+}
+
+/**
+ * Create deep water texture
+ */
+function createDeepwaterTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Very dark blue gradient
+    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+    gradient.addColorStop(0, '#0a2540');
+    gradient.addColorStop(0.5, '#051530');
+    gradient.addColorStop(1, '#0a2540');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+
+    // Deep wave patterns
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 40, y / 40, 3, 10);
+            if (n > 0.6) {
+                ctx.fillStyle = `rgba(50, 100, 150, ${(n - 0.6) * 0.3})`;
+                ctx.fillRect(x, y, 1, 1);
+            }
+        }
+    }
+
+    textureCache.set('deepwater', canvas);
+}
+
+/**
+ * Create flowers texture
+ */
+function createFlowersTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Green grass base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 20, y / 20, 4, 15);
+            const r = Math.floor(50 + n * 30);
+            const g = Math.floor(120 + n * 40);
+            const b = Math.floor(60 + n * 20);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Small colorful flowers
+    const colors = ['#ff6b6b', '#ffd93d', '#ffffff', '#ff9ecd', '#b19cd9'];
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+        ctx.beginPath();
+        ctx.arc(x, y, 2 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('flowers', canvas);
+}
+
+/**
+ * Create wheat texture
+ */
+function createWheatTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Golden wheat base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 15, y / 15, 4, 25);
+            const r = Math.floor(180 + n * 40);
+            const g = Math.floor(150 + n * 35);
+            const b = Math.floor(70 + n * 25);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Wheat stalks
+    for (let i = 0; i < 60; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const height = 8 + Math.random() * 10;
+
+        ctx.strokeStyle = `rgba(${200 + Math.random() * 40}, ${170 + Math.random() * 30}, ${80 + Math.random() * 20}, 0.7)`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 3, y - height);
+        ctx.stroke();
+    }
+
+    textureCache.set('wheat', canvas);
+}
+
+/**
+ * Create mud texture
+ */
+function createMudTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Brown mud base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 18, y / 18, 4, 30);
+            const r = Math.floor(85 + n * 30);
+            const g = Math.floor(70 + n * 25);
+            const b = Math.floor(45 + n * 20);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Wet patches
+    for (let i = 0; i < 6; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
+        gradient.addColorStop(0, 'rgba(60, 45, 30, 0.5)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+    }
+
+    textureCache.set('mud', canvas);
+}
+
+/**
+ * Create gravel texture
+ */
+function createGravelTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Gray gravel base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 12, y / 12, 4, 35);
+            const shade = 120 + n * 50;
+            ctx.fillStyle = `rgb(${shade},${shade * 0.95},${shade * 0.9})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Pebbles
+    for (let i = 0; i < 80; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const shade = 0.5 + Math.random() * 0.5;
+        ctx.fillStyle = `rgb(${Math.floor(130 * shade)}, ${Math.floor(125 * shade)}, ${Math.floor(115 * shade)})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 2 + Math.random() * 3, 1.5 + Math.random() * 2, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('gravel', canvas);
+}
+
+/**
+ * Create ruins texture
+ */
+function createRuinsTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Stone floor base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 20, y / 20, 4, 40);
+            const shade = 100 + n * 40;
+            ctx.fillStyle = `rgb(${shade},${shade * 0.95},${shade * 0.9})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Stone blocks pattern
+    ctx.strokeStyle = 'rgba(60, 55, 50, 0.4)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.strokeRect(x, y, 20 + Math.random() * 20, 15 + Math.random() * 15);
+    }
+
+    // Moss patches
+    for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = 'rgba(60, 100, 50, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 8, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('ruins', canvas);
+}
+
+/**
+ * Create heather texture
+ */
+function createHeatherTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Purple-brown heather base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 20, y / 20, 4, 45);
+            const r = Math.floor(100 + n * 40);
+            const g = Math.floor(70 + n * 30);
+            const b = Math.floor(100 + n * 40);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Small purple flowers
+    for (let i = 0; i < 50; i++) {
+        ctx.fillStyle = `rgb(${140 + Math.random() * 50}, ${80 + Math.random() * 40}, ${140 + Math.random() * 50})`;
+        ctx.beginPath();
+        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random(), 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('heather', canvas);
+}
+
+/**
+ * Create moss texture
+ */
+function createMossTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = TEXTURE_SIZE;
+    canvas.height = TEXTURE_SIZE;
+    const ctx = canvas.getContext('2d');
+
+    // Dark green moss base
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n = fractalNoise(x / 15, y / 15, 5, 50);
+            const r = Math.floor(40 + n * 25);
+            const g = Math.floor(80 + n * 35);
+            const b = Math.floor(40 + n * 20);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Moss clumps
+    for (let i = 0; i < 20; i++) {
+        ctx.fillStyle = `rgba(${50 + Math.random() * 30}, ${90 + Math.random() * 30}, ${50 + Math.random() * 20}, 0.6)`;
+        ctx.beginPath();
+        ctx.ellipse(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 5 + Math.random() * 8, 3 + Math.random() * 5, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    textureCache.set('moss', canvas);
 }
 
 /**

@@ -12,6 +12,31 @@ import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { updateParticles, drawParticles } from './particles.js';
+import {
+    animationTick,
+    drawAnimatedGrass,
+    drawAnimatedWater,
+    drawShallowWater,
+    drawWheatField,
+    drawReeds,
+    drawSnowfall,
+    drawSnowDetails,
+    drawIceReflections,
+    drawFireflies,
+    drawDustMotes,
+    drawFallingLeaves,
+    drawFlowers,
+    drawHeather,
+    drawRuins,
+    drawGravel,
+    drawFarmland,
+    drawMud,
+    drawTerrainBlend,
+    getNeighborTerrains,
+    getCharacterAnimState,
+    setCharacterAnimation,
+    CHAR_ANIM
+} from './animations.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -523,7 +548,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
     const s = size * 0.45;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
 
-    if (type === 'forest') {
+    if (type === 'forest' || type === 'pine') {
         // Trees are foreground elements - make them bigger for 2.5D effect
         const treeCount = 1 + Math.abs(baseSeed % 2);
         for (let i = 0; i < treeCount; i++) {
@@ -531,8 +556,8 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.4;
             // Make trees 2x bigger for proper 2.5D effect
             const treeSize = s * (1.4 + seededRandom(baseSeed + i * 10 + 2) * 0.6);
-            // Now includes 5 tree types: 0=pine, 1=round, 2=birch, 3=willow, 4=oak
-            const treeType = Math.floor(seededRandom(baseSeed + i * 10 + 3) * 5);
+            // Pine terrain uses mostly pine trees (type 0), forest uses all types
+            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 5);
 
             elements.push({
                 type: 'tree',
@@ -559,7 +584,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + 104)
             });
         }
-    } else if (type === 'grass') {
+    } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
         // Large bushes on grass are foreground elements
         const grassType = Math.abs(baseSeed) % 100;
         if (grassType < 15) {
@@ -572,7 +597,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 draw: () => drawBush2D5(cx, cy, bushSize, baseSeed)
             });
         }
-    } else if (type === 'rock') {
+    } else if (type === 'rock' || type === 'cliff') {
         // Rock formations are foreground elements - make them much bigger for proper cover
         elements.push({
             type: 'rock',
@@ -581,6 +606,17 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             sortY: cy + s * 0.5,
             draw: () => drawRockFormation2D5(cx, cy, s * 2.2, baseSeed)
         });
+    } else if (type === 'ruins') {
+        // Ruins have some rock formations
+        if (seededRandom(baseSeed) > 0.5) {
+            elements.push({
+                type: 'rock',
+                x: cx,
+                y: cy,
+                sortY: cy + s * 0.3,
+                draw: () => drawRockFormation2D5(cx, cy, s * 1.5, baseSeed)
+            });
+        }
     }
 
     return elements;
@@ -599,8 +635,8 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            // Draw ground-level grass blades
-            drawGrassBlades(cx, cy, s, baseSeed);
+            // Draw animated grass blades
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
 
             // Small flowers stay on ground level
             const grassType = Math.abs(baseSeed) % 100;
@@ -612,6 +648,12 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'forest':
             // Draw forest floor (leaves, small plants) - trees are drawn as foreground
             drawForestFloor(cx, cy, s, baseSeed);
+            // Add fireflies for atmosphere
+            if (state.effectiveQuality === 'high') {
+                drawFireflies(ctx, cx, cy, size);
+            }
+            // Falling leaves
+            drawFallingLeaves(ctx, cx, cy, size);
             break;
 
         case 'rock':
@@ -624,10 +666,16 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'water':
             drawWaterDetails(cx, cy, s, baseSeed);
+            // Add animated water overlay
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
 
         case 'sand':
             drawSandDetails(cx, cy, s, baseSeed);
+            // Add floating dust particles
+            if (state.effectiveQuality !== 'low') {
+                drawDustMotes(ctx, cx, cy, size);
+            }
             break;
 
         case 'swamp':
@@ -648,7 +696,83 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'river':
             drawRiverDetails(cx, cy, s, baseSeed);
+            // Add flowing water animation
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, false);
             break;
+
+        // New terrain types with animations
+        case 'snow':
+            drawSnowDetails(ctx, cx, cy, size, hexQ, hexR);
+            drawSnowfall(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'ice':
+            drawIceReflections(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'deepwater':
+            drawAnimatedWater(ctx, cx, cy, size, hexQ, hexR, true);
+            break;
+
+        case 'shallows':
+            drawShallowWater(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'reeds':
+            drawReeds(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'flowers':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'grass');
+            drawFlowers(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'mud':
+            drawMud(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'farmland':
+            drawFarmland(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'wheat':
+            drawWheatField(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'gravel':
+            drawGravel(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'ruins':
+            drawRuins(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'tallgrass':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'tallgrass');
+            break;
+
+        case 'pine':
+            drawForestFloor(cx, cy, s, baseSeed);
+            break;
+
+        case 'clearing':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'clearing');
+            break;
+
+        case 'heather':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'heather');
+            drawHeather(ctx, cx, cy, size, hexQ, hexR);
+            break;
+
+        case 'moss':
+            drawAnimatedGrass(ctx, cx, cy, size, hexQ, hexR, 1, 'moss');
+            break;
+    }
+
+    // Add terrain blend effects for all visible terrain
+    if (state.effectiveQuality !== 'low') {
+        const neighbors = getNeighborTerrains(state.hexMap, hexQ, hexR);
+        drawTerrainBlend(ctx, cx, cy, size, type, neighbors);
     }
 
     ctx.restore();
@@ -2378,10 +2502,28 @@ function shouldRenderForeground() {
 }
 
 /**
+ * Check if hex grid should be visible
+ * Only show when planning movement or attacking
+ */
+function shouldShowHexGrid() {
+    const currentUnit = getCurrentUnit();
+    if (!currentUnit) return false;
+
+    // Show grid when we have reachable hexes (movement mode) or targeting (attack mode)
+    return state.selectedAction === 'move' ||
+           state.selectedAction === 'attack' ||
+           state.currentPath !== null ||
+           state.pendingMoveDestination !== null;
+}
+
+/**
  * Main render function
  */
 export function render() {
     if (!canvas || !ctx) return;
+
+    // Update animations
+    animationTick(performance.now());
 
     // Track performance for auto-quality adjustment
     updatePerformance();
@@ -2420,6 +2562,9 @@ export function render() {
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
     const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
+
+    // Only show hex grid borders when planning movement or attacking
+    const showGrid = shouldShowHexGrid();
 
     // Get max move cost for path visualization (consistent with getReachableHexes)
     const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
@@ -2470,8 +2615,10 @@ export function render() {
                 fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
             }
 
-            const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
-                (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
+            // Only show grid lines when in movement/attack mode
+            const strokeColor = showGrid ?
+                (fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
+                (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)')) : null;
             const terrainData = fogLevel === 'visible' ? terrain : null;
             drawHex(sx, sy, state.hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData);
 
