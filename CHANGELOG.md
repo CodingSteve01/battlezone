@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/CodingSteve01/battlezone/compare/v1.8.1...v1.8.2) (2025-12-23)
+
+
+### Bug Fixes
+
+* improve performance and enable animated terrain rendering ([#57](https://github.com/CodingSteve01/battlezone/issues/57)) ([40ec02f](https://github.com/CodingSteve01/battlezone/commit/40ec02f18864208376b585d3afbe870ad157984e))
+
 ## [1.8.1](https://github.com/CodingSteve01/battlezone/compare/v1.8.0...v1.8.1) (2025-12-23)
 
 
