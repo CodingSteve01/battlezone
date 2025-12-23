@@ -2,15 +2,15 @@
 // Advanced tactical AI with memory, planning, and unit coordination
 
 import { state, getHex, getPlayerUnits, spendSharedAP, getRemainingMoveCapacity, trackUnitMovement } from './state.js';
-import { hexDistance, hexToPixel, getNeighbors } from './hexMath.js';
+import { hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits, moveUnitInstant } from './units.js';
-import { executeAttack, useSpecialAbility, calculateHitChance } from './combat.js';
+import { getAttackableUnits } from './units.js';
+import { executeAttack, useSpecialAbility } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
-import { updateUI, showToast } from './ui.js';
+import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
-import { TERRAIN, UNIT_CLASSES } from './config.js';
+import { TERRAIN } from './config.js';
 
 // ===== AI MEMORY SYSTEM =====
 // Stores information about enemy positions, even when not visible
@@ -612,20 +612,30 @@ function shouldUseSpecial(unit, enemies, plan) {
             return false;
 
         case 'sniper':
-            // Cloak for stealth approach or when enemies nearby
+            // Cloak only when tactically beneficial (not always)
             if (unit.cloaked) return false;
-            return enemies.length > 0 || plan.inHuntMode;
+            if (enemies.length > 0) {
+                // Only cloak if in danger - enemies within 3 hexes
+                const closestEnemy = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                return closestEnemy <= 3 && unit.currentHp < unit.maxHp * 0.7;
+            }
+            // In hunt mode, only cloak 30% of the time (not always)
+            return plan.inHuntMode && Math.random() < 0.3;
 
         case 'ninja':
-            // Stealth for ambush
+            // Stealth for ambush - but not constantly
             if (unit.cloaked) return false;
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                return closestEnemy <= 5;
+                // Only stealth if close enough to ambush (within 3 hexes)
+                return closestEnemy <= 3 && closestEnemy > 1;
             }
-            return plan.inHuntMode;
+            // In hunt mode, only cloak 20% of the time
+            return plan.inHuntMode && Math.random() < 0.2;
 
         default:
             return false;
@@ -681,7 +691,7 @@ function selectStrategicMoveTarget(unit, plan) {
 /**
  * Score position for combat situations
  */
-function scoreCombatPosition(unit, q, r, enemies, plan) {
+function scoreCombatPosition(unit, q, r, enemies, _plan) {
     let score = 0;
 
     // Get assigned target or closest enemy
@@ -793,7 +803,7 @@ function scoreSearchPosition(unit, q, r, plan) {
 
     // Search pattern specific scoring
     switch (plan.searchPattern) {
-        case 'expand':
+        case 'expand': {
             // Move outward from current position toward map edges
             const distFromStart = Math.sqrt(q * q + r * r);
             const currentDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
@@ -801,8 +811,9 @@ function scoreSearchPosition(unit, q, r, plan) {
                 score += 15;
             }
             break;
+        }
 
-        case 'sweep':
+        case 'sweep': {
             // Move in coordinated line
             const allies = getPlayerUnits(unit.player);
             const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
@@ -811,8 +822,9 @@ function scoreSearchPosition(unit, q, r, plan) {
             // But push forward
             score += q * 2;
             break;
+        }
 
-        case 'pincer':
+        case 'pincer': {
             // Move to flank estimated enemy position
             if (aiMemory.playerCenterEstimate) {
                 const estPos = aiMemory.playerCenterEstimate;
@@ -829,6 +841,7 @@ function scoreSearchPosition(unit, q, r, plan) {
                 score += (Math.PI - angleDiff) * 10;
             }
             break;
+        }
     }
 
     // Move towards map center (higher chance of finding enemies)

@@ -122,28 +122,33 @@ export function isUnitVisibleToPlayer(unit, viewerPlayer) {
 
     // Cloaked units can be detected if very close (proximity detection)
     if (unit.cloaked) {
-        const viewerUnits = getPlayerUnits(viewerPlayer);
-        const classData = UNIT_CLASSES[unit.class];
-        // Base detection range is 1 for ninja, 2 for others
-        const baseDetectionRange = classData.stealthDetectionRange || 2;
+        // Flare event reveals all cloaked units
+        if (unit.flareRevealed) {
+            // Continue to normal visibility checks - flare reveals them
+        } else {
+            const viewerUnits = getPlayerUnits(viewerPlayer);
+            const classData = UNIT_CLASSES[unit.class];
+            // Base detection range is 1 for ninja, 2 for others
+            const baseDetectionRange = classData.stealthDetectionRange || 2;
 
-        // Check if any viewer unit is close enough to detect
-        const detected = viewerUnits.some(friendlyUnit => {
-            const dist = hexDistance(
-                { q: friendlyUnit.q, r: friendlyUnit.r },
-                { q: unit.q, r: unit.r }
-            );
-            // Must be within detection range AND have line of sight
-            if (dist > baseDetectionRange) return false;
-            const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
-            return los.clear;
-        });
+            // Check if any viewer unit is close enough to detect
+            const detected = viewerUnits.some(friendlyUnit => {
+                const dist = hexDistance(
+                    { q: friendlyUnit.q, r: friendlyUnit.r },
+                    { q: unit.q, r: unit.r }
+                );
+                // Must be within detection range AND have line of sight
+                if (dist > baseDetectionRange) return false;
+                const los = hasLineOfSight(friendlyUnit.q, friendlyUnit.r, unit.q, unit.r);
+                return los.clear;
+            });
 
-        // If not detected by proximity, cloaked unit is invisible
-        if (!detected) {
-            return false;
+            // If not detected by proximity, cloaked unit is invisible
+            if (!detected) {
+                return false;
+            }
+            // If detected, continue to check visibility normally
         }
-        // If detected, continue to check visibility normally
     }
 
     // Enemy units only visible if in viewer's visible hex

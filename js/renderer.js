@@ -37,6 +37,23 @@ import {
     setCharacterAnimation,
     CHAR_ANIM
 } from './animations.js';
+import { seededRandom } from './renderUtils.js';
+import {
+    initVegetationRenderer,
+    drawTree2D5,
+    drawBush2D5,
+    drawSmallShrub,
+    drawFlowerCluster
+} from './renderVegetation.js';
+import {
+    initTerrainRenderer,
+    drawRockFormation2D5,
+    drawHillsDetails,
+    drawRoadDetails,
+    drawPathDetails,
+    drawRiverDetails,
+    drawForestFloor
+} from './renderTerrain.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -157,12 +174,17 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
         fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
     }
 
-    // Draw hex with texture
-    const strokeColor = fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
-        (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)');
+    // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
     const terrainData = fogLevel === 'visible' ? terrain : null;
 
-    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, strokeColor, 1, texture, terrainData, hex.q, hex.r);
+    // Pass null for strokeColor - grid overlay is drawn separately when needed
+    drawHexToContext(tileCtx, cx, cy, hexSize * 0.95, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
+
+    // Add terrain blending for seamless transitions between terrain types
+    if (fogLevel === 'visible' && terrainData) {
+        const neighbors = getNeighborTerrains(state.hexMap, hex.q, hex.r);
+        drawTerrainBlend(tileCtx, cx, cy, hexSize * 0.95, hex.type, neighbors);
+    }
 
     // Add fog overlays
     if (fogLevel === 'explored') {
@@ -288,22 +310,8 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.fill();
     }
 
-    if (terrain) {
-        context.save();
-        context.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * 0.85 * Math.cos(angle);
-            const py = cy + size * 0.85 * Math.sin(angle);
-            if (i === 0) context.moveTo(px, py);
-            else context.lineTo(px, py);
-        }
-        context.closePath();
-        context.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-        context.lineWidth = 1.5;
-        context.stroke();
-        context.restore();
-    }
+    // Removed inner hex highlight for seamless terrain appearance
+    // Grid overlay is now drawn separately only when needed
 
     if (strokeColor) {
         context.strokeStyle = strokeColor;
@@ -321,6 +329,74 @@ function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
     ctx = context;
     drawTerrainDetails(cx, cy, size, type, hexQ, hexR);
     ctx = originalCtx;
+}
+
+/**
+ * Draw a subtle terrain-colored shimmer for enemy cloaked units
+ * This makes them visible if you look carefully, but camouflaged with the terrain
+ * @param {number} cx - Center X position
+ * @param {number} cy - Center Y position
+ * @param {number} size - Unit size
+ * @param {Object} unit - The cloaked unit
+ */
+function drawCamouflageShimmer(cx, cy, size, unit) {
+    // Get terrain at unit's position
+    const hex = getHex(unit.q, unit.r);
+    if (!hex) return;
+
+    const terrainData = TERRAIN[hex.type];
+    const baseColor = terrainData?.color || '#2d5a40';
+
+    // Parse base color
+    const r = parseInt(baseColor.slice(1, 3), 16);
+    const g = parseInt(baseColor.slice(3, 5), 16);
+    const b = parseInt(baseColor.slice(5, 7), 16);
+
+    // Create a subtle shimmer effect using animated noise
+    const time = Date.now() * 0.002;
+    const shimmerIntensity = 0.15 + Math.sin(time + unit.q * 0.5 + unit.r * 0.7) * 0.05;
+
+    ctx.save();
+
+    // Draw a subtle distortion/heat-wave effect
+    // Base camouflage shape (humanoid silhouette)
+    ctx.globalAlpha = shimmerIntensity;
+
+    // Create gradient that matches terrain
+    const shimmerGrad = ctx.createRadialGradient(
+        cx, cy - size * 0.3, 0,
+        cx, cy, size * 0.8
+    );
+    shimmerGrad.addColorStop(0, `rgba(${r + 30}, ${g + 30}, ${b + 30}, 0.3)`);
+    shimmerGrad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.15)`);
+    shimmerGrad.addColorStop(1, 'transparent');
+
+    ctx.fillStyle = shimmerGrad;
+
+    // Draw subtle humanoid shape
+    ctx.beginPath();
+    // Head
+    ctx.arc(cx, cy - size * 0.5, size * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body (oval)
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, size * 0.25, size * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Add subtle shimmer lines (like heat distortion)
+    ctx.strokeStyle = `rgba(${r + 40}, ${g + 40}, ${b + 40}, ${shimmerIntensity * 0.5})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+        const offsetY = (i - 1) * size * 0.3;
+        const wave = Math.sin(time * 2 + i) * size * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(cx - size * 0.2 + wave, cy + offsetY);
+        ctx.quadraticCurveTo(cx + wave * 2, cy + offsetY - size * 0.1, cx + size * 0.2 + wave, cy + offsetY);
+        ctx.stroke();
+    }
+
+    ctx.restore();
 }
 
 /**
@@ -373,6 +449,10 @@ function getStealthVisibilityAlpha(stealthUnit) {
 export function initRenderer() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
+
+    // Initialize sub-renderers with canvas context
+    initVegetationRenderer(ctx);
+    initTerrainRenderer(ctx);
 
     // Initialize textures once
     if (!texturesInitialized) {
@@ -506,37 +586,14 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.fill();
     }
 
-    // Inner highlight for depth - hexagon shape
-    if (terrain) {
-        ctx.save();
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * 0.85 * Math.cos(angle);
-            const py = cy + size * 0.85 * Math.sin(angle);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.restore();
-    }
+    // Removed inner hex highlight for seamless terrain appearance
+    // Grid overlay is now drawn separately only when needed
 
     if (strokeColor) {
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = lineWidth;
         ctx.stroke();
     }
-}
-
-/**
- * Seeded random number generator for consistent decorations
- */
-function seededRandom(seed) {
-    const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-    return x - Math.floor(x);
 }
 
 /**
@@ -776,982 +833,6 @@ function drawTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     }
 
     ctx.restore();
-}
-
-/**
- * Draw a tree with 2.5D depth effect - larger and more detailed
- */
-function drawTree2D5(x, y, size, treeType, seed) {
-    ctx.save();
-
-    // Ground shadow - larger and more visible
-    ctx.fillStyle = 'rgba(0, 20, 10, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.55, size * 0.5, size * 0.18, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Trunk - thicker for bigger trees
-    ctx.fillStyle = '#3d2817';
-    const trunkWidth = size * 0.15;
-    const trunkHeight = size * 0.5;
-    ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
-
-    // Trunk detail/bark
-    ctx.strokeStyle = '#2a1a0f';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x - trunkWidth * 0.25, y + size * 0.1);
-    ctx.lineTo(x - trunkWidth * 0.15, y + trunkHeight * 0.8);
-    ctx.moveTo(x + trunkWidth * 0.2, y + size * 0.15);
-    ctx.lineTo(x + trunkWidth * 0.1, y + trunkHeight * 0.7);
-    ctx.stroke();
-
-    if (treeType === 0) {
-        // Pine tree - larger layers
-        const layers = 5;
-        for (let i = layers - 1; i >= 0; i--) {
-            const layerY = y - size * 0.05 - i * size * 0.18;
-            const layerWidth = size * (0.55 - i * 0.08);
-
-            ctx.fillStyle = `rgb(${15 + i * 7}, ${45 + i * 10}, ${25 + i * 5})`;
-            ctx.beginPath();
-            ctx.moveTo(x, layerY - size * 0.28);
-            ctx.lineTo(x - layerWidth, layerY + size * 0.12);
-            ctx.lineTo(x + layerWidth, layerY + size * 0.12);
-            ctx.closePath();
-            ctx.fill();
-        }
-    } else if (treeType === 1) {
-        // Round/deciduous tree - larger canopy
-        const foliageColors = ['#1a4d2e', '#165a32', '#1e6b3a', '#2a7a45'];
-        for (let i = 0; i < 4; i++) {
-            const fx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.35;
-            const fy = y - size * 0.3 + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.25;
-            const fSize = size * (0.4 + seededRandom(seed + i * 5 + 2) * 0.2);
-
-            ctx.fillStyle = foliageColors[i % foliageColors.length];
-            ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    } else if (treeType === 2) {
-        // Birch tree - white bark, lighter foliage
-        // White trunk with dark marks
-        ctx.fillStyle = '#e8e4dc';
-        ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, trunkHeight);
-
-        // Birch bark markings (horizontal dark lines)
-        ctx.fillStyle = '#3a3530';
-        for (let m = 0; m < 4; m++) {
-            const markY = y + trunkHeight * (0.1 + m * 0.22);
-            const markWidth = trunkWidth * (0.4 + seededRandom(seed + m * 3) * 0.4);
-            ctx.fillRect(x - markWidth / 2, markY, markWidth, 2);
-        }
-
-        // Lighter, more delicate foliage
-        const birchColors = ['#3d7a4a', '#4a8f58', '#5aa368', '#68b575'];
-        for (let i = 0; i < 5; i++) {
-            const fx = x + (seededRandom(seed + i * 7) - 0.5) * size * 0.5;
-            const fy = y - size * 0.35 + (seededRandom(seed + i * 7 + 1) - 0.5) * size * 0.35;
-            const fSize = size * (0.25 + seededRandom(seed + i * 7 + 2) * 0.15);
-
-            ctx.fillStyle = birchColors[i % birchColors.length];
-            ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    } else if (treeType === 3) {
-        // Willow tree - drooping branches
-        ctx.fillStyle = '#4a3520';
-        ctx.fillRect(x - trunkWidth * 0.6, y, trunkWidth * 1.2, trunkHeight * 0.8);
-
-        // Drooping willow branches
-        ctx.strokeStyle = '#2d5a35';
-        ctx.lineWidth = 2;
-        for (let b = 0; b < 8; b++) {
-            const branchStartX = x + (seededRandom(seed + b * 5) - 0.5) * size * 0.7;
-            const branchStartY = y - size * 0.2;
-            const branchEndX = branchStartX + (seededRandom(seed + b * 5 + 1) - 0.5) * size * 0.4;
-            const branchEndY = y + size * 0.3;
-
-            ctx.beginPath();
-            ctx.moveTo(branchStartX, branchStartY);
-            ctx.bezierCurveTo(
-                branchStartX, branchStartY + size * 0.3,
-                branchEndX, branchEndY - size * 0.2,
-                branchEndX, branchEndY
-            );
-            ctx.stroke();
-
-            // Leaves along the branch
-            ctx.fillStyle = '#3d6b42';
-            for (let l = 0; l < 5; l++) {
-                const t = 0.2 + l * 0.18;
-                const lx = branchStartX + (branchEndX - branchStartX) * t;
-                const ly = branchStartY + (branchEndY - branchStartY) * t * t;
-                ctx.beginPath();
-                ctx.ellipse(lx, ly, size * 0.06, size * 0.03, Math.PI / 4, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-    } else {
-        // Oak-style tree - larger and fuller
-        ctx.fillStyle = '#1a4d2e';
-        ctx.beginPath();
-        ctx.ellipse(x, y - size * 0.25, size * 0.55, size * 0.4, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#165a32';
-        ctx.beginPath();
-        ctx.ellipse(x - size * 0.18, y - size * 0.38, size * 0.35, size * 0.28, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#1e6b3a';
-        ctx.beginPath();
-        ctx.ellipse(x + size * 0.15, y - size * 0.42, size * 0.3, size * 0.22, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Light highlight on foliage
-    ctx.fillStyle = 'rgba(150, 200, 120, 0.2)';
-    ctx.beginPath();
-    ctx.ellipse(x - size * 0.18, y - size * 0.4, size * 0.18, size * 0.14, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-}
-
-/**
- * Draw a bush with 2.5D depth effect - larger
- */
-function drawBush2D5(x, y, size, seed) {
-    ctx.save();
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 30, 10, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.35, size * 0.6, size * 0.18, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Bush layers - larger
-    const layers = 4;
-    for (let i = layers - 1; i >= 0; i--) {
-        const layerSize = size * (0.5 + i * 0.18);
-        const yOff = -i * size * 0.1;
-        const shade = 0.55 + i * 0.12;
-        ctx.fillStyle = `rgb(${Math.floor(30 * shade)}, ${Math.floor(70 * shade)}, ${Math.floor(35 * shade)})`;
-        ctx.beginPath();
-        ctx.ellipse(x, y + yOff, layerSize, layerSize * 0.65, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Highlight
-    ctx.fillStyle = 'rgba(100, 160, 80, 0.35)';
-    ctx.beginPath();
-    ctx.ellipse(x - size * 0.18, y - size * 0.2, size * 0.28, size * 0.22, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-}
-
-/**
- * Draw a small shrub/undergrowth - lower vegetation for forest floors
- */
-function drawSmallShrub(x, y, size, seed) {
-    ctx.save();
-
-    // Small shadow
-    ctx.fillStyle = 'rgba(0, 30, 10, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.15, size * 0.4, size * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Multiple small leaf clusters
-    const colors = ['#2a5a35', '#345f3a', '#3d6b42', '#467348'];
-    const clusterCount = 3 + Math.floor(seededRandom(seed) * 3);
-
-    for (let i = 0; i < clusterCount; i++) {
-        const cx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.6;
-        const cy = y + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.4;
-        const cSize = size * (0.2 + seededRandom(seed + i * 5 + 2) * 0.15);
-
-        ctx.fillStyle = colors[i % colors.length];
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, cSize, cSize * 0.7, seededRandom(seed + i * 5 + 3) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Small berries or flowers occasionally
-    if (seededRandom(seed + 50) > 0.6) {
-        const berryColor = seededRandom(seed + 51) > 0.5 ? '#8b3a3a' : '#a04080';
-        ctx.fillStyle = berryColor;
-        for (let b = 0; b < 3; b++) {
-            const bx = x + (seededRandom(seed + b * 7 + 60) - 0.5) * size * 0.5;
-            const by = y + (seededRandom(seed + b * 7 + 61) - 0.5) * size * 0.3;
-            ctx.beginPath();
-            ctx.arc(bx, by, size * 0.04, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw a rock formation with 2.5D depth effect - large enough to provide cover
- */
-function drawRockFormation2D5(cx, cy, s, seed) {
-    ctx.save();
-
-    // Large main rock shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(cx + 6, cy + s * 0.35, s * 0.75, s * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Main large boulder - tall enough to hide behind
-    ctx.fillStyle = '#4a4a5a';
-    ctx.beginPath();
-    // Draw as a tall irregular polygon for more rock-like appearance
-    ctx.moveTo(cx - s * 0.5, cy + s * 0.25);
-    ctx.lineTo(cx - s * 0.55, cy - s * 0.1);
-    ctx.lineTo(cx - s * 0.35, cy - s * 0.45);
-    ctx.lineTo(cx + s * 0.1, cy - s * 0.55);
-    ctx.lineTo(cx + s * 0.45, cy - s * 0.35);
-    ctx.lineTo(cx + s * 0.5, cy + s * 0.05);
-    ctx.lineTo(cx + s * 0.4, cy + s * 0.3);
-    ctx.closePath();
-    ctx.fill();
-
-    // Add 3D shading to the rock
-    const rockGradient = ctx.createLinearGradient(cx - s * 0.5, cy - s * 0.5, cx + s * 0.5, cy + s * 0.3);
-    rockGradient.addColorStop(0, 'rgba(100, 100, 120, 0.6)');
-    rockGradient.addColorStop(0.5, 'rgba(70, 70, 85, 0.3)');
-    rockGradient.addColorStop(1, 'rgba(30, 30, 40, 0.5)');
-    ctx.fillStyle = rockGradient;
-    ctx.fill();
-
-    // Secondary rock pillar
-    ctx.fillStyle = '#5a5a6a';
-    ctx.beginPath();
-    ctx.moveTo(cx + s * 0.2, cy + s * 0.25);
-    ctx.lineTo(cx + s * 0.15, cy - s * 0.2);
-    ctx.lineTo(cx + s * 0.35, cy - s * 0.4);
-    ctx.lineTo(cx + s * 0.55, cy - s * 0.25);
-    ctx.lineTo(cx + s * 0.6, cy + s * 0.15);
-    ctx.closePath();
-    ctx.fill();
-
-    // Small rock in front
-    ctx.fillStyle = '#656575';
-    ctx.beginPath();
-    ctx.ellipse(cx - s * 0.25, cy + s * 0.2, s * 0.25, s * 0.15, 0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Rock face details - cracks
-    ctx.strokeStyle = 'rgba(30, 30, 40, 0.7)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.2, cy - s * 0.4);
-    ctx.lineTo(cx - s * 0.15, cy - s * 0.1);
-    ctx.lineTo(cx - s * 0.05, cy + s * 0.15);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(cx + s * 0.2, cy - s * 0.3);
-    ctx.lineTo(cx + s * 0.25, cy + s * 0.05);
-    ctx.stroke();
-
-    // Edge highlights (top-left lit)
-    ctx.strokeStyle = 'rgba(150, 150, 170, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.35, cy - s * 0.45);
-    ctx.lineTo(cx + s * 0.1, cy - s * 0.55);
-    ctx.lineTo(cx + s * 0.45, cy - s * 0.35);
-    ctx.stroke();
-
-    // Moss patches for natural look
-    if (seededRandom(seed) > 0.3) {
-        ctx.fillStyle = 'rgba(50, 90, 45, 0.7)';
-        ctx.beginPath();
-        ctx.ellipse(cx - s * 0.3, cy - s * 0.15, s * 0.12, s * 0.08, 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(cx + s * 0.35, cy - s * 0.1, s * 0.1, s * 0.06, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Cover indicator icon (shield symbol)
-    ctx.fillStyle = 'rgba(100, 100, 120, 0.6)';
-    ctx.font = `${Math.round(s * 0.25)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🪨', cx, cy - s * 0.65);
-
-    ctx.restore();
-}
-
-/**
- * Draw hills terrain details
- */
-function drawHillsDetails(cx, cy, s, seed) {
-    // Draw rolling hill contours
-    ctx.strokeStyle = 'rgba(80, 100, 70, 0.4)';
-    ctx.lineWidth = 2;
-
-    // Multiple contour lines to show elevation
-    for (let i = 0; i < 3; i++) {
-        const yOffset = (i - 1) * s * 0.35;
-        const xWobble = (seededRandom(seed + i * 17) - 0.5) * s * 0.3;
-
-        ctx.beginPath();
-        ctx.moveTo(cx - s * 0.8, cy + yOffset + s * 0.1);
-        ctx.bezierCurveTo(
-            cx - s * 0.3 + xWobble, cy + yOffset - s * 0.15,
-            cx + s * 0.3 - xWobble, cy + yOffset - s * 0.1,
-            cx + s * 0.8, cy + yOffset + s * 0.05
-        );
-        ctx.stroke();
-    }
-
-    // Add some rocks on the hills
-    const rockCount = 1 + (seed % 2);
-    for (let i = 0; i < rockCount; i++) {
-        const rx = cx + (seededRandom(seed + i * 23) - 0.5) * s * 1.2;
-        const ry = cy + (seededRandom(seed + i * 23 + 1) - 0.5) * s * 0.8;
-        const rSize = s * (0.12 + seededRandom(seed + i * 23 + 2) * 0.1);
-
-        // Rock shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(rx + 1, ry + 1, rSize, rSize * 0.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Rock
-        const grayVal = 100 + seededRandom(seed + i * 23 + 3) * 30;
-        ctx.fillStyle = `rgb(${grayVal}, ${grayVal - 5}, ${grayVal - 10})`;
-        ctx.beginPath();
-        ctx.ellipse(rx, ry, rSize, rSize * 0.6, seededRandom(seed + i) * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Sparse grass on hills
-    for (let i = 0; i < 3; i++) {
-        const gx = cx + (seededRandom(seed + i * 31) - 0.5) * s * 1.4;
-        const gy = cy + (seededRandom(seed + i * 31 + 1) - 0.5) * s * 1.1;
-        const height = s * (0.12 + seededRandom(seed + i * 31 + 2) * 0.08);
-
-        ctx.strokeStyle = 'rgba(70, 100, 60, 0.7)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(gx, gy);
-        ctx.lineTo(gx + (seededRandom(seed + i * 31 + 3) - 0.5) * s * 0.08, gy - height);
-        ctx.stroke();
-    }
-
-    // Height indicator icon (small mountain symbol)
-    ctx.fillStyle = 'rgba(90, 110, 80, 0.5)';
-    ctx.font = `${Math.round(s * 0.35)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⛰', cx, cy);
-}
-
-/**
- * Draw road terrain details
- */
-function drawRoadDetails(cx, cy, s, seed) {
-    // Cobblestone pattern
-    ctx.strokeStyle = 'rgba(80, 70, 60, 0.4)';
-    ctx.lineWidth = 1;
-
-    // Draw cobblestone grid
-    for (let i = 0; i < 5; i++) {
-        const rx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.2;
-        const ry = cy + (seededRandom(seed + i * 7 + 1) - 0.5) * s * 0.9;
-        const rSize = s * (0.15 + seededRandom(seed + i * 7 + 2) * 0.1);
-
-        ctx.beginPath();
-        ctx.roundRect(
-            rx - rSize / 2,
-            ry - rSize / 2,
-            rSize,
-            rSize * 0.7,
-            rSize * 0.1
-        );
-        ctx.stroke();
-    }
-
-    // Road edge markings
-    ctx.strokeStyle = 'rgba(90, 80, 70, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.7, cy - s * 0.4);
-    ctx.lineTo(cx + s * 0.7, cy - s * 0.4);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.7, cy + s * 0.4);
-    ctx.lineTo(cx + s * 0.7, cy + s * 0.4);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Speed indicator
-    ctx.fillStyle = 'rgba(100, 90, 80, 0.4)';
-    ctx.font = `${Math.round(s * 0.3)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🛤️', cx, cy);
-}
-
-/**
- * Draw path terrain details
- */
-function drawPathDetails(cx, cy, s, seed) {
-    // Dirt path with footprints
-    ctx.strokeStyle = 'rgba(70, 60, 50, 0.4)';
-    ctx.lineWidth = 1;
-
-    // Worn path marks
-    for (let i = 0; i < 6; i++) {
-        const px = cx + (seededRandom(seed + i * 11) - 0.5) * s * 1.0;
-        const py = cy + (seededRandom(seed + i * 11 + 1) - 0.5) * s * 0.8;
-        const pSize = s * (0.08 + seededRandom(seed + i * 11 + 2) * 0.06);
-
-        ctx.fillStyle = `rgba(${70 + seededRandom(seed + i) * 20}, ${60 + seededRandom(seed + i + 1) * 20}, ${50 + seededRandom(seed + i + 2) * 15}, 0.3)`;
-        ctx.beginPath();
-        ctx.ellipse(px, py, pSize, pSize * 0.5, seededRandom(seed + i * 11 + 3) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Small pebbles
-    for (let i = 0; i < 3; i++) {
-        const px = cx + (seededRandom(seed + i * 19) - 0.5) * s * 0.8;
-        const py = cy + (seededRandom(seed + i * 19 + 1) - 0.5) * s * 0.6;
-        const pSize = s * 0.05;
-
-        ctx.fillStyle = 'rgba(80, 75, 65, 0.5)';
-        ctx.beginPath();
-        ctx.arc(px, py, pSize, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw river terrain details
- */
-function drawRiverDetails(cx, cy, s, seed) {
-    // Flowing water ripples
-    ctx.strokeStyle = 'rgba(60, 120, 160, 0.4)';
-    ctx.lineWidth = 1.5;
-
-    // Wave patterns
-    for (let i = 0; i < 3; i++) {
-        const yOffset = (i - 1) * s * 0.35;
-        ctx.beginPath();
-        for (let x = -s * 0.8; x <= s * 0.8; x += s * 0.2) {
-            const wobble = Math.sin(x * 0.3 + seed * 0.1 + i) * s * 0.1;
-            if (x === -s * 0.8) {
-                ctx.moveTo(cx + x, cy + yOffset + wobble);
-            } else {
-                ctx.lineTo(cx + x, cy + yOffset + wobble);
-            }
-        }
-        ctx.stroke();
-    }
-
-    // Sparkle effects on water
-    ctx.fillStyle = 'rgba(180, 220, 255, 0.5)';
-    for (let i = 0; i < 2; i++) {
-        const sx = cx + (seededRandom(seed + i * 13) - 0.5) * s * 1.0;
-        const sy = cy + (seededRandom(seed + i * 13 + 1) - 0.5) * s * 0.6;
-        ctx.beginPath();
-        ctx.arc(sx, sy, s * 0.04, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // River flow indicator
-    ctx.fillStyle = 'rgba(70, 130, 170, 0.4)';
-    ctx.font = `${Math.round(s * 0.3)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('🌊', cx, cy);
-}
-
-/**
- * Draw full grass texture coverage - creates the base meadow look
- */
-function drawGrassTexture(cx, cy, size, seed) {
-    const radius = size * 0.8;
-
-    // Multiple overlapping grass patches for natural coverage
-    for (let ring = 0; ring < 3; ring++) {
-        const ringRadius = radius * (0.3 + ring * 0.3);
-        const patchCount = 4 + ring * 2;
-
-        for (let i = 0; i < patchCount; i++) {
-            const angle = (i / patchCount) * Math.PI * 2 + seededRandom(seed + ring * 100 + i) * 0.5;
-            const dist = ringRadius * (0.5 + seededRandom(seed + ring * 100 + i + 50) * 0.5);
-            const px = cx + Math.cos(angle) * dist;
-            const py = cy + Math.sin(angle) * dist;
-
-            // Grass patch - organic shape
-            const patchSize = size * (0.15 + seededRandom(seed + ring * 100 + i + 10) * 0.12);
-            const shade = 0.7 + seededRandom(seed + ring * 100 + i + 20) * 0.3;
-
-            ctx.fillStyle = `rgba(${Math.floor(55 * shade)}, ${Math.floor(115 * shade)}, ${Math.floor(60 * shade)}, 0.4)`;
-            ctx.beginPath();
-            ctx.ellipse(px, py, patchSize, patchSize * 0.7,
-                seededRandom(seed + ring * 100 + i + 30) * Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    // Central grass tufts
-    for (let i = 0; i < 5; i++) {
-        const tx = cx + (seededRandom(seed + i * 23) - 0.5) * radius * 0.6;
-        const ty = cy + (seededRandom(seed + i * 23 + 1) - 0.5) * radius * 0.5;
-        const shade = 0.8 + seededRandom(seed + i * 23 + 2) * 0.2;
-
-        ctx.fillStyle = `rgba(${Math.floor(60 * shade)}, ${Math.floor(120 * shade)}, ${Math.floor(65 * shade)}, 0.35)`;
-        ctx.beginPath();
-        ctx.ellipse(tx, ty, size * 0.1, size * 0.06, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw wild meadow with mixed vegetation
- */
-function drawWildMeadow(cx, cy, s, seed) {
-    // Scattered wild grass clumps
-    const clumpCount = 4 + (seed % 3);
-    for (let i = 0; i < clumpCount; i++) {
-        const clumpX = cx + (seededRandom(seed + i * 31) - 0.5) * s * 1.4;
-        const clumpY = cy + (seededRandom(seed + i * 31 + 1) - 0.5) * s * 1.1;
-
-        // Draw 3-5 grass blades per clump
-        const bladeCount = 3 + (Math.floor(seededRandom(seed + i * 31 + 2) * 3));
-        for (let j = 0; j < bladeCount; j++) {
-            const bx = clumpX + (seededRandom(seed + i * 31 + j * 5) - 0.5) * s * 0.15;
-            const by = clumpY;
-            const height = s * (0.2 + seededRandom(seed + i * 31 + j * 5 + 1) * 0.2);
-            const lean = (seededRandom(seed + i * 31 + j * 5 + 2) - 0.5) * s * 0.12;
-
-            const shade = 0.7 + seededRandom(seed + i * 31 + j * 5 + 3) * 0.3;
-            ctx.strokeStyle = `rgba(${Math.floor(50 * shade)}, ${Math.floor(105 * shade)}, ${Math.floor(55 * shade)}, 0.85)`;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(bx, by);
-            ctx.quadraticCurveTo(bx + lean * 0.5, by - height * 0.6, bx + lean, by - height);
-            ctx.stroke();
-        }
-    }
-
-    // Occasional small wildflowers
-    if (seededRandom(seed + 500) > 0.4) {
-        const flowerCount = 2 + Math.floor(seededRandom(seed + 501) * 3);
-        const flowerColors = ['#ffeb99', '#ffd4e5', '#d4f0ff', '#e5d4ff'];
-        for (let i = 0; i < flowerCount; i++) {
-            const fx = cx + (seededRandom(seed + 600 + i) - 0.5) * s * 1.2;
-            const fy = cy + (seededRandom(seed + 601 + i) - 0.5) * s;
-            const fSize = 2 + seededRandom(seed + 602 + i) * 1.5;
-
-            ctx.fillStyle = flowerColors[Math.floor(seededRandom(seed + 603 + i) * flowerColors.length)];
-            ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw forest floor - leaves, fallen branches, small plants
- */
-function drawForestFloor(cx, cy, s, seed) {
-    // Fallen leaves scattered on ground
-    const leafCount = 4 + (seed % 4);
-    for (let i = 0; i < leafCount; i++) {
-        const lx = cx + (seededRandom(seed + i * 11) - 0.5) * s * 1.6;
-        const ly = cy + (seededRandom(seed + i * 11 + 1) - 0.5) * s * 1.2;
-        const leafSize = s * (0.08 + seededRandom(seed + i * 11 + 2) * 0.06);
-        const rotation = seededRandom(seed + i * 11 + 3) * Math.PI * 2;
-
-        const shade = 0.4 + seededRandom(seed + i * 11 + 4) * 0.3;
-        ctx.fillStyle = `rgba(${Math.floor(80 * shade)}, ${Math.floor(60 * shade)}, ${Math.floor(30 * shade)}, 0.6)`;
-        ctx.save();
-        ctx.translate(lx, ly);
-        ctx.rotate(rotation);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, leafSize, leafSize * 0.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-
-    // Small ferns/plants
-    const fernCount = 2 + (seed % 2);
-    for (let i = 0; i < fernCount; i++) {
-        const fx = cx + (seededRandom(seed + i * 17) - 0.5) * s * 1.2;
-        const fy = cy + (seededRandom(seed + i * 17 + 1) - 0.5) * s * 0.8;
-        const fernSize = s * (0.15 + seededRandom(seed + i * 17 + 2) * 0.1);
-
-        ctx.strokeStyle = 'rgba(35, 80, 45, 0.7)';
-        ctx.lineWidth = 1.5;
-
-        // Draw small fern fronds
-        for (let j = 0; j < 3; j++) {
-            const angle = -Math.PI / 2 + (j - 1) * 0.4;
-            ctx.beginPath();
-            ctx.moveTo(fx, fy);
-            ctx.lineTo(fx + Math.cos(angle) * fernSize, fy + Math.sin(angle) * fernSize);
-            ctx.stroke();
-        }
-    }
-
-    // Darker ground patches (shade from trees)
-    ctx.fillStyle = 'rgba(0, 20, 10, 0.15)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, s * 0.5, s * 0.3, seededRandom(seed + 50) * Math.PI, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-/**
- * Draw grass blades for texture - optimized
- */
-function drawGrassBlades(cx, cy, s, seed) {
-    const bladeCount = 5 + (seed % 3);  // Reduced for performance
-    for (let i = 0; i < bladeCount; i++) {
-        const bx = cx + (seededRandom(seed + i * 7) - 0.5) * s * 1.4;
-        const by = cy + (seededRandom(seed + i * 7 + 3) - 0.5) * s * 1.2;
-        const height = s * (0.15 + seededRandom(seed + i * 7 + 1) * 0.2);
-        const lean = (seededRandom(seed + i * 7 + 2) - 0.5) * s * 0.15;
-
-        const shade = 0.7 + seededRandom(seed + i * 7 + 4) * 0.3;
-        ctx.strokeStyle = `rgba(${Math.floor(45 * shade)}, ${Math.floor(95 * shade)}, ${Math.floor(50 * shade)}, 0.8)`;
-        ctx.lineWidth = 1 + seededRandom(seed + i * 7 + 5) * 0.5;
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.quadraticCurveTo(bx + lean * 0.5, by - height * 0.6, bx + lean, by - height);
-        ctx.stroke();
-    }
-}
-
-/**
- * Draw a decorative bush
- */
-function drawBush(x, y, size, seed) {
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 30, 10, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.4, size * 0.5, size * 0.15, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Bush layers
-    const layers = 3;
-    for (let i = layers - 1; i >= 0; i--) {
-        const layerSize = size * (0.6 + i * 0.2);
-        const yOff = -i * size * 0.12;
-        const shade = 0.6 + i * 0.15;
-        ctx.fillStyle = `rgb(${Math.floor(35 * shade)}, ${Math.floor(75 * shade)}, ${Math.floor(40 * shade)})`;
-        ctx.beginPath();
-        ctx.ellipse(x, y + yOff, layerSize, layerSize * 0.7, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Highlight
-    ctx.fillStyle = 'rgba(100, 160, 80, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(x - size * 0.15, y - size * 0.2, size * 0.25, size * 0.2, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-/**
- * Draw flower cluster
- */
-function drawFlowerCluster(cx, cy, s, seed) {
-    const flowerColors = ['#ff6b9d', '#ffeb3b', '#ffffff', '#ff9f43', '#a29bfe', '#fd79a8'];
-    const flowerCount = 4 + (seed % 4);
-
-    for (let i = 0; i < flowerCount; i++) {
-        const fx = cx + (seededRandom(seed + i * 11) - 0.5) * s * 1.3;
-        const fy = cy + (seededRandom(seed + i * 11 + 1) - 0.5) * s * 1.1;
-        const fSize = 2 + seededRandom(seed + i * 11 + 2) * 2;
-        const colorIdx = Math.floor(seededRandom(seed + i * 11 + 3) * flowerColors.length);
-
-        // Stem
-        ctx.strokeStyle = '#3d6b3d';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(fx, fy + fSize);
-        ctx.lineTo(fx, fy + fSize + 4);
-        ctx.stroke();
-
-        // Petals
-        ctx.fillStyle = flowerColors[colorIdx];
-        const petalCount = 5;
-        for (let p = 0; p < petalCount; p++) {
-            const angle = (p / petalCount) * Math.PI * 2;
-            ctx.beginPath();
-            ctx.ellipse(
-                fx + Math.cos(angle) * fSize * 0.5,
-                fy + Math.sin(angle) * fSize * 0.5,
-                fSize * 0.4, fSize * 0.25,
-                angle, 0, Math.PI * 2
-            );
-            ctx.fill();
-        }
-
-        // Center
-        ctx.fillStyle = '#ffd32a';
-        ctx.beginPath();
-        ctx.arc(fx, fy, fSize * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-    }
-}
-
-/**
- * Draw stones with moss
- */
-function drawStones(cx, cy, s, seed) {
-    const stoneCount = 2 + (seed % 3);
-    for (let i = 0; i < stoneCount; i++) {
-        const sx = cx + (seededRandom(seed + i * 13) - 0.5) * s * 0.8;
-        const sy = cy + (seededRandom(seed + i * 13 + 1) - 0.5) * s * 0.6;
-        const sSize = s * (0.15 + seededRandom(seed + i * 13 + 2) * 0.15);
-
-        // Stone shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(sx + 2, sy + 2, sSize, sSize * 0.6, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Stone
-        const grayVal = 90 + seededRandom(seed + i * 13 + 3) * 40;
-        ctx.fillStyle = `rgb(${grayVal}, ${grayVal - 5}, ${grayVal + 10})`;
-        ctx.beginPath();
-        ctx.ellipse(sx, sy, sSize, sSize * 0.6, seededRandom(seed + i) * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Moss on stone
-        if (seededRandom(seed + i * 13 + 4) > 0.4) {
-            ctx.fillStyle = 'rgba(60, 100, 50, 0.6)';
-            ctx.beginPath();
-            ctx.ellipse(sx - sSize * 0.3, sy - sSize * 0.2, sSize * 0.3, sSize * 0.2, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-/**
- * Draw tall grass patch
- */
-function drawTallGrass(cx, cy, s, seed) {
-    const bladeCount = 8 + (seed % 5);
-    for (let i = 0; i < bladeCount; i++) {
-        const bx = cx + (seededRandom(seed + i * 9) - 0.5) * s * 1.2;
-        const by = cy + (seededRandom(seed + i * 9 + 1) - 0.5) * s * 0.8;
-        const height = s * (0.35 + seededRandom(seed + i * 9 + 2) * 0.25);
-        const lean = (seededRandom(seed + i * 9 + 3) - 0.5) * s * 0.25;
-
-        const shade = 0.6 + seededRandom(seed + i * 9 + 4) * 0.4;
-        ctx.strokeStyle = `rgba(${Math.floor(50 * shade)}, ${Math.floor(110 * shade)}, ${Math.floor(55 * shade)}, 0.9)`;
-        ctx.lineWidth = 1.5 + seededRandom(seed + i * 9 + 5) * 1;
-        ctx.beginPath();
-        ctx.moveTo(bx, by + s * 0.1);
-        ctx.bezierCurveTo(
-            bx + lean * 0.3, by - height * 0.3,
-            bx + lean * 0.7, by - height * 0.7,
-            bx + lean, by - height
-        );
-        ctx.stroke();
-    }
-}
-
-/**
- * Draw forest undergrowth
- */
-function drawUndergrowth(cx, cy, s, seed) {
-    // Dark undergrowth patches
-    for (let i = 0; i < 3; i++) {
-        const ux = cx + (seededRandom(seed + i * 17) - 0.5) * s * 1.5;
-        const uy = cy + (seededRandom(seed + i * 17 + 1) - 0.5) * s * 1.2;
-        ctx.fillStyle = `rgba(20, 40, 25, ${0.2 + seededRandom(seed + i * 17 + 2) * 0.2})`;
-        ctx.beginPath();
-        ctx.ellipse(ux, uy, s * 0.4, s * 0.25, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Small ferns
-    for (let i = 0; i < 2; i++) {
-        const fx = cx + (seededRandom(seed + i * 19 + 50) - 0.5) * s * 1.2;
-        const fy = cy + (seededRandom(seed + i * 19 + 51) - 0.5) * s;
-        drawFern(fx, fy, s * 0.3, seed + i * 100);
-    }
-}
-
-/**
- * Draw a small fern
- */
-function drawFern(x, y, size, seed) {
-    ctx.strokeStyle = '#2d5a35';
-    ctx.lineWidth = 1;
-
-    const fronds = 5;
-    for (let i = 0; i < fronds; i++) {
-        const angle = -Math.PI / 2 + (i - fronds / 2) * 0.3;
-        const length = size * (0.8 + seededRandom(seed + i) * 0.4);
-
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        const endX = x + Math.cos(angle) * length;
-        const endY = y + Math.sin(angle) * length;
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        // Leaflets
-        for (let j = 1; j < 4; j++) {
-            const t = j / 4;
-            const lx = x + (endX - x) * t;
-            const ly = y + (endY - y) * t;
-            const leafSize = size * 0.15 * (1 - t * 0.5);
-
-            ctx.beginPath();
-            ctx.moveTo(lx, ly);
-            ctx.lineTo(lx + leafSize, ly - leafSize * 0.5);
-            ctx.moveTo(lx, ly);
-            ctx.lineTo(lx - leafSize, ly - leafSize * 0.5);
-            ctx.stroke();
-        }
-    }
-}
-
-
-/**
- * Draw a tree with type variation
- */
-function drawTree(x, y, size, treeType, seed) {
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 20, 10, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(x, y + size * 0.5, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Trunk
-    ctx.fillStyle = '#3d2817';
-    const trunkWidth = size * 0.12;
-    ctx.fillRect(x - trunkWidth / 2, y, trunkWidth, size * 0.45);
-
-    // Trunk detail
-    ctx.strokeStyle = '#2a1a0f';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x - trunkWidth * 0.3, y + size * 0.1);
-    ctx.lineTo(x - trunkWidth * 0.2, y + size * 0.35);
-    ctx.stroke();
-
-    if (treeType === 0) {
-        // Pine tree
-        const layers = 4;
-        for (let i = layers - 1; i >= 0; i--) {
-            const layerY = y - size * 0.1 - i * size * 0.18;
-            const layerWidth = size * (0.5 - i * 0.08);
-
-            ctx.fillStyle = `rgb(${15 + i * 8}, ${50 + i * 12}, ${25 + i * 6})`;
-            ctx.beginPath();
-            ctx.moveTo(x, layerY - size * 0.25);
-            ctx.lineTo(x - layerWidth, layerY + size * 0.1);
-            ctx.lineTo(x + layerWidth, layerY + size * 0.1);
-            ctx.closePath();
-            ctx.fill();
-        }
-    } else if (treeType === 1) {
-        // Round tree
-        const foliageColors = ['#1a4d2e', '#165a32', '#1e6b3a'];
-        for (let i = 0; i < 3; i++) {
-            const fx = x + (seededRandom(seed + i * 5) - 0.5) * size * 0.3;
-            const fy = y - size * 0.25 + (seededRandom(seed + i * 5 + 1) - 0.5) * size * 0.2;
-            const fSize = size * (0.35 + seededRandom(seed + i * 5 + 2) * 0.15);
-
-            ctx.fillStyle = foliageColors[i % foliageColors.length];
-            ctx.beginPath();
-            ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    } else {
-        // Oak-style tree
-        ctx.fillStyle = '#1a4d2e';
-        ctx.beginPath();
-        ctx.ellipse(x, y - size * 0.2, size * 0.45, size * 0.35, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#165a32';
-        ctx.beginPath();
-        ctx.ellipse(x - size * 0.15, y - size * 0.3, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#1e6b3a';
-        ctx.beginPath();
-        ctx.ellipse(x + size * 0.1, y - size * 0.35, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Highlight
-    ctx.fillStyle = 'rgba(150, 200, 120, 0.15)';
-    ctx.beginPath();
-    ctx.ellipse(x - size * 0.15, y - size * 0.35, size * 0.15, size * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-}
-
-/**
- * Draw rock formation with detail
- */
-function drawRockFormation(cx, cy, s, seed) {
-    // Main rock shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.beginPath();
-    ctx.ellipse(cx + 3, cy + s * 0.15, s * 0.85, s * 0.45, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Main rock
-    ctx.fillStyle = '#6a6a7a';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + s * 0.05, s * 0.85, s * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Secondary rocks
-    ctx.fillStyle = '#7a7a8a';
-    ctx.beginPath();
-    ctx.ellipse(cx - s * 0.25, cy - s * 0.15, s * 0.45, s * 0.3, -0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#858595';
-    ctx.beginPath();
-    ctx.ellipse(cx + s * 0.3, cy - s * 0.05, s * 0.35, s * 0.25, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Cracks
-    ctx.strokeStyle = 'rgba(40, 40, 50, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - s * 0.3, cy);
-    ctx.lineTo(cx - s * 0.1, cy + s * 0.15);
-    ctx.lineTo(cx + s * 0.1, cy + s * 0.1);
-    ctx.stroke();
-
-    // Highlights
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.ellipse(cx - s * 0.35, cy - s * 0.2, s * 0.15, s * 0.1, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Moss patches
-    if (seededRandom(seed) > 0.5) {
-        ctx.fillStyle = 'rgba(60, 100, 50, 0.5)';
-        ctx.beginPath();
-        ctx.ellipse(cx + s * 0.2, cy - s * 0.25, s * 0.15, s * 0.1, 0.5, 0, Math.PI * 2);
-        ctx.fill();
-    }
 }
 
 /**
@@ -2080,15 +1161,29 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Cloaked units visibility based on distance to nearest friendly unit
     // Closer = more visible, farther = more transparent
+    let isCamouflagedEnemy = false;
     if (unit.cloaked && unit.player === state.viewingPlayer) {
         // Own cloaked units - visibility based on distance to own non-cloaked units
         ctx.globalAlpha = getStealthVisibilityAlpha(unit);
     } else if (unit.cloaked && unit.player !== state.viewingPlayer) {
         // Enemy cloaked unit detected by proximity - show semi-transparent
-        ctx.globalAlpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
+        const alpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
+        if (alpha > 0) {
+            ctx.globalAlpha = alpha;
+        } else {
+            // Even invisible enemies show as terrain-colored shimmer (subtle)
+            isCamouflagedEnemy = true;
+        }
     } else if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
         // Unit that attacked while cloaked - visible but semi-transparent until turn ends
         ctx.globalAlpha = 0.6;
+    }
+
+    // Draw terrain camouflage shimmer for enemy cloaked units not in detection range
+    if (isCamouflagedEnemy) {
+        drawCamouflageShimmer(cx, cy, size, unit);
+        ctx.restore();
+        return; // Don't draw the actual unit sprite
     }
 
     // Selection glow effect
@@ -2517,6 +1612,44 @@ function shouldShowHexGrid() {
 }
 
 /**
+ * Draw hex grid overlay on top of seamless terrain
+ * Only called when grid should be visible (movement/attack planning)
+ */
+function drawHexGridOverlay(w, h) {
+    ctx.save();
+
+    state.hexes.forEach(hex => {
+        const pos = hexToPixel(hex.q, hex.r, state.hexSize);
+        const sx = state.offsetX + pos.x;
+        const sy = state.offsetY + pos.y;
+
+        // Skip if off screen
+        if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
+            sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+            return;
+        }
+
+        const fogLevel = getFogLevel(hex.q, hex.r);
+
+        // Draw subtle grid lines based on fog level
+        ctx.beginPath();
+        drawHexPath(sx, sy, state.hexSize * 0.95);
+
+        if (fogLevel === 'visible') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        } else if (fogLevel === 'explored') {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        } else {
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        }
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+
+    ctx.restore();
+}
+
+/**
  * Main render function
  */
 export function render() {
@@ -2703,6 +1836,11 @@ export function render() {
             }
         }
     });
+
+    // Draw hex grid overlay only when planning movement or attack
+    if (showGrid) {
+        drawHexGridOverlay(w, h);
+    }
 
     // Draw path preview - clean simple path line with destination marker (point-and-click system)
     if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {

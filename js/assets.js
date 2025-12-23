@@ -74,7 +74,7 @@ export function getTexture(type) {
 }
 
 /**
- * Create realistic grass texture
+ * Create highly realistic grass texture with multiple detail layers
  */
 function createGrassTexture() {
     const canvas = document.createElement('canvas');
@@ -82,39 +82,113 @@ function createGrassTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Base green with variation
+    // Multi-layer base with natural color variation
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 20, y / 20, 4, 1);
-            const r = Math.floor(40 + n * 30);
-            const g = Math.floor(90 + n * 50);
-            const b = Math.floor(50 + n * 25);
+            const n1 = fractalNoise(x / 25, y / 25, 5, 1);
+            const n2 = fractalNoise(x / 10, y / 10, 3, 50);
+            const n3 = fractalNoise(x / 40, y / 40, 2, 100);
+            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+            // Natural grass color variations
+            const r = Math.floor(35 + combined * 25 + n3 * 15);
+            const g = Math.floor(75 + combined * 55 + n2 * 20);
+            const b = Math.floor(35 + combined * 20);
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, 1);
         }
     }
 
-    // Add grass blades
-    for (let i = 0; i < 300; i++) {
+    // Add dirt patches for realism
+    for (let i = 0; i < 8; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        const height = 3 + Math.random() * 8;
-        const lean = (Math.random() - 0.5) * 3;
-
-        const shade = 0.6 + Math.random() * 0.4;
-        ctx.strokeStyle = `rgba(${Math.floor(30 * shade)}, ${Math.floor(100 * shade)}, ${Math.floor(40 * shade)}, 0.8)`;
-        ctx.lineWidth = 0.5 + Math.random() * 0.5;
+        const size = 3 + Math.random() * 8;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(85, 70, 50, 0.4)');
+        gradient.addColorStop(0.7, 'rgba(85, 70, 50, 0.15)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(x + lean * 0.5, y - height * 0.5, x + lean, y - height);
-        ctx.stroke();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
     }
 
-    // Add small highlights
-    for (let i = 0; i < 50; i++) {
-        ctx.fillStyle = `rgba(150, 200, 100, ${0.1 + Math.random() * 0.15})`;
+    // Dense grass blades in multiple layers
+    for (let layer = 0; layer < 3; layer++) {
+        const bladeCount = 150 + layer * 80;
+        const baseHeight = 3 + layer * 3;
+        const alpha = 0.6 + layer * 0.15;
+
+        for (let i = 0; i < bladeCount; i++) {
+            const x = Math.random() * TEXTURE_SIZE;
+            const y = Math.random() * TEXTURE_SIZE;
+            const height = baseHeight + Math.random() * 6;
+            const lean = (Math.random() - 0.5) * 4;
+            const shade = 0.5 + Math.random() * 0.5;
+
+            // Varied green tones
+            const colorVariation = Math.random();
+            let grassR, grassG, grassB;
+            if (colorVariation < 0.3) {
+                // Dark green
+                grassR = Math.floor(25 * shade);
+                grassG = Math.floor(85 * shade);
+                grassB = Math.floor(35 * shade);
+            } else if (colorVariation < 0.7) {
+                // Medium green
+                grassR = Math.floor(35 * shade);
+                grassG = Math.floor(100 * shade);
+                grassB = Math.floor(40 * shade);
+            } else {
+                // Light/yellow green
+                grassR = Math.floor(55 * shade);
+                grassG = Math.floor(115 * shade);
+                grassB = Math.floor(35 * shade);
+            }
+
+            ctx.strokeStyle = `rgba(${grassR}, ${grassG}, ${grassB}, ${alpha})`;
+            ctx.lineWidth = 0.4 + Math.random() * 0.6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.quadraticCurveTo(x + lean * 0.4, y - height * 0.5, x + lean, y - height);
+            ctx.stroke();
+        }
+    }
+
+    // Small flowers and clovers
+    for (let i = 0; i < 15; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const flowerType = Math.random();
+
+        if (flowerType < 0.4) {
+            // White clover
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.random() * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 1.5 + Math.random(), 0, Math.PI * 2);
+            ctx.fill();
+        } else if (flowerType < 0.7) {
+            // Yellow dandelion
+            ctx.fillStyle = `rgba(255, 220, 50, ${0.6 + Math.random() * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 1 + Math.random() * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Light dappling effect (sunlight through trees)
+    for (let i = 0; i < 20; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 4 + Math.random() * 10;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(180, 220, 100, 0.12)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 2, 0, Math.PI * 2);
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -122,7 +196,7 @@ function createGrassTexture() {
 }
 
 /**
- * Create realistic forest floor texture
+ * Create highly realistic forest floor texture with rich organic detail
  */
 function createForestTexture() {
     const canvas = document.createElement('canvas');
@@ -130,56 +204,162 @@ function createForestTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Dark forest floor base
+    // Rich organic forest floor base with multiple noise layers
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 15, y / 15, 5, 2);
-            const r = Math.floor(30 + n * 25);
-            const g = Math.floor(55 + n * 35);
-            const b = Math.floor(30 + n * 20);
+            const n1 = fractalNoise(x / 18, y / 18, 5, 2);
+            const n2 = fractalNoise(x / 8, y / 8, 3, 30);
+            const n3 = fractalNoise(x / 35, y / 35, 2, 80);
+            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+            // Natural forest floor colors - browns, dark greens
+            const r = Math.floor(28 + combined * 22 + n3 * 12);
+            const g = Math.floor(45 + combined * 30 + n2 * 15);
+            const b = Math.floor(25 + combined * 15);
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, 1);
         }
     }
 
-    // Add fallen leaves
-    for (let i = 0; i < 80; i++) {
+    // Moss patches
+    for (let i = 0; i < 12; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        const size = 2 + Math.random() * 4;
-        const hue = Math.random() < 0.5 ?
-            `rgba(${60 + Math.random() * 40}, ${40 + Math.random() * 30}, ${20}, 0.6)` :
-            `rgba(${30 + Math.random() * 30}, ${50 + Math.random() * 30}, ${25}, 0.5)`;
-        ctx.fillStyle = hue;
+        const size = 8 + Math.random() * 18;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(45, 85, 40, 0.5)');
+        gradient.addColorStop(0.5, 'rgba(35, 70, 35, 0.35)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Fallen leaves in multiple layers with varied colors
+    const leafColors = [
+        { r: 140, g: 90, b: 40 },   // Brown
+        { r: 100, g: 70, b: 35 },   // Dark brown
+        { r: 160, g: 100, b: 30 },  // Orange-brown
+        { r: 80, g: 60, b: 30 },    // Very dark
+        { r: 45, g: 65, b: 35 },    // Green (fresh)
+        { r: 120, g: 50, b: 30 },   // Reddish
+    ];
+
+    for (let layer = 0; layer < 3; layer++) {
+        const leafCount = 40 + layer * 30;
+        const alpha = 0.4 + layer * 0.15;
+
+        for (let i = 0; i < leafCount; i++) {
+            const x = Math.random() * TEXTURE_SIZE;
+            const y = Math.random() * TEXTURE_SIZE;
+            const size = 2 + Math.random() * 5;
+            const color = leafColors[Math.floor(Math.random() * leafColors.length)];
+            const shade = 0.6 + Math.random() * 0.4;
+
+            ctx.fillStyle = `rgba(${Math.floor(color.r * shade)}, ${Math.floor(color.g * shade)}, ${Math.floor(color.b * shade)}, ${alpha})`;
+            ctx.beginPath();
+            ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Twigs and small branches
+    for (let i = 0; i < 35; i++) {
+        const shade = 0.4 + Math.random() * 0.4;
+        ctx.strokeStyle = `rgba(${Math.floor(75 * shade)}, ${Math.floor(55 * shade)}, ${Math.floor(35 * shade)}, ${0.5 + Math.random() * 0.3})`;
+        ctx.lineWidth = 0.8 + Math.random() * 1.5;
+        ctx.lineCap = 'round';
+
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+
+        // Main branch
+        const length = 10 + Math.random() * 20;
+        const angle = Math.random() * Math.PI * 2;
+        const endX = x + Math.cos(angle) * length;
+        const endY = y + Math.sin(angle) * length;
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // Small side branches
+        if (Math.random() > 0.5) {
+            ctx.lineWidth *= 0.6;
+            ctx.beginPath();
+            const midX = x + (endX - x) * 0.5;
+            const midY = y + (endY - y) * 0.5;
+            ctx.moveTo(midX, midY);
+            ctx.lineTo(midX + (Math.random() - 0.5) * 8, midY + (Math.random() - 0.5) * 8);
+            ctx.stroke();
+        }
+    }
+
+    // Pine needles clusters
+    for (let i = 0; i < 15; i++) {
+        const cx = Math.random() * TEXTURE_SIZE;
+        const cy = Math.random() * TEXTURE_SIZE;
+        ctx.strokeStyle = `rgba(45, 60, 35, ${0.4 + Math.random() * 0.3})`;
+        ctx.lineWidth = 0.5;
+
+        for (let j = 0; j < 8; j++) {
+            const angle = (j / 8) * Math.PI * 2 + Math.random() * 0.3;
+            const len = 3 + Math.random() * 4;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+            ctx.stroke();
+        }
+    }
+
+    // Tree shadows - larger, softer
+    for (let i = 0; i < 5; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 20 + Math.random() * 25;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(0, 15, 10, 0.35)');
+        gradient.addColorStop(0.6, 'rgba(0, 15, 10, 0.15)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Add twigs
-    for (let i = 0; i < 20; i++) {
-        ctx.strokeStyle = `rgba(60, 45, 30, ${0.4 + Math.random() * 0.3})`;
-        ctx.lineWidth = 1 + Math.random();
-        ctx.beginPath();
-        const x = Math.random() * TEXTURE_SIZE;
-        const y = Math.random() * TEXTURE_SIZE;
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20);
-        ctx.stroke();
+    // Mushroom spots
+    for (let i = 0; i < 5; i++) {
+        if (Math.random() > 0.4) {
+            const x = Math.random() * TEXTURE_SIZE;
+            const y = Math.random() * TEXTURE_SIZE;
+
+            // Stem
+            ctx.fillStyle = 'rgba(200, 190, 170, 0.7)';
+            ctx.beginPath();
+            ctx.ellipse(x, y + 1, 1.5, 2.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Cap
+            const capColor = Math.random() > 0.5 ? 'rgba(180, 60, 40, 0.8)' : 'rgba(160, 140, 100, 0.8)';
+            ctx.fillStyle = capColor;
+            ctx.beginPath();
+            ctx.ellipse(x, y - 1, 3, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
-    // Tree shadows
-    for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = 'rgba(0, 20, 10, 0.3)';
+    // Light filtering through canopy
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 8 + Math.random() * 15;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(140, 180, 80, 0.08)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(
-            30 + Math.random() * 68,
-            30 + Math.random() * 68,
-            15 + Math.random() * 15,
-            10 + Math.random() * 10,
-            Math.random() * Math.PI,
-            0, Math.PI * 2
-        );
+        ctx.arc(x, y, size, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -246,7 +426,7 @@ function createRockTexture() {
 }
 
 /**
- * Create realistic water texture
+ * Create highly realistic water texture with depth and movement
  */
 function createWaterTexture() {
     const canvas = document.createElement('canvas');
@@ -254,51 +434,108 @@ function createWaterTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Deep water gradient
-    const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-    gradient.addColorStop(0, '#1a3a5c');
-    gradient.addColorStop(0.5, '#0d2840');
-    gradient.addColorStop(1, '#1a3a5c');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-
-    // Wave distortion
+    // Multi-layer deep water base with natural color variation
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 30, y / 30, 3, 5);
-            if (n > 0.55) {
-                ctx.fillStyle = `rgba(80, 150, 200, ${(n - 0.55) * 0.5})`;
-                ctx.fillRect(x, y, 1, 1);
+            const n1 = fractalNoise(x / 35, y / 35, 4, 5);
+            const n2 = fractalNoise(x / 15, y / 15, 3, 25);
+            const n3 = fractalNoise(x / 60, y / 60, 2, 60);
+            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+            // Deep water colors with natural variation
+            const r = Math.floor(15 + combined * 25 + n3 * 15);
+            const g = Math.floor(45 + combined * 40 + n2 * 20);
+            const b = Math.floor(70 + combined * 50 + n1 * 25);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // Underwater depth variations
+    for (let i = 0; i < 8; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 15 + Math.random() * 30;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(5, 25, 45, 0.4)');
+        gradient.addColorStop(0.7, 'rgba(10, 35, 55, 0.2)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Multiple wave layers for realistic surface
+    for (let layer = 0; layer < 4; layer++) {
+        const alpha = 0.2 - layer * 0.04;
+        const ySpacing = 16 + layer * 4;
+
+        ctx.strokeStyle = `rgba(100, 170, 210, ${alpha})`;
+        ctx.lineWidth = 2 - layer * 0.3;
+
+        for (let i = 0; i < 7; i++) {
+            const yBase = (i * ySpacing + layer * 5) % TEXTURE_SIZE;
+            const waveAmplitude = 3 + layer * 1.5;
+            const frequency = 0.06 - layer * 0.01;
+
+            ctx.beginPath();
+            ctx.moveTo(0, yBase);
+            for (let x = 0; x <= TEXTURE_SIZE; x += 4) {
+                const waveY = yBase + Math.sin(x * frequency + layer * 0.5 + i * 0.8) * waveAmplitude;
+                ctx.lineTo(x, waveY);
             }
+            ctx.stroke();
         }
     }
 
-    // Wave lines
-    ctx.strokeStyle = 'rgba(120, 180, 220, 0.4)';
-    ctx.lineWidth = 2;
+    // Light reflections and caustics
+    for (let i = 0; i < 30; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 2 + Math.random() * 6;
+        const brightness = 0.15 + Math.random() * 0.25;
+
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, `rgba(200, 235, 255, ${brightness})`);
+        gradient.addColorStop(0.5, `rgba(180, 220, 250, ${brightness * 0.5})`);
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.5, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Foam patches near edges (suggesting shore proximity)
     for (let i = 0; i < 6; i++) {
-        const yBase = 15 + i * 18;
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 4 + Math.random() * 8;
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.08 + Math.random() * 0.1})`;
         ctx.beginPath();
-        ctx.moveTo(0, yBase);
-        for (let x = 0; x <= TEXTURE_SIZE; x += 8) {
-            const waveY = yBase + Math.sin(x / 15 + i) * 4;
-            ctx.lineTo(x, waveY);
+
+        // Irregular foam shape
+        for (let j = 0; j < 6; j++) {
+            const angle = (j / 6) * Math.PI * 2;
+            const dist = size * (0.6 + Math.random() * 0.4);
+            const px = x + Math.cos(angle) * dist;
+            const py = y + Math.sin(angle) * dist * 0.6;
+            if (j === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
         }
-        ctx.stroke();
+        ctx.closePath();
+        ctx.fill();
     }
 
-    // Light reflections
+    // Subtle underwater particles/algae
     for (let i = 0; i < 20; i++) {
-        ctx.fillStyle = `rgba(200, 230, 255, ${0.15 + Math.random() * 0.2})`;
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        ctx.fillStyle = `rgba(40, 90, 60, ${0.15 + Math.random() * 0.15})`;
         ctx.beginPath();
-        ctx.ellipse(
-            Math.random() * TEXTURE_SIZE,
-            Math.random() * TEXTURE_SIZE,
-            2 + Math.random() * 5,
-            1 + Math.random() * 2,
-            Math.random() * Math.PI,
-            0, Math.PI * 2
-        );
+        ctx.arc(x, y, 0.5 + Math.random() * 1.5, 0, Math.PI * 2);
         ctx.fill();
     }
 
