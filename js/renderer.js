@@ -11,6 +11,7 @@ import { getTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
+import { updateParticles, drawParticles } from './particles.js';
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -2823,6 +2824,10 @@ export function render() {
     allDrawables.forEach(drawable => {
         drawable.draw();
     });
+
+    // Update and draw particles
+    updateParticles();
+    drawParticles(ctx, state.offsetX, state.offsetY);
 
     // Draw attack range indicator when targeting an enemy
     if (currentUnit && state.targetedUnit) {

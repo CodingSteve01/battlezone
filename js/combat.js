@@ -11,6 +11,7 @@ import {
     playWeaponSound, playHit, playCriticalHit, playMiss, playDeath, playShieldBlock,
     playHeal, playSprint, playPowershot, playCloak, playCover
 } from './audio.js';
+import { particles } from './particles.js';
 
 /**
  * Check if a unit can take cover on their current hex
@@ -329,6 +330,18 @@ export function executeAttack(attacker, defender) {
     // Play weapon sound
     playWeaponSound(attacker.class);
 
+    // Calculate positions for particle effects
+    const attackerPos = hexToPixel(attacker.q, attacker.r, state.hexSize);
+    const defenderPos = hexToPixel(defender.q, defender.r, state.hexSize);
+
+    // Calculate direction from attacker to defender
+    const dx = defenderPos.x - attackerPos.x;
+    const dy = defenderPos.y - attackerPos.y;
+    const attackDirection = Math.atan2(dy, dx);
+
+    // Muzzle flash at attacker position
+    particles.muzzleFlash(attackerPos.x, attackerPos.y - 10, attackDirection);
+
     // Check for event-based miss (storm)
     if (hit && checkEventMiss()) {
         hit = false;
@@ -400,6 +413,10 @@ export function executeAttack(attacker, defender) {
             showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
         }
 
+        // Hit particle effects at defender position
+        // Direction is from attacker to defender (impact direction)
+        particles.hitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection);
+
         // Check for kill
         if (defender.currentHp <= 0) {
             killUnit(defender);
@@ -465,6 +482,10 @@ function useMedicSpecial(unit) {
 
     playHeal();
 
+    // Healing aura at medic position
+    const medicPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.healEffect(medicPos.x, medicPos.y - 10);
+
     allies.forEach(ally => {
         const dist = hexDistance(
             { q: unit.q, r: unit.r },
@@ -477,8 +498,11 @@ function useMedicSpecial(unit) {
                 ally.currentHp += healAmount;
                 totalHealed += healAmount;
 
-                // Show floating heal number
+                // Healing particles at ally position
                 const allyPos = hexToPixel(ally.q, ally.r, state.hexSize);
+                particles.burst('heal', allyPos.x, allyPos.y - 10, 8);
+
+                // Show floating heal number
                 const canvas = document.getElementById('game-canvas');
                 if (canvas) {
                     const rect = canvas.getBoundingClientRect();
@@ -505,6 +529,11 @@ function useMedicSpecial(unit) {
 function useScoutSpecial(unit) {
     unit.move += 3;
     playSprint();
+
+    // Sprint dust cloud effect
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
     showToast('🎯 Sprint aktiviert!', 'special');
     return true;
 }
@@ -515,6 +544,11 @@ function useScoutSpecial(unit) {
 function useAssaultSpecial(unit) {
     unit.damage += 20;
     playPowershot();
+
+    // Powershot charging effect
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.powershotEffect(unitPos.x, unitPos.y - 10, 0); // Direction 0 = right, will spread
+
     showToast('💥 Powershot bereit!', 'special');
     return true;
 }
@@ -525,6 +559,11 @@ function useAssaultSpecial(unit) {
 function useSniperSpecial(unit) {
     unit.cloaked = true;
     playCloak();
+
+    // Cloak shimmer effect
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.cloakEffect(unitPos.x, unitPos.y - 10);
+
     showToast('🔫 Getarnt!', 'special');
     return true;
 }
@@ -536,6 +575,12 @@ function useNinjaSpecial(unit) {
     unit.cloaked = true;
     unit.move += 2;  // Bonus movement
     playCloak();
+
+    // Cloak + sprint effect for ninja
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.cloakEffect(unitPos.x, unitPos.y - 10);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
     showToast('🥷 Schleichen aktiviert!', 'special');
     return true;
 }
