@@ -1,7 +1,7 @@
 // ===== UNIT SYSTEM =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getHex, getPlayerUnits, spendSharedAP, trackUnitMovement } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, trackUnitMovement, canUnitAttack, getRemainingAttacks } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -75,10 +75,11 @@ export function getEffectiveRange(unit) {
 
 /**
  * Get attackable enemies for a unit
- * Considers range and line of sight (rocks block completely, 2+ forests block)
+ * Considers range, line of sight, and attack limit per turn
  */
 export function getAttackableUnits(unit) {
     if (state.sharedAP < 1) return [];  // Need AP in shared pool
+    if (!canUnitAttack(unit)) return [];  // Unit has reached attack limit for this turn
 
     const effectiveRange = getEffectiveRange(unit);
 
@@ -104,6 +105,7 @@ export function getAttackableUnits(unit) {
  */
 export function getBlockedTargets(unit) {
     if (state.sharedAP < 1) return [];  // Need AP in shared pool
+    if (!canUnitAttack(unit)) return [];  // Unit has reached attack limit for this turn
 
     const effectiveRange = getEffectiveRange(unit);
 

@@ -9,6 +9,9 @@ export const CONFIG = {
     MAX_ROUNDS: 15,
     VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
 
+    // Balance: Limit attacks per unit per turn to prevent one unit from dominating
+    MAX_ATTACKS_PER_UNIT: 2,  // Each unit can attack max 2 times per turn
+
     // Map sizes (radius in hexes)
     MAP_SIZES: {
         small: 8,
