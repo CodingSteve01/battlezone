@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.0...shadow-squad-v1.11.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* resolve service worker cache versioning for automatic updates ([#79](https://github.com/CodingSteve01/battlezone/issues/79)) ([83004d2](https://github.com/CodingSteve01/battlezone/commit/83004d21cbb0b4780f40b12a8c2f4ad2f54b012f))
+
 ## [1.11.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.10.1...shadow-squad-v1.11.0) (2025-12-24)
 
 
