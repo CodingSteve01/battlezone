@@ -9,7 +9,7 @@
  */
 
 import { chromium } from 'playwright';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync as fsExists } from 'fs';
@@ -171,12 +171,12 @@ async function generateAssets() {
     console.log('\n⏳ Generating app icons...');
     const iconSizes = [120, 152, 180, 192, 512];
 
-    for (const size of iconSizes) {
-        const iconDataUrl = await page.evaluate(async (size) => {
-            const svgUrl = '../icons/icon.svg';
-            const response = await fetch(svgUrl);
-            const svgText = await response.text();
+    // Read SVG file with Node.js to avoid CORS issues with file:// protocol
+    const svgPath = join(ICONS_DIR, 'icon.svg');
+    const svgText = readFileSync(svgPath, 'utf-8');
 
+    for (const size of iconSizes) {
+        const iconDataUrl = await page.evaluate(async ({ size, svgText }) => {
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
@@ -196,7 +196,7 @@ async function generateAssets() {
             URL.revokeObjectURL(url);
 
             return canvas.toDataURL('image/png');
-        }, size);
+        }, { size, svgText });
 
         const base64Data = iconDataUrl.replace(/^data:image\/png;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
