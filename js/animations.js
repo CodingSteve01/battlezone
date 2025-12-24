@@ -60,6 +60,8 @@ function seededRandom(seed) {
 
 /**
  * Initialize grass blades for a hex
+ * Stores NORMALIZED positions (0-1 range) that get scaled by hexSize when drawing
+ * This ensures proper scaling when zooming in/out
  */
 export function initGrassBlades(q, r, hexSize) {
     const key = `${q},${r}`;
@@ -73,15 +75,18 @@ export function initGrassBlades(q, r, hexSize) {
         const rand2 = seededRandom(seed + i * 3 + 1);
         const rand3 = seededRandom(seed + i * 3 + 2);
 
-        // Position within hex (polar coordinates)
+        // Position within hex (polar coordinates) - NORMALIZED (0-1 range)
         const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.75;
+        const normalizedDist = rand2 * 0.75;  // Normalized distance factor
 
         blades.push({
-            x: Math.cos(angle) * dist,
-            y: Math.sin(angle) * dist,
-            height: 4 + rand3 * 10,
-            thickness: 0.4 + rand3 * 0.8,
+            // Store normalized positions - will be multiplied by hexSize when drawing
+            normalizedX: Math.cos(angle) * normalizedDist,
+            normalizedY: Math.sin(angle) * normalizedDist,
+            // Height as a factor of hexSize (typical hexSize ~45, so 0.1-0.3 gives similar range)
+            heightFactor: 0.09 + rand3 * 0.22,
+            // Thickness scales with hexSize too
+            thicknessFactor: 0.01 + rand3 * 0.02,
             phase: rand1 * Math.PI * 2,
             colorVariant: rand2
         });
@@ -161,6 +166,13 @@ export function drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, alpha = 1, terrain
     const key = `${q},${r}`;
     let blades = animationState.grassBlades.get(key);
 
+    // Check if cached blades use old format (x/y) vs new format (normalizedX/normalizedY)
+    // If old format, clear and regenerate with new normalized format
+    if (blades && blades.length > 0 && blades[0].x !== undefined) {
+        animationState.grassBlades.delete(key);
+        blades = null;
+    }
+
     if (!blades) {
         initGrassBlades(q, r, hexSize);
         blades = animationState.grassBlades.get(key);
@@ -195,21 +207,25 @@ export function drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, alpha = 1, terrain
 
     for (const blade of blades) {
         const waveX = q * 0.1 + r * 0.1;
+        // Scale sway amount with hexSize for consistent visual effect at all zoom levels
+        const scaledSwayAmount = ANIM_CONFIG.GRASS_SWAY_AMOUNT * (hexSize / 45);
         const sway = Math.sin(windOffset + blade.phase + waveX) *
-                     ANIM_CONFIG.GRASS_SWAY_AMOUNT * windStr;
+                     scaledSwayAmount * windStr;
 
         const color = getGrassColor(blade.colorVariant, baseR, baseG, baseB);
         ctx.strokeStyle = color;
-        ctx.lineWidth = blade.thickness;
+        // Scale thickness with hexSize
+        ctx.lineWidth = blade.thicknessFactor * hexSize;
         ctx.lineCap = 'round';
 
         ctx.beginPath();
-        const baseX = cx + blade.x;
-        const baseY = cy + blade.y;
+        // Scale normalized positions by current hexSize
+        const baseX = cx + blade.normalizedX * hexSize;
+        const baseY = cy + blade.normalizedY * hexSize;
         ctx.moveTo(baseX, baseY);
 
-        // Curved grass blade with wind
-        const height = blade.height * heightMultiplier;
+        // Curved grass blade with wind - scale height with hexSize
+        const height = blade.heightFactor * hexSize * heightMultiplier;
         const tipX = baseX + sway + windDir * height * 0.3;
         const tipY = baseY - height;
         const cpX = baseX + sway * 0.5;
