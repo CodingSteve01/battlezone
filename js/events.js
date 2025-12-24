@@ -184,11 +184,23 @@ export function clearRoundEvent() {
 /**
  * Check if attack misses due to event (storm)
  */
-export function checkEventMiss() {
-    if (state.missChanceModifier && Math.random() < state.missChanceModifier) {
-        return true;
+export function checkEventMiss(distance = null) {
+    if (!state.missChanceModifier) {
+        return false;
     }
-    return false;
+
+    let modifier = state.missChanceModifier;
+    if (distance !== null) {
+        if (distance <= 1) {
+            modifier = 0;
+        } else if (distance === 2) {
+            modifier *= 0.5;
+        } else if (distance === 3) {
+            modifier *= 0.75;
+        }
+    }
+
+    return Math.random() < modifier;
 }
 
 /**

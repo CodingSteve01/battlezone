@@ -260,6 +260,15 @@ export function calculateHitChance(attacker, defender) {
         { q: defender.q, r: defender.r }
     );
 
+    // Close-range bonus: harder to miss when up close
+    if (dist === 1) {
+        chance += 20;
+    } else if (dist === 2) {
+        chance += 10;
+    } else if (dist === 3) {
+        chance += 5;
+    }
+
     // Sniper: accuracy bonus, especially at range
     if (attacker.class === 'sniper') {
         chance += 20; // Base accuracy bonus
@@ -273,7 +282,14 @@ export function calculateHitChance(attacker, defender) {
     }
 
     // Clamp to reasonable bounds
-    return Math.min(95, Math.max(25, chance));
+    const clampedChance = Math.min(95, Math.max(25, chance));
+
+    // Commandos at melee range should not miss
+    if (attacker.class === 'ninja' && dist === 1) {
+        return 100;
+    }
+
+    return clampedChance;
 }
 
 /**
@@ -323,6 +339,10 @@ export function executeAttack(attacker, defender) {
         attacker.hiding = false;
     }
 
+    const dist = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
     const hitChance = calculateHitChance(attacker, defender);
     const roll = Math.random() * 100;
     let hit = roll < hitChance;
@@ -343,7 +363,7 @@ export function executeAttack(attacker, defender) {
     particles.muzzleFlash(attackerPos.x, attackerPos.y - 10, attackDirection);
 
     // Check for event-based miss (storm)
-    if (hit && checkEventMiss()) {
+    if (hit && checkEventMiss(dist)) {
         hit = false;
         playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
@@ -385,10 +405,6 @@ export function executeAttack(attacker, defender) {
 
         // Ninja melee bonus (at range 1)
         if (attacker.class === 'ninja') {
-            const dist = hexDistance(
-                { q: attacker.q, r: attacker.r },
-                { q: defender.q, r: defender.r }
-            );
             if (dist === 1) {
                 damage += UNIT_CLASSES.ninja.meleeBonus || 15;
             }
