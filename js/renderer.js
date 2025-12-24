@@ -22,9 +22,6 @@ import {
     drawSnowfall,
     drawSnowDetails,
     drawIceReflections,
-    drawFireflies,
-    drawDustMotes,
-    drawFallingLeaves,
     drawFlowers,
     drawHeather,
     drawRuins,
@@ -2176,11 +2173,11 @@ function drawAnimatedTerrainOverlay(cx, cy, hexSize, terrainType, q, r) {
             break;
         case 'forest':
         case 'pine':
-            drawFireflies(ctx, cx, cy, hexSize);
-            drawFallingLeaves(ctx, cx, cy, hexSize);
+            // Removed expensive per-hex fireflies and falling leaves animations
+            // These were rendering global animations on EVERY forest hex (very inefficient)
             break;
         case 'sand':
-            drawDustMotes(ctx, cx, cy, hexSize);
+            // Removed dust motes animation (same performance issue as fireflies)
             break;
         case 'flowers':
             drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.5, 'grass');
