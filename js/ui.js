@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getRemainingMoveCapacity } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
 import { calculateHitChance, getCoverInfo } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
@@ -34,20 +34,30 @@ function centerOnUnit(unit) {
  * Update all UI elements
  */
 export function updateUI() {
-    const units = getPlayerUnits(state.currentPlayer);
-    const unit = getCurrentUnit();
+    const isAiTurnHidden = state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer;
+    const units = isAiTurnHidden ? getPlayerUnits(state.viewingPlayer) : getPlayerUnits(state.currentPlayer);
+    const unit = isAiTurnHidden ? null : getCurrentUnit();
 
-    updateTopBar(unit);
-    updateUnitTabs(units);
-    updateActionButtons(unit);
+    updateTopBar(unit, isAiTurnHidden);
+    updateUnitTabs(units, isAiTurnHidden);
+    updateActionButtons(unit, isAiTurnHidden);
     updateTargetInfo(unit);
     updateCompassIndicator();
+
+    const endTurnBtn = document.getElementById('end-turn-btn');
+    if (endTurnBtn) {
+        endTurnBtn.disabled = isAiTurnHidden;
+    }
+    const giveUpBtn = document.getElementById('give-up-btn');
+    if (giveUpBtn) {
+        giveUpBtn.disabled = state.gameOver;
+    }
 }
 
 /**
  * Update top bar (player indicator, round, AP)
  */
-function updateTopBar(unit) {
+function updateTopBar(unit, isAiTurnHidden = false) {
     const dot = document.getElementById('current-dot');
     if (dot) {
         dot.style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
@@ -56,39 +66,54 @@ function updateTopBar(unit) {
 
     const nameEl = document.getElementById('current-name');
     if (nameEl) {
-        nameEl.textContent = `Spieler ${state.currentPlayer + 1}`;
+        nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : `Spieler ${state.currentPlayer + 1}`;
     }
 
     const roundEl = document.getElementById('round-num');
     if (roundEl) {
         roundEl.textContent = state.round;
     }
+    const roundMaxEl = document.getElementById('round-max');
+    if (roundMaxEl) {
+        roundMaxEl.textContent = CONFIG.MAX_ROUNDS;
+    }
 
     // AP display - now shows shared pool
     const apDisplay = document.getElementById('ap-display');
     if (apDisplay) {
         apDisplay.innerHTML = '';
-        // Show shared AP pool as numeric display
-        const poolDisplay = document.createElement('div');
-        poolDisplay.className = 'ap-pool-display';
-        poolDisplay.innerHTML = `
-            <span class="ap-pool-label">Team AP:</span>
-            <span class="ap-pool-value">${state.sharedAP}</span>
-            <span class="ap-pool-max">/ ${state.maxSharedAP}</span>
-            <span class="ap-pool-icon">⚡</span>
-        `;
-        apDisplay.appendChild(poolDisplay);
+        if (isAiTurnHidden) {
+            const waitDisplay = document.createElement('div');
+            waitDisplay.className = 'ap-pool-display';
+            waitDisplay.innerHTML = `
+                <span class="ap-pool-label">KI am Zug</span>
+                <span class="ap-pool-icon">⏳</span>
+            `;
+            apDisplay.appendChild(waitDisplay);
+        } else {
+            // Show shared AP pool as numeric display
+            const poolDisplay = document.createElement('div');
+            poolDisplay.className = 'ap-pool-display';
+            poolDisplay.innerHTML = `
+                <span class="ap-pool-label">Team AP:</span>
+                <span class="ap-pool-value">${state.sharedAP}</span>
+                <span class="ap-pool-max">/ ${state.maxSharedAP}</span>
+                <span class="ap-pool-icon">⚡</span>
+            `;
+            apDisplay.appendChild(poolDisplay);
+        }
     }
 }
 
 /**
  * Update unit selection tabs
  */
-function updateUnitTabs(units) {
+function updateUnitTabs(units, isAiTurnHidden = false) {
     const tabsEl = document.getElementById('unit-tabs');
     if (!tabsEl) return;
 
     tabsEl.innerHTML = '';
+    if (isAiTurnHidden) return;
 
     units.forEach((unit, index) => {
         const tab = document.createElement('div');
@@ -110,26 +135,12 @@ function updateUnitTabs(units) {
         const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
         const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
 
-        // Movement capacity info (how much this unit can still move)
-        const remainingMove = getRemainingMoveCapacity(unit);
-        const movePct = (remainingMove / unit.move) * 100;
-        let moveClass = '';
-        if (remainingMove === 0) moveClass = ' depleted';
-        else if (remainingMove <= unit.move * 0.3) moveClass = ' low';
-        else if (remainingMove <= unit.move * 0.6) moveClass = ' medium';
-
         tab.innerHTML = `
             <div class="class-icon">${UNIT_CLASSES[unit.class].icon}</div>
             <div class="class-name">${UNIT_CLASSES[unit.class].name}</div>
             <div class="unit-level" style="background: ${levelColor}">Lv.${level}</div>
             <div class="hp-bar">
                 <div class="hp-fill${hpClass}" style="width: ${hpPct * 100}%"></div>
-            </div>
-            <div class="move-bar-container">
-                <div class="move-bar">
-                    <div class="move-fill${moveClass}" style="width: ${movePct}%"></div>
-                </div>
-                <div class="move-number">${remainingMove}/${unit.move}🦶</div>
             </div>
             ${!xpProgress.maxLevel ? `
                 <div class="xp-bar">
@@ -159,14 +170,14 @@ function updateUnitTabs(units) {
 /**
  * Update action buttons state
  */
-function updateActionButtons(unit) {
+function updateActionButtons(unit, isAiTurnHidden = false) {
     // Update cover button
     const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
     if (coverBtn) {
         coverBtn.classList.remove('disabled', 'active', 'suggested');
         const coverLabel = document.getElementById('cover-label');
 
-        if (!unit) {
+        if (!unit || isAiTurnHidden) {
             coverBtn.classList.add('disabled');
             if (coverLabel) coverLabel.textContent = 'Deckung';
         } else {
@@ -202,7 +213,7 @@ function updateActionButtons(unit) {
         const labelEl = document.getElementById('special-label');
         const tipEl = document.getElementById('special-tip');
 
-        if (!unit) {
+        if (!unit || isAiTurnHidden) {
             specialBtn.classList.add('disabled');
             if (labelEl) labelEl.textContent = 'Spezial';
             if (tipEl) tipEl.textContent = '';
