@@ -1249,20 +1249,24 @@ button:focus:not(:focus-visible),
 
 .give-up-btn {
     flex: 0.7;
-    padding: 14px 18px;
-    background: linear-gradient(135deg, #475569 0%, #334155 100%);
-    border: none;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(51, 65, 85, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%);
+    border: 1px solid rgba(248, 113, 113, 0.55);
     border-radius: 14px;
-    color: #e2e8f0;
+    color: #fca5a5;
     font-weight: 700;
     font-size: 11px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.5);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.45);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-transform: uppercase;
     letter-spacing: 0.6px;
     position: relative;
     overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 
 .give-up-btn::before {
@@ -1282,11 +1286,22 @@ button:focus:not(:focus-visible),
 
 .give-up-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.6);
+    box-shadow: 0 8px 18px rgba(248, 113, 113, 0.25);
+    border-color: rgba(248, 113, 113, 0.8);
+    color: #fecaca;
 }
 
 .give-up-btn:active {
     transform: translateY(0) scale(0.98);
+}
+
+.give-up-icon {
+    font-size: 14px;
+    filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.45));
+}
+
+.give-up-label {
+    line-height: 1;
 }
 
 .give-up-btn:disabled,

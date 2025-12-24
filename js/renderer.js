@@ -292,8 +292,9 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.save();
         context.clip();
         const pattern = context.createPattern(texture, 'repeat');
-        // Use hex coordinates for consistent pattern alignment
-        pattern.setTransform(new DOMMatrix().translate(hexQ * 10, hexR * 10));
+        const { x: worldX, y: worldY } = hexToPixel(hexQ, hexR, size);
+        // Align texture to world coordinates for seamless terrain across hexes
+        pattern.setTransform(new DOMMatrix().translate(cx - worldX, cy - worldY));
         context.fillStyle = pattern;
         context.fillRect(cx - size, cy - size, size * 2, size * 2);
         context.restore();
