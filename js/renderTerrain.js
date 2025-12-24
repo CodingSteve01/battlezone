@@ -1,10 +1,25 @@
 // ===== TERRAIN RENDERING =====
 // Terrain detail and ground texture functions
 
+import { getRockSprite } from './assetLoader.js';
 import { seededRandom } from './renderUtils.js';
 
 // Canvas context - set by renderer.js
 let ctx = null;
+
+const DETAIL_SPRITE_SIZE = 128;
+const ROCK_BASE_RATIO = 0.6225;
+const ROCK_REFERENCE_SIZE = DETAIL_SPRITE_SIZE * 0.35;
+
+function drawDetailSprite(sprite, x, y, size, baseRatio, baseOffset, referenceSize) {
+    const scale = size / referenceSize;
+    const spriteSize = DETAIL_SPRITE_SIZE * scale;
+    const baseY = y + baseOffset;
+    const drawX = x - spriteSize / 2;
+    const drawY = baseY - spriteSize * baseRatio;
+
+    ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
+}
 
 /**
  * Initialize the terrain renderer with canvas context
@@ -18,6 +33,13 @@ export function initTerrainRenderer(context) {
  * Draw a rock formation with 2.5D depth effect - large enough to provide cover
  */
 export function drawRockFormation2D5(cx, cy, s, seed) {
+    const variant = Math.floor(seededRandom(seed + 5) * 4);
+    const sprite = getRockSprite(variant);
+    if (sprite) {
+        drawDetailSprite(sprite, cx, cy, s, ROCK_BASE_RATIO, s * 0.35, ROCK_REFERENCE_SIZE);
+        return;
+    }
+
     ctx.save();
 
     // Large main rock shadow
