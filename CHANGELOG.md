@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.3...shadow-squad-v2.0.0) (2025-12-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* redesign graphics with natural colors and streamlined UI ([#85](https://github.com/CodingSteve01/battlezone/issues/85))
+
+### Features
+
+* redesign graphics with natural colors and streamlined UI ([#85](https://github.com/CodingSteve01/battlezone/issues/85)) ([40d2b57](https://github.com/CodingSteve01/battlezone/commit/40d2b571c2059d29225de83bf422a5d195bcd98f))
+
 ## [1.11.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.2...shadow-squad-v1.11.3) (2025-12-24)
 
 
