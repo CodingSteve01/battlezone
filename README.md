@@ -14,15 +14,15 @@ A tactical turn-based strategy game built with vanilla JavaScript and HTML5 Canv
 
 Or run locally: open `index.html` in a modern browser or use any static file server.
 
-## 📲 Offline installieren (PWA)
+## 📲 Install Offline (PWA)
 
-Shadow Squad kann als Progressive Web App installiert werden und läuft dann offline:
+Shadow Squad can be installed as a Progressive Web App and runs offline:
 
-1. **[Öffne das Spiel](https://codingsteve01.github.io/battlezone/)** in Chrome, Edge oder Safari
-2. Wähle **Installieren** im Browser-Menü (oder „Zum Startbildschirm hinzufügen" auf iOS)
-3. Starte das Spiel als eigenständige App - es läuft auch offline!
+1. **[Open the game](https://codingsteve01.github.io/battlezone/)** in Chrome, Edge, or Safari
+2. Select **Install** from the browser menu (or "Add to Home Screen" on iOS)
+3. Launch the game as a standalone app - it works offline too!
 
-> **Tipp**: Nach einem Update die Seite einmal online öffnen, damit die neuesten Assets geladen werden.
+> **Tip**: After an update, open the page online once to load the latest assets.
 
 ## Features
 
