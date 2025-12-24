@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v2.0.0...shadow-squad-v2.0.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* resolve CORS error in icon generation by reading SVG with Node.js ([#87](https://github.com/CodingSteve01/battlezone/issues/87)) ([de7a3ce](https://github.com/CodingSteve01/battlezone/commit/de7a3ce1a0b4047ee868b59d87ff2d8409b4fe6d))
+
 ## [2.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.3...shadow-squad-v2.0.0) (2025-12-24)
 
 
