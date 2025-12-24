@@ -41,23 +41,27 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium
 
-      - name: Generate static assets
-        run: npm run build
-
-      - name: Cache-bust with git hash
+      - name: Set build environment variables
         run: |
-          COMMIT_HASH=$(git rev-parse --short HEAD)
-          echo "Commit Hash: $COMMIT_HASH"
-          sed -i "s/\?v=[^\"']*/\?v=$COMMIT_HASH/g" index.html
-
-      - name: Update version info display
-        run: |
-          # Read version from package.json (managed by release-please)
           VERSION=$(node -p "require('./package.json').version")
           COMMIT_HASH=$(git rev-parse --short HEAD)
           BUILD_DATE=$(TZ='Europe/Berlin' date '+%d.%m.%Y %H:%M')
-          echo "Version: v$VERSION ($COMMIT_HASH) @ $BUILD_DATE"
-          sed -i "s|Version DEV • Build: --|v$VERSION • $BUILD_DATE|g" index.html
+          echo "VITE_APP_VERSION=v$VERSION" >> $GITHUB_ENV
+          echo "VITE_BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          echo "VITE_COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+          echo "Build info: v$VERSION ($COMMIT_HASH) @ $BUILD_DATE"
+
+      - name: Build with Vite
+        run: npm run build
+        env:
+          VITE_APP_VERSION: ${{ env.VITE_APP_VERSION }}
+          VITE_BUILD_DATE: ${{ env.VITE_BUILD_DATE }}
+          VITE_COMMIT_HASH: ${{ env.VITE_COMMIT_HASH }}
+
+      - name: Update version info in built files
+        run: |
+          # Update version display in the built index.html
+          sed -i "s|Version DEV • Build: --|$VITE_APP_VERSION • $VITE_BUILD_DATE|g" dist/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -65,7 +69,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: 'dist'
 
       - name: Deploy to GitHub Pages
         id: deployment

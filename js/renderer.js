@@ -54,6 +54,16 @@ import {
     drawRiverDetails,
     drawForestFloor
 } from './renderTerrain.js';
+import {
+    applyPostProcessing,
+    applyWeatherEffect,
+    setColorPreset,
+    getCurrentPreset,
+    getPresetList
+} from './postProcessing.js';
+
+// Re-export post-processing controls for external use
+export { setColorPreset, getCurrentPreset, getPresetList };
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -659,13 +669,25 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
 
     if (type === 'forest' || type === 'pine') {
-        // Trees are foreground elements - make them bigger for 2.5D effect
-        const treeCount = 1 + Math.abs(baseSeed % 2);
-        for (let i = 0; i < treeCount; i++) {
-            const tx = cx + (seededRandom(baseSeed + i * 10) - 0.5) * s * 0.6;
-            const ty = cy + (seededRandom(baseSeed + i * 10 + 5) - 0.5) * s * 0.4;
-            // Make trees 2x bigger for proper 2.5D effect
-            const treeSize = s * (1.4 + seededRandom(baseSeed + i * 10 + 2) * 0.6);
+        // Dense forest with multiple trees for realistic appearance
+        // Main trees: 3-5 per hex for proper forest density
+        const baseTreeCount = 3 + Math.abs(baseSeed % 3);
+        const hexRadius = s * 0.9;
+
+        for (let i = 0; i < baseTreeCount; i++) {
+            // Distribute trees across the hex using golden angle for natural spacing
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+            const angle = i * goldenAngle + seededRandom(baseSeed + i) * 0.5;
+            const radius = hexRadius * (0.3 + seededRandom(baseSeed + i * 7) * 0.6);
+
+            const tx = cx + Math.cos(angle) * radius * 0.7;
+            const ty = cy + Math.sin(angle) * radius * 0.5; // Compress Y for isometric effect
+
+            // Vary tree sizes - larger in center, smaller at edges
+            const distFromCenter = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / hexRadius;
+            const sizeVariation = 1.2 - distFromCenter * 0.4;
+            const treeSize = s * (1.2 + seededRandom(baseSeed + i * 10 + 2) * 0.5) * sizeVariation;
+
             // Pine terrain uses mostly pine trees (type 0), forest uses all types
             const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 5);
 
@@ -673,25 +695,62 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'tree',
                 x: tx,
                 y: ty,
-                // Sort by base of tree (where it touches ground)
                 sortY: ty + treeSize * 0.5,
                 draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i)
             });
         }
 
-        // Add small shrubs/undergrowth around the trees
-        const shrubChance = seededRandom(baseSeed + 100);
-        if (shrubChance > 0.4) {
-            const shrubX = cx + (seededRandom(baseSeed + 101) - 0.5) * s * 1.2;
-            const shrubY = cy + (seededRandom(baseSeed + 102) - 0.5) * s * 0.8;
-            const shrubSize = s * (0.5 + seededRandom(baseSeed + 103) * 0.3);
+        // Add background/smaller trees for depth (draw first, appear behind)
+        const bgTreeCount = 2 + Math.abs((baseSeed + 50) % 2);
+        for (let i = 0; i < bgTreeCount; i++) {
+            const angle = seededRandom(baseSeed + i * 20 + 200) * Math.PI * 2;
+            const radius = hexRadius * (0.4 + seededRandom(baseSeed + i * 20 + 201) * 0.5);
+
+            const tx = cx + Math.cos(angle) * radius * 0.6;
+            // Place background trees higher (smaller Y = further back in 2.5D)
+            const ty = cy - s * 0.3 + Math.sin(angle) * radius * 0.3;
+
+            // Background trees are smaller
+            const treeSize = s * (0.7 + seededRandom(baseSeed + i * 20 + 202) * 0.3);
+            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 5);
+
+            elements.push({
+                type: 'tree-bg',
+                x: tx,
+                y: ty,
+                sortY: ty + treeSize * 0.3, // Sorts behind main trees
+                draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i + 100)
+            });
+        }
+
+        // Dense undergrowth: multiple shrubs and small bushes
+        const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
+        for (let i = 0; i < undergrowthCount; i++) {
+            const shrubX = cx + (seededRandom(baseSeed + i * 15 + 101) - 0.5) * s * 1.4;
+            const shrubY = cy + (seededRandom(baseSeed + i * 15 + 102) - 0.5) * s * 0.9;
+            const shrubSize = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
 
             elements.push({
                 type: 'shrub',
                 x: shrubX,
                 y: shrubY,
                 sortY: shrubY + shrubSize * 0.2,
-                draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + 104)
+                draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + i + 104)
+            });
+        }
+
+        // Occasional large bush for variety
+        if (seededRandom(baseSeed + 300) > 0.6) {
+            const bushX = cx + (seededRandom(baseSeed + 301) - 0.5) * s * 0.8;
+            const bushY = cy + (seededRandom(baseSeed + 302) - 0.5) * s * 0.6;
+            const bushSize = s * (0.6 + seededRandom(baseSeed + 303) * 0.3);
+
+            elements.push({
+                type: 'bush',
+                x: bushX,
+                y: bushY,
+                sortY: bushY + bushSize * 0.3,
+                draw: () => drawBush2D5(bushX, bushY, bushSize, baseSeed + 304)
             });
         }
     } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
@@ -2594,6 +2653,26 @@ export function render() {
 
     // Draw zoom indicator
     drawZoomIndicator(w, h);
+
+    // Apply post-processing effects (color grading, vignette, etc.)
+    // Only on medium/high quality for performance
+    if (state.effectiveQuality !== 'low') {
+        applyPostProcessing(ctx, w, h);
+
+        // Apply weather effects if there's an active event
+        const currentEvent = getCurrentEvent();
+        if (currentEvent) {
+            const weatherMap = {
+                'sandstorm': 'sandstorm',
+                'storm': 'storm',
+                'fog': 'fog'
+            };
+            const weather = weatherMap[currentEvent.type];
+            if (weather) {
+                applyWeatherEffect(ctx, w, h, weather);
+            }
+        }
+    }
 
     if (shouldAnimate()) {
         ensureAnimationLoop();
