@@ -171,40 +171,6 @@ function updateUnitTabs(units, isAiTurnHidden = false) {
  * Update action buttons state
  */
 function updateActionButtons(unit, isAiTurnHidden = false) {
-    // Update cover button
-    const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
-    if (coverBtn) {
-        coverBtn.classList.remove('disabled', 'active', 'suggested');
-        const coverLabel = document.getElementById('cover-label');
-
-        if (!unit || isAiTurnHidden) {
-            coverBtn.classList.add('disabled');
-            if (coverLabel) coverLabel.textContent = 'Deckung';
-        } else {
-            // Check if unit can take cover
-            const hex = getHex(unit.q, unit.r);
-            const canHide = hex && TERRAIN[hex.type] && TERRAIN[hex.type].canHide;
-
-            if (unit.hiding) {
-                // Already hiding - show active state
-                coverBtn.classList.add('active');
-                if (coverLabel) coverLabel.textContent = 'In Deckung';
-            } else if (!canHide) {
-                coverBtn.classList.add('disabled');
-                if (coverLabel) coverLabel.textContent = 'Deckung';
-            } else if (state.sharedAP < 1) {
-                coverBtn.classList.add('disabled');
-                if (coverLabel) coverLabel.textContent = 'Deckung';
-            } else {
-                // Can take cover - highlight as suggested if unit has low HP or is in danger
-                if (unit.currentHp < unit.maxHp * 0.5) {
-                    coverBtn.classList.add('suggested');
-                }
-                if (coverLabel) coverLabel.textContent = 'Deckung';
-            }
-        }
-    }
-
     // Update special ability button
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {
