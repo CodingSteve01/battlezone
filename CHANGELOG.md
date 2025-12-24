@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.1...shadow-squad-v3.0.2) (2025-12-24)
+
+
+### Bug Fixes
+
+* **graphics:** remove expensive global particle animations for performance ([#93](https://github.com/CodingSteve01/battlezone/issues/93)) ([5e39ef7](https://github.com/CodingSteve01/battlezone/commit/5e39ef7d4222a3ff06f09284b446134e8330f1f7))
+
 ## [3.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.0...shadow-squad-v3.0.1) (2025-12-24)
 
 
