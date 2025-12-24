@@ -6,13 +6,13 @@
 [![Version](https://img.shields.io/github/v/release/CodingSteve01/battlezone?label=version)](https://github.com/CodingSteve01/battlezone/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A tactical turn-based strategy game built with vanilla JavaScript and HTML5 Canvas. Command your squad of specialized units in hex-grid combat with fog of war, power-ups, and AI opponents.
+A tactical turn-based strategy game built with JavaScript and HTML5 Canvas. Command your squad of specialized units in hex-grid combat with fog of war, power-ups, and AI opponents.
 
 ## 🎮 Play Now
 
 **[▶️ Play Shadow Squad Online](https://codingsteve01.github.io/battlezone/)**
 
-Or run locally: open `index.html` in a modern browser or use any static file server.
+Or run locally with `npm install && npm run dev` (see [Development](#development) section).
 
 ## 📲 Install Offline (PWA)
 
@@ -73,13 +73,17 @@ Shadow Squad can be installed as a Progressive Web App and runs offline:
 ### Running Locally
 
 ```bash
-# Python
-python -m http.server 8000
+# Install dependencies
+npm install
 
-# Node.js
-npx http-server
+# Start development server with hot reload
+npm run dev
 
-# Then open http://localhost:8000
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
 ### Project Structure
@@ -100,10 +104,10 @@ npx http-server
 
 ### Tech Stack
 
-- Vanilla JavaScript (ES6 modules)
-- HTML5 Canvas 2D
+- JavaScript (ES6 modules) with Vite build system
+- HTML5 Canvas 2D (with optional PixiJS WebGL renderer)
 - CSS3 with custom properties
-- Zero external dependencies
+- Runtime dependencies: [PixiJS](https://pixijs.com/) for advanced graphics
 
 ## GitHub Pages Deployment
 
@@ -157,4 +161,4 @@ MIT License - Feel free to modify and share!
 
 ---
 
-*Built with vanilla JavaScript, no frameworks, no dependencies.*
+*Built with JavaScript, PixiJS, and Vite.*

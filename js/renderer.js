@@ -14,19 +14,6 @@ import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import {
     animationTick,
-    drawAnimatedGrass,
-    drawAnimatedWater,
-    drawShallowWater,
-    drawWheatField,
-    drawReeds,
-    drawSnowfall,
-    drawSnowDetails,
-    drawIceReflections,
-    drawFireflies,
-    drawDustMotes,
-    drawFallingLeaves,
-    drawFlowers,
-    drawHeather,
     drawRuins,
     drawGravel,
     drawFarmland,
@@ -2282,6 +2269,11 @@ export function render() {
                 (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)')) : null;
             const terrainData = fogLevel === 'visible' ? terrain : null;
             drawHex(sx, sy, state.hexSize, fillColor, strokeColor, 1, texture, terrainData);
+
+            // Draw terrain details for visible hexes (same as cached tiles)
+            if (fogLevel === 'visible' && shouldRenderDetails()) {
+                drawStaticTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            }
 
             // Fog overlays for non-cached rendering (match cached version)
             if (fogLevel === 'explored') {
