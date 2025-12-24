@@ -1247,6 +1247,56 @@ button:focus:not(:focus-visible),
     transform: translateY(0) scale(0.98);
 }
 
+.give-up-btn {
+    flex: 0.7;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #475569 0%, #334155 100%);
+    border: none;
+    border-radius: 14px;
+    color: #e2e8f0;
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    position: relative;
+    overflow: hidden;
+}
+
+.give-up-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    transition: left 0.4s;
+}
+
+.give-up-btn:hover::before {
+    left: 100%;
+}
+
+.give-up-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.6);
+}
+
+.give-up-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.give-up-btn:disabled,
+.end-turn-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
 /* Bottom Safe Area */
 .bottom-safe {
     height: env(safe-area-inset-bottom);

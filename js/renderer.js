@@ -6,12 +6,12 @@ import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
-import { initTextures, drawAPIndicator } from './assets.js';
+import { initTextures } from './assets.js';
 import { getTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
-import { updateParticles, drawParticles } from './particles.js';
+import { particles, updateParticles, drawParticles } from './particles.js';
 import {
     animationTick,
     drawAnimatedGrass,
@@ -335,14 +335,14 @@ function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
 }
 
 /**
- * Draw a subtle terrain-colored shimmer for enemy cloaked units
- * This makes them visible if you look carefully, but camouflaged with the terrain
+ * Draw a subtle terrain-matched camouflage pattern for enemy cloaked units
+ * This makes them barely visible, blending into the terrain without shimmering
  * @param {number} cx - Center X position
  * @param {number} cy - Center Y position
  * @param {number} size - Unit size
  * @param {Object} unit - The cloaked unit
  */
-function drawCamouflageShimmer(cx, cy, size, unit) {
+function drawCamouflagePattern(cx, cy, size, unit) {
     // Get terrain at unit's position
     const hex = getHex(unit.q, unit.r);
     if (!hex) return;
@@ -355,26 +355,27 @@ function drawCamouflageShimmer(cx, cy, size, unit) {
     const g = parseInt(baseColor.slice(3, 5), 16);
     const b = parseInt(baseColor.slice(5, 7), 16);
 
-    // Create a subtle shimmer effect using animated noise
-    const time = Date.now() * 0.002;
-    const shimmerIntensity = 0.15 + Math.sin(time + unit.q * 0.5 + unit.r * 0.7) * 0.05;
+    // Deterministic pseudo-random for camo shapes (stable per unit position)
+    const seed = (unit.q * 73856093) ^ (unit.r * 19349663);
+    const rand = (offset) => {
+        const x = Math.sin(seed + offset) * 43758.5453;
+        return x - Math.floor(x);
+    };
 
     ctx.save();
 
-    // Draw a subtle distortion/heat-wave effect
-    // Base camouflage shape (humanoid silhouette)
-    ctx.globalAlpha = shimmerIntensity;
+    // Base camouflage silhouette
+    ctx.globalAlpha = 0.22;
 
-    // Create gradient that matches terrain
-    const shimmerGrad = ctx.createRadialGradient(
-        cx, cy - size * 0.3, 0,
-        cx, cy, size * 0.8
+    // Soft camo fill with terrain-tinted gradient
+    const baseGrad = ctx.createRadialGradient(
+        cx, cy - size * 0.2, 0,
+        cx, cy, size * 0.9
     );
-    shimmerGrad.addColorStop(0, `rgba(${r + 30}, ${g + 30}, ${b + 30}, 0.3)`);
-    shimmerGrad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.15)`);
-    shimmerGrad.addColorStop(1, 'transparent');
-
-    ctx.fillStyle = shimmerGrad;
+    baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
+    baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
+    baseGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = baseGrad;
 
     // Draw subtle humanoid shape
     ctx.beginPath();
@@ -387,16 +388,18 @@ function drawCamouflageShimmer(cx, cy, size, unit) {
     ctx.ellipse(cx, cy, size * 0.25, size * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Add subtle shimmer lines (like heat distortion)
-    ctx.strokeStyle = `rgba(${r + 40}, ${g + 40}, ${b + 40}, ${shimmerIntensity * 0.5})`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 3; i++) {
-        const offsetY = (i - 1) * size * 0.3;
-        const wave = Math.sin(time * 2 + i) * size * 0.05;
+    // Add low-contrast camo blotches
+    for (let i = 0; i < 6; i++) {
+        const angle = rand(i * 11) * Math.PI * 2;
+        const radius = size * (0.1 + rand(i * 7) * 0.35);
+        const blotchX = cx + Math.cos(angle) * radius;
+        const blotchY = cy + Math.sin(angle) * radius * 0.6;
+        const blotchSize = size * (0.12 + rand(i * 17) * 0.18);
+        const shade = rand(i * 19) > 0.5 ? 18 : -12;
+        ctx.fillStyle = `rgba(${r + shade}, ${g + shade}, ${b + shade}, 0.22)`;
         ctx.beginPath();
-        ctx.moveTo(cx - size * 0.2 + wave, cy + offsetY);
-        ctx.quadraticCurveTo(cx + wave * 2, cy + offsetY - size * 0.1, cx + size * 0.2 + wave, cy + offsetY);
-        ctx.stroke();
+        ctx.ellipse(blotchX, blotchY, blotchSize * 0.9, blotchSize * 0.6, angle, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     ctx.restore();
@@ -450,6 +453,8 @@ function getStealthVisibilityAlpha(stealthUnit) {
  * Initialize renderer
  */
 let animationLoopRunning = false;
+let animationFrameId = null;
+let lastFrameTime = 0;
 
 export function initRenderer() {
     canvas = document.getElementById('game-canvas');
@@ -467,25 +472,47 @@ export function initRenderer() {
 
     resizeCanvas();
 
-    // Start continuous animation loop for smooth animations
+    // Start animation loop only when needed
     if (!animationLoopRunning) {
         animationLoopRunning = true;
-        startAnimationLoop();
+    }
+    ensureAnimationLoop();
+}
+
+function getTargetFps() {
+    switch (state.effectiveQuality) {
+        case 'low':
+            return 20;
+        case 'medium':
+            return 30;
+        case 'high':
+        default:
+            return 45;
     }
 }
 
-/**
- * Continuous animation loop for smooth particle/vegetation animations
- */
-function startAnimationLoop() {
-    function loop() {
-        // Only render if game is active (not in menu)
-        if (state.screen === null && state.hexes.length > 0) {
-            render();
-        }
-        requestAnimationFrame(loop);
+function shouldAnimate() {
+    if (state.screen !== null || state.hexes.length === 0) return false;
+    if (state.animating || state.movementAnimation) return true;
+    return particles.getActiveCount() > 0;
+}
+
+function ensureAnimationLoop() {
+    if (animationFrameId !== null) return;
+    animationFrameId = requestAnimationFrame(animationLoop);
+}
+
+function animationLoop(timestamp) {
+    animationFrameId = null;
+    if (!shouldAnimate()) return;
+
+    const frameInterval = 1000 / getTargetFps();
+    if (!lastFrameTime || timestamp - lastFrameTime >= frameInterval) {
+        lastFrameTime = timestamp;
+        render();
     }
-    requestAnimationFrame(loop);
+
+    ensureAnimationLoop();
 }
 
 /**
@@ -1558,9 +1585,9 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         ctx.globalAlpha = 0.6;
     }
 
-    // Draw terrain camouflage shimmer for enemy cloaked units not in detection range
+    // Draw terrain camouflage pattern for enemy cloaked units not in detection range
     if (isCamouflagedEnemy) {
-        drawCamouflageShimmer(cx, cy, size, unit);
+        drawCamouflagePattern(cx, cy, size, unit);
         ctx.restore();
         return; // Don't draw the actual unit sprite
     }
@@ -1782,12 +1809,6 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
-
-    // Movement capacity indicator below HP bar (for selected unit)
-    if (isSelected) {
-        const remainingMove = getRemainingMoveCapacity(unit);
-        drawAPIndicator(ctx, cx, barY + barHeight + 16, remainingMove, unit.move, 14);
-    }
 
     // Attackable indicator
     if (isAttackable && !isSelected) {
@@ -2095,17 +2116,15 @@ export function render() {
         }
     }
 
-    const currentUnit = getCurrentUnit();
+    const isAiTurnHidden = state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer;
+    const currentUnit = isAiTurnHidden ? null : getCurrentUnit();
     // Always show reachable hexes when a unit is selected (point-and-click system)
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
     const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
 
     // Only show hex grid borders when planning movement or attacking
-    const showGrid = shouldShowHexGrid();
-
-    // Get max move cost for path visualization (consistent with getReachableHexes)
-    const maxMoveCost = currentUnit ? Math.min(currentUnit.ap, currentUnit.move) : 0;
+    const showGrid = !isAiTurnHidden && shouldShowHexGrid();
 
     // Collect all foreground elements for 2.5D depth sorting
     const foregroundElements = [];
@@ -2530,9 +2549,11 @@ export function render() {
         drawable.draw();
     });
 
-    // Update and draw particles
-    updateParticles();
-    drawParticles(ctx, state.offsetX, state.offsetY);
+    // Update and draw particles only when active
+    if (particles.getActiveCount() > 0) {
+        updateParticles();
+        drawParticles(ctx, state.offsetX, state.offsetY);
+    }
 
     // Draw attack range indicator when targeting an enemy
     if (currentUnit && state.targetedUnit) {
@@ -2566,6 +2587,10 @@ export function render() {
 
     // Draw zoom indicator
     drawZoomIndicator(w, h);
+
+    if (shouldAnimate()) {
+        ensureAnimationLoop();
+    }
 }
 
 /**

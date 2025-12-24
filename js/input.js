@@ -2,10 +2,10 @@
 
 import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, getRemainingMoveCapacity } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
-import { getReachableHexes, getPathToHex, findPath } from './pathfinding.js';
+import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
 import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCover } from './combat.js';
-import { checkWinCondition, endTurn } from './turns.js';
+import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
 import { render, resizeCanvas } from './renderer.js';
@@ -124,9 +124,6 @@ function handleMouseMove(e) {
             updateCameraOffset();
             render();
         }
-    } else {
-        // Path preview when not dragging
-        handlePathPreview(e.clientX, e.clientY);
     }
 }
 
@@ -433,6 +430,10 @@ function applyZoom(zoomDelta, screenX, screenY) {
  * - Click empty hex: Move there
  */
 function handleTapOrClick(clientX, clientY) {
+    if (state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer) {
+        return;
+    }
+
     const rect = canvas.getBoundingClientRect();
 
     const x = clientX - rect.left - state.offsetX;
@@ -554,6 +555,7 @@ function handleEnemyClick(unit, hex) {
  */
 function handlePathPreview(clientX, clientY) {
     if (state.gameOver) return;
+    if (state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer) return;
     // Don't show path preview if targeting an enemy
     if (state.targetedUnit) return;
 
@@ -566,30 +568,7 @@ function handlePathPreview(clientX, clientY) {
 
     state.hoveredHex = hex;
 
-    // Update path preview
-    const unit = getCurrentUnit();
-    if (unit && hex && hex.walkable && !hex.unit) {
-        const maxPossibleCost = unit.move * 3;
-        const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxPossibleCost);
-
-        if (pathResult && pathResult.path) {
-            state.currentPath = pathResult.path;
-        } else {
-            const reachable = getReachableHexes(unit);
-            const hexKey = `${hex.q},${hex.r}`;
-            const pathData = reachable.get(hexKey);
-
-            if (pathData && pathData.path) {
-                state.currentPath = pathData.path;
-            } else {
-                state.currentPath = null;
-            }
-        }
-    } else {
-        state.currentPath = null;
-    }
-
-    render();
+    state.currentPath = null;
 }
 
 /**
@@ -958,7 +937,7 @@ function setupMenuButtons() {
         endTurnBtn.onclick = () => {
             // Check if any unit still has AP
             const playerUnits = state.units.filter(u => u.player === state.currentPlayer && u.alive);
-            const totalAP = playerUnits.reduce((sum, u) => sum + u.ap, 0);
+            const totalAP = state.sharedAP;
 
             if (totalAP > 0 && !endTurnPending) {
                 // First click: warn about remaining AP
@@ -977,6 +956,22 @@ function setupMenuButtons() {
     const menuBtn = document.getElementById('menu-btn');
     if (menuBtn) {
         menuBtn.onclick = () => showScreen('menu');
+    }
+
+    const giveUpBtn = document.getElementById('give-up-btn');
+    if (giveUpBtn) {
+        giveUpBtn.onclick = () => {
+            if (state.gameOver) return;
+            const remainingPlayers = [];
+            for (let p = 0; p < state.settings.players; p++) {
+                if (p === state.currentPlayer) continue;
+                const units = getPlayerUnits(p);
+                if (units.length > 0) remainingPlayers.push(p);
+            }
+            const winner = remainingPlayers.length === 1 ? remainingPlayers[0] : (remainingPlayers[0] ?? null);
+            showToast('🏳️ Du hast aufgegeben.', 'warning');
+            endGame(winner);
+        };
     }
 }
 

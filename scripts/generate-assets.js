@@ -177,7 +177,7 @@ async function generateAssets() {
     }
 
     // Expected counts
-    const expectedTerrain = 10;  // grass, forest, rock, water, sand, swamp, hills, road, path, river
+    const expectedTerrain = 50;  // 10 types × base + 4 variants
     const expectedUnits = 40;    // 5 classes × 4 players × 2 states (normal + selected)
     const expectedDetails = 23;  // 5 tree types × 3 variants + 4 bushes + 4 rocks
 

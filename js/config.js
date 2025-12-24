@@ -6,11 +6,11 @@ export const CONFIG = {
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb'],
     UNITS_PER_PLAYER: 3,
     AP_PER_TURN: 4,
-    MAX_ROUNDS: 15,
+    MAX_ROUNDS: 30,
     VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
 
     // Balance: Limit attacks per unit per turn to prevent one unit from dominating
-    MAX_ATTACKS_PER_UNIT: 2,  // Each unit can attack max 2 times per turn
+    MAX_ATTACKS_PER_UNIT: 1,  // Each unit can attack max 1 time per turn
 
     // Map sizes (radius in hexes)
     MAP_SIZES: {
@@ -28,7 +28,7 @@ export const CONFIG = {
 
     // Number of pre-generated terrain variants per type (e.g., grass_v1.png)
     // Set to >0 only if you have generated *_v#.png files in assets/terrain
-    TERRAIN_VARIANTS: 3
+    TERRAIN_VARIANTS: 4
 };
 
 export const TERRAIN = {
