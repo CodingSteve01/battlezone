@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.10.1...shadow-squad-v1.11.0) (2025-12-24)
+
+
+### Features
+
+* add Vite bundler, seamless textures, status sprites, and visual enhancements ([#77](https://github.com/CodingSteve01/battlezone/issues/77)) ([7f7750e](https://github.com/CodingSteve01/battlezone/commit/7f7750e0eb915dd895c4d3fdcfb74c90231841a8))
+
 ## [1.10.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.10.0...shadow-squad-v1.10.1) (2025-12-24)
 
 
