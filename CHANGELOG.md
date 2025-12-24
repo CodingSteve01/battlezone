@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.1...shadow-squad-v1.11.2) (2025-12-24)
+
+
+### Bug Fixes
+
+* correct devicePixelRatio scaling in post-processing effects ([#81](https://github.com/CodingSteve01/battlezone/issues/81)) ([6c66205](https://github.com/CodingSteve01/battlezone/commit/6c66205d4e4376fb1bfb40f88a0b3160dafe6b14))
+
 ## [1.11.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.0...shadow-squad-v1.11.1) (2025-12-24)
 
 
