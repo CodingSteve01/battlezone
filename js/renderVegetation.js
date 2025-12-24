@@ -3,6 +3,25 @@
 
 import { getBushSprite, getTreeSprite } from './assetLoader.js';
 import { seededRandom } from './renderUtils.js';
+import { drawLSystemTree, getTreeTypes } from './lsystem.js';
+
+// Configuration for L-System trees (can be toggled for performance)
+let useLSystemTrees = false;
+
+/**
+ * Enable or disable L-System procedural trees
+ * L-System trees are more realistic but more CPU-intensive
+ */
+export function setLSystemTreesEnabled(enabled) {
+    useLSystemTrees = enabled;
+}
+
+/**
+ * Check if L-System trees are enabled
+ */
+export function isLSystemTreesEnabled() {
+    return useLSystemTrees;
+}
 
 // Canvas context - set by renderer.js
 let ctx = null;
@@ -32,14 +51,28 @@ export function initVegetationRenderer(context) {
 }
 
 /**
+ * Map tree type index to L-System tree type name
+ */
+const TREE_TYPE_MAP = ['pine', 'deciduous', 'birch', 'willow', 'deciduous'];
+
+/**
  * Draw a realistic tree with 2.5D depth effect
  * Supports multiple tree types: pine, deciduous, birch, willow, oak
+ * Can use L-System procedural generation for more realistic trees
  */
 export function drawTree2D5(x, y, size, treeType, seed) {
+    // Try pre-rendered sprite first
     const variant = Math.floor(seededRandom(seed + 17) * 3);
     const sprite = getTreeSprite(treeType, variant);
     if (sprite) {
         drawDetailSprite(sprite, x, y, size, TREE_BASE_RATIO, size * 0.55, TREE_REFERENCE_SIZE);
+        return;
+    }
+
+    // Use L-System trees if enabled (more realistic but slower)
+    if (useLSystemTrees && ctx) {
+        const lsystemType = TREE_TYPE_MAP[treeType] || 'deciduous';
+        drawLSystemTree(ctx, x, y + size * 0.45, size * 1.2, lsystemType, seed);
         return;
     }
 

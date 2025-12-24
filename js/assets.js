@@ -1,46 +1,72 @@
 // ===== ASSET MANAGEMENT & TEXTURES =====
 
+import {
+    seamlessFBM,
+    seamlessTurbulence,
+    seamlessRidged,
+    seamlessVoronoi,
+    seamlessWarpedNoise,
+    seedNoise
+} from './seamlessNoise.js';
+
 // Pre-rendered texture canvases for performance
 const textureCache = new Map();
 const TEXTURE_SIZE = 128;
 
-// Perlin-like noise for realistic textures
+// Initialize noise with consistent seed
+seedNoise(42);
+
+/**
+ * Seamless fractal noise wrapper - normalized coordinates (0-1)
+ * This replaces the old fractalNoise and produces tileable textures
+ */
+function fractalNoise(x, y, octaves = 4, seed = 0) {
+    // Convert pixel coordinates to 0-1 range for seamless tiling
+    const nx = x / TEXTURE_SIZE;
+    const ny = y / TEXTURE_SIZE;
+    // Use seamless FBM - returns -1 to 1, normalize to 0-1
+    return (seamlessFBM(nx, ny, octaves, 0.5, 4, seed) + 1) * 0.5;
+}
+
+/**
+ * Legacy noise functions for backward compatibility
+ * Now using seamless noise internally
+ */
 function noise2D(x, y, seed = 0) {
-    const n = Math.sin(x * 12.9898 + y * 78.233 + seed) * 43758.5453;
-    return n - Math.floor(n);
+    const nx = x / TEXTURE_SIZE;
+    const ny = y / TEXTURE_SIZE;
+    return (seamlessFBM(nx, ny, 1, 0.5, 8, seed) + 1) * 0.5;
 }
 
 function smoothNoise(x, y, seed = 0) {
-    const x0 = Math.floor(x);
-    const y0 = Math.floor(y);
-    const fx = x - x0;
-    const fy = y - y0;
-
-    const v00 = noise2D(x0, y0, seed);
-    const v10 = noise2D(x0 + 1, y0, seed);
-    const v01 = noise2D(x0, y0 + 1, seed);
-    const v11 = noise2D(x0 + 1, y0 + 1, seed);
-
-    const i1 = v00 * (1 - fx) + v10 * fx;
-    const i2 = v01 * (1 - fx) + v11 * fx;
-
-    return i1 * (1 - fy) + i2 * fy;
+    return noise2D(x, y, seed);
 }
 
-function fractalNoise(x, y, octaves = 4, seed = 0) {
-    let value = 0;
-    let amplitude = 1;
-    let frequency = 1;
-    let maxValue = 0;
+/**
+ * Warped noise for organic patterns (terrain details)
+ */
+function warpedNoise(x, y, seed = 0) {
+    const nx = x / TEXTURE_SIZE;
+    const ny = y / TEXTURE_SIZE;
+    return (seamlessWarpedNoise(nx, ny, 4, 0.3, seed) + 1) * 0.5;
+}
 
-    for (let i = 0; i < octaves; i++) {
-        value += smoothNoise(x * frequency, y * frequency, seed + i * 100) * amplitude;
-        maxValue += amplitude;
-        amplitude *= 0.5;
-        frequency *= 2;
-    }
+/**
+ * Turbulence noise for dramatic patterns
+ */
+function turbulenceNoise(x, y, octaves = 4, seed = 0) {
+    const nx = x / TEXTURE_SIZE;
+    const ny = y / TEXTURE_SIZE;
+    return seamlessTurbulence(nx, ny, octaves, 0.5, 4, seed);
+}
 
-    return value / maxValue;
+/**
+ * Voronoi for cellular patterns (rocks, cracks)
+ */
+function voronoiNoise(x, y, scale = 4, seed = 0) {
+    const nx = x / TEXTURE_SIZE;
+    const ny = y / TEXTURE_SIZE;
+    return seamlessVoronoi(nx, ny, scale, seed);
 }
 
 /**
@@ -1763,44 +1789,268 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
             break;
     }
 
-    // === STATUS OVERLAYS ===
-    if (status === 'attack') {
-        ctx.save();
-        ctx.globalAlpha = 0.9;
-        ctx.fillStyle = 'rgba(255, 200, 120, 0.8)';
+    // === STATUS-SPECIFIC VISUAL EFFECTS ===
+    drawStatusEffects(ctx, status, accentColor, playerColor);
+
+    ctx.restore();
+}
+
+/**
+ * Draw status-specific visual effects
+ */
+function drawStatusEffects(ctx, status, accentColor, playerColor) {
+    switch (status) {
+        case 'attack':
+            drawAttackEffect(ctx);
+            break;
+        case 'cover':
+        case 'crouch':
+            drawCrouchEffect(ctx);
+            break;
+        case 'move':
+            drawMoveEffect(ctx);
+            break;
+        case 'alert':
+            drawAlertEffect(ctx, accentColor);
+            break;
+        case 'wounded':
+            drawWoundedEffect(ctx);
+            break;
+        case 'stealth':
+            drawStealthEffect(ctx);
+            break;
+    }
+}
+
+/**
+ * Attack pose - muzzle flash and action lines
+ */
+function drawAttackEffect(ctx) {
+    ctx.save();
+
+    // Muzzle flash
+    const gradient = ctx.createRadialGradient(32, -4, 0, 32, -4, 12);
+    gradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 200, 100, 0.9)');
+    gradient.addColorStop(0.6, 'rgba(255, 150, 50, 0.5)');
+    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(32, -4, 12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flash spikes
+    ctx.strokeStyle = 'rgba(255, 255, 150, 0.8)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 5; i++) {
+        const angle = (i / 5) * Math.PI - Math.PI / 2;
+        const len = 8 + Math.random() * 6;
         ctx.beginPath();
-        ctx.moveTo(26, -6);
-        ctx.lineTo(38, -2);
-        ctx.lineTo(26, 2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 220, 160, 0.7)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(20, -8);
-        ctx.lineTo(34, -16);
-        ctx.moveTo(20, 0);
-        ctx.lineTo(34, 6);
+        ctx.moveTo(32, -4);
+        ctx.lineTo(32 + Math.cos(angle) * len, -4 + Math.sin(angle) * len);
         ctx.stroke();
-        ctx.restore();
     }
 
-    if (status === 'cover') {
-        ctx.save();
-        ctx.translate(0, 8);
-        ctx.fillStyle = 'rgba(70, 80, 60, 0.9)';
+    // Action lines
+    ctx.strokeStyle = 'rgba(255, 220, 160, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(24, -12);
+    ctx.lineTo(40, -20);
+    ctx.moveTo(24, 4);
+    ctx.lineTo(40, 10);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+}
+
+/**
+ * Crouch/cover pose - lowered stance indicator
+ */
+function drawCrouchEffect(ctx) {
+    ctx.save();
+
+    // Cover indicator bar
+    ctx.fillStyle = 'rgba(70, 100, 60, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(-24, 20, 48, 10, 3);
+    ctx.fill();
+
+    // Shield icon
+    ctx.fillStyle = 'rgba(100, 140, 80, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(0, 22);
+    ctx.lineTo(-8, 25);
+    ctx.lineTo(-8, 28);
+    ctx.lineTo(0, 30);
+    ctx.lineTo(8, 28);
+    ctx.lineTo(8, 25);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cover text lines
+    ctx.strokeStyle = 'rgba(50, 70, 45, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-20, 24);
+    ctx.lineTo(-12, 24);
+    ctx.moveTo(12, 24);
+    ctx.lineTo(20, 24);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Move pose - motion blur lines
+ */
+function drawMoveEffect(ctx) {
+    ctx.save();
+
+    // Motion blur lines behind character
+    ctx.strokeStyle = 'rgba(150, 180, 200, 0.4)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+        const y = -25 + i * 18;
+        const length = 15 + i * 3;
         ctx.beginPath();
-        ctx.roundRect(-22, 8, 44, 12, 4);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(40, 50, 35, 0.7)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(-18, 10);
-        ctx.lineTo(18, 10);
-        ctx.moveTo(-12, 14);
-        ctx.lineTo(12, 14);
+        ctx.moveTo(-28, y);
+        ctx.lineTo(-28 - length, y + 2);
         ctx.stroke();
-        ctx.restore();
+    }
+
+    // Dust particles
+    ctx.fillStyle = 'rgba(180, 160, 140, 0.5)';
+    for (let i = 0; i < 5; i++) {
+        const x = -20 - Math.random() * 15;
+        const y = 25 + Math.random() * 10;
+        const size = 2 + Math.random() * 3;
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Alert pose - glowing visor and exclamation
+ */
+function drawAlertEffect(ctx, accentColor) {
+    ctx.save();
+
+    // Visor glow pulse
+    const glowGrad = ctx.createRadialGradient(0, -28, 5, 0, -28, 20);
+    glowGrad.addColorStop(0, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, 0.6)`);
+    glowGrad.addColorStop(0.5, `rgba(${accentColor.r}, ${accentColor.g}, ${accentColor.b}, 0.2)`);
+    glowGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, -28, 20, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Exclamation mark
+    ctx.fillStyle = 'rgba(255, 200, 50, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(-3, -55, 6, 14, 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -38, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Alert rays
+    ctx.strokeStyle = 'rgba(255, 200, 50, 0.5)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 4; i++) {
+        const angle = -Math.PI / 2 + (i - 1.5) * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * 8, -48 + Math.sin(angle) * 8);
+        ctx.lineTo(Math.cos(angle) * 16, -48 + Math.sin(angle) * 16);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Wounded pose - damage indicators
+ */
+function drawWoundedEffect(ctx) {
+    ctx.save();
+
+    // Damage cracks on armor
+    ctx.strokeStyle = 'rgba(60, 40, 40, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-8, -8);
+    ctx.lineTo(-12, -2);
+    ctx.lineTo(-10, 4);
+    ctx.moveTo(6, -5);
+    ctx.lineTo(10, 2);
+    ctx.stroke();
+
+    // Blood drips (subtle)
+    ctx.fillStyle = 'rgba(150, 50, 50, 0.6)';
+    for (let i = 0; i < 3; i++) {
+        const x = -5 + i * 5;
+        const y = 8 + i * 4;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 2, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Low HP indicator
+    ctx.fillStyle = 'rgba(200, 60, 60, 0.8)';
+    ctx.beginPath();
+    ctx.moveTo(0, -52);
+    ctx.lineTo(-6, -58);
+    ctx.lineTo(-4, -58);
+    ctx.lineTo(-4, -64);
+    ctx.lineTo(4, -64);
+    ctx.lineTo(4, -58);
+    ctx.lineTo(6, -58);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Stealth pose - shimmer/camo effect
+ */
+function drawStealthEffect(ctx) {
+    ctx.save();
+
+    // Reduced opacity for stealth
+    ctx.globalAlpha = 0.6;
+
+    // Camo pattern overlay
+    ctx.fillStyle = 'rgba(60, 80, 60, 0.3)';
+    for (let i = 0; i < 12; i++) {
+        const x = -20 + (i % 4) * 12;
+        const y = -35 + Math.floor(i / 4) * 22;
+        const w = 8 + Math.random() * 6;
+        const h = 6 + Math.random() * 4;
+        ctx.beginPath();
+        ctx.ellipse(x, y, w, h, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Shimmer lines
+    ctx.strokeStyle = 'rgba(100, 150, 180, 0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+        const y = -40 + i * 14;
+        ctx.beginPath();
+        ctx.moveTo(-18, y);
+        for (let j = 0; j <= 8; j++) {
+            const x = -18 + j * 4.5;
+            const wave = Math.sin(j * 0.8 + i * 0.5) * 2;
+            ctx.lineTo(x, y + wave);
+        }
+        ctx.stroke();
     }
 
     ctx.restore();
