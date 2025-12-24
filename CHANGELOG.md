@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.2...shadow-squad-v1.11.3) (2025-12-24)
+
+
+### Bug Fixes
+
+* improve mobile give-up button and translate README to English ([#83](https://github.com/CodingSteve01/battlezone/issues/83)) ([9217985](https://github.com/CodingSteve01/battlezone/commit/921798584434f37bf5de0f73e4a221798d2031bb))
+
 ## [1.11.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.11.1...shadow-squad-v1.11.2) (2025-12-24)
 
 
