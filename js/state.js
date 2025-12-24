@@ -52,6 +52,10 @@ export const state = {
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }
 
+    // Terrain animation state
+    terrainAnimationFrame: 0,     // Current frame index (0 to FRAME_COUNT-1)
+    terrainAnimationTime: 0,      // Last frame change timestamp
+
     // Fog of War (per player)
     visibleHexes: new Set(),  // Set of "q,r" keys for currently visible hexes (current player)
     exploredHexes: new Set(), // Current player's explored hexes

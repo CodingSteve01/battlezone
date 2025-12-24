@@ -4,12 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0b1021">
     <title>Shadow Squad - Taktisches Teamspiel</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 4 56 16v32L32 60 8 48V16z' fill='%230b1021'/%3E%3Cpath d='M32 8 52 18v28L32 56 12 46V18z' fill='%23121a34'/%3E%3Cpath d='M12 30h40v4H12z' fill='%23324363' opacity='.8'/%3E%3Cpath d='M26 14v12m12-12v12m0 12v12m-12-12v12' stroke='%23324363' stroke-width='3' stroke-linecap='round' opacity='.9'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%23e94560'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%23f7f7f7'/%3E%3Cpath d='M32 18v6m0 16v6m-6-14h-6m22 0h-6' stroke='%23f7f7f7' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="apple-touch-icon" href="icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -122,9 +125,15 @@
                     <div class="player-dot" id="current-dot"></div>
                     <span class="player-name" id="current-name">Spieler 1</span>
                 </div>
-                <div class="round-info">
+                <div class="round-info" id="round-info-toggle">
                     <div class="round-badge">Runde <span id="round-num">1</span>/<span id="round-max">30</span></div>
                     <div class="ap-display" id="ap-display"></div>
+                </div>
+                <div class="round-dropdown" id="round-dropdown">
+                    <button class="dropdown-give-up-btn" id="give-up-btn">
+                        <span class="give-up-icon" aria-hidden="true">🏳️</span>
+                        <span>Aufgeben</span>
+                    </button>
                 </div>
             </div>
 
@@ -141,18 +150,10 @@
             <div class="unit-panel">
                 <div class="unit-tabs" id="unit-tabs"></div>
                 <div class="action-row">
-                    <button class="action-btn cover-btn" data-action="cover" title="Deckung nehmen (1 AP)">
-                        <span class="icon">🌲</span>
-                        <span class="label" id="cover-label">Deckung</span>
-                    </button>
                     <button class="action-btn special-btn" data-action="special" title="Spezialfähigkeit (2 AP)">
                         <span class="icon">✨</span>
                         <span class="label" id="special-label">Spezial</span>
                         <span class="special-tip" id="special-tip"></span>
-                    </button>
-                    <button class="give-up-btn" id="give-up-btn">
-                        <span class="give-up-icon" aria-hidden="true">🏳️</span>
-                        <span class="give-up-label">Aufgeben</span>
                     </button>
                     <button class="end-turn-btn" id="end-turn-btn">Zug beenden</button>
                 </div>

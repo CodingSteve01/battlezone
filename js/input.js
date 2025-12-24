@@ -4,7 +4,7 @@ import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueued
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
-import { executeAttack, useSpecialAbility, revealFromCover, takeCover, canTakeCover } from './combat.js';
+import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -958,10 +958,31 @@ function setupMenuButtons() {
         menuBtn.onclick = () => showScreen('menu');
     }
 
+    // Round info dropdown toggle
+    const roundInfoToggle = document.getElementById('round-info-toggle');
+    const roundDropdown = document.getElementById('round-dropdown');
+    if (roundInfoToggle && roundDropdown) {
+        roundInfoToggle.onclick = (e) => {
+            e.stopPropagation();
+            roundDropdown.classList.toggle('visible');
+        };
+
+        // Close dropdown when clicking elsewhere
+        document.addEventListener('click', (e) => {
+            if (!roundDropdown.contains(e.target) && !roundInfoToggle.contains(e.target)) {
+                roundDropdown.classList.remove('visible');
+            }
+        });
+    }
+
     const giveUpBtn = document.getElementById('give-up-btn');
     if (giveUpBtn) {
         giveUpBtn.onclick = () => {
             if (state.gameOver) return;
+            // Close dropdown
+            const roundDropdown = document.getElementById('round-dropdown');
+            if (roundDropdown) roundDropdown.classList.remove('visible');
+
             const remainingPlayers = [];
             for (let p = 0; p < state.settings.players; p++) {
                 if (p === state.currentPlayer) continue;
@@ -979,25 +1000,6 @@ function setupMenuButtons() {
  * Setup action buttons
  */
 function setupActionButtons() {
-    // Cover button - take cover on forest/rock tiles
-    const coverBtn = document.querySelector('.action-btn[data-action="cover"]');
-    if (coverBtn) {
-        coverBtn.onclick = () => {
-            const unit = getCurrentUnit();
-            if (unit && canTakeCover(unit)) {
-                takeCover(unit);
-                render();
-                updateUI();
-            } else if (unit && unit.hiding) {
-                showToast('❌ Bereits in Deckung!', 'warning');
-            } else if (unit && state.sharedAP < 1) {
-                showToast('❌ Nicht genug AP (braucht 1)!', 'warning');
-            } else {
-                showToast('❌ Hier keine Deckung möglich!', 'warning');
-            }
-        };
-    }
-
     // Special ability button - simplified UI
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {

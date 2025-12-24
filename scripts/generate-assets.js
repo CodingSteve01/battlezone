@@ -18,6 +18,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const ASSETS_DIR = join(__dirname, '..', 'assets');
 const TOOLS_DIR = join(__dirname, '..', 'tools');
+const ICONS_DIR = join(__dirname, '..', 'icons');
 
 function resolveChromiumExecutable() {
     // Playwright sometimes returns the x64 path even on ARM Macs; pick an existing one.
@@ -166,9 +167,47 @@ async function generateAssets() {
         console.log(`  ✓ assets/details/${asset.name}`);
     }
 
+    // Generate app icons from SVG
+    console.log('\n⏳ Generating app icons...');
+    const iconSizes = [120, 152, 180, 192, 512];
+
+    for (const size of iconSizes) {
+        const iconDataUrl = await page.evaluate(async (size) => {
+            const svgUrl = '../icons/icon.svg';
+            const response = await fetch(svgUrl);
+            const svgText = await response.text();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const img = new Image();
+            const blob = new Blob([svgText], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = url;
+            });
+
+            ctx.drawImage(img, 0, 0, size, size);
+            URL.revokeObjectURL(url);
+
+            return canvas.toDataURL('image/png');
+        }, size);
+
+        const base64Data = iconDataUrl.replace(/^data:image\/png;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const filePath = join(ICONS_DIR, `icon-${size}.png`);
+        writeFileSync(filePath, buffer);
+        console.log(`  ✓ icons/icon-${size}.png`);
+    }
+
     await browser.close();
 
-    const totalAssets = terrainAssets.length + unitAssets.length + detailAssets.length;
+    const totalAssets = terrainAssets.length + unitAssets.length + detailAssets.length + iconSizes.length;
 
     // Validate that we actually generated assets
     if (totalAssets === 0) {

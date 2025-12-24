@@ -28,14 +28,22 @@ export const CONFIG = {
 
     // Number of pre-generated terrain variants per type (e.g., grass_v1.png)
     // Set to >0 only if you have generated *_v#.png files in assets/terrain
-    TERRAIN_VARIANTS: 4
+    TERRAIN_VARIANTS: 4,
+
+    // Animation settings for animated terrain (water, wheat, etc.)
+    ANIMATION: {
+        FRAME_COUNT: 4,        // Number of frames per animation (e.g., water_f0.png to water_f3.png)
+        FRAME_DURATION: 250,   // Milliseconds per frame (4 FPS for subtle movement)
+        ENABLED: true          // Master toggle for terrain animations
+    }
 };
 
+// Natural color palette - more realistic earth tones
 export const TERRAIN = {
     grass: {
-        color: '#2d5a40',
-        colorLight: '#3d7352',
-        colorDark: '#1e4030',
+        color: '#4a7c59',      // Natural meadow green
+        colorLight: '#5d9668', // Sun-lit grass
+        colorDark: '#3a6347',  // Shadowed grass
         walkable: true,
         cover: false,
         canHide: false,
@@ -43,97 +51,97 @@ export const TERRAIN = {
         name: 'Gras'
     },
     forest: {
-        color: '#1e4d35',
-        colorLight: '#2a6045',
-        colorDark: '#143525',
+        color: '#2d5a3e',      // Deep forest green
+        colorLight: '#3d6b4d', // Canopy highlights
+        colorDark: '#1e4430',  // Forest shadows
         walkable: true,
         cover: true,
-        canHide: true,  // Units can hide in forest
+        canHide: true,
         moveCost: 2,
         name: 'Wald'
     },
     hills: {
-        color: '#5a6a50',
-        colorLight: '#6a7a60',
-        colorDark: '#4a5a40',
+        color: '#6b7c5a',      // Natural hill with grass
+        colorLight: '#7d8d6a', // Sunlit slope
+        colorDark: '#5a6b4a',  // Shadowed slope
         walkable: true,
         cover: false,
         moveCost: 2,
         name: 'Hügel',
-        rangeBonus: 1,      // +1 range for attacks
-        defenseBonus: 10    // +10% hit chance when defending (height advantage)
+        rangeBonus: 1,
+        defenseBonus: 10
     },
     rock: {
-        color: '#4a4a5a',
-        colorLight: '#5a5a6a',
-        colorDark: '#3a3a4a',
+        color: '#6b6b78',      // Natural granite
+        colorLight: '#7d7d8a', // Weathered stone
+        colorDark: '#5a5a68',  // Rock shadow
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Felsen'
     },
     water: {
-        color: '#1a4a70',
-        colorLight: '#2a5a85',
-        colorDark: '#0f3555',
+        color: '#3a6b8c',      // Clear lake water
+        colorLight: '#4a7d9e', // Sunlit water
+        colorDark: '#2a5a7a',  // Deep water
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Wasser'
     },
     sand: {
-        color: '#8a7355',
-        colorLight: '#a08565',
-        colorDark: '#6a5540',
+        color: '#c4a97a',      // Natural beach sand
+        colorLight: '#d4b98a', // Dry sand
+        colorDark: '#b4996a',  // Wet sand
         walkable: true,
         cover: false,
         moveCost: 1,
         name: 'Sand'
     },
     swamp: {
-        color: '#3a4a30',
-        colorLight: '#4a5a40',
-        colorDark: '#2a3520',
+        color: '#4a5c3d',      // Murky swamp green
+        colorLight: '#5a6c4d', // Algae surface
+        colorDark: '#3a4c2d',  // Deep swamp
         walkable: true,
         cover: false,
         moveCost: 3,
         name: 'Sumpf'
     },
     road: {
-        color: '#6a5a4a',
-        colorLight: '#7a6a5a',
-        colorDark: '#5a4a3a',
+        color: '#8a7a68',      // Dusty road brown
+        colorLight: '#9a8a78', // Dry road
+        colorDark: '#7a6a58',  // Shadowed road
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 0.5,  // Fast movement on roads (half cost)
+        moveCost: 0.5,
         name: 'Straße'
     },
     path: {
-        color: '#5a5040',
-        colorLight: '#6a6050',
-        colorDark: '#4a4030',
+        color: '#7a6855',      // Worn earth path
+        colorLight: '#8a7865', // Sun-baked
+        colorDark: '#6a5845',  // Shadowed path
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 1,  // Normal movement cost (but good for visual variety)
+        moveCost: 1,
         name: 'Pfad'
     },
     river: {
-        color: '#2a5a80',
-        colorLight: '#3a6a95',
-        colorDark: '#1a4a65',
-        walkable: true,  // Can cross, but expensive
+        color: '#4a7c9a',      // Natural river blue-green
+        colorLight: '#5a8caa', // Sunlit ripples
+        colorDark: '#3a6c8a',  // Deep river
+        walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 3,  // Expensive to cross
+        moveCost: 3,
         name: 'Fluss'
     },
-    // Realistic enhanced terrain types
+    // Natural enhanced terrain types
     snow: {
-        color: '#e8eef5',
-        colorLight: '#f5f8fc',
-        colorDark: '#c8d4e0',
+        color: '#e8eef5',      // Fresh snow white
+        colorLight: '#f8fcff', // Bright snow
+        colorDark: '#d8dee8',  // Shadowed snow
         walkable: true,
         cover: false,
         canHide: false,
@@ -142,9 +150,9 @@ export const TERRAIN = {
         slippery: true
     },
     ice: {
-        color: '#a0d4e8',
-        colorLight: '#c0e8f5',
-        colorDark: '#70b0d0',
+        color: '#b8d8e8',      // Natural ice blue
+        colorLight: '#d0e8f5', // Bright ice
+        colorDark: '#98c0d8',  // Deep ice
         walkable: true,
         cover: false,
         canHide: false,
@@ -154,9 +162,9 @@ export const TERRAIN = {
         reflective: true
     },
     deepwater: {
-        color: '#0a2540',
-        colorLight: '#1a3555',
-        colorDark: '#051530',
+        color: '#1a4060',      // Dark ocean blue
+        colorLight: '#2a5070', // Sunlit deep
+        colorDark: '#0a3050',  // Abyss
         walkable: false,
         cover: false,
         moveCost: Infinity,
@@ -165,9 +173,9 @@ export const TERRAIN = {
         depth: 'deep'
     },
     shallows: {
-        color: '#3a7a9a',
-        colorLight: '#4a8aaa',
-        colorDark: '#2a6a8a',
+        color: '#5a9aaa',      // Clear shallow water
+        colorLight: '#6aaaba', // Bright shallows
+        colorDark: '#4a8a9a',  // Shadowed shallows
         walkable: true,
         cover: false,
         canHide: false,
@@ -176,9 +184,9 @@ export const TERRAIN = {
         animated: true
     },
     reeds: {
-        color: '#4a6a45',
-        colorLight: '#5a7a55',
-        colorDark: '#3a5a35',
+        color: '#5a7a50',      // Natural reed green
+        colorLight: '#6a8a60', // Sunlit reeds
+        colorDark: '#4a6a40',  // Shadowed reeds
         walkable: true,
         cover: true,
         canHide: true,
@@ -187,9 +195,9 @@ export const TERRAIN = {
         animated: true
     },
     flowers: {
-        color: '#3d8050',
-        colorLight: '#4d9060',
-        colorDark: '#2d7040',
+        color: '#5a8a60',      // Flower meadow green
+        colorLight: '#6a9a70', // Bright meadow
+        colorDark: '#4a7a50',  // Shadowed meadow
         walkable: true,
         cover: false,
         canHide: false,
@@ -198,9 +206,9 @@ export const TERRAIN = {
         decorative: true
     },
     mud: {
-        color: '#5a4a30',
-        colorLight: '#6a5a40',
-        colorDark: '#4a3a20',
+        color: '#5a4838',      // Natural brown mud
+        colorLight: '#6a5848', // Drying mud
+        colorDark: '#4a3828',  // Wet mud
         walkable: true,
         cover: false,
         canHide: false,
@@ -209,9 +217,9 @@ export const TERRAIN = {
         sticky: true
     },
     farmland: {
-        color: '#6a5535',
-        colorLight: '#7a6545',
-        colorDark: '#5a4525',
+        color: '#7a6545',      // Tilled earth
+        colorLight: '#8a7555', // Dry soil
+        colorDark: '#6a5535',  // Moist soil
         walkable: true,
         cover: false,
         canHide: false,
@@ -219,9 +227,9 @@ export const TERRAIN = {
         name: 'Ackerland'
     },
     wheat: {
-        color: '#c4a84a',
-        colorLight: '#d4b85a',
-        colorDark: '#b4983a',
+        color: '#c8b060',      // Golden wheat
+        colorLight: '#d8c070', // Sunlit wheat
+        colorDark: '#b8a050',  // Shadowed wheat
         walkable: true,
         cover: true,
         canHide: true,
@@ -230,9 +238,9 @@ export const TERRAIN = {
         animated: true
     },
     gravel: {
-        color: '#8a8075',
-        colorLight: '#9a9085',
-        colorDark: '#7a7065',
+        color: '#9a9088',      // Natural gravel grey
+        colorLight: '#aaa098', // Light gravel
+        colorDark: '#8a8078',  // Dark gravel
         walkable: true,
         cover: false,
         canHide: false,
@@ -240,9 +248,9 @@ export const TERRAIN = {
         name: 'Kies'
     },
     cliff: {
-        color: '#5a5550',
-        colorLight: '#6a6560',
-        colorDark: '#4a4540',
+        color: '#6a6560',      // Natural rock face
+        colorLight: '#7a7570', // Lit cliff
+        colorDark: '#5a5550',  // Shadowed cliff
         walkable: false,
         cover: true,
         moveCost: Infinity,
@@ -250,9 +258,9 @@ export const TERRAIN = {
         elevation: 2
     },
     ruins: {
-        color: '#6a6560',
-        colorLight: '#7a7570',
-        colorDark: '#5a5550',
+        color: '#7a7570',      // Weathered stone ruins
+        colorLight: '#8a8580', // Lichen-covered stone
+        colorDark: '#6a6560',  // Shadowed ruins
         walkable: true,
         cover: true,
         canHide: true,
@@ -260,9 +268,9 @@ export const TERRAIN = {
         name: 'Ruinen'
     },
     bridge: {
-        color: '#6a5040',
-        colorLight: '#7a6050',
-        colorDark: '#5a4030',
+        color: '#8a7060',      // Wooden bridge planks
+        colorLight: '#9a8070', // Weathered wood
+        colorDark: '#7a6050',  // Shadowed planks
         walkable: true,
         cover: false,
         canHide: false,
@@ -271,9 +279,9 @@ export const TERRAIN = {
         elevated: true
     },
     tallgrass: {
-        color: '#3a6a40',
-        colorLight: '#4a7a50',
-        colorDark: '#2a5a30',
+        color: '#5a8a55',      // Wild tall grass
+        colorLight: '#6a9a65', // Sun-touched grass
+        colorDark: '#4a7a45',  // Shaded grass
         walkable: true,
         cover: true,
         canHide: true,
@@ -282,9 +290,9 @@ export const TERRAIN = {
         animated: true
     },
     pine: {
-        color: '#1a3a25',
-        colorLight: '#2a4a35',
-        colorDark: '#0a2a15',
+        color: '#2a4a35',      // Dark pine forest
+        colorLight: '#3a5a45', // Sunlit pines
+        colorDark: '#1a3a25',  // Dense forest shade
         walkable: true,
         cover: true,
         canHide: true,
@@ -292,9 +300,9 @@ export const TERRAIN = {
         name: 'Nadelwald'
     },
     clearing: {
-        color: '#4a8a55',
-        colorLight: '#5a9a65',
-        colorDark: '#3a7a45',
+        color: '#5a9a60',      // Bright forest clearing
+        colorLight: '#6aaa70', // Sunlit clearing
+        colorDark: '#4a8a50',  // Shaded clearing
         walkable: true,
         cover: false,
         canHide: false,
@@ -302,9 +310,9 @@ export const TERRAIN = {
         name: 'Lichtung'
     },
     heather: {
-        color: '#7a5a7a',
-        colorLight: '#8a6a8a',
-        colorDark: '#6a4a6a',
+        color: '#8a6a8a',      // Purple heather moorland
+        colorLight: '#9a7a9a', // Blooming heather
+        colorDark: '#7a5a7a',  // Shaded heather
         walkable: true,
         cover: false,
         canHide: false,
@@ -312,9 +320,9 @@ export const TERRAIN = {
         name: 'Heide'
     },
     moss: {
-        color: '#3a5a3a',
-        colorLight: '#4a6a4a',
-        colorDark: '#2a4a2a',
+        color: '#4a6a48',      // Soft forest moss
+        colorLight: '#5a7a58', // Damp moss
+        colorDark: '#3a5a38',  // Deep shade moss
         walkable: true,
         cover: false,
         canHide: false,

@@ -1,6 +1,7 @@
 // ===== TERRAIN & CHARACTER ANIMATION SYSTEM =====
 
-import { TERRAIN } from './config.js';
+import { TERRAIN, CONFIG } from './config.js';
+import { state } from './state.js';
 
 // Animation state
 export const animationState = {
@@ -114,6 +115,9 @@ export function updateAnimations(deltaTime) {
     // Update water
     animationState.waterPhase += ANIM_CONFIG.WATER_WAVE_SPEED * deltaTime;
 
+    // Update terrain sprite animation frames (for animated PNG textures)
+    updateTerrainAnimationFrame(animationState.time);
+
     // Update snowflakes
     updateSnowflakes(deltaTime);
 
@@ -124,6 +128,23 @@ export function updateAnimations(deltaTime) {
 
     // Update character animations
     updateCharacterAnimations(deltaTime);
+}
+
+/**
+ * Update terrain animation frame index based on time
+ * This cycles through sprite sheet frames for animated terrain like water, wheat, etc.
+ */
+function updateTerrainAnimationFrame(currentTime) {
+    if (!CONFIG.ANIMATION?.ENABLED) return;
+
+    const frameDuration = CONFIG.ANIMATION.FRAME_DURATION || 250;
+    const frameCount = CONFIG.ANIMATION.FRAME_COUNT || 4;
+
+    // Check if it's time to advance to the next frame
+    if (currentTime - state.terrainAnimationTime >= frameDuration) {
+        state.terrainAnimationFrame = (state.terrainAnimationFrame + 1) % frameCount;
+        state.terrainAnimationTime = currentTime;
+    }
 }
 
 /**
