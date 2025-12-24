@@ -27,7 +27,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
-    name: Update Version Display
+    name: Publish Release Assets
     runs-on: ubuntu-latest
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
@@ -35,10 +35,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          fetch-depth: 0
+
+      - name: Create release archive
+        run: |
+          archive_name="shadow-squad-${{ needs.release-please.outputs.version }}.zip"
+          zip -r "${archive_name}" . \
+            -x ".git/*" \
+            -x "node_modules/*"
+          echo "ARCHIVE_NAME=${archive_name}" >> "$GITHUB_ENV"
 
       - name: Log release info
         run: |
           echo "New release created!"
           echo "Tag: ${{ needs.release-please.outputs.tag_name }}"
           echo "Version: ${{ needs.release-please.outputs.version }}"
+
+      - name: Upload release asset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" "${ARCHIVE_NAME}" --clobber
