@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.10.0...shadow-squad-v1.10.1) (2025-12-24)
+
+
+### Documentation
+
+* improve documentation linking and add status badges ([#75](https://github.com/CodingSteve01/battlezone/issues/75)) ([68253bb](https://github.com/CodingSteve01/battlezone/commit/68253bbceb336006ce684ab7c20d3a44306a481c))
+
 ## [1.10.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.9.1...shadow-squad-v1.10.0) (2025-12-24)
 
 
