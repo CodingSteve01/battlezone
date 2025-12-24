@@ -38,12 +38,12 @@ export const CONFIG = {
     }
 };
 
-// Natural color palette - more realistic earth tones
+// Ultra-realistic color palette - warm, natural earth tones inspired by high-quality strategy games
 export const TERRAIN = {
     grass: {
-        color: '#4a7c59',      // Natural meadow green
-        colorLight: '#5d9668', // Sun-lit grass
-        colorDark: '#3a6347',  // Shadowed grass
+        color: '#6a9a58',      // Warm meadow green with yellow undertones
+        colorLight: '#7db068', // Sun-drenched grass
+        colorDark: '#4a7a40',  // Shadowed meadow
         walkable: true,
         cover: false,
         canHide: false,
@@ -51,9 +51,9 @@ export const TERRAIN = {
         name: 'Gras'
     },
     forest: {
-        color: '#2d5a3e',      // Deep forest green
-        colorLight: '#3d6b4d', // Canopy highlights
-        colorDark: '#1e4430',  // Forest shadows
+        color: '#3d6a4a',      // Rich forest green
+        colorLight: '#4d7a58', // Canopy with light filtering
+        colorDark: '#2a5038',  // Deep forest shade
         walkable: true,
         cover: true,
         canHide: true,
@@ -61,9 +61,9 @@ export const TERRAIN = {
         name: 'Wald'
     },
     hills: {
-        color: '#6b7c5a',      // Natural hill with grass
-        colorLight: '#7d8d6a', // Sunlit slope
-        colorDark: '#5a6b4a',  // Shadowed slope
+        color: '#7a8c5a',      // Warm grassy hill
+        colorLight: '#8a9c68', // Sunlit slope with golden highlights
+        colorDark: '#5a7040',  // Hill in shadow
         walkable: true,
         cover: false,
         moveCost: 2,
@@ -72,45 +72,45 @@ export const TERRAIN = {
         defenseBonus: 10
     },
     rock: {
-        color: '#6b6b78',      // Natural granite
-        colorLight: '#7d7d8a', // Weathered stone
-        colorDark: '#5a5a68',  // Rock shadow
+        color: '#7a7878',      // Natural weathered stone
+        colorLight: '#908a88', // Sun-bleached rock
+        colorDark: '#5a5858',  // Rock shadow
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Felsen'
     },
     water: {
-        color: '#3a6b8c',      // Clear lake water
-        colorLight: '#4a7d9e', // Sunlit water
-        colorDark: '#2a5a7a',  // Deep water
+        color: '#4a7a95',      // Natural lake blue-green
+        colorLight: '#5a8aa8', // Sunlit ripples
+        colorDark: '#3a6a80',  // Deeper water
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Wasser'
     },
     sand: {
-        color: '#c4a97a',      // Natural beach sand
-        colorLight: '#d4b98a', // Dry sand
-        colorDark: '#b4996a',  // Wet sand
+        color: '#d4b888',      // Warm golden sand
+        colorLight: '#e4c898', // Sun-baked sand
+        colorDark: '#c4a878',  // Shadowed sand
         walkable: true,
         cover: false,
         moveCost: 1,
         name: 'Sand'
     },
     swamp: {
-        color: '#4a5c3d',      // Murky swamp green
-        colorLight: '#5a6c4d', // Algae surface
-        colorDark: '#3a4c2d',  // Deep swamp
+        color: '#5a6a45',      // Murky swamp with warm undertones
+        colorLight: '#6a7a55', // Algae-covered surface
+        colorDark: '#3a4a30',  // Deep swamp shadow
         walkable: true,
         cover: false,
         moveCost: 3,
         name: 'Sumpf'
     },
     road: {
-        color: '#8a7a68',      // Dusty road brown
-        colorLight: '#9a8a78', // Dry road
-        colorDark: '#7a6a58',  // Shadowed road
+        color: '#9a8a70',      // Warm dusty road
+        colorLight: '#aa9a80', // Sun-baked road
+        colorDark: '#7a6a55',  // Shadowed road
         walkable: true,
         cover: false,
         canHide: false,
@@ -118,9 +118,9 @@ export const TERRAIN = {
         name: 'Straße'
     },
     path: {
-        color: '#7a6855',      // Worn earth path
-        colorLight: '#8a7865', // Sun-baked
-        colorDark: '#6a5845',  // Shadowed path
+        color: '#8a7860',      // Worn earth path with warm tones
+        colorLight: '#9a8870', // Sunlit path
+        colorDark: '#6a5845',  // Path in shadow
         walkable: true,
         cover: false,
         canHide: false,
