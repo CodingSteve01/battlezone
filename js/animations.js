@@ -121,10 +121,8 @@ export function updateAnimations(deltaTime) {
     // Update snowflakes
     updateSnowflakes(deltaTime);
 
-    // Update environmental particles
-    updateFireflies(deltaTime);
-    updateDustMotes(deltaTime);
-    updateFallingLeaves(deltaTime);
+    // Environmental particles removed for performance
+    // (fireflies, leaves, dust motes were all rendering globally on every hex)
 
     // Update character animations
     updateCharacterAnimations(deltaTime);

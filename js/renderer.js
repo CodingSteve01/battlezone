@@ -22,9 +22,6 @@ import {
     drawSnowfall,
     drawSnowDetails,
     drawIceReflections,
-    drawFireflies,
-    drawDustMotes,
-    drawFallingLeaves,
     drawFlowers,
     drawHeather,
     drawRuins,
@@ -826,11 +823,20 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
 /**
  * Collect foreground elements (trees, large rocks) for 2.5D depth sorting
  * Returns array of objects with draw function and y-position
+ *
+ * IMPORTANT: sortY must be based on consistent offsets from the element's base position,
+ * NOT on the element's size. This ensures proper depth sorting at all zoom levels.
  */
 function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
     const elements = [];
     const s = size * 0.45;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
+
+    // Consistent sort offsets based on hex size (not element size!)
+    const TREE_SORT_OFFSET = size * 0.4;      // Trees sort at their base
+    const BG_TREE_SORT_OFFSET = size * 0.25;  // Background trees sort behind
+    const SHRUB_SORT_OFFSET = size * 0.35;    // Shrubs between trees and ground
+    const BUSH_SORT_OFFSET = size * 0.38;     // Bushes similar to shrubs
 
     if (type === 'forest' || type === 'pine') {
         // Dense forest with multiple trees for realistic appearance
@@ -859,7 +865,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'tree',
                 x: tx,
                 y: ty,
-                sortY: ty + treeSize * 0.5,
+                sortY: ty + TREE_SORT_OFFSET,
                 draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i)
             });
         }
@@ -882,7 +888,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'tree-bg',
                 x: tx,
                 y: ty,
-                sortY: ty + treeSize * 0.3, // Sorts behind main trees
+                sortY: ty + BG_TREE_SORT_OFFSET,
                 draw: () => drawTree2D5(tx, ty, treeSize, treeType, baseSeed + i + 100)
             });
         }
@@ -898,7 +904,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'shrub',
                 x: shrubX,
                 y: shrubY,
-                sortY: shrubY + shrubSize * 0.2,
+                sortY: shrubY + SHRUB_SORT_OFFSET,
                 draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + i + 104)
             });
         }
@@ -913,7 +919,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'bush',
                 x: bushX,
                 y: bushY,
-                sortY: bushY + bushSize * 0.3,
+                sortY: bushY + BUSH_SORT_OFFSET,
                 draw: () => drawBush2D5(bushX, bushY, bushSize, baseSeed + 304)
             });
         }
@@ -926,7 +932,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'bush',
                 x: cx,
                 y: cy,
-                sortY: cy + bushSize * 0.3,
+                sortY: cy + BUSH_SORT_OFFSET,
                 draw: () => drawBush2D5(cx, cy, bushSize, baseSeed)
             });
         }
@@ -936,7 +942,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             type: 'rock',
             x: cx,
             y: cy,
-            sortY: cy + s * 0.5,
+            sortY: cy + TREE_SORT_OFFSET,  // Rocks sort like trees (tall elements)
             draw: () => drawRockFormation2D5(cx, cy, s * 2.2, baseSeed)
         });
     } else if (type === 'ruins') {
@@ -946,7 +952,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 type: 'rock',
                 x: cx,
                 y: cy,
-                sortY: cy + s * 0.3,
+                sortY: cy + SHRUB_SORT_OFFSET,  // Smaller ruins rocks
                 draw: () => drawRockFormation2D5(cx, cy, s * 1.5, baseSeed)
             });
         }
@@ -2176,11 +2182,11 @@ function drawAnimatedTerrainOverlay(cx, cy, hexSize, terrainType, q, r) {
             break;
         case 'forest':
         case 'pine':
-            drawFireflies(ctx, cx, cy, hexSize);
-            drawFallingLeaves(ctx, cx, cy, hexSize);
+            // Removed expensive per-hex fireflies and falling leaves animations
+            // These were rendering global animations on EVERY forest hex (very inefficient)
             break;
         case 'sand':
-            drawDustMotes(ctx, cx, cy, hexSize);
+            // Removed dust motes animation (same performance issue as fireflies)
             break;
         case 'flowers':
             drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.5, 'grass');
