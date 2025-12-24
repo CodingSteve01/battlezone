@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync, readFileSync, writeFileSync } from 'fs';
 
 // Helper to copy directory recursively
 function copyDir(src, dest) {
@@ -15,6 +15,12 @@ function copyDir(src, dest) {
             copyFileSync(srcPath, destPath);
         }
     }
+}
+
+// Helper to get build hash from environment or generate one
+function getBuildHash() {
+    // Use commit hash from environment (set by CI) or generate timestamp-based hash
+    return process.env.VITE_COMMIT_HASH || Date.now().toString(36);
 }
 
 export default defineConfig({
@@ -67,6 +73,14 @@ export default defineConfig({
                 }
                 if (existsSync('icons')) {
                     copyDir('icons', 'dist/icons');
+                }
+                // Copy and process service worker with build hash
+                if (existsSync('sw.js')) {
+                    const buildHash = getBuildHash();
+                    let swContent = readFileSync('sw.js', 'utf-8');
+                    swContent = swContent.replace(/__BUILD_HASH__/g, buildHash);
+                    writeFileSync('dist/sw.js', swContent);
+                    console.log(`[vite] Service worker updated with hash: ${buildHash}`);
                 }
             }
         }

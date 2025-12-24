@@ -527,10 +527,74 @@ if (document.readyState === 'loading') {
     init();
 }
 
+// Service Worker registration with update handling
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((error) => {
-            console.warn('Service worker registration failed:', error);
-        });
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('./sw.js');
+            console.log('[App] Service worker registered');
+
+            // Check for updates periodically (every 5 minutes)
+            setInterval(() => {
+                registration.update();
+            }, 5 * 60 * 1000);
+
+            // Handle updates
+            registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                console.log('[App] New service worker installing...');
+
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New version available, show update notification
+                        console.log('[App] New version available!');
+                        showUpdateNotification();
+                    }
+                });
+            });
+
+            // Handle controller change (when new SW takes over)
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                console.log('[App] New service worker activated, reloading...');
+                window.location.reload();
+            });
+        } catch (error) {
+            console.warn('[App] Service worker registration failed:', error);
+        }
     });
+}
+
+/**
+ * Show update notification to user
+ */
+function showUpdateNotification() {
+    // Check if notification already exists
+    if (document.getElementById('update-notification')) return;
+
+    const notification = document.createElement('div');
+    notification.id = 'update-notification';
+    notification.className = 'update-notification';
+    notification.innerHTML = `
+        <span>🔄 Neue Version verfügbar!</span>
+        <button id="update-btn">Jetzt aktualisieren</button>
+    `;
+    document.body.appendChild(notification);
+
+    document.getElementById('update-btn').addEventListener('click', () => {
+        // Tell the waiting service worker to take over
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+                if (registration.waiting) {
+                    registration.waiting.postMessage('skipWaiting');
+                }
+            });
+        }
+        notification.remove();
+    });
+
+    // Auto-dismiss after 30 seconds if user doesn't interact
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => notification.remove(), 300);
+    }, 30000);
 }
