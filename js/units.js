@@ -1,7 +1,7 @@
 // ===== UNIT SYSTEM =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getHex, getPlayerUnits, spendSharedAP, trackUnitMovement, canUnitAttack, getRemainingAttacks } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -151,9 +151,8 @@ export function moveUnitInstant(unit, targetHex) {
  */
 export function moveUnit(unit, targetHex, cost) {
     moveUnitInstant(unit, targetHex);
-    // Deduct AP from shared pool and track movement
+    // Deduct AP from shared pool
     spendSharedAP(cost);
-    trackUnitMovement(unit, cost);
 }
 
 /**
@@ -188,9 +187,8 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
             // Animation complete
             state.animating = false;
             state.movementAnimation = null;
-            // Deduct cost from shared pool and track movement
+            // Deduct cost from shared pool
             spendSharedAP(totalCost);
-            trackUnitMovement(unit, totalCost);
             if (onComplete) onComplete();
             return;
         }

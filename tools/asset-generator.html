@@ -248,6 +248,26 @@
             return x - Math.floor(x);
         }
 
+        function applyCamoPattern(ctx, x, y, width, height, colors, density = 12) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x, y, width, height);
+            ctx.clip();
+
+            for (let i = 0; i < density; i++) {
+                const px = x + Math.random() * width;
+                const py = y + Math.random() * height;
+                const w = 4 + Math.random() * 8;
+                const h = 3 + Math.random() * 6;
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath();
+                ctx.ellipse(px, py, w, h, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
         // ===== TERRAIN TEXTURE GENERATION =====
 
         function createGrassTexture() {
@@ -256,13 +276,13 @@
             canvas.height = TEXTURE_SIZE;
             const ctx = canvas.getContext('2d');
 
-            // Base green with variation
+            // Base meadow green with variation
             for (let y = 0; y < TEXTURE_SIZE; y++) {
                 for (let x = 0; x < TEXTURE_SIZE; x++) {
-                    const n = fractalNoise(x / 20, y / 20, 4, 1);
-                    const r = Math.floor(40 + n * 30);
-                    const g = Math.floor(90 + n * 50);
-                    const b = Math.floor(50 + n * 25);
+                    const n = fractalNoise(x / 24, y / 24, 5, 1);
+                    const r = Math.floor(45 + n * 25);
+                    const g = Math.floor(85 + n * 45);
+                    const b = Math.floor(45 + n * 20);
                     ctx.fillStyle = `rgb(${r},${g},${b})`;
                     ctx.fillRect(x, y, 1, 1);
                 }
@@ -286,9 +306,22 @@
 
             // Add small highlights
             for (let i = 0; i < 50; i++) {
-                ctx.fillStyle = `rgba(150, 200, 100, ${0.1 + Math.random() * 0.15})`;
+                ctx.fillStyle = `rgba(150, 190, 120, ${0.08 + Math.random() * 0.12})`;
                 ctx.beginPath();
                 ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Subtle dirt patches
+            for (let i = 0; i < 6; i++) {
+                const x = Math.random() * TEXTURE_SIZE;
+                const y = Math.random() * TEXTURE_SIZE;
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 12 + Math.random() * 18);
+                gradient.addColorStop(0, 'rgba(80, 70, 45, 0.25)');
+                gradient.addColorStop(1, 'rgba(80, 70, 45, 0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.ellipse(x, y, 20 + Math.random() * 10, 12 + Math.random() * 8, 0, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -303,22 +336,22 @@
 
             for (let y = 0; y < TEXTURE_SIZE; y++) {
                 for (let x = 0; x < TEXTURE_SIZE; x++) {
-                    const n = fractalNoise(x / 15, y / 15, 5, 2);
-                    const r = Math.floor(30 + n * 25);
-                    const g = Math.floor(55 + n * 35);
-                    const b = Math.floor(30 + n * 20);
+                    const n = fractalNoise(x / 18, y / 18, 5, 2);
+                    const r = Math.floor(35 + n * 20);
+                    const g = Math.floor(55 + n * 30);
+                    const b = Math.floor(30 + n * 18);
                     ctx.fillStyle = `rgb(${r},${g},${b})`;
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
 
-            for (let i = 0; i < 80; i++) {
+            for (let i = 0; i < 100; i++) {
                 const x = Math.random() * TEXTURE_SIZE;
                 const y = Math.random() * TEXTURE_SIZE;
                 const size = 2 + Math.random() * 4;
                 const hue = Math.random() < 0.5 ?
-                    `rgba(${60 + Math.random() * 40}, ${40 + Math.random() * 30}, 20, 0.6)` :
-                    `rgba(${30 + Math.random() * 30}, ${50 + Math.random() * 30}, 25, 0.5)`;
+                    `rgba(${60 + Math.random() * 30}, ${50 + Math.random() * 25}, 25, 0.55)` :
+                    `rgba(${35 + Math.random() * 25}, ${55 + Math.random() * 25}, 30, 0.5)`;
                 ctx.fillStyle = hue;
                 ctx.beginPath();
                 ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
@@ -337,9 +370,16 @@
             }
 
             for (let i = 0; i < 3; i++) {
-                ctx.fillStyle = 'rgba(0, 20, 10, 0.3)';
+                ctx.fillStyle = 'rgba(0, 15, 8, 0.35)';
                 ctx.beginPath();
                 ctx.ellipse(30 + Math.random() * 68, 30 + Math.random() * 68, 15 + Math.random() * 15, 10 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let i = 0; i < 20; i++) {
+                ctx.fillStyle = `rgba(90, 75, 50, ${0.25 + Math.random() * 0.2})`;
+                ctx.beginPath();
+                ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 3, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -357,16 +397,16 @@
                     const n1 = fractalNoise(x / 25, y / 25, 4, 3);
                     const n2 = fractalNoise(x / 10, y / 10, 3, 4);
                     const combined = n1 * 0.7 + n2 * 0.3;
-                    const base = 70 + combined * 50;
-                    const r = Math.floor(base);
-                    const g = Math.floor(base * 0.95);
-                    const b = Math.floor(base * 1.05);
+                    const base = 80 + combined * 45;
+                    const r = Math.floor(base * 0.95);
+                    const g = Math.floor(base * 0.97);
+                    const b = Math.floor(base * 1.02);
                     ctx.fillStyle = `rgb(${r},${g},${b})`;
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
 
-            ctx.strokeStyle = 'rgba(40, 40, 50, 0.5)';
+            ctx.strokeStyle = 'rgba(45, 45, 55, 0.5)';
             ctx.lineWidth = 1;
             for (let i = 0; i < 8; i++) {
                 ctx.beginPath();
@@ -382,7 +422,7 @@
             }
 
             for (let i = 0; i < 30; i++) {
-                ctx.fillStyle = `rgba(180, 180, 190, ${0.1 + Math.random() * 0.2})`;
+                ctx.fillStyle = `rgba(185, 185, 190, ${0.1 + Math.random() * 0.2})`;
                 ctx.beginPath();
                 ctx.arc(Math.random() * TEXTURE_SIZE, Math.random() * TEXTURE_SIZE, 1 + Math.random() * 3, 0, Math.PI * 2);
                 ctx.fill();
@@ -405,24 +445,24 @@
             const ctx = canvas.getContext('2d');
 
             const gradient = ctx.createLinearGradient(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-            gradient.addColorStop(0, '#1a3a5c');
-            gradient.addColorStop(0.5, '#0d2840');
-            gradient.addColorStop(1, '#1a3a5c');
+            gradient.addColorStop(0, '#1b3f5f');
+            gradient.addColorStop(0.5, '#0f2a42');
+            gradient.addColorStop(1, '#1b3f5f');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
 
             for (let y = 0; y < TEXTURE_SIZE; y++) {
                 for (let x = 0; x < TEXTURE_SIZE; x++) {
-                    const n = fractalNoise(x / 30, y / 30, 3, 5);
+                    const n = fractalNoise(x / 28, y / 28, 3, 5);
                     if (n > 0.55) {
-                        ctx.fillStyle = `rgba(80, 150, 200, ${(n - 0.55) * 0.5})`;
+                        ctx.fillStyle = `rgba(90, 150, 200, ${(n - 0.55) * 0.45})`;
                         ctx.fillRect(x, y, 1, 1);
                     }
                 }
             }
 
-            ctx.strokeStyle = 'rgba(120, 180, 220, 0.4)';
-            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(120, 180, 220, 0.35)';
+            ctx.lineWidth = 1.5;
             for (let i = 0; i < 6; i++) {
                 const yBase = 15 + i * 18;
                 ctx.beginPath();
@@ -452,10 +492,10 @@
 
             for (let y = 0; y < TEXTURE_SIZE; y++) {
                 for (let x = 0; x < TEXTURE_SIZE; x++) {
-                    const n = fractalNoise(x / 20, y / 20, 4, 6);
-                    const r = Math.floor(170 + n * 40);
-                    const g = Math.floor(145 + n * 35);
-                    const b = Math.floor(100 + n * 30);
+                    const n = fractalNoise(x / 22, y / 22, 4, 6);
+                    const r = Math.floor(175 + n * 35);
+                    const g = Math.floor(150 + n * 30);
+                    const b = Math.floor(110 + n * 25);
                     ctx.fillStyle = `rgb(${r},${g},${b})`;
                     ctx.fillRect(x, y, 1, 1);
                 }
@@ -465,7 +505,7 @@
                 const x = Math.random() * TEXTURE_SIZE;
                 const y = Math.random() * TEXTURE_SIZE;
                 const shade = 0.7 + Math.random() * 0.3;
-                ctx.fillStyle = `rgba(${Math.floor(200 * shade)}, ${Math.floor(175 * shade)}, ${Math.floor(130 * shade)}, 0.6)`;
+                ctx.fillStyle = `rgba(${Math.floor(205 * shade)}, ${Math.floor(180 * shade)}, ${Math.floor(135 * shade)}, 0.55)`;
                 ctx.beginPath();
                 ctx.arc(x, y, 0.5 + Math.random() * 1, 0, Math.PI * 2);
                 ctx.fill();
@@ -717,7 +757,7 @@
 
         // ===== UNIT SPRITE GENERATION =====
 
-        function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected) {
+        function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, status = 'normal') {
             ctx.save();
             ctx.translate(cx, cy);
 
@@ -740,28 +780,29 @@
             let bodyColor, armorColor, helmetColor;
             switch (classType) {
                 case 'scout':
-                    bodyColor = '#2a2a3a'; armorColor = '#3a3a4a'; helmetColor = '#4a4a5a';
+                    bodyColor = '#2f3b2f'; armorColor = '#3e4a38'; helmetColor = '#4b5544';
                     break;
                 case 'assault':
-                    bodyColor = '#3a2a2a'; armorColor = '#4a3a3a'; helmetColor = '#5a4a4a';
+                    bodyColor = '#3b3a33'; armorColor = '#4b4a43'; helmetColor = '#595850';
                     break;
                 case 'medic':
-                    bodyColor = '#2a3a2a'; armorColor = '#3a4a3a'; helmetColor = '#4a5a4a';
+                    bodyColor = '#2d3a35'; armorColor = '#3d4a45'; helmetColor = '#4c5a55';
                     break;
                 case 'sniper':
-                    bodyColor = '#2a2a40'; armorColor = '#3a3a55'; helmetColor = '#4a4a65';
+                    bodyColor = '#2a303a'; armorColor = '#353d4b'; helmetColor = '#404a59';
                     break;
                 case 'ninja':
-                    bodyColor = '#1a1a1a'; armorColor = '#252525'; helmetColor = '#303030';
+                    bodyColor = '#2b2b2b'; armorColor = '#383838'; helmetColor = '#454545';
                     break;
                 default:
-                    bodyColor = '#2a2a3a'; armorColor = '#3a3a4a'; helmetColor = '#4a4a5a';
+                    bodyColor = '#2f3b2f'; armorColor = '#3e4a38'; helmetColor = '#4b5544';
             }
 
             // Legs
             ctx.fillStyle = bodyColor;
             ctx.beginPath(); ctx.roundRect(-12, 8, 10, 22, 3); ctx.fill();
             ctx.beginPath(); ctx.roundRect(2, 8, 10, 22, 3); ctx.fill();
+            applyCamoPattern(ctx, -12, 10, 24, 18, ['rgba(35, 45, 35, 0.5)', 'rgba(60, 70, 55, 0.4)', 'rgba(25, 30, 25, 0.4)'], 10);
 
             // Boots
             ctx.fillStyle = '#1a1a1a';
@@ -771,11 +812,12 @@
             // Torso/Armor
             ctx.fillStyle = armorColor;
             ctx.beginPath(); ctx.roundRect(-16, -14, 32, 26, 5); ctx.fill();
+            applyCamoPattern(ctx, -15, -12, 30, 22, ['rgba(45, 55, 45, 0.45)', 'rgba(70, 80, 60, 0.35)', 'rgba(30, 35, 30, 0.35)'], 14);
 
             // Player color stripe
             ctx.fillStyle = playerColor;
-            ctx.fillRect(-14, -10, 5, 18);
-            ctx.fillRect(9, -10, 5, 18);
+            ctx.fillRect(-16, -12, 4, 12);
+            ctx.fillRect(12, -12, 4, 12);
 
             // Chest plate highlight
             ctx.fillStyle = 'rgba(255,255,255,0.1)';
@@ -852,32 +894,66 @@
                     ctx.fillRect(5, -8, 3, 12);
                     break;
                 case 'ninja':
-                    ctx.fillStyle = '#1a1a1a';
-                    ctx.save(); ctx.rotate(0.3); ctx.fillRect(8, -48, 3, 45); ctx.restore();
-                    ctx.fillStyle = '#4a2020';
-                    ctx.save(); ctx.rotate(0.3); ctx.fillRect(8, -5, 3, 12); ctx.restore();
-                    ctx.fillStyle = '#c0a040';
-                    ctx.beginPath(); ctx.ellipse(15, -2, 4, 2, 0.3, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#1f1f1f';
+                    ctx.save(); ctx.rotate(-0.15); ctx.fillRect(10, -40, 5, 42); ctx.restore();
+                    ctx.fillStyle = '#2f2f2f';
+                    ctx.beginPath(); ctx.roundRect(16, -8, 20, 6, 2); ctx.fill();
                     ctx.fillStyle = '#606060';
-                    ctx.beginPath(); ctx.moveTo(-18, 4);
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (Math.PI / 2) * i;
-                        ctx.lineTo(-18 + Math.cos(angle) * 5, 4 + Math.sin(angle) * 5);
-                        ctx.lineTo(-18 + Math.cos(angle + Math.PI / 4) * 2, 4 + Math.sin(angle + Math.PI / 4) * 2);
-                    }
-                    ctx.closePath(); ctx.fill();
-                    ctx.fillStyle = '#151515';
+                    ctx.fillRect(34, -6, 8, 2);
+                    ctx.fillStyle = '#404040';
+                    ctx.beginPath(); ctx.roundRect(-22, 2, 8, 16, 2); ctx.fill();
+                    ctx.fillStyle = '#2a2a2a';
                     ctx.beginPath(); ctx.arc(0, -24, 10, 0.2 * Math.PI, 0.8 * Math.PI); ctx.fill();
-                    ctx.fillStyle = '#ff3030';
-                    ctx.beginPath(); ctx.ellipse(-4, -30, 2, 1.5, 0, 0, Math.PI * 2); ctx.fill();
-                    ctx.beginPath(); ctx.ellipse(4, -30, 2, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+                    ctx.fillStyle = '#a0a0a0';
+                    ctx.beginPath(); ctx.arc(-6, -28, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(6, -28, 2, 0, Math.PI * 2); ctx.fill();
                     break;
+            }
+
+            // Status overlays
+            if (status === 'attack') {
+                ctx.save();
+                ctx.globalAlpha = 0.9;
+                ctx.fillStyle = 'rgba(255, 200, 120, 0.8)';
+                ctx.beginPath();
+                ctx.moveTo(26, -6);
+                ctx.lineTo(38, -2);
+                ctx.lineTo(26, 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 220, 160, 0.7)';
+                ctx.lineWidth = 1.2;
+                ctx.beginPath();
+                ctx.moveTo(20, -8);
+                ctx.lineTo(34, -16);
+                ctx.moveTo(20, 0);
+                ctx.lineTo(34, 6);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (status === 'cover') {
+                ctx.save();
+                ctx.translate(0, 8);
+                ctx.fillStyle = 'rgba(70, 80, 60, 0.9)';
+                ctx.beginPath();
+                ctx.roundRect(-22, 8, 44, 12, 4);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(40, 50, 35, 0.7)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-18, 10);
+                ctx.lineTo(18, 10);
+                ctx.moveTo(-12, 14);
+                ctx.lineTo(12, 14);
+                ctx.stroke();
+                ctx.restore();
             }
 
             ctx.restore();
         }
 
-        function generateUnitSprite(classType, playerColor, isSelected = false) {
+        function generateUnitSprite(classType, playerColor, isSelected = false, status = 'normal') {
             const padding = 20;
             const canvas = document.createElement('canvas');
             canvas.width = UNIT_SIZE + padding * 2;
@@ -887,7 +963,7 @@
             const cx = (UNIT_SIZE + padding * 2) / 2;
             const cy = (UNIT_SIZE + padding * 2) / 2;
 
-            drawHumanSprite(ctx, cx, cy, UNIT_SIZE * 0.6, playerColor, classType, isSelected);
+            drawHumanSprite(ctx, cx, cy, UNIT_SIZE * 0.6, playerColor, classType, isSelected, status);
 
             return canvas;
         }
@@ -1170,7 +1246,7 @@
             assets.units = [];
             resetRandomSeed();
 
-            const total = UNIT_CLASSES.length * PLAYER_COLORS.length * 2;
+            const total = UNIT_CLASSES.length * PLAYER_COLORS.length * 4;
             let count = 0;
 
             for (const classType of UNIT_CLASSES) {
@@ -1178,7 +1254,7 @@
                     const playerColor = PLAYER_COLORS[playerIdx];
 
                     // Normal state
-                    const normalCanvas = generateUnitSprite(classType, playerColor, false);
+                    const normalCanvas = generateUnitSprite(classType, playerColor, false, 'normal');
                     const normalName = `${classType}_p${playerIdx}.png`;
                     assets.units.push({ name: normalName, canvas: normalCanvas });
                     addPreview('units-preview', normalCanvas, normalName);
@@ -1187,13 +1263,31 @@
                     log(`Generated unit: ${normalName}`, 'success');
 
                     // Selected state
-                    const selectedCanvas = generateUnitSprite(classType, playerColor, true);
+                    const selectedCanvas = generateUnitSprite(classType, playerColor, true, 'selected');
                     const selectedName = `${classType}_p${playerIdx}_selected.png`;
                     assets.units.push({ name: selectedName, canvas: selectedCanvas });
                     addPreview('units-preview', selectedCanvas, selectedName);
                     count++;
                     setProgress((count / total) * 100);
                     log(`Generated unit: ${selectedName}`, 'success');
+
+                    // Attack state
+                    const attackCanvas = generateUnitSprite(classType, playerColor, false, 'attack');
+                    const attackName = `${classType}_p${playerIdx}_attack.png`;
+                    assets.units.push({ name: attackName, canvas: attackCanvas });
+                    addPreview('units-preview', attackCanvas, attackName);
+                    count++;
+                    setProgress((count / total) * 100);
+                    log(`Generated unit: ${attackName}`, 'success');
+
+                    // Cover state
+                    const coverCanvas = generateUnitSprite(classType, playerColor, false, 'cover');
+                    const coverName = `${classType}_p${playerIdx}_cover.png`;
+                    assets.units.push({ name: coverName, canvas: coverCanvas });
+                    addPreview('units-preview', coverCanvas, coverName);
+                    count++;
+                    setProgress((count / total) * 100);
+                    log(`Generated unit: ${coverName}`, 'success');
 
                     await new Promise(resolve => setTimeout(resolve, 20));
                 }

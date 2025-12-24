@@ -42,7 +42,6 @@ export const state = {
     // Shared AP Pool - all units share one pool per turn
     sharedAP: 0,              // Current AP in the pool
     maxSharedAP: 0,           // Maximum AP for this turn (for UI display)
-    unitMovedThisTurn: {},    // Track how much each unit has moved: unitId -> distance moved
     unitAttacksThisTurn: {},  // Track attacks per unit per turn: unitId -> attack count
 
     // Game progress
@@ -148,7 +147,6 @@ export function resetState() {
     state.roundsWithoutContact = 0;
     state.sharedAP = 0;
     state.maxSharedAP = 0;
-    state.unitMovedThisTurn = {};
     state.unitAttacksThisTurn = {};
 
     // Initialize per-player explored hexes and visible hexes
@@ -237,7 +235,6 @@ export function initSharedAPPool(player) {
     const poolSize = units.length * CONFIG.AP_PER_TURN;
     state.sharedAP = poolSize;
     state.maxSharedAP = poolSize;
-    state.unitMovedThisTurn = {};    // Reset movement tracking
     state.unitAttacksThisTurn = {};  // Reset attack tracking
 }
 
@@ -251,23 +248,6 @@ export function spendSharedAP(amount) {
         return true;
     }
     return false;
-}
-
-/**
- * Get remaining movement capacity for a unit this turn
- * Based on unit.move stat minus distance already moved
- */
-export function getRemainingMoveCapacity(unit) {
-    const movedSoFar = state.unitMovedThisTurn[unit.id] || 0;
-    return Math.max(0, unit.move - movedSoFar);
-}
-
-/**
- * Track movement for a unit
- */
-export function trackUnitMovement(unit, distance) {
-    const current = state.unitMovedThisTurn[unit.id] || 0;
-    state.unitMovedThisTurn[unit.id] = current + distance;
 }
 
 /**

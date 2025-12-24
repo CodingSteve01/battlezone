@@ -1468,7 +1468,7 @@ function drawFabricRect(ctx, x, y, w, h, baseColor, seed = 0) {
 /**
  * Draw a human character sprite with enhanced details
  */
-export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, direction = 0) {
+export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, status = 'normal', direction = 0) {
     ctx.save();
     ctx.translate(cx, cy);
 
@@ -1761,6 +1761,46 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
         case 'ninja':
             drawNinjaEquipment(ctx, armorColor, accentColor, seed);
             break;
+    }
+
+    // === STATUS OVERLAYS ===
+    if (status === 'attack') {
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = 'rgba(255, 200, 120, 0.8)';
+        ctx.beginPath();
+        ctx.moveTo(26, -6);
+        ctx.lineTo(38, -2);
+        ctx.lineTo(26, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 220, 160, 0.7)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(20, -8);
+        ctx.lineTo(34, -16);
+        ctx.moveTo(20, 0);
+        ctx.lineTo(34, 6);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    if (status === 'cover') {
+        ctx.save();
+        ctx.translate(0, 8);
+        ctx.fillStyle = 'rgba(70, 80, 60, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(-22, 8, 44, 12, 4);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(40, 50, 35, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-18, 10);
+        ctx.lineTo(18, 10);
+        ctx.moveTo(-12, 14);
+        ctx.lineTo(12, 14);
+        ctx.stroke();
+        ctx.restore();
     }
 
     ctx.restore();

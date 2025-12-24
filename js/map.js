@@ -68,43 +68,63 @@ function smoothNoise(q, r, scale, seed) {
 }
 
 /**
+ * Fractal noise for more natural terrain variation
+ */
+function fractalNoise(q, r, baseScale, octaves, seed) {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let maxValue = 0;
+
+    for (let i = 0; i < octaves; i++) {
+        value += smoothNoise(q, r, baseScale / frequency, seed + i * 11) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2;
+    }
+
+    return value / maxValue;
+}
+
+/**
  * Create a single hex with terrain using noise-based biomes
  */
 function createHex(q, r, distFromCenter, radius) {
     const edgeFactor = distFromCenter / radius;
 
     // Use multiple noise layers for different terrain features
-    const elevationNoise = smoothNoise(q, r, 4, 1) * 0.6 + smoothNoise(q, r, 8, 2) * 0.4;
-    const moistureNoise = smoothNoise(q, r, 5, 3) * 0.5 + smoothNoise(q, r, 10, 4) * 0.5;
-    const vegetationNoise = smoothNoise(q, r, 3, 5);
+    const elevationNoise = fractalNoise(q, r, 16, 4, 1);
+    const moistureNoise = fractalNoise(q, r, 14, 3, 2);
+    const vegetationNoise = fractalNoise(q, r, 10, 3, 3);
+    const roughnessNoise = fractalNoise(q, r, 8, 2, 4);
 
     let type = 'grass';
 
     // Determine terrain based on noise values (biome system)
-    if (elevationNoise > 0.75) {
+    if (elevationNoise > 0.78 || (elevationNoise > 0.7 && roughnessNoise > 0.6)) {
         // High elevation = rocks/mountains
         type = 'rock';
-    } else if (elevationNoise > 0.55) {
+    } else if (elevationNoise > 0.62) {
         // Medium-high elevation = hills
         type = 'hills';
-    } else if (elevationNoise < 0.2 && moistureNoise > 0.6 && distFromCenter > 2) {
+    } else if (elevationNoise < 0.25 && moistureNoise > 0.65 && distFromCenter > 2) {
         // Low elevation + high moisture = water (lakes)
         type = 'water';
-    } else if (elevationNoise < 0.3 && moistureNoise > 0.5 && distFromCenter > 1) {
+    } else if (elevationNoise < 0.32 && moistureNoise > 0.55 && distFromCenter > 1) {
         // Low elevation + medium moisture = swamp (near water)
         type = 'swamp';
-    } else if (moistureNoise > 0.55 && vegetationNoise > 0.4) {
+    } else if (moistureNoise > 0.6 && vegetationNoise > 0.45) {
         // High moisture + vegetation = forest
         type = 'forest';
-    } else if (moistureNoise < 0.3 && elevationNoise < 0.4) {
+    } else if (moistureNoise < 0.28 && elevationNoise < 0.45) {
         // Low moisture + low elevation = sand
         type = 'sand';
     }
     // Default: grass
 
     // Add some randomness to prevent too uniform patterns
-    const rand = Math.random();
-    if (type === 'grass' && rand < 0.08) {
+    const rand = smoothNoise(q, r, 2, 9);
+    if (type === 'grass' && rand < 0.06) {
         type = vegetationNoise > 0.5 ? 'forest' : 'hills';
     }
 

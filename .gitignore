@@ -20,6 +20,7 @@ npm-debug.log*
 
 # Build artifacts
 dist/
+assets/
 
 # Playwright
 test-results/
