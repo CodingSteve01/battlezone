@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.0...shadow-squad-v3.0.1) (2025-12-24)
+
+
+### Bug Fixes
+
+* **docs,graphics:** update tech stack docs and fix terrain details rendering ([#91](https://github.com/CodingSteve01/battlezone/issues/91)) ([69bffba](https://github.com/CodingSteve01/battlezone/commit/69bffba36b43db647d7b85187c64922cda40c2d6))
+
 ## [3.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v2.0.1...shadow-squad-v3.0.0) (2025-12-24)
 
 
