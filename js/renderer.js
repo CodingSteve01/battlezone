@@ -301,6 +301,7 @@ function drawHexPathToContext(context, cx, cy, size) {
 
 /**
  * Draw hex with texture to a specific context (for caching)
+ * Now includes 3D bevel effect for realistic raised border appearance
  */
 function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWidth, texture, terrain, hexQ, hexR) {
     context.beginPath();
@@ -345,12 +346,85 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.fill();
     }
 
-    // Removed inner hex highlight for seamless terrain appearance
-    // Grid overlay is now drawn separately only when needed
+    // === 3D BEVEL EFFECT for realistic raised border appearance ===
+    // Draw beveled edges - highlights on top-left, shadows on bottom-right
+    const bevelWidth = Math.max(2, size * 0.04);
+
+    // Get hex vertices
+    const vertices = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        vertices.push({
+            x: cx + size * Math.cos(angle),
+            y: cy + size * Math.sin(angle)
+        });
+    }
+
+    // Draw highlight edges (top-left facing edges: indices 0-1, 5-0, 4-5)
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+
+    // Top edges - highlight
+    context.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    context.lineWidth = bevelWidth;
+    context.beginPath();
+    context.moveTo(vertices[5].x, vertices[5].y);
+    context.lineTo(vertices[0].x, vertices[0].y);
+    context.lineTo(vertices[1].x, vertices[1].y);
+    context.stroke();
+
+    // Upper-left edge
+    context.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    context.lineWidth = bevelWidth * 0.8;
+    context.beginPath();
+    context.moveTo(vertices[4].x, vertices[4].y);
+    context.lineTo(vertices[5].x, vertices[5].y);
+    context.stroke();
+
+    // Bottom edges - shadow
+    context.strokeStyle = 'rgba(0, 20, 10, 0.22)';
+    context.lineWidth = bevelWidth;
+    context.beginPath();
+    context.moveTo(vertices[2].x, vertices[2].y);
+    context.lineTo(vertices[3].x, vertices[3].y);
+    context.lineTo(vertices[4].x, vertices[4].y);
+    context.stroke();
+
+    // Lower-right edge
+    context.strokeStyle = 'rgba(0, 20, 10, 0.15)';
+    context.lineWidth = bevelWidth * 0.8;
+    context.beginPath();
+    context.moveTo(vertices[1].x, vertices[1].y);
+    context.lineTo(vertices[2].x, vertices[2].y);
+    context.stroke();
+
+    // Inner subtle border for definition
+    const innerSize = size * 0.97;
+    context.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const px = cx + innerSize * Math.cos(angle);
+        const py = cy + innerSize * Math.sin(angle);
+        if (i === 0) context.moveTo(px, py);
+        else context.lineTo(px, py);
+    }
+    context.closePath();
+    context.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    context.lineWidth = 1;
+    context.stroke();
 
     if (strokeColor) {
         context.strokeStyle = strokeColor;
         context.lineWidth = lineWidth;
+        context.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * Math.cos(angle);
+            const py = cy + size * Math.sin(angle);
+            if (i === 0) context.moveTo(px, py);
+            else context.lineTo(px, py);
+        }
+        context.closePath();
         context.stroke();
     }
 }
@@ -671,12 +745,83 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.fill();
     }
 
-    // Removed inner hex highlight for seamless terrain appearance
-    // Grid overlay is now drawn separately only when needed
+    // === 3D BEVEL EFFECT for realistic raised border appearance ===
+    const bevelWidth = Math.max(2, size * 0.04);
+
+    // Get hex vertices
+    const vertices = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        vertices.push({
+            x: cx + size * Math.cos(angle),
+            y: cy + size * Math.sin(angle)
+        });
+    }
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Top edges - highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = bevelWidth;
+    ctx.beginPath();
+    ctx.moveTo(vertices[5].x, vertices[5].y);
+    ctx.lineTo(vertices[0].x, vertices[0].y);
+    ctx.lineTo(vertices[1].x, vertices[1].y);
+    ctx.stroke();
+
+    // Upper-left edge
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = bevelWidth * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(vertices[4].x, vertices[4].y);
+    ctx.lineTo(vertices[5].x, vertices[5].y);
+    ctx.stroke();
+
+    // Bottom edges - shadow
+    ctx.strokeStyle = 'rgba(0, 20, 10, 0.22)';
+    ctx.lineWidth = bevelWidth;
+    ctx.beginPath();
+    ctx.moveTo(vertices[2].x, vertices[2].y);
+    ctx.lineTo(vertices[3].x, vertices[3].y);
+    ctx.lineTo(vertices[4].x, vertices[4].y);
+    ctx.stroke();
+
+    // Lower-right edge
+    ctx.strokeStyle = 'rgba(0, 20, 10, 0.15)';
+    ctx.lineWidth = bevelWidth * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(vertices[1].x, vertices[1].y);
+    ctx.lineTo(vertices[2].x, vertices[2].y);
+    ctx.stroke();
+
+    // Inner subtle border
+    const innerSize = size * 0.97;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        const px = cx + innerSize * Math.cos(angle);
+        const py = cy + innerSize * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
     if (strokeColor) {
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = lineWidth;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = Math.PI / 3 * i;
+            const px = cx + size * Math.cos(angle);
+            const py = cy + size * Math.sin(angle);
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
         ctx.stroke();
     }
 }

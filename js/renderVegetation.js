@@ -182,13 +182,31 @@ export function drawTree2D5(x, y, size, treeType, seed) {
             ctx.fill();
         }
     } else if (treeType === 1) {
-        // Realistic deciduous tree with leaf clusters
-        const foliageBaseColors = [
-            { r: 25, g: 75, b: 40 },
-            { r: 30, g: 85, b: 45 },
-            { r: 35, g: 95, b: 50 },
-            { r: 40, g: 105, b: 55 }
+        // Realistic deciduous tree with autumn colors
+        // Use seed to determine if this tree has autumn colors (about 40% of trees)
+        const hasAutumnColors = seededRandom(seed + 999) < 0.4;
+
+        // Green foliage colors (summer)
+        const greenFoliageColors = [
+            { r: 35, g: 85, b: 45 },
+            { r: 45, g: 100, b: 55 },
+            { r: 55, g: 110, b: 60 },
+            { r: 65, g: 120, b: 65 }
         ];
+
+        // Autumn foliage colors (oranges, yellows, reds like in reference image)
+        const autumnFoliageColors = [
+            { r: 200, g: 120, b: 40 },   // Golden orange
+            { r: 220, g: 140, b: 50 },   // Bright orange
+            { r: 180, g: 90, b: 35 },    // Burnt orange
+            { r: 160, g: 70, b: 30 },    // Rust red
+            { r: 190, g: 160, b: 50 },   // Yellow-gold
+            { r: 170, g: 130, b: 45 },   // Amber
+            { r: 140, g: 50, b: 30 },    // Deep red
+            { r: 180, g: 100, b: 40 }    // Orange-brown
+        ];
+
+        const foliageBaseColors = hasAutumnColors ? autumnFoliageColors : greenFoliageColors;
 
         // Draw overlapping leaf clusters for depth
         for (let layer = 0; layer < 3; layer++) {
@@ -204,7 +222,7 @@ export function drawTree2D5(x, y, size, treeType, seed) {
 
                 // Soft gradient for each cluster
                 const clusterGrad = ctx.createRadialGradient(fx - fSize * 0.3, fy - fSize * 0.3, 0, fx, fy, fSize);
-                clusterGrad.addColorStop(0, `rgb(${Math.floor(color.r * shade * 1.2)}, ${Math.floor(color.g * shade * 1.2)}, ${Math.floor(color.b * shade * 1.2)})`);
+                clusterGrad.addColorStop(0, `rgb(${Math.floor(color.r * shade * 1.15)}, ${Math.floor(color.g * shade * 1.15)}, ${Math.floor(color.b * shade * 1.15)})`);
                 clusterGrad.addColorStop(0.7, `rgb(${Math.floor(color.r * shade)}, ${Math.floor(color.g * shade)}, ${Math.floor(color.b * shade)})`);
                 clusterGrad.addColorStop(1, `rgb(${Math.floor(color.r * shade * 0.7)}, ${Math.floor(color.g * shade * 0.7)}, ${Math.floor(color.b * shade * 0.7)})`);
 
@@ -213,8 +231,9 @@ export function drawTree2D5(x, y, size, treeType, seed) {
                 ctx.arc(fx, fy, fSize, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Individual leaf hints
-                ctx.fillStyle = `rgba(${color.r + 30}, ${color.g + 40}, ${color.b + 20}, 0.3)`;
+                // Individual leaf hints with color variation
+                const leafShade = hasAutumnColors ? 1.1 : 1.0;
+                ctx.fillStyle = `rgba(${Math.floor((color.r + 20) * leafShade)}, ${Math.floor((color.g + (hasAutumnColors ? 10 : 30)) * leafShade)}, ${Math.floor((color.b + 10) * leafShade)}, 0.35)`;
                 for (let l = 0; l < 4; l++) {
                     const lx = fx + (seededRandom(seed + i * 50 + l * 7) - 0.5) * fSize;
                     const ly = fy + (seededRandom(seed + i * 50 + l * 7 + 1) - 0.5) * fSize;
