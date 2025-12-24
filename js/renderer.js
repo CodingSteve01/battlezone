@@ -198,21 +198,16 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
         drawTerrainBlend(tileCtx, cx, cy, hexSize, hex.type, neighbors);
     }
 
-    // Add fog overlays
+    // Draw terrain details ONLY for visible hexes (not explored/hidden)
+    if (fogLevel === 'visible' && shouldRenderDetails()) {
+        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
+    }
+
+    // Add fog overlays AFTER terrain (so they cover everything properly)
     if (fogLevel === 'explored') {
         drawExploredOverlay(tileCtx, cx, cy, hexSize);
     } else if (fogLevel === 'hidden') {
         drawHiddenOverlay(tileCtx, cx, cy, hexSize);
-    }
-
-    // Draw terrain details for visible/explored hexes
-    if (fogLevel === 'visible' && shouldRenderDetails()) {
-        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
-    } else if (fogLevel === 'explored' && shouldRenderDetails()) {
-        tileCtx.save();
-        tileCtx.globalAlpha = 0.3;
-        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
-        tileCtx.restore();
     }
 
     return tileCanvas;
@@ -220,29 +215,21 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
 
 /**
  * Draw explored hex shadow overlay to a context
+ * Creates a clean, natural-looking dim effect for previously seen areas
  */
 function drawExploredOverlay(context, cx, cy, hexSize) {
     context.save();
+
+    // Single clean overlay with slight gradient for natural look
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    const shadowGradient = context.createLinearGradient(
-        cx - hexSize * 0.5, cy - hexSize * 0.5,
-        cx + hexSize * 0.5, cy + hexSize * 0.5
-    );
-    shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
-    shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
-    shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
-    context.fillStyle = shadowGradient;
-    context.fill();
-
-    const vignetteGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
-    vignetteGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vignetteGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.05)');
-    vignetteGradient.addColorStop(1, 'rgba(0, 0, 0, 0.20)');
-    context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize);
-    context.fillStyle = vignetteGradient;
+    // Subtle radial gradient - darker at edges, slightly lighter in center
+    const dimGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
+    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    context.fillStyle = dimGradient;
     context.fill();
 
     context.restore();
@@ -250,16 +237,17 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
 
 /**
  * Draw hidden hex fog overlay to a context
+ * Creates a solid black fog for unseen areas
  */
 function drawHiddenOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
-    const fogGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
-    fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
-    fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
-    context.fillStyle = fogGradient;
+
+    // Solid dark fog - completely obscures the terrain
+    context.fillStyle = '#050810';
     context.fill();
+
     context.restore();
 }
 
@@ -2245,29 +2233,25 @@ export function render() {
             const terrainData = fogLevel === 'visible' ? terrain : null;
             drawHex(sx, sy, state.hexSize, fillColor, strokeColor, 1, texture, terrainData);
 
-            // Fog overlays for non-cached rendering
+            // Fog overlays for non-cached rendering (match cached version)
             if (fogLevel === 'explored') {
                 ctx.save();
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
-                const shadowGradient = ctx.createLinearGradient(
-                    sx - state.hexSize * 0.5, sy - state.hexSize * 0.5,
-                    sx + state.hexSize * 0.5, sy + state.hexSize * 0.5
-                );
-                shadowGradient.addColorStop(0, 'rgba(15, 20, 35, 0.65)');
-                shadowGradient.addColorStop(0.5, 'rgba(10, 15, 30, 0.55)');
-                shadowGradient.addColorStop(1, 'rgba(5, 10, 25, 0.70)');
-                ctx.fillStyle = shadowGradient;
+                // Clean dim overlay for explored areas
+                const dimGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
+                dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+                dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+                dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+                ctx.fillStyle = dimGradient;
                 ctx.fill();
                 ctx.restore();
             } else if (fogLevel === 'hidden') {
                 ctx.save();
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
-                const fogGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-                fogGradient.addColorStop(0, 'rgba(5, 5, 15, 0.95)');
-                fogGradient.addColorStop(1, 'rgba(0, 0, 0, 1)');
-                ctx.fillStyle = fogGradient;
+                // Solid dark fog for hidden areas
+                ctx.fillStyle = '#050810';
                 ctx.fill();
                 ctx.restore();
             }
