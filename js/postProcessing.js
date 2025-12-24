@@ -133,8 +133,8 @@ export function setCustomSettings(settings) {
 /**
  * Apply post-processing effects to the canvas
  * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {number} width - Canvas width
- * @param {number} height - Canvas height
+ * @param {number} width - Canvas logical width (CSS pixels)
+ * @param {number} height - Canvas logical height (CSS pixels)
  */
 export function applyPostProcessing(ctx, width, height) {
     const settings = customSettings || COLOR_PRESETS[currentPreset];
@@ -162,18 +162,30 @@ export function applyPostProcessing(ctx, width, height) {
     }
 
     if (filters.length > 0) {
-        // Create a temporary canvas to apply filters
+        // Get the actual canvas pixel dimensions (accounting for devicePixelRatio)
+        const dpr = window.devicePixelRatio || 1;
+        const actualWidth = ctx.canvas.width;
+        const actualHeight = ctx.canvas.height;
+
+        // Create a temporary canvas at full resolution to avoid scaling issues
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = width;
-        tempCanvas.height = height;
+        tempCanvas.width = actualWidth;
+        tempCanvas.height = actualHeight;
         const tempCtx = tempCanvas.getContext('2d');
 
+        // Apply filters and draw the source canvas at full resolution
         tempCtx.filter = filters.join(' ');
         tempCtx.drawImage(ctx.canvas, 0, 0);
 
-        // Draw filtered result back
+        // Reset the context transform before drawing the filtered result
+        // The main canvas has ctx.scale(dpr, dpr) applied, so we need to
+        // temporarily reset it to draw at 1:1 pixel scale
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalCompositeOperation = 'source-over';
         ctx.drawImage(tempCanvas, 0, 0);
+
+        // Restore the devicePixelRatio scale transform for subsequent drawing
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     // Apply color tint overlay
@@ -247,7 +259,11 @@ function drawLetterbox(ctx, width, height) {
 export function applyColorMatrix(ctx, width, height, matrix) {
     if (!matrix) return;
 
-    const imageData = ctx.getImageData(0, 0, width, height);
+    // Use the actual canvas pixel dimensions, not logical dimensions
+    const actualWidth = ctx.canvas.width;
+    const actualHeight = ctx.canvas.height;
+
+    const imageData = ctx.getImageData(0, 0, actualWidth, actualHeight);
     const data = imageData.data;
 
     for (let i = 0; i < data.length; i += 4) {
