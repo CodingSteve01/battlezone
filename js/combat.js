@@ -260,6 +260,15 @@ export function calculateHitChance(attacker, defender) {
         { q: defender.q, r: defender.r }
     );
 
+    // Close-range bonus: harder to miss when up close
+    if (dist === 1) {
+        chance += 20;
+    } else if (dist === 2) {
+        chance += 10;
+    } else if (dist === 3) {
+        chance += 5;
+    }
+
     // Sniper: accuracy bonus, especially at range
     if (attacker.class === 'sniper') {
         chance += 20; // Base accuracy bonus
@@ -273,7 +282,14 @@ export function calculateHitChance(attacker, defender) {
     }
 
     // Clamp to reasonable bounds
-    return Math.min(95, Math.max(25, chance));
+    const clampedChance = Math.min(95, Math.max(25, chance));
+
+    // Commandos at melee range should not miss
+    if (attacker.class === 'ninja' && dist === 1) {
+        return 100;
+    }
+
+    return clampedChance;
 }
 
 /**
