@@ -286,13 +286,13 @@ Push to main
     │
     ├─→ ci.yml (on PR) ─→ Lint + Test + Commit Lint
     │
-    ├─→ release.yml ─→ Release Please (creates release PR)
+    ├─→ release.yml ─→ Release Please (creates/updates release PR)
     │                         │
-    │                         └─→ On merge: Publish release archive
+    │                         └─→ On PR merge: Publish release + ZIP archive
     │
     └─→ static.yml ─→ Generate assets + Deploy to Pages
                             │
-                            └─→ Triggered by: push, release, workflow_run
+                            └─→ Also triggered by: release published
 ```
 
 ### Workflow Files
@@ -332,7 +332,7 @@ This project uses [release-please](https://github.com/googleapis/release-please)
 
 The project uses a GitHub Actions pipeline (`.github/workflows/static.yml`) that:
 
-1. Triggers on push to `main`, release publish, or workflow completion
+1. Triggers on push to `main` or release publish
 2. **Generates all static assets** using Playwright (terrain, units, details)
 3. Replaces version strings with semantic version from `package.json` (managed by release-please)
 4. Cache-busts file references with git commit hash (e.g., `?v=fa38f5d`)
