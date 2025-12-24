@@ -7,7 +7,7 @@ import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
 import { initTextures } from './assets.js';
-import { getTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
+import { getTexture, getAnimatedTexture, hasAnimatedTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
@@ -113,6 +113,35 @@ export function clearRenderCaches() {
 }
 
 /**
+ * Get the appropriate texture for a terrain type
+ * Uses animated frame if available, otherwise falls back to static texture
+ * @param {string} terrainType - The terrain type (e.g., 'water', 'grass')
+ * @param {number} q - Hex q coordinate (for static variant selection)
+ * @param {number} r - Hex r coordinate (for static variant selection)
+ * @returns {Image|Canvas|null} The texture to use
+ */
+function getTerrainTexture(terrainType, q, r) {
+    // Check if this terrain type has animated frames loaded
+    if (hasAnimatedTexture(terrainType)) {
+        const animFrame = getAnimatedTexture(terrainType, state.terrainAnimationFrame);
+        if (animFrame) {
+            return animFrame;
+        }
+    }
+
+    // Fall back to static texture
+    return getTexture(terrainType, q, r);
+}
+
+/**
+ * Check if a terrain type should skip caching (animated terrain)
+ */
+function shouldSkipCache(hexType) {
+    // Skip caching for animated terrain that has loaded animation frames
+    return hasAnimatedTexture(hexType);
+}
+
+/**
  * Get or create a cached hex tile with terrain details
  * Tiles are cached at a fixed base size and scaled when drawn to avoid
  * cache invalidation during zoom operations
@@ -123,6 +152,11 @@ export function clearRenderCaches() {
 function getCachedHexTile(hex, fogLevel) {
     // Only cache on medium/high quality - low quality is simple enough
     if (state.effectiveQuality === 'low') {
+        return null;
+    }
+
+    // Skip caching for animated terrain types (they need to update each frame)
+    if (fogLevel === 'visible' && shouldSkipCache(hex.type)) {
         return null;
     }
 
@@ -177,7 +211,7 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
 
     const terrain = TERRAIN[hex.type];
     let fillColor = terrain.color;
-    const texture = fogLevel === 'visible' ? getTexture(hex.type, hex.q, hex.r) : null;
+    const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
 
     // Fog of war overlay
     if (fogLevel === 'hidden') {
@@ -2087,9 +2121,9 @@ export function render() {
                 scaledSize
             );
         } else {
-            // Fallback: draw directly (low quality mode or cache miss)
+            // Fallback: draw directly (low quality mode or cache miss, or animated terrain)
             let fillColor = terrain.color;
-            const texture = fogLevel === 'visible' ? getTexture(hex.type, hex.q, hex.r) : null;
+            const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
 
             if (fogLevel === 'hidden') {
                 fillColor = '#000000';

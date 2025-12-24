@@ -28,7 +28,14 @@ export const CONFIG = {
 
     // Number of pre-generated terrain variants per type (e.g., grass_v1.png)
     // Set to >0 only if you have generated *_v#.png files in assets/terrain
-    TERRAIN_VARIANTS: 4
+    TERRAIN_VARIANTS: 4,
+
+    // Animation settings for animated terrain (water, wheat, etc.)
+    ANIMATION: {
+        FRAME_COUNT: 4,        // Number of frames per animation (e.g., water_f0.png to water_f3.png)
+        FRAME_DURATION: 250,   // Milliseconds per frame (4 FPS for subtle movement)
+        ENABLED: true          // Master toggle for terrain animations
+    }
 };
 
 // Natural color palette - more realistic earth tones

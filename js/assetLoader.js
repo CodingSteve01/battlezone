@@ -19,6 +19,7 @@ import { CONFIG } from './config.js';
 const textureCache = new Map(); // terrain type -> array of Image variants
 const spriteCache = new Map();
 const detailCache = new Map();
+const animatedTextureCache = new Map(); // terrain type -> array of frame arrays [frame0variants, frame1variants, ...]
 
 // Loading state
 let assetsLoaded = false;
@@ -38,6 +39,9 @@ const PLAYER_COLORS = CONFIG.PLAYER_COLORS;
 
 // Terrain types
 const TERRAIN_TYPES = ['grass', 'forest', 'rock', 'water', 'sand', 'swamp', 'hills', 'road', 'path', 'river'];
+
+// Animated terrain types (these can have frame sequences: type_f0.png, type_f1.png, etc.)
+const ANIMATED_TERRAIN_TYPES = ['water', 'deepwater', 'shallows', 'reeds', 'wheat', 'tallgrass'];
 
 /**
  * Load an image from URL with promise
@@ -94,6 +98,34 @@ async function loadTerrainTextures() {
 
         if (variants.length > 0) {
             textureCache.set(type, variants);
+        }
+    });
+
+    await Promise.all(loadPromises);
+}
+
+/**
+ * Load animated terrain frames (e.g., water_f0.png, water_f1.png, etc.)
+ */
+async function loadAnimatedTerrainFrames() {
+    const frameCount = CONFIG.ANIMATION?.FRAME_COUNT || 4;
+
+    const loadPromises = ANIMATED_TERRAIN_TYPES.map(async (type) => {
+        const frames = [];
+
+        for (let frameIdx = 0; frameIdx < frameCount; frameIdx++) {
+            try {
+                const frame = await loadImage(`${TERRAIN_PATH}/${type}_f${frameIdx}.png`);
+                frames.push(frame);
+            } catch {
+                // Frame not found - stop loading more frames for this type
+                break;
+            }
+        }
+
+        if (frames.length > 0) {
+            animatedTextureCache.set(type, frames);
+            console.log(`[AssetLoader] Loaded ${frames.length} animation frames for ${type}`);
         }
     });
 
@@ -184,6 +216,7 @@ export async function initAssetLoader() {
             // Load all static assets in parallel
             await Promise.all([
                 loadTerrainTextures(),
+                loadAnimatedTerrainFrames(),
                 loadUnitSprites(),
                 loadDetailElements()
             ]);
@@ -191,8 +224,9 @@ export async function initAssetLoader() {
             const textureCount = textureCache.size;
             const spriteCount = spriteCache.size;
             const detailCount = detailCache.size;
+            const animatedCount = animatedTextureCache.size;
 
-            console.log(`[AssetLoader] Loaded: ${textureCount} textures, ${spriteCount} sprites, ${detailCount} details`);
+            console.log(`[AssetLoader] Loaded: ${textureCount} textures, ${animatedCount} animated, ${spriteCount} sprites, ${detailCount} details`);
         } else {
             console.log('[AssetLoader] Static assets not found, using runtime generation');
             // Initialize runtime texture generation
@@ -223,6 +257,37 @@ export function getTexture(type, q = 0, r = 0) {
 
     // Fallback to runtime generation
     return getRuntimeTexture(type);
+}
+
+/**
+ * Get an animated terrain texture frame
+ * Returns the current animation frame if available, null otherwise
+ * @param {string} type - Terrain type (e.g., 'water', 'wheat')
+ * @param {number} frameIndex - Current animation frame index
+ * @returns {Image|null} The animation frame image, or null if not available
+ */
+export function getAnimatedTexture(type, frameIndex) {
+    if (!animatedTextureCache.has(type)) {
+        return null;
+    }
+
+    const frames = animatedTextureCache.get(type);
+    if (!frames || frames.length === 0) {
+        return null;
+    }
+
+    // Wrap frame index to available frames
+    const safeIndex = frameIndex % frames.length;
+    return frames[safeIndex];
+}
+
+/**
+ * Check if a terrain type has animated frames loaded
+ * @param {string} type - Terrain type
+ * @returns {boolean} True if animated frames are available
+ */
+export function hasAnimatedTexture(type) {
+    return animatedTextureCache.has(type) && animatedTextureCache.get(type).length > 0;
 }
 
 /**
