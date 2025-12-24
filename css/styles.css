@@ -1304,6 +1304,23 @@ button:focus:not(:focus-visible),
     line-height: 1;
 }
 
+/* Hide label on very narrow screens, show only icon */
+@media (max-width: 360px) {
+    .give-up-btn {
+        flex: 0 0 auto;
+        padding: 12px;
+        min-width: 44px;
+    }
+
+    .give-up-label {
+        display: none;
+    }
+
+    .give-up-icon {
+        margin: 0;
+    }
+}
+
 .give-up-btn:disabled,
 .end-turn-btn:disabled {
     opacity: 0.5;
