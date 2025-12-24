@@ -339,6 +339,10 @@ export function executeAttack(attacker, defender) {
         attacker.hiding = false;
     }
 
+    const dist = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
     const hitChance = calculateHitChance(attacker, defender);
     const roll = Math.random() * 100;
     let hit = roll < hitChance;
@@ -359,7 +363,7 @@ export function executeAttack(attacker, defender) {
     particles.muzzleFlash(attackerPos.x, attackerPos.y - 10, attackDirection);
 
     // Check for event-based miss (storm)
-    if (hit && checkEventMiss()) {
+    if (hit && checkEventMiss(dist)) {
         hit = false;
         playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
@@ -401,10 +405,6 @@ export function executeAttack(attacker, defender) {
 
         // Ninja melee bonus (at range 1)
         if (attacker.class === 'ninja') {
-            const dist = hexDistance(
-                { q: attacker.q, r: attacker.r },
-                { q: defender.q, r: defender.r }
-            );
             if (dist === 1) {
                 damage += UNIT_CLASSES.ninja.meleeBonus || 15;
             }
