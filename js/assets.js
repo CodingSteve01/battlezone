@@ -1492,17 +1492,39 @@ function drawFabricRect(ctx, x, y, w, h, baseColor, seed = 0) {
 }
 
 /**
- * Draw a human character sprite with enhanced details
+ * Draw a human character sprite with enhanced details and procedural animation
  */
 export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, status = 'normal', direction = 0) {
     ctx.save();
     ctx.translate(cx, cy);
 
     const scale = size / 45;
-    ctx.scale(scale, scale);
 
-    // Generate consistent seed from position for noise
+    // Generate consistent seed from position for unique character variation
     const seed = Math.abs(cx * 100 + cy) % 1000;
+
+    // Procedural animation based on time and seed
+    const time = performance.now() / 1000;
+    const animPhase = (time + seed * 0.1) % (Math.PI * 2);
+
+    // Breathing animation - subtle vertical oscillation
+    const breathAmount = status === 'wounded' ? 2.0 : 0.8;
+    const breathOffset = Math.sin(animPhase * 1.5) * breathAmount;
+
+    // Idle sway - very subtle side-to-side motion
+    const swayAmount = status === 'alert' ? 0 : (status === 'stealth' ? 0.3 : 0.5);
+    const swayOffset = Math.sin(animPhase * 0.7) * swayAmount;
+
+    // Apply base scale with breathing effect (chest expansion)
+    const breathScale = 1 + Math.sin(animPhase * 1.5) * 0.015;
+    ctx.scale(scale * breathScale, scale);
+
+    // Apply subtle rotation for more natural stance
+    const idleRotation = Math.sin(animPhase * 0.5) * 0.02 * (status === 'cover' ? 0 : 1);
+    ctx.rotate(idleRotation);
+
+    // Translate for breathing motion
+    ctx.translate(swayOffset, breathOffset * 0.3);
 
     // Enhanced shadow with blur effect
     const shadowGrad = ctx.createRadialGradient(0, 32, 0, 0, 32, 20);
@@ -1674,30 +1696,40 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
     ctx.arc(0, -2, 4, 0, Math.PI * 2);
     ctx.fill();
 
-    // === ARMS ===
-    // Left arm
+    // === ARMS with procedural animation ===
+    // Arm swing animation - opposite to breathing
+    const armSwing = Math.sin(animPhase * 1.2) * 0.08;
+    const armLift = Math.sin(animPhase * 1.5) * 1.5;
+
+    // Left arm with subtle animation
     ctx.save();
+    ctx.translate(-19, -2);
+    ctx.rotate(-armSwing); // Subtle rotation
+    ctx.translate(19, 2);
     ctx.beginPath();
-    ctx.roundRect(-24, -12, 10, 20, 3);
+    ctx.roundRect(-24, -12 + armLift * 0.5, 10, 20, 3);
     ctx.clip();
-    drawFabricRect(ctx, -24, -12, 10, 20, bodyColor, seed + 7);
+    drawFabricRect(ctx, -24, -12 + armLift * 0.5, 10, 20, bodyColor, seed + 7);
     ctx.restore();
 
-    // Right arm
+    // Right arm with opposite animation
     ctx.save();
+    ctx.translate(19, -2);
+    ctx.rotate(armSwing); // Opposite rotation
+    ctx.translate(-19, 2);
     ctx.beginPath();
-    ctx.roundRect(14, -12, 10, 20, 3);
+    ctx.roundRect(14, -12 - armLift * 0.3, 10, 20, 3);
     ctx.clip();
-    drawFabricRect(ctx, 14, -12, 10, 20, bodyColor, seed + 8);
+    drawFabricRect(ctx, 14, -12 - armLift * 0.3, 10, 20, bodyColor, seed + 8);
     ctx.restore();
 
     // Arm armor plates
-    drawTexturedRect(ctx, -23, -10, 8, 6, armorColor, { metallic: true, seed: seed + 9 });
-    drawTexturedRect(ctx, 15, -10, 8, 6, armorColor, { metallic: true, seed: seed + 10 });
+    drawTexturedRect(ctx, -23, -10 + armLift * 0.5, 8, 6, armorColor, { metallic: true, seed: seed + 9 });
+    drawTexturedRect(ctx, 15, -10 - armLift * 0.3, 8, 6, armorColor, { metallic: true, seed: seed + 10 });
 
-    // === GLOVES ===
-    drawTexturedCircle(ctx, -19, 10, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 11 });
-    drawTexturedCircle(ctx, 19, 10, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 12 });
+    // === GLOVES with animation ===
+    drawTexturedCircle(ctx, -19, 10 + armLift * 0.8, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 11 });
+    drawTexturedCircle(ctx, 19, 10 - armLift * 0.5, 6, 5, { r: 35, g: 32, b: 30 }, { noise: 0.15, seed: seed + 12 });
 
     // Glove knuckle details
     ctx.fillStyle = 'rgba(60,55,50,0.8)';
@@ -1710,63 +1742,100 @@ export function drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSel
         ctx.fill();
     }
 
-    // === NECK ===
+    // === NECK (adjusted for smaller helmet) ===
     if (classType !== 'ninja') {
         ctx.save();
         ctx.beginPath();
-        ctx.roundRect(-5, -20, 10, 8, 2);
+        ctx.roundRect(-4, -17, 8, 5, 2);
         ctx.clip();
         // Skin with subtle texture
-        const skinGrad = ctx.createLinearGradient(-5, -20, 5, -12);
+        const skinGrad = ctx.createLinearGradient(-4, -17, 4, -12);
         skinGrad.addColorStop(0, `rgb(${skinTone.r + 15},${skinTone.g + 10},${skinTone.b + 5})`);
         skinGrad.addColorStop(1, `rgb(${skinTone.r - 20},${skinTone.g - 15},${skinTone.b - 10})`);
         ctx.fillStyle = skinGrad;
-        ctx.fillRect(-5, -20, 10, 8);
+        ctx.fillRect(-4, -17, 8, 5);
         ctx.restore();
 
         // Neck shadow from helmet
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
         ctx.beginPath();
-        ctx.ellipse(0, -15, 5, 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -14, 4, 1.5, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // === HELMET ===
-    drawTexturedCircle(ctx, 0, -28, 14, 14, helmetColor, { metallic: true, noise: 0.1, seed: seed + 13 });
+    // === HELMET (proportionally smaller - realistic tactical helmet) ===
+    // Head size reduced from 14 to 10 for better proportions
+    const headY = -24;
+    const headRadius = 10;
 
-    // Helmet ridge/crest
-    ctx.fillStyle = `rgb(${helmetColor.r - 15},${helmetColor.g - 15},${helmetColor.b - 15})`;
+    // Helmet base
+    drawTexturedCircle(ctx, 0, headY, headRadius, headRadius, helmetColor, { metallic: true, noise: 0.1, seed: seed + 13 });
+
+    // Helmet top with slight elongation
+    ctx.fillStyle = `rgb(${helmetColor.r - 10},${helmetColor.g - 10},${helmetColor.b - 10})`;
     ctx.beginPath();
-    ctx.ellipse(0, -40, 3, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, headY - 4, headRadius * 0.9, headRadius * 0.6, 0, Math.PI, 0);
     ctx.fill();
 
-    // Helmet vents
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(-8, -36, 2, 4);
-    ctx.fillRect(6, -36, 2, 4);
+    // Helmet ridge/crest (smaller, more tactical)
+    ctx.fillStyle = `rgb(${helmetColor.r - 20},${helmetColor.g - 20},${helmetColor.b - 20})`;
+    ctx.beginPath();
+    ctx.ellipse(0, headY - 8, 2, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-    // === VISOR ===
-    const visorGradient = ctx.createLinearGradient(-10, -32, 10, -24);
+    // Side rails (tactical mount points)
+    ctx.fillStyle = `rgb(${helmetColor.r - 25},${helmetColor.g - 25},${helmetColor.b - 25})`;
+    ctx.fillRect(-headRadius - 1, headY - 2, 3, 6);
+    ctx.fillRect(headRadius - 2, headY - 2, 3, 6);
+
+    // Helmet vents (smaller, repositioned)
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(-5, headY - 7, 1.5, 3);
+    ctx.fillRect(3.5, headY - 7, 1.5, 3);
+
+    // Front plate detail
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(-headRadius * 0.6, headY - 6);
+    ctx.lineTo(-headRadius * 0.6, headY + 2);
+    ctx.moveTo(headRadius * 0.6, headY - 6);
+    ctx.lineTo(headRadius * 0.6, headY + 2);
+    ctx.stroke();
+
+    // === VISOR (proportionally smaller) ===
+    const visorGradient = ctx.createLinearGradient(-8, headY - 2, 8, headY + 4);
     visorGradient.addColorStop(0, `rgba(${accentColor.r},${accentColor.g},${accentColor.b},0.9)`);
     visorGradient.addColorStop(0.3, `rgba(${accentColor.r + 50},${accentColor.g + 50},${accentColor.b + 50},0.7)`);
     visorGradient.addColorStop(0.7, `rgba(${accentColor.r - 30},${accentColor.g - 30},${accentColor.b},0.8)`);
     visorGradient.addColorStop(1, `rgba(${accentColor.r - 50},${accentColor.g - 50},${accentColor.b - 20},0.9)`);
     ctx.fillStyle = visorGradient;
     ctx.beginPath();
-    ctx.ellipse(0, -28, 11, 7, 0, 0, Math.PI);
+    ctx.ellipse(0, headY, headRadius * 0.85, headRadius * 0.5, 0, 0, Math.PI);
     ctx.fill();
 
-    // Visor reflection
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    // Visor reflection (sharper, more realistic)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.beginPath();
-    ctx.ellipse(-4, -30, 4, 2, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(-3, headY - 1, 2.5, 1.2, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(2, headY + 1, 1.5, 0.8, 0.3, 0, Math.PI * 2);
     ctx.fill();
 
     // Visor edge
-    ctx.strokeStyle = `rgba(${helmetColor.r + 30},${helmetColor.g + 30},${helmetColor.b + 30},0.8)`;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `rgba(${helmetColor.r + 30},${helmetColor.g + 30},${helmetColor.b + 30},0.9)`;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(0, -28, 11, 7, 0, 0, Math.PI);
+    ctx.ellipse(0, headY, headRadius * 0.85, headRadius * 0.5, 0, 0, Math.PI);
+    ctx.stroke();
+
+    // Chin guard detail
+    ctx.fillStyle = `rgba(${helmetColor.r - 15},${helmetColor.g - 15},${helmetColor.b - 15},0.8)`;
+    ctx.beginPath();
+    ctx.moveTo(-5, headY + headRadius * 0.6);
+    ctx.quadraticCurveTo(0, headY + headRadius * 0.9, 5, headY + headRadius * 0.6);
     ctx.stroke();
 
     // === CLASS-SPECIFIC EQUIPMENT ===

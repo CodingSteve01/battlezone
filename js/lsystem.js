@@ -281,28 +281,76 @@ export function drawLSystemTree(ctx, x, y, size, type, seed) {
     const leafColor = getLeafColor(type, seed);
     const endpoints = segments.filter(s => s.depth >= 2);
 
-    for (let i = 0; i < endpoints.length; i++) {
-        const seg = endpoints[i];
-        const lx = seg.x2 * scale;
-        const ly = seg.y2 * scale;
-        const leafSize = size * (0.08 + seededRandom(seed + i * 7) * 0.06);
+    // Draw foliage in layers for depth effect (back to front)
+    for (let layer = 0; layer < 3; layer++) {
+        const layerAlpha = 0.7 + layer * 0.15;
+        const layerOffset = (2 - layer) * size * 0.02;
 
-        // Leaf cluster gradient
-        const leafGrad = ctx.createRadialGradient(
-            lx - leafSize * 0.3, ly - leafSize * 0.3, 0,
-            lx, ly, leafSize
-        );
-        leafGrad.addColorStop(0, leafColor.light);
-        leafGrad.addColorStop(0.6, leafColor.mid);
-        leafGrad.addColorStop(1, leafColor.dark);
+        for (let i = 0; i < endpoints.length; i++) {
+            const seg = endpoints[i];
+            const baseLx = seg.x2 * scale;
+            const baseLy = seg.y2 * scale - layerOffset;
+            const clusterSize = size * (0.06 + seededRandom(seed + i * 7) * 0.04);
 
-        ctx.fillStyle = leafGrad;
-        ctx.beginPath();
-        ctx.arc(lx, ly, leafSize, 0, Math.PI * 2);
-        ctx.fill();
+            // Draw multiple small leaves per cluster
+            const leafCount = type === 'pine' ? 8 : 5;
+
+            for (let j = 0; j < leafCount; j++) {
+                const angle = seededRandom(seed + i * 100 + j * 17 + layer) * Math.PI * 2;
+                const dist = seededRandom(seed + i * 100 + j * 23 + layer) * clusterSize * 0.8;
+                const lx = baseLx + Math.cos(angle) * dist;
+                const ly = baseLy + Math.sin(angle) * dist * 0.6; // Flatten vertically
+
+                const leafW = clusterSize * (0.3 + seededRandom(seed + i * 50 + j * 31) * 0.3);
+                const leafH = type === 'pine'
+                    ? leafW * 0.3  // Pine needles are thin
+                    : leafW * (0.5 + seededRandom(seed + i * 50 + j * 37) * 0.3);
+                const leafAngle = seededRandom(seed + i * 50 + j * 41) * Math.PI;
+
+                // Color variation per leaf
+                const colorVar = seededRandom(seed + i * 50 + j * 47);
+                let leafFill;
+                if (colorVar < 0.3) {
+                    leafFill = leafColor.light;
+                } else if (colorVar < 0.7) {
+                    leafFill = leafColor.mid;
+                } else {
+                    leafFill = leafColor.dark;
+                }
+
+                ctx.save();
+                ctx.translate(lx, ly);
+                ctx.rotate(leafAngle);
+                ctx.globalAlpha = layerAlpha * (0.7 + seededRandom(seed + i + j) * 0.3);
+                ctx.fillStyle = leafFill;
+                ctx.beginPath();
+
+                if (type === 'pine') {
+                    // Pine needles - thin elongated shapes
+                    ctx.ellipse(0, 0, leafW, leafH, 0, 0, Math.PI * 2);
+                } else {
+                    // Deciduous leaves - more organic leaf shape
+                    drawLeafShape(ctx, leafW, leafH);
+                }
+
+                ctx.fill();
+                ctx.restore();
+            }
+        }
     }
 
     ctx.restore();
+}
+
+/**
+ * Draw an organic leaf shape (pointed oval)
+ */
+function drawLeafShape(ctx, w, h) {
+    ctx.moveTo(w, 0);
+    ctx.bezierCurveTo(w, h * 0.5, w * 0.3, h, 0, h * 1.2);
+    ctx.bezierCurveTo(-w * 0.3, h, -w, h * 0.5, -w, 0);
+    ctx.bezierCurveTo(-w, -h * 0.5, -w * 0.3, -h, 0, -h * 1.2);
+    ctx.bezierCurveTo(w * 0.3, -h, w, -h * 0.5, w, 0);
 }
 
 /**
