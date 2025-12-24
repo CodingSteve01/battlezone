@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-**Shadow Squad** is a browser-based tactical turn-based strategy game built with vanilla JavaScript, HTML5 Canvas, and CSS. It features hexagonal grid-based gameplay, multiple unit classes with unique abilities, fog of war, and both single-player (vs AI) and local multiplayer modes.
+**Shadow Squad** is a browser-based tactical turn-based strategy game built with JavaScript, HTML5 Canvas, and CSS. It features hexagonal grid-based gameplay, multiple unit classes with unique abilities, fog of war, and both single-player (vs AI) and local multiplayer modes.
 
 ## Technology Stack
 
-- **Frontend**: Vanilla JavaScript (ES6 modules), HTML5, CSS3
-- **Rendering**: HTML5 Canvas 2D API
-- **Build System**: None (static files, no bundler required)
-- **Dependencies**: None (zero external dependencies)
+- **Frontend**: JavaScript (ES6 modules), HTML5, CSS3
+- **Rendering**: HTML5 Canvas 2D API with animated terrain effects
+- **Build System**: Vite (for development server and production builds)
+- **Dependencies**: None (zero runtime dependencies)
 
 ## Project Structure
 
@@ -143,13 +143,19 @@ Priority-based decision making:
 ## Development Guidelines
 
 ### Running the Game
-Simply open `index.html` in a browser. No build step required.
+Use the Vite development server for the best experience:
 ```bash
-# Using Python's built-in server
-python -m http.server 8000
+# Install dependencies
+npm install
 
-# Or Node.js http-server
-npx http-server
+# Start development server with hot reload
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
 ### Code Style Conventions
@@ -362,7 +368,7 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 ## Important Notes for AI Assistants
 
-1. **No build system** - This is a vanilla JS project. Don't suggest npm/webpack configurations.
+1. **Vite build system** - Use `npm run dev` for development. The project uses Vite for bundling.
 
 2. **German UI text** - All user-facing strings are in German. Maintain consistency when adding new text.
 
@@ -376,7 +382,7 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 7. **Module imports** - All files use ES6 modules. Circular dependencies should be avoided.
 
-8. **No external dependencies** - Keep it that way. Don't suggest adding libraries.
+8. **Minimal dependencies** - Only add dependencies when truly necessary. Keep runtime dependencies at zero.
 
 9. **Conventional Commits** - All commits must follow the format `type(scope): description`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 

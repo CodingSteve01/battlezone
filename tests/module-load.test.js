@@ -130,10 +130,4 @@ describe('Module Loading', () => {
     expect(module.startGame).toBeTypeOf('function');
   });
 
-  it('loads pixiRenderer.js without errors', async () => {
-    const module = await import('../js/pixiRenderer.js');
-    expect(module.initRenderer).toBeTypeOf('function');
-    expect(module.render).toBeTypeOf('function');
-    expect(module.resizeCanvas).toBeTypeOf('function');
-  });
 });
