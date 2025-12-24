@@ -1,0 +1,19 @@
+{
+  "name": "Shadow Squad",
+  "short_name": "Shadow Squad",
+  "description": "Taktisches, rundenbasiertes Strategiespiel für Browser und Offline-Spiel.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0b1021",
+  "theme_color": "#0b1021",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
