@@ -2103,10 +2103,10 @@ function shouldRenderForeground() {
 
 /**
  * Check if animated terrain overlays should be rendered
- * Disabled on low quality for performance
+ * Enabled on medium and high quality for better visuals on mobile
  */
 function shouldRenderAnimations() {
-    return state.effectiveQuality === 'high';
+    return state.effectiveQuality !== 'low';
 }
 
 /**
