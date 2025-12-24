@@ -59,6 +59,21 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Generate static assets
+        run: npm run build
+
       - name: Cache-bust with git hash
         run: |
           VERSION=$(git rev-parse --short HEAD)
