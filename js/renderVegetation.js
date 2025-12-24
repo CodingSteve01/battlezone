@@ -6,7 +6,8 @@ import { seededRandom } from './renderUtils.js';
 import { drawLSystemTree, getTreeTypes } from './lsystem.js';
 
 // Configuration for L-System trees (can be toggled for performance)
-let useLSystemTrees = false;
+// Enabled by default for more realistic tree rendering
+let useLSystemTrees = true;
 
 /**
  * Enable or disable L-System procedural trees
