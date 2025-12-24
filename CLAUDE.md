@@ -7,9 +7,9 @@
 ## Technology Stack
 
 - **Frontend**: JavaScript (ES6 modules), HTML5, CSS3
-- **Rendering**: HTML5 Canvas 2D API (with optional PixiJS WebGL renderer)
+- **Rendering**: HTML5 Canvas 2D API with animated terrain effects
 - **Build System**: Vite (for development server and production builds)
-- **Dependencies**: PixiJS (optional, for enhanced graphics)
+- **Dependencies**: None (zero runtime dependencies)
 
 ## Project Structure
 
@@ -382,7 +382,7 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 7. **Module imports** - All files use ES6 modules. Circular dependencies should be avoided.
 
-8. **Minimal dependencies** - Only add dependencies when truly necessary. Currently uses PixiJS for enhanced graphics.
+8. **Minimal dependencies** - Only add dependencies when truly necessary. Keep runtime dependencies at zero.
 
 9. **Conventional Commits** - All commits must follow the format `type(scope): description`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 

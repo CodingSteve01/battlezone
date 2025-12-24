@@ -105,9 +105,9 @@ npm run preview
 ### Tech Stack
 
 - JavaScript (ES6 modules) with Vite build system
-- HTML5 Canvas 2D (with optional PixiJS WebGL renderer)
+- HTML5 Canvas 2D with animated terrain effects
 - CSS3 with custom properties
-- Runtime dependencies: [PixiJS](https://pixijs.com/) for advanced graphics
+- Zero runtime dependencies
 
 ## GitHub Pages Deployment
 
@@ -161,4 +161,4 @@ MIT License - Feel free to modify and share!
 
 ---
 
-*Built with JavaScript, PixiJS, and Vite.*
+*Built with JavaScript and Vite.*

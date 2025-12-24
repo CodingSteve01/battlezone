@@ -14,15 +14,25 @@ import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import {
     animationTick,
+    drawAnimatedGrass,
+    drawAnimatedWater,
+    drawShallowWater,
+    drawWheatField,
+    drawReeds,
+    drawSnowfall,
+    drawSnowDetails,
+    drawIceReflections,
+    drawFireflies,
+    drawDustMotes,
+    drawFallingLeaves,
+    drawFlowers,
+    drawHeather,
     drawRuins,
     drawGravel,
     drawFarmland,
     drawMud,
     drawTerrainBlend,
-    getNeighborTerrains,
-    getCharacterAnimState,
-    setCharacterAnimation,
-    CHAR_ANIM
+    getNeighborTerrains
 } from './animations.js';
 import { seededRandom } from './renderUtils.js';
 import {
@@ -2092,6 +2102,74 @@ function shouldRenderForeground() {
 }
 
 /**
+ * Check if animated terrain overlays should be rendered
+ * Disabled on low quality for performance
+ */
+function shouldRenderAnimations() {
+    return state.effectiveQuality === 'high';
+}
+
+/**
+ * Draw animated terrain overlay for a hex
+ * These are drawn on top of cached/static terrain for dynamic effects
+ * @param {number} cx - Center X position
+ * @param {number} cy - Center Y position
+ * @param {number} hexSize - Size of the hex
+ * @param {string} terrainType - Type of terrain
+ * @param {number} q - Hex q coordinate
+ * @param {number} r - Hex r coordinate
+ */
+function drawAnimatedTerrainOverlay(cx, cy, hexSize, terrainType, q, r) {
+    switch (terrainType) {
+        case 'grass':
+        case 'clearing':
+            drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.6, terrainType);
+            break;
+        case 'tallgrass':
+            drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.8, 'tallgrass');
+            break;
+        case 'water':
+            drawAnimatedWater(ctx, cx, cy, hexSize, q, r, false);
+            break;
+        case 'deepwater':
+            drawAnimatedWater(ctx, cx, cy, hexSize, q, r, true);
+            break;
+        case 'shallows':
+            drawShallowWater(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'wheat':
+            drawWheatField(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'reeds':
+            drawReeds(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'snow':
+            drawSnowfall(ctx, cx, cy, hexSize, q, r);
+            drawSnowDetails(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'ice':
+            drawIceReflections(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'forest':
+        case 'pine':
+            drawFireflies(ctx, cx, cy, hexSize);
+            drawFallingLeaves(ctx, cx, cy, hexSize);
+            break;
+        case 'sand':
+            drawDustMotes(ctx, cx, cy, hexSize);
+            break;
+        case 'flowers':
+            drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.5, 'grass');
+            drawFlowers(ctx, cx, cy, hexSize, q, r);
+            break;
+        case 'heather':
+            drawAnimatedGrass(ctx, cx, cy, hexSize, q, r, 0.5, 'heather');
+            drawHeather(ctx, cx, cy, hexSize, q, r);
+            break;
+    }
+}
+
+/**
  * Check if hex grid should be visible
  * Only show when planning movement or attacking
  */
@@ -2297,6 +2375,12 @@ export function render() {
                 ctx.fill();
                 ctx.restore();
             }
+        }
+
+        // Draw animated terrain overlays (grass swaying, water ripples, etc.)
+        // These are drawn on top of cached/static terrain for dynamic effects
+        if (fogLevel === 'visible' && shouldRenderAnimations()) {
+            drawAnimatedTerrainOverlay(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
         }
 
         // Collect foreground elements for 2.5D sorting (always needed for depth sorting)
