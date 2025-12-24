@@ -1092,39 +1092,63 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 }
 
 /**
- * Draw subtle ground texture - minimal, natural looking
- * Only adds very subtle color variation, no individual grass blades
+ * Draw grass blades and ground texture for natural looking terrain
  */
 function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
-    // Skip for most grass - just use base terrain color
-    // Only add very subtle texture for variety terrain types
-    if (grassType !== 'tallgrass' && grassType !== 'heather') {
-        return; // Clean terrain without individual blades
-    }
+    ctx.save();
 
-    // Very subtle ground patches only for tall grass and heather
-    const patchCount = 8;
-    ctx.globalAlpha = 0.15;
+    // Determine blade count and height based on grass type
+    const isTall = grassType === 'tallgrass';
+    const isHeather = grassType === 'heather';
+    const bladeCount = isTall ? 25 : (isHeather ? 20 : 18);
+    const heightMult = isTall ? 1.4 : (isHeather ? 0.8 : 1.0);
 
-    for (let i = 0; i < patchCount; i++) {
+    // Draw grass blades
+    for (let i = 0; i < bladeCount; i++) {
         const rand1 = seededRandom(seed + i * 3);
         const rand2 = seededRandom(seed + i * 3 + 1);
+        const rand3 = seededRandom(seed + i * 3 + 2);
 
         const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.6;
+        const dist = rand2 * hexSize * 0.7;
         const x = cx + Math.cos(angle) * dist;
         const y = cy + Math.sin(angle) * dist;
-        const patchSize = hexSize * 0.08 + rand2 * hexSize * 0.08;
 
-        // Subtle darker patches for texture
-        ctx.fillStyle = grassType === 'heather' ?
-            'rgba(90, 50, 90, 0.3)' : 'rgba(30, 60, 30, 0.3)';
+        const bladeHeight = (4 + rand3 * 8) * heightMult;
+        const lean = (rand1 - 0.5) * 4;
+
+        // Color variation
+        const greenShade = isHeather ?
+            `rgb(${70 + rand3 * 30}, ${90 + rand3 * 20}, ${70 + rand3 * 30})` :
+            `rgb(${40 + rand3 * 30}, ${100 + rand3 * 40}, ${40 + rand3 * 20})`;
+
+        ctx.strokeStyle = greenShade;
+        ctx.lineWidth = 1 + rand2 * 0.5;
+        ctx.lineCap = 'round';
+
         ctx.beginPath();
-        ctx.ellipse(x, y, patchSize, patchSize * 0.6, rand1 * Math.PI, 0, Math.PI * 2);
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + lean * 0.5, y - bladeHeight * 0.6, x + lean, y - bladeHeight);
+        ctx.stroke();
+    }
+
+    // Add subtle ground texture patches
+    ctx.globalAlpha = 0.2;
+    for (let i = 0; i < 5; i++) {
+        const rand1 = seededRandom(seed + i * 7 + 100);
+        const rand2 = seededRandom(seed + i * 7 + 101);
+
+        const px = cx + (rand1 - 0.5) * hexSize * 1.2;
+        const py = cy + (rand2 - 0.5) * hexSize * 1.2;
+        const patchSize = hexSize * 0.1 + rand2 * hexSize * 0.15;
+
+        ctx.fillStyle = isHeather ? 'rgba(100, 60, 100, 0.4)' : 'rgba(30, 70, 30, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(px, py, patchSize, patchSize * 0.5, rand1 * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    ctx.globalAlpha = 1;
+    ctx.restore();
 }
 
 /**
