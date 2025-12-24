@@ -1,5 +1,64 @@
 # Changelog
 
+## [1.10.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v1.9.1...shadow-squad-v1.10.0) (2025-12-24)
+
+
+### Features
+
+* add distance-based stealth visibility and hex tile caching ([#33](https://github.com/CodingSteve01/battlezone/issues/33)) ([0d6996f](https://github.com/CodingSteve01/battlezone/commit/0d6996f6a7717adf71e9ff720d4974dfda0baa68))
+* add enhanced graphics system with terrain animations and dynamic grid ([#51](https://github.com/CodingSteve01/battlezone/issues/51)) ([f335f1f](https://github.com/CodingSteve01/battlezone/commit/f335f1fb204d8e3d7489b5346874c235e4d22df6))
+* add eslint-plugin-import for improved import/export validation ([886f62b](https://github.com/CodingSteve01/battlezone/commit/886f62b38aa77def63e9c466d3cf913780af5998))
+* add static asset system with fallback support ([#46](https://github.com/CodingSteve01/battlezone/issues/46)) ([2cc883b](https://github.com/CodingSteve01/battlezone/commit/2cc883b6f9539b26618be42ccb77d90bb7c3c0e6))
+* implement proper fog of war during AI turns ([#39](https://github.com/CodingSteve01/battlezone/issues/39)) ([976f67f](https://github.com/CodingSteve01/battlezone/commit/976f67fc35e38a93919cafd381ab2e2458d01683))
+* implement shared movement pool system ([#44](https://github.com/CodingSteve01/battlezone/issues/44)) ([f7319aa](https://github.com/CodingSteve01/battlezone/commit/f7319aa5e06b6be2b1c9efafbdfa3992315b93a5))
+* improve game balance for faster enemy encounters ([#37](https://github.com/CodingSteve01/battlezone/issues/37)) ([eb6870d](https://github.com/CodingSteve01/battlezone/commit/eb6870da0c7db441415ea2479e927c0dfc0d4dc3))
+* improve stealth visibility with proximity-based detection ([#42](https://github.com/CodingSteve01/battlezone/issues/42)) ([4387728](https://github.com/CodingSteve01/battlezone/commit/4387728b30c49b4d09d26f9ebffea254c1103df2))
+* major graphics overhaul with seamless terrain and realistic vegetation ([#53](https://github.com/CodingSteve01/battlezone/issues/53)) ([9339e28](https://github.com/CodingSteve01/battlezone/commit/9339e2822076cb853e601b0234114085ea3395b5))
+
+
+### Bug Fixes
+
+* Bugfixs for pixi renderer intergration ([#61](https://github.com/CodingSteve01/battlezone/issues/61)) ([bb5dc1a](https://github.com/CodingSteve01/battlezone/commit/bb5dc1afd389c680a995e781eb2cf77893d9b835))
+* center pinch-to-zoom on finger position instead of origin ([#30](https://github.com/CodingSteve01/battlezone/issues/30)) ([2e47e48](https://github.com/CodingSteve01/battlezone/commit/2e47e4861e5a7504a89820d7f794103364e43817))
+* ci, imports ([#64](https://github.com/CodingSteve01/battlezone/issues/64)) ([2da7840](https://github.com/CodingSteve01/battlezone/commit/2da784099ce2d43ec18eff1315b57e002785c306))
+* correct enemy detection for stealth units and AI visibility ([#31](https://github.com/CodingSteve01/battlezone/issues/31)) ([eda86b8](https://github.com/CodingSteve01/battlezone/commit/eda86b82ff7aaf118813c8fc73aa72f9cdabc8fe))
+* correct terrain blending edges and limit grid to movement range ([#55](https://github.com/CodingSteve01/battlezone/issues/55)) ([63aeb97](https://github.com/CodingSteve01/battlezone/commit/63aeb97875e1f46255b6aa52c2f7cd07505a3b67))
+* improve fog of war visuals, audio, zoom, and performance ([#29](https://github.com/CodingSteve01/battlezone/issues/29)) ([c845981](https://github.com/CodingSteve01/battlezone/commit/c845981585243c1ef0bb393ae447f62c8e55e11c))
+* improve performance and enable animated terrain rendering ([#57](https://github.com/CodingSteve01/battlezone/issues/57)) ([40ec02f](https://github.com/CodingSteve01/battlezone/commit/40ec02f18864208376b585d3afbe870ad157984e))
+* menu buttons not clickable due to PixiJS canvas event capture ([#59](https://github.com/CodingSteve01/battlezone/issues/59)) ([0d3a237](https://github.com/CodingSteve01/battlezone/commit/0d3a23753651f1727cb8e844c1512758a2cf15e6))
+* remove duplicate menu handlers and add dynamic visibility updates ([#35](https://github.com/CodingSteve01/battlezone/issues/35)) ([54b5625](https://github.com/CodingSteve01/battlezone/commit/54b56258114babc088b010bdb5e2c0c29d8de11a))
+* repair menu buttons and add CI pipeline with tests ([#23](https://github.com/CodingSteve01/battlezone/issues/23)) ([c0b0222](https://github.com/CodingSteve01/battlezone/commit/c0b02227c22e9edcdb232730300d445ea3cbd019))
+* use semantic version from package.json in deployment ([#48](https://github.com/CodingSteve01/battlezone/issues/48)) ([e8566cb](https://github.com/CodingSteve01/battlezone/commit/e8566cb39c43c23f5e1948c1c65a7a644756b729))
+
+
+### Tests
+
+* add Playwright e2e test setup and integration tests ([#41](https://github.com/CodingSteve01/battlezone/issues/41)) ([523111b](https://github.com/CodingSteve01/battlezone/commit/523111bc9f2841d41af868120c1d77d47ee9575d))
+
+
+### Miscellaneous
+
+* **main:** release 1.0.0 ([#26](https://github.com/CodingSteve01/battlezone/issues/26)) ([9bfa227](https://github.com/CodingSteve01/battlezone/commit/9bfa227c3e6b3a897e8ba61dd46c08f5aa243b14))
+* **main:** release 1.0.1 ([#28](https://github.com/CodingSteve01/battlezone/issues/28)) ([7a10717](https://github.com/CodingSteve01/battlezone/commit/7a10717f9028fa28c1498ad3779a71c43387a18a))
+* **main:** release 1.0.2 ([#32](https://github.com/CodingSteve01/battlezone/issues/32)) ([ae1848d](https://github.com/CodingSteve01/battlezone/commit/ae1848df4a84960a1bc288efdc428a5ec2d96a58))
+* **main:** release 1.1.0 ([#34](https://github.com/CodingSteve01/battlezone/issues/34)) ([68047db](https://github.com/CodingSteve01/battlezone/commit/68047db4bb3d56c4709dba43f09c0ce8df584991))
+* **main:** release 1.1.1 ([#36](https://github.com/CodingSteve01/battlezone/issues/36)) ([23e6c4a](https://github.com/CodingSteve01/battlezone/commit/23e6c4ab9b314bd065d7b4b67a2e143dcc9d7457))
+* **main:** release 1.2.0 ([#38](https://github.com/CodingSteve01/battlezone/issues/38)) ([ec80397](https://github.com/CodingSteve01/battlezone/commit/ec80397fdbd065b949395626758b0a7baa69b75e))
+* **main:** release 1.3.0 ([#40](https://github.com/CodingSteve01/battlezone/issues/40)) ([b1e4530](https://github.com/CodingSteve01/battlezone/commit/b1e4530db0c6a3b0429a422941a47dd17c078ecb))
+* **main:** release 1.4.0 ([#43](https://github.com/CodingSteve01/battlezone/issues/43)) ([4a88190](https://github.com/CodingSteve01/battlezone/commit/4a881904fea1072a4a47a6c8b439c55ae17085d7))
+* **main:** release 1.5.0 ([#45](https://github.com/CodingSteve01/battlezone/issues/45)) ([d03b211](https://github.com/CodingSteve01/battlezone/commit/d03b211679115b3597f9ea149eade4608eb2edfc))
+* **main:** release 1.6.0 ([#47](https://github.com/CodingSteve01/battlezone/issues/47)) ([f3fde03](https://github.com/CodingSteve01/battlezone/commit/f3fde032a8997eb86ec3dd6c130a2cddf3c5475b))
+* **main:** release 1.6.1 ([#49](https://github.com/CodingSteve01/battlezone/issues/49)) ([7c78927](https://github.com/CodingSteve01/battlezone/commit/7c78927245f170724d7e760645dcb39c7d1ace79))
+* **main:** release 1.7.0 ([#52](https://github.com/CodingSteve01/battlezone/issues/52)) ([b700b99](https://github.com/CodingSteve01/battlezone/commit/b700b99534fed5dcce5a37eb5af314034a70fd78))
+* **main:** release 1.8.0 ([#54](https://github.com/CodingSteve01/battlezone/issues/54)) ([e302d5b](https://github.com/CodingSteve01/battlezone/commit/e302d5b4c6280f447c12659513b995ec085739bd))
+* **main:** release 1.8.1 ([#56](https://github.com/CodingSteve01/battlezone/issues/56)) ([64204d1](https://github.com/CodingSteve01/battlezone/commit/64204d1dc0178229e017a65e8be67e62d4cb674c))
+* **main:** release 1.8.2 ([#58](https://github.com/CodingSteve01/battlezone/issues/58)) ([04e8851](https://github.com/CodingSteve01/battlezone/commit/04e8851003ad8335554547cae86f9d6ac70cf496))
+* **main:** release 1.8.3 ([#60](https://github.com/CodingSteve01/battlezone/issues/60)) ([54a03cd](https://github.com/CodingSteve01/battlezone/commit/54a03cd9952cc0757dd1dc2aec518ea5cba74285))
+* **main:** release 1.8.4 ([#62](https://github.com/CodingSteve01/battlezone/issues/62)) ([1bb3a79](https://github.com/CodingSteve01/battlezone/commit/1bb3a79af9129a5c9c438e2900f772b90c1b20ab))
+* **main:** release 1.9.0 ([#63](https://github.com/CodingSteve01/battlezone/issues/63)) ([b064eea](https://github.com/CodingSteve01/battlezone/commit/b064eea8e79f487d4ee69eae4eef93c536e084d4))
+* **main:** release 1.9.1 ([#65](https://github.com/CodingSteve01/battlezone/issues/65)) ([cbe9933](https://github.com/CodingSteve01/battlezone/commit/cbe993368ab2125e41c7847f8427f7098fb54905))
+* **release:** deterministic asset generation + prefer static detail sprites and new release PR workflow ([#68](https://github.com/CodingSteve01/battlezone/issues/68))s ([998afc7](https://github.com/CodingSteve01/battlezone/commit/998afc72c90958e1bc4745f10248e1f4085b46f7))
+
 ## [1.9.1](https://github.com/CodingSteve01/battlezone/compare/v1.9.0...v1.9.1) (2025-12-23)
 
 

@@ -6,6 +6,16 @@ A tactical turn-based strategy game built with vanilla JavaScript and HTML5 Canv
 
 Open `index.html` in a modern browser or host on any static file server.
 
+## Offline installieren (PWA)
+
+Shadow Squad kann als Offline-App installiert werden, sobald die Seite einmal online geöffnet wurde.
+
+1. Öffne die Spielseite in Chrome, Edge oder Safari.
+2. Wähle **Installieren** im Browser-Menü (oder „Zum Startbildschirm hinzufügen“ auf iOS).
+3. Starte das Spiel anschließend als eigenständige App – es läuft auch offline.
+
+> Hinweis: Damit Offline-Assets aktuell bleiben, die Seite nach einem Update einmal online öffnen.
+
 ## Features
 
 - **Hex-grid tactical combat** - Strategic positioning on procedurally generated maps
