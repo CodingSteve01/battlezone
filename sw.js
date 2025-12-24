@@ -1,84 +1,145 @@
-const CACHE_NAME = 'shadow-squad-v1';
+// Cache version - will be replaced by build process with actual version/hash
+const CACHE_VERSION = '__BUILD_HASH__';
+const CACHE_NAME = `shadow-squad-${CACHE_VERSION}`;
+
+// Files to precache (will be updated by build process)
 const PRECACHE_URLS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './css/styles.css',
-  './js/main.js',
-  './js/config.js',
-  './js/state.js',
-  './js/map.js',
-  './js/renderer.js',
-  './js/combat.js',
-  './js/ai.js',
-  './js/animations.js',
-  './js/events.js',
-  './js/particles.js',
-  './js/renderTerrain.js',
-  './js/renderUtils.js',
-  './js/renderVegetation.js',
-  './js/ui.js',
-  './js/assetLoader.js',
-  './js/fogOfWar.js',
-  './js/pathfinding.js',
-  './js/hexMath.js',
-  './js/pixiRenderer.js',
-  './js/assets.js',
-  './js/audio.js',
-  './js/input.js',
-  './js/powerups.js',
-  './js/progression.js',
-  './js/turns.js',
-  './js/units.js',
   './icons/icon.svg'
 ];
 
+// Install: precache essential files
 self.addEventListener('install', (event) => {
+  console.log(`[SW] Installing version: ${CACHE_VERSION}`);
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then(() => {
+        console.log('[SW] Precache complete');
+        // Force activation without waiting for old SW to finish
+        return self.skipWaiting();
+      })
   );
-  self.skipWaiting();
 });
 
+// Activate: clean up old caches
 self.addEventListener('activate', (event) => {
+  console.log(`[SW] Activating version: ${CACHE_VERSION}`);
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name.startsWith('shadow-squad-') && name !== CACHE_NAME)
+          .map((name) => {
+            console.log(`[SW] Deleting old cache: ${name}`);
+            return caches.delete(name);
+          })
+      );
+    }).then(() => {
+      console.log('[SW] Claiming clients');
+      // Take control of all pages immediately
+      return self.clients.claim();
+    })
   );
-  self.clients.claim();
 });
 
+// Fetch: network-first for HTML, cache-first for hashed assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Only handle GET requests
   if (request.method !== 'GET') {
     return;
   }
 
   const requestUrl = new URL(request.url);
-  const isSameOrigin = requestUrl.origin === self.location.origin;
 
-  if (isSameOrigin) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) {
-          return cached;
-        }
-        return fetch(request).then((response) => {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-          return response;
-        });
-      })
-    );
+  // Only handle same-origin requests
+  if (requestUrl.origin !== self.location.origin) {
     return;
   }
 
-  event.respondWith(
-    fetch(request).catch(() => caches.match('./index.html'))
-  );
+  // Determine caching strategy based on file type
+  const isHTML = request.destination === 'document' ||
+                 requestUrl.pathname.endsWith('.html') ||
+                 requestUrl.pathname === '/' ||
+                 requestUrl.pathname.endsWith('/');
+
+  // Check if asset has hash in filename (Vite bundled assets)
+  const isHashedAsset = /\.[a-f0-9]{8}\.(js|css|png|jpg|svg|woff2?)$/i.test(requestUrl.pathname);
+
+  if (isHTML) {
+    // Network-first for HTML - always try to get latest version
+    event.respondWith(networkFirst(request));
+  } else if (isHashedAsset) {
+    // Cache-first for hashed assets - they're immutable
+    event.respondWith(cacheFirst(request));
+  } else {
+    // Stale-while-revalidate for other assets
+    event.respondWith(staleWhileRevalidate(request));
+  }
+});
+
+// Network-first strategy: try network, fall back to cache
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    // Cache the fresh response
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, networkResponse.clone());
+    return networkResponse;
+  } catch (error) {
+    console.log('[SW] Network failed, trying cache:', request.url);
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    // If no cache, try the root for navigation requests
+    if (request.destination === 'document') {
+      return caches.match('./index.html');
+    }
+    throw error;
+  }
+}
+
+// Cache-first strategy: use cache if available, otherwise fetch
+async function cacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+
+  const networkResponse = await fetch(request);
+  const cache = await caches.open(CACHE_NAME);
+  cache.put(request, networkResponse.clone());
+  return networkResponse;
+}
+
+// Stale-while-revalidate: return cache immediately, update in background
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cachedResponse = await caches.match(request);
+
+  // Fetch in background
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    cache.put(request, networkResponse.clone());
+    return networkResponse;
+  }).catch(() => null);
+
+  // Return cached response immediately if available, otherwise wait for network
+  return cachedResponse || fetchPromise;
+}
+
+// Listen for messages from the app
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+
+  // Force update check
+  if (event.data === 'checkUpdate') {
+    self.registration.update();
+  }
 });
