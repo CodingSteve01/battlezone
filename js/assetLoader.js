@@ -33,6 +33,7 @@ const DETAILS_PATH = `${ASSETS_BASE}/details`;
 
 // Unit classes and player colors for sprite loading
 const UNIT_CLASSES = ['scout', 'assault', 'medic', 'sniper', 'ninja'];
+const UNIT_STATES = ['', '_selected', '_attack', '_cover'];
 const PLAYER_COLORS = CONFIG.PLAYER_COLORS;
 
 // Terrain types
@@ -107,21 +108,14 @@ async function loadUnitSprites() {
 
     for (const classType of UNIT_CLASSES) {
         for (let playerIdx = 0; playerIdx < PLAYER_COLORS.length; playerIdx++) {
-            // Normal sprite
-            const normalKey = `${classType}_p${playerIdx}`;
-            loadPromises.push(
-                loadImage(`${UNITS_PATH}/${normalKey}.png`)
-                    .then(img => spriteCache.set(normalKey, img))
-                    .catch(() => console.warn(`Static sprite not found: ${normalKey}`))
-            );
-
-            // Selected sprite
-            const selectedKey = `${classType}_p${playerIdx}_selected`;
-            loadPromises.push(
-                loadImage(`${UNITS_PATH}/${selectedKey}.png`)
-                    .then(img => spriteCache.set(selectedKey, img))
-                    .catch(() => console.warn(`Static sprite not found: ${selectedKey}`))
-            );
+            for (const suffix of UNIT_STATES) {
+                const key = `${classType}_p${playerIdx}${suffix}`;
+                loadPromises.push(
+                    loadImage(`${UNITS_PATH}/${key}.png`)
+                        .then(img => spriteCache.set(key, img))
+                        .catch(() => console.warn(`Static sprite not found: ${key}`))
+                );
+            }
         }
     }
 
@@ -242,10 +236,12 @@ export function isUsingStaticAssets() {
  * Get a unit sprite image (if available)
  * Returns null if not loaded (caller should use runtime drawing)
  */
-export function getUnitSprite(classType, playerIndex, isSelected = false) {
-    const key = isSelected
-        ? `${classType}_p${playerIndex}_selected`
-        : `${classType}_p${playerIndex}`;
+export function getUnitSprite(classType, playerIndex, status = 'normal') {
+    let suffix = '';
+    if (status === 'selected') suffix = '_selected';
+    if (status === 'attack') suffix = '_attack';
+    if (status === 'cover') suffix = '_cover';
+    const key = `${classType}_p${playerIndex}${suffix}`;
 
     return spriteCache.get(key) || null;
 }
@@ -291,8 +287,8 @@ export function areAssetsLoaded() {
 /**
  * Draw a unit (using static sprite if available, otherwise runtime)
  */
-export function drawUnit(ctx, cx, cy, size, playerColor, classType, isSelected, playerIndex) {
-    const sprite = getUnitSprite(classType, playerIndex, isSelected);
+export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex) {
+    const sprite = getUnitSprite(classType, playerIndex, status);
 
     if (sprite) {
         // Draw static sprite
@@ -306,7 +302,7 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, isSelected, 
         );
     } else {
         // Fallback to runtime drawing
-        drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected);
+        drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, status);
     }
 }
 

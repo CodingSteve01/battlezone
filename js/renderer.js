@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, getRemainingMoveCapacity } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits } from './state.js';
 import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -1613,8 +1613,14 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     ctx.shadowBlur = 0;
 
+    const unitStatus = unit.hiding
+        ? 'cover'
+        : (isSelected && state.selectedAction === 'attack'
+            ? 'attack'
+            : (isSelected ? 'selected' : 'normal'));
+
     // Draw the human sprite (uses static asset if available, otherwise runtime)
-    drawUnitSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, isSelected, unit.player);
+    drawUnitSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // Player number badge
     ctx.fillStyle = playerColor;
@@ -2268,8 +2274,8 @@ export function render() {
 
     // Draw path preview - clean simple path line with destination marker (point-and-click system)
     if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {
-        // Use same budget as movement logic: remaining move capacity vs shared AP
-        const maxCost = Math.min(getRemainingMoveCapacity(currentUnit), state.sharedAP);
+        // Use same budget as movement logic: shared AP pool
+        const maxCost = state.sharedAP;
 
         // Calculate cumulative costs along path
         let cumulativeCost = 0;

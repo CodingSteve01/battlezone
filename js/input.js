@@ -1,6 +1,6 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, getRemainingMoveCapacity } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
@@ -580,8 +580,8 @@ function handleMoveClick(unit, hex) {
 
     // Try to find path with extended range for multi-turn movement
     const maxExtendedCost = unit.move * 10; // Allow planning for many turns ahead
-    // Use the lesser of remaining move capacity or shared AP pool
-    const maxMoveCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
+    // Movement limited by shared AP pool
+    const maxMoveCost = state.sharedAP;
 
     // First try to find the full path
     const pathResult = findPath(unit.q, unit.r, hex.q, hex.r, maxExtendedCost);
@@ -777,8 +777,8 @@ export function continueQueuedPath(unit) {
     }
 
     // Recalculate path from current position to target
-    // Use the lesser of remaining move capacity or shared AP pool
-    const maxMoveCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
+    // Movement limited by shared AP pool
+    const maxMoveCost = state.sharedAP;
     const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
 
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {

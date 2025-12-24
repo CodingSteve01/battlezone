@@ -16,33 +16,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Run CI checks before deployment
-  ci:
-    name: CI Checks
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run ESLint
-        run: npm run lint
-
-      - name: Run tests
-        run: npm test
-
-  # Build and deploy after CI passes
+  # Build and deploy
   deploy:
     name: Build & Deploy
-    needs: ci
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

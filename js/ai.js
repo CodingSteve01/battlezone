@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, getRemainingMoveCapacity, trackUnitMovement } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits } from './units.js';
@@ -399,7 +399,7 @@ async function performUnitAI(unit, plan) {
     }
 
     // 5. Move strategically
-    if (state.sharedAP >= 1 && getRemainingMoveCapacity(unit) > 0) {
+    if (state.sharedAP >= 1) {
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget);
@@ -483,7 +483,7 @@ async function executeRetreat(unit, enemies) {
     if (reachable.size === 0) return;
 
     // Movement limited by remaining move capacity and shared AP pool
-    const maxCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
+    const maxCost = state.sharedAP;
     let bestHex = null;
     let bestScore = -Infinity;
 
@@ -650,7 +650,7 @@ function selectStrategicMoveTarget(unit, plan) {
     if (reachable.size === 0) return null;
 
     // Movement limited by remaining move capacity and shared AP pool
-    const maxCost = Math.min(getRemainingMoveCapacity(unit), state.sharedAP);
+    const maxCost = state.sharedAP;
     const candidates = [];
     const enemies = plan.visibleEnemies;
 
@@ -885,7 +885,6 @@ async function executeAIMove(unit, target) {
 
     // Spend from shared pool and track movement
     spendSharedAP(target.cost);
-    trackUnitMovement(unit, target.cost);
 
     // Mark this area as searched
     aiMemory.searchedAreas.add(`${target.q},${target.r}`);

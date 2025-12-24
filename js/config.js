@@ -326,7 +326,7 @@ export const TERRAIN = {
 export const UNIT_CLASSES = {
     scout: {
         name: 'Scout',
-        icon: '🎯',
+        icon: '🧭',
         hp: 60,
         damage: 18,
         range: 4,
@@ -337,7 +337,7 @@ export const UNIT_CLASSES = {
     },
     assault: {
         name: 'Assault',
-        icon: '💥',
+        icon: '🪖',
         hp: 100,
         damage: 35,
         range: 2,
@@ -348,7 +348,7 @@ export const UNIT_CLASSES = {
     },
     medic: {
         name: 'Medic',
-        icon: '💚',
+        icon: '⛑️',
         hp: 80,
         damage: 12,
         range: 2,
@@ -359,7 +359,7 @@ export const UNIT_CLASSES = {
     },
     sniper: {
         name: 'Sniper',
-        icon: '🔫',
+        icon: '🎯',
         hp: 50,
         damage: 45,
         range: 6,
@@ -370,8 +370,8 @@ export const UNIT_CLASSES = {
         stealthDetectionRange: 2
     },
     ninja: {
-        name: 'Ninja',
-        icon: '🥷',
+        name: 'Commando',
+        icon: '⚔️',
         hp: 65,
         damage: 40,
         range: 1,           // Nahkampf

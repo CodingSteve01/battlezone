@@ -178,7 +178,7 @@ async function generateAssets() {
 
     // Expected counts
     const expectedTerrain = 50;  // 10 types × base + 4 variants
-    const expectedUnits = 40;    // 5 classes × 4 players × 2 states (normal + selected)
+    const expectedUnits = 80;    // 5 classes × 4 players × 4 states (normal + selected + attack + cover)
     const expectedDetails = 23;  // 5 tree types × 3 variants + 4 bushes + 4 rocks
 
     console.log(`\n✅ Asset generation complete!`);
