@@ -1,10 +1,27 @@
 // ===== VEGETATION RENDERING =====
 // Tree, bush, fern, and flower drawing functions
 
+import { getBushSprite, getTreeSprite } from './assetLoader.js';
 import { seededRandom } from './renderUtils.js';
 
 // Canvas context - set by renderer.js
 let ctx = null;
+
+const DETAIL_SPRITE_SIZE = 128;
+const TREE_BASE_RATIO = 0.84875;
+const BUSH_BASE_RATIO = 0.64;
+const TREE_REFERENCE_SIZE = DETAIL_SPRITE_SIZE * 0.35;
+const BUSH_REFERENCE_SIZE = DETAIL_SPRITE_SIZE * 0.4;
+
+function drawDetailSprite(sprite, x, y, size, baseRatio, baseOffset, referenceSize) {
+    const scale = size / referenceSize;
+    const spriteSize = DETAIL_SPRITE_SIZE * scale;
+    const baseY = y + baseOffset;
+    const drawX = x - spriteSize / 2;
+    const drawY = baseY - spriteSize * baseRatio;
+
+    ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
+}
 
 /**
  * Initialize the vegetation renderer with canvas context
@@ -19,6 +36,13 @@ export function initVegetationRenderer(context) {
  * Supports multiple tree types: pine, deciduous, birch, willow, oak
  */
 export function drawTree2D5(x, y, size, treeType, seed) {
+    const variant = Math.floor(seededRandom(seed + 17) * 3);
+    const sprite = getTreeSprite(treeType, variant);
+    if (sprite) {
+        drawDetailSprite(sprite, x, y, size, TREE_BASE_RATIO, size * 0.55, TREE_REFERENCE_SIZE);
+        return;
+    }
+
     ctx.save();
 
     // Enhanced ground shadow with soft edges
@@ -312,6 +336,13 @@ export function drawTree2D5(x, y, size, treeType, seed) {
  * Draw a realistic bush with 2.5D depth effect
  */
 export function drawBush2D5(x, y, size, seed) {
+    const variant = Math.floor(seededRandom(seed + 9) * 4);
+    const sprite = getBushSprite(variant);
+    if (sprite) {
+        drawDetailSprite(sprite, x, y, size, BUSH_BASE_RATIO, size * 0.35, BUSH_REFERENCE_SIZE);
+        return;
+    }
+
     ctx.save();
 
     // Enhanced shadow with soft edges

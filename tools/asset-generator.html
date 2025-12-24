@@ -155,6 +155,21 @@
             details: []
         };
 
+        // Deterministic RNG for reproducible asset generation
+        const ASSET_RANDOM_SEED = 1337;
+        let randomSeed = ASSET_RANDOM_SEED;
+
+        function resetRandomSeed(seed = ASSET_RANDOM_SEED) {
+            randomSeed = seed >>> 0;
+        }
+
+        function nextRandom() {
+            randomSeed = (randomSeed * 1664525 + 1013904223) % 4294967296;
+            return randomSeed / 4294967296;
+        }
+
+        Math.random = nextRandom;
+
         // ===== UTILITY FUNCTIONS =====
 
         function log(message, type = 'info') {
@@ -1101,6 +1116,7 @@
             document.getElementById('btn-terrain').disabled = true;
             document.getElementById('terrain-preview').innerHTML = '';
             assets.terrain = [];
+            resetRandomSeed();
 
             const generators = {
                 grass: createGrassTexture,
@@ -1152,6 +1168,7 @@
             document.getElementById('btn-units').disabled = true;
             document.getElementById('units-preview').innerHTML = '';
             assets.units = [];
+            resetRandomSeed();
 
             const total = UNIT_CLASSES.length * PLAYER_COLORS.length * 2;
             let count = 0;
@@ -1190,6 +1207,7 @@
             document.getElementById('btn-details').disabled = true;
             document.getElementById('details-preview').innerHTML = '';
             assets.details = [];
+            resetRandomSeed();
 
             // Generate trees
             const treeTypes = 5;
@@ -1253,6 +1271,7 @@
         window.generateAll = async function() {
             document.getElementById('btn-all').disabled = true;
             log('Starting full asset generation...', 'info');
+            resetRandomSeed();
 
             await generateTerrain();
             await generateUnits();

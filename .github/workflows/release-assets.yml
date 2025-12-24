@@ -1,0 +1,49 @@
+name: Release Assets
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  generate-assets:
+    name: Generate Assets for Release PR
+    runs-on: ubuntu-latest
+    if: startsWith(github.head_ref, 'release-please--')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium
+
+      - name: Generate assets
+        run: npm run build
+
+      - name: Commit generated assets
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No asset changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add assets
+          git commit -m "chore(assets): update generated assets"
+          git push
