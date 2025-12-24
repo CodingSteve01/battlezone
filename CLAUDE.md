@@ -275,18 +275,68 @@ main.js
 └── events.js → state.js
 ```
 
+## CI/CD Pipeline
+
+### Workflow Overview
+
+The project uses four GitHub Actions workflows that work together:
+
+```
+Push to main
+    │
+    ├─→ ci.yml (on PR) ─→ Lint + Test + Commit Lint
+    │
+    ├─→ release.yml ─→ Release Please (creates/updates release PR)
+    │                         │
+    │                         └─→ On PR merge: Publish release + ZIP archive
+    │
+    └─→ static.yml ─→ Generate assets + Deploy to Pages
+                            │
+                            └─→ Also triggered by: release published
+```
+
+### Workflow Files
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Pull requests | Commit lint, ESLint, unit tests |
+| `release.yml` | Push to main | Release-please automation, publish ZIP |
+| `static.yml` | Push, release, manual | Asset generation, Pages deployment |
+| `preview.yml` | Manual dispatch | Preview deployments from branches |
+
+### Release Please (Semantic Versioning)
+
+This project uses [release-please](https://github.com/googleapis/release-please) for automated versioning:
+
+**Configuration files:**
+- `release-please-config.json` - Release settings and changelog sections
+- `.release-please-manifest.json` - Current version tracking
+
+**How it works:**
+1. Every push to `main` triggers release-please
+2. It analyzes commits and creates/updates a release PR
+3. Merging the PR creates a GitHub release with:
+   - Updated `package.json` version
+   - Updated `CHANGELOG.md`
+   - Git tag (e.g., `shadow-squad-v1.10.0`)
+   - ZIP archive of the project
+
+**Version bumps from commits:**
+- `feat:` → Minor bump (1.x.0)
+- `fix:` → Patch bump (1.0.x)
+- `feat!:` or `BREAKING CHANGE:` → Major bump (x.0.0)
+
 ## GitHub Pages Deployment
 
 ### Automatic Deployment Pipeline (GitHub Actions)
 
 The project uses a GitHub Actions pipeline (`.github/workflows/static.yml`) that:
 
-1. Triggers on push to `main` branch
-2. Runs CI checks (lint, tests)
-3. **Generates all static assets** using Playwright (terrain, units, details)
-4. Replaces version strings with semantic version from `package.json` (managed by release-please)
-5. Cache-busts file references with git commit hash (e.g., `?v=fa38f5d`)
-6. Deploys all static files to GitHub Pages
+1. Triggers on push to `main` or release publish
+2. **Generates all static assets** using Playwright (terrain, units, details)
+3. Replaces version strings with semantic version from `package.json` (managed by release-please)
+4. Cache-busts file references with git commit hash (e.g., `?v=fa38f5d`)
+5. Deploys all static files to GitHub Pages
 
 **Version Display:**
 - The in-game version info (bottom of menu) shows: `v1.6.0 • 23.12.2025 14:30`
@@ -327,3 +377,12 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 7. **Module imports** - All files use ES6 modules. Circular dependencies should be avoided.
 
 8. **No external dependencies** - Keep it that way. Don't suggest adding libraries.
+
+9. **Conventional Commits** - All commits must follow the format `type(scope): description`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Related Documentation
+
+- [README.md](README.md) - Project overview and quick start
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines and commit conventions
+- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
+- [AGENTS.md](AGENTS.md) - Quick reference for AI coding agents

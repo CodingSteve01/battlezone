@@ -1,20 +1,28 @@
 # Shadow Squad
 
+[![CI](https://github.com/CodingSteve01/battlezone/actions/workflows/ci.yml/badge.svg)](https://github.com/CodingSteve01/battlezone/actions/workflows/ci.yml)
+[![Deploy to Pages](https://github.com/CodingSteve01/battlezone/actions/workflows/static.yml/badge.svg)](https://github.com/CodingSteve01/battlezone/actions/workflows/static.yml)
+[![Release](https://github.com/CodingSteve01/battlezone/actions/workflows/release.yml/badge.svg)](https://github.com/CodingSteve01/battlezone/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/CodingSteve01/battlezone?label=version)](https://github.com/CodingSteve01/battlezone/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A tactical turn-based strategy game built with vanilla JavaScript and HTML5 Canvas. Command your squad of specialized units in hex-grid combat with fog of war, power-ups, and AI opponents.
 
-## Play Now
+## 🎮 Play Now
 
-Open `index.html` in a modern browser or host on any static file server.
+**[▶️ Play Shadow Squad Online](https://codingsteve01.github.io/battlezone/)**
 
-## Offline installieren (PWA)
+Or run locally: open `index.html` in a modern browser or use any static file server.
 
-Shadow Squad kann als Offline-App installiert werden, sobald die Seite einmal online geöffnet wurde.
+## 📲 Offline installieren (PWA)
 
-1. Öffne die Spielseite in Chrome, Edge oder Safari.
-2. Wähle **Installieren** im Browser-Menü (oder „Zum Startbildschirm hinzufügen“ auf iOS).
-3. Starte das Spiel anschließend als eigenständige App – es läuft auch offline.
+Shadow Squad kann als Progressive Web App installiert werden und läuft dann offline:
 
-> Hinweis: Damit Offline-Assets aktuell bleiben, die Seite nach einem Update einmal online öffnen.
+1. **[Öffne das Spiel](https://codingsteve01.github.io/battlezone/)** in Chrome, Edge oder Safari
+2. Wähle **Installieren** im Browser-Menü (oder „Zum Startbildschirm hinzufügen" auf iOS)
+3. Starte das Spiel als eigenständige App - es läuft auch offline!
+
+> **Tipp**: Nach einem Update die Seite einmal online öffnen, damit die neuesten Assets geladen werden.
 
 ## Features
 
@@ -129,6 +137,19 @@ If you're making changes and want to ensure fresh loads:
 - Firefox 75+
 - Safari 13+
 - Mobile Safari / Chrome for Android
+
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+- Commit message conventions (Conventional Commits)
+- Pull request process
+- Development setup
+
+## Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
+- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
+- [CLAUDE.md](CLAUDE.md) - AI assistant guide for development
 
 ## License
 
