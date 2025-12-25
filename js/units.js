@@ -44,7 +44,7 @@ export function createUnits() {
                 alive: true,
                 usedSpecial: false,
                 cloaked: false,           // Sniper stealth (active cloak ability)
-                stealthActive: classType === 'sniper' || classType === 'ninja', // Only sniper/ninja have passive stealth
+                stealthActive: classType === 'sniper' || classType === 'commando', // Only sniper/commando have passive stealth
                 hiding: false             // Taking cover in forest/rocks
             };
 
@@ -233,8 +233,8 @@ export function resetUnitsForTurn(player) {
             unit.damage = UNIT_CLASSES.sniper.damage;
             // Cloak expires at end of round (handled in resetSpecialAbilities)
         }
-        if (unit.class === 'ninja') {
-            unit.move = UNIT_CLASSES.ninja.move;  // Reset stealth movement bonus
+        if (unit.class === 'commando') {
+            unit.move = UNIT_CLASSES.commando.move;  // Reset stealth movement bonus
         }
     });
 }

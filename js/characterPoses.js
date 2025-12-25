@@ -11,7 +11,7 @@ export const UNIT_POSE = {
     MOVE: 'move',           // Walking animation frame
     ALERT: 'alert',         // Spotted enemy, raised weapon
     WOUNDED: 'wounded',     // Low HP, limping
-    STEALTH: 'stealth'      // Sneaking (ninja/sniper)
+    STEALTH: 'stealth'      // Sneaking (commando/sniper)
 };
 
 /**

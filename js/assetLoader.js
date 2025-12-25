@@ -238,7 +238,7 @@ function drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelect
         assault: 'A',
         medic: 'M',
         sniper: 'N',
-        ninja: 'C'
+        commando: 'C'
     };
 
     ctx.fillStyle = '#ffffff';

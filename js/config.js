@@ -377,7 +377,7 @@ export const UNIT_CLASSES = {
         specialDesc: 'Unsichtbar für 1 Runde',
         stealthDetectionRange: 2
     },
-    ninja: {
+    commando: {
         name: 'Commando',
         icon: '⚔️',
         hp: 65,

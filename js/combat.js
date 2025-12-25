@@ -285,7 +285,7 @@ export function calculateHitChance(attacker, defender) {
     const clampedChance = Math.min(95, Math.max(25, chance));
 
     // Commandos at melee range should not miss
-    if (attacker.class === 'ninja' && dist === 1) {
+    if (attacker.class === 'commando' && dist === 1) {
         return 100;
     }
 
@@ -320,7 +320,7 @@ export function executeAttack(attacker, defender) {
     // Track ghost indicator for stealth units before revealing
     // This shows enemy where the attack came from
     const wasStealthed = attacker.cloaked || attacker.hiding ||
-        ((attacker.class === 'sniper' || attacker.class === 'ninja') && attacker.stealthActive !== false);
+        ((attacker.class === 'sniper' || attacker.class === 'commando') && attacker.stealthActive !== false);
 
     if (wasStealthed && attacker.player !== defender.player) {
         // Add ghost indicator at attack position
@@ -404,9 +404,9 @@ export function executeAttack(attacker, defender) {
         }
 
         // Ninja melee bonus (at range 1)
-        if (attacker.class === 'ninja') {
+        if (attacker.class === 'commando') {
             if (dist === 1) {
-                damage += UNIT_CLASSES.ninja.meleeBonus || 15;
+                damage += UNIT_CLASSES.commando.meleeBonus || 15;
             }
         }
 
@@ -494,7 +494,7 @@ export function useSpecialAbility(unit) {
             return useAssaultSpecial(unit);
         case 'sniper':
             return useSniperSpecial(unit);
-        case 'ninja':
+        case 'commando':
             return useNinjaSpecial(unit);
         default:
             return false;
@@ -604,7 +604,7 @@ function useNinjaSpecial(unit) {
     unit.move += 2;  // Bonus movement
     playCloak();
 
-    // Cloak + sprint effect for ninja
+    // Cloak + sprint effect for commando
     const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
     particles.cloakEffect(unitPos.x, unitPos.y - 10);
     particles.sprintEffect(unitPos.x, unitPos.y);

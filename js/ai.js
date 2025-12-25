@@ -167,7 +167,7 @@ function updateThreatAssessment(enemies) {
         // Base threat by class
         const classThreat = {
             sniper: 90,   // High damage at range
-            ninja: 85,    // High damage, stealth
+            commando: 85,    // High damage, stealth
             assault: 70,  // High damage, tanky
             medic: 80,    // Force multiplier - healing
             scout: 50     // Lower threat but mobile
@@ -346,7 +346,7 @@ function sortUnitsForExecution(plan) {
         }
 
         // In exploration mode, scouts and snipers first (vision)
-        const explorePriority = { scout: 0, sniper: 1, ninja: 2, medic: 4, assault: 3 };
+        const explorePriority = { scout: 0, sniper: 1, commando: 2, medic: 4, assault: 3 };
         return (explorePriority[a.class] ?? 5) - (explorePriority[b.class] ?? 5);
     });
 }
@@ -562,8 +562,8 @@ function selectBestTarget(attacker, targets) {
         if (a.class === 'medic' && b.class !== 'medic') return -1;
         if (b.class === 'medic' && a.class !== 'medic') return 1;
 
-        // Priority 5: Dangerous units (snipers, ninjas)
-        const dangerClasses = ['sniper', 'ninja'];
+        // Priority 5: Dangerous units (snipers, commandos)
+        const dangerClasses = ['sniper', 'commando'];
         const aIsDanger = dangerClasses.includes(a.class);
         const bIsDanger = dangerClasses.includes(b.class);
         if (aIsDanger && !bIsDanger) return -1;
@@ -624,7 +624,7 @@ function shouldUseSpecial(unit, enemies, plan) {
             // In hunt mode, only cloak 30% of the time (not always)
             return plan.inHuntMode && Math.random() < 0.3;
 
-        case 'ninja':
+        case 'commando':
             // Stealth for ambush - but not constantly
             if (unit.cloaked) return false;
             if (enemies.length > 0) {
@@ -706,7 +706,7 @@ function scoreCombatPosition(unit, q, r, enemies, _plan) {
         // Ideal distance based on unit type
         let idealDist = unit.range;
         if (unit.class === 'sniper') idealDist = Math.max(4, unit.range - 1);
-        if (unit.class === 'ninja') idealDist = 1;
+        if (unit.class === 'commando') idealDist = 1;
         if (unit.class === 'assault') idealDist = Math.min(2, unit.range);
 
         // Score based on distance to ideal range

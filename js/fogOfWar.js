@@ -128,7 +128,7 @@ export function isUnitVisibleToPlayer(unit, viewerPlayer) {
         } else {
             const viewerUnits = getPlayerUnits(viewerPlayer);
             const classData = UNIT_CLASSES[unit.class];
-            // Base detection range is 1 for ninja, 2 for others
+            // Base detection range is 1 for commando, 2 for others
             const baseDetectionRange = classData.stealthDetectionRange || 2;
 
             // Check if any viewer unit is close enough to detect
@@ -186,7 +186,7 @@ export function isUnitVisibleToPlayer(unit, viewerPlayer) {
     }
 
     // Sniper/Ninja stealth: harder to detect at range
-    if ((unit.class === 'sniper' || unit.class === 'ninja') && unit.stealthActive === true) {
+    if ((unit.class === 'sniper' || unit.class === 'commando') && unit.stealthActive === true) {
         const classData = UNIT_CLASSES[unit.class];
         const detectionRange = classData.stealthDetectionRange || 2;
 
