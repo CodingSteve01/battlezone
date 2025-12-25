@@ -110,8 +110,8 @@ function createGrassTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // === BASE LAYER: Rich, natural earth tones ===
-    // Using warmer, more natural greens like in nature photography
+    // === BASE LAYER: Rich, lush meadow greens ===
+    // Inspired by reference image - deep greens with moss-like texture
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
             // Multiple noise layers for organic variation
@@ -121,14 +121,38 @@ function createGrassTexture() {
             const n4 = warpedNoise(x / 35, y / 35, 150);
             const combined = n1 * 0.35 + n2 * 0.3 + n3 * 0.2 + n4 * 0.15;
 
-            // Warm, natural grass colors (inspired by reference image)
-            // Base: olive-green with yellow undertones
-            const r = Math.floor(75 + combined * 40 + n3 * 25 + n4 * 15);
-            const g = Math.floor(115 + combined * 50 + n2 * 30);
-            const b = Math.floor(45 + combined * 25 + n3 * 10);
+            // Richer, more saturated greens (like reference image's lush meadows)
+            const r = Math.floor(55 + combined * 35 + n3 * 20);
+            const g = Math.floor(120 + combined * 45 + n2 * 25);
+            const b = Math.floor(50 + combined * 20 + n3 * 10);
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, 1);
         }
+    }
+
+    // === MOSS-LIKE TEXTURE OVERLAY ===
+    // Creates the dense, mossy appearance from the reference
+    for (let i = 0; i < 200; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 3 + Math.random() * 8;
+        const mossType = Math.random();
+
+        let color;
+        if (mossType < 0.3) {
+            color = `rgba(45, 95, 40, ${0.4 + Math.random() * 0.3})`;
+        } else if (mossType < 0.6) {
+            color = `rgba(70, 120, 55, ${0.35 + Math.random() * 0.25})`;
+        } else {
+            color = `rgba(85, 135, 65, ${0.3 + Math.random() * 0.2})`;
+        }
+
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        // Irregular mossy blob shape
+        ctx.ellipse(x, y, size, size * (0.5 + Math.random() * 0.5),
+                   Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     // === LAYER 2: Large color patches for natural variation ===
@@ -346,6 +370,71 @@ function createGrassTexture() {
         ctx.beginPath();
         ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
+    }
+
+    // === ROCKY/STONE PATCHES (visible in reference image) ===
+    // Small stones peeking through the grass
+    for (let i = 0; i < 15; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const stoneSize = 3 + Math.random() * 6;
+        const shade = 0.5 + Math.random() * 0.4;
+
+        // Stone base with shadow
+        ctx.fillStyle = `rgba(60, 55, 50, 0.4)`;
+        ctx.beginPath();
+        ctx.ellipse(x + 1.5, y + 1.5, stoneSize, stoneSize * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stone surface
+        const gray = Math.floor(100 + Math.random() * 50);
+        ctx.fillStyle = `rgba(${gray}, ${gray - 5}, ${gray - 10}, ${0.7 + Math.random() * 0.25})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, stoneSize, stoneSize * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stone highlight
+        ctx.fillStyle = `rgba(180, 175, 170, 0.25)`;
+        ctx.beginPath();
+        ctx.ellipse(x - stoneSize * 0.2, y - stoneSize * 0.15, stoneSize * 0.4, stoneSize * 0.25, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Larger rock clusters (like in reference top-right grass tile)
+    for (let i = 0; i < 3; i++) {
+        if (Math.random() > 0.4) continue;
+        const cx = Math.random() * TEXTURE_SIZE;
+        const cy = Math.random() * TEXTURE_SIZE;
+
+        // Draw 3-5 grouped stones
+        const stoneCount = 3 + Math.floor(Math.random() * 3);
+        for (let s = 0; s < stoneCount; s++) {
+            const sx = cx + (Math.random() - 0.5) * 20;
+            const sy = cy + (Math.random() - 0.5) * 15;
+            const size = 4 + Math.random() * 8;
+            const shade = 0.6 + Math.random() * 0.3;
+
+            // Shadow
+            ctx.fillStyle = `rgba(40, 35, 30, 0.45)`;
+            ctx.beginPath();
+            ctx.ellipse(sx + 2, sy + 2, size, size * 0.55, Math.random() * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Rock
+            const gray = Math.floor((90 + Math.random() * 45) * shade);
+            ctx.fillStyle = `rgb(${gray + 10}, ${gray + 5}, ${gray})`;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, size, size * 0.55, Math.random() * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Moss on rock
+            if (Math.random() > 0.5) {
+                ctx.fillStyle = `rgba(55, 90, 45, 0.5)`;
+                ctx.beginPath();
+                ctx.ellipse(sx - size * 0.2, sy - size * 0.1, size * 0.4, size * 0.25, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
     }
 
     textureCache.set('grass', canvas);
@@ -836,31 +925,70 @@ function createWaterTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Multi-layer deep water base with natural color variation
+    // === UNDERWATER SANDY BOTTOM (visible through clear water) ===
+    // First draw the sandy/rocky bottom that shows through
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n1 = fractalNoise(x / 35, y / 35, 4, 5);
-            const n2 = fractalNoise(x / 15, y / 15, 3, 25);
-            const n3 = fractalNoise(x / 60, y / 60, 2, 60);
-            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+            const n1 = fractalNoise(x / 25, y / 25, 4, 3);
+            const n2 = fractalNoise(x / 12, y / 12, 3, 20);
+            const combined = n1 * 0.6 + n2 * 0.4;
 
-            // Deep water colors with natural variation
-            const r = Math.floor(15 + combined * 25 + n3 * 15);
-            const g = Math.floor(45 + combined * 40 + n2 * 20);
-            const b = Math.floor(70 + combined * 50 + n1 * 25);
+            // Sandy underwater bottom
+            const r = Math.floor(130 + combined * 35);
+            const g = Math.floor(115 + combined * 30);
+            const b = Math.floor(85 + combined * 25);
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, 1);
         }
     }
 
-    // Underwater depth variations
-    for (let i = 0; i < 8; i++) {
+    // === UNDERWATER ROCKS AND STONES ===
+    for (let i = 0; i < 20; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        const size = 15 + Math.random() * 30;
+        const size = 3 + Math.random() * 8;
+        const shade = 0.5 + Math.random() * 0.4;
+
+        // Stone shadow
+        ctx.fillStyle = `rgba(60, 50, 40, 0.35)`;
+        ctx.beginPath();
+        ctx.ellipse(x + 2, y + 2, size, size * 0.6, Math.random() * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stone
+        const gray = Math.floor((85 + Math.random() * 40) * shade);
+        ctx.fillStyle = `rgba(${gray + 15}, ${gray + 10}, ${gray}, 0.8)`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.6, Math.random() * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === WATER OVERLAY (semi-transparent blue) ===
+    // This creates the "looking through water" effect
+    for (let y = 0; y < TEXTURE_SIZE; y++) {
+        for (let x = 0; x < TEXTURE_SIZE; x++) {
+            const n1 = fractalNoise(x / 40, y / 40, 3, 8);
+            const n2 = fractalNoise(x / 20, y / 20, 2, 40);
+            const combined = n1 * 0.6 + n2 * 0.4;
+
+            // Semi-transparent water tint with depth variation
+            const depth = 0.45 + combined * 0.25; // Water transparency
+            const r = Math.floor(30 + combined * 20);
+            const g = Math.floor(90 + combined * 40);
+            const b = Math.floor(140 + combined * 50);
+            ctx.fillStyle = `rgba(${r},${g},${b},${depth})`;
+            ctx.fillRect(x, y, 1, 1);
+        }
+    }
+
+    // === DEEPER AREAS (darker patches) ===
+    for (let i = 0; i < 6; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 20 + Math.random() * 35;
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
-        gradient.addColorStop(0, 'rgba(5, 25, 45, 0.4)');
-        gradient.addColorStop(0.7, 'rgba(10, 35, 55, 0.2)');
+        gradient.addColorStop(0, 'rgba(15, 50, 80, 0.4)');
+        gradient.addColorStop(0.6, 'rgba(20, 60, 90, 0.2)');
         gradient.addColorStop(1, 'transparent');
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -868,76 +996,72 @@ function createWaterTexture() {
         ctx.fill();
     }
 
-    // Multiple wave layers for realistic surface
-    for (let layer = 0; layer < 4; layer++) {
-        const alpha = 0.2 - layer * 0.04;
-        const ySpacing = 16 + layer * 4;
+    // === WATER SURFACE RIPPLES ===
+    for (let layer = 0; layer < 3; layer++) {
+        const alpha = 0.18 - layer * 0.04;
+        const ySpacing = 18 + layer * 6;
 
-        ctx.strokeStyle = `rgba(100, 170, 210, ${alpha})`;
-        ctx.lineWidth = 2 - layer * 0.3;
+        ctx.strokeStyle = `rgba(150, 200, 230, ${alpha})`;
+        ctx.lineWidth = 1.5 - layer * 0.3;
 
-        for (let i = 0; i < 7; i++) {
-            const yBase = (i * ySpacing + layer * 5) % TEXTURE_SIZE;
-            const waveAmplitude = 3 + layer * 1.5;
-            const frequency = 0.06 - layer * 0.01;
+        for (let i = 0; i < 6; i++) {
+            const yBase = (i * ySpacing + layer * 7) % TEXTURE_SIZE;
+            const waveAmplitude = 2.5 + layer;
+            const frequency = 0.05 - layer * 0.008;
 
             ctx.beginPath();
             ctx.moveTo(0, yBase);
-            for (let x = 0; x <= TEXTURE_SIZE; x += 4) {
-                const waveY = yBase + Math.sin(x * frequency + layer * 0.5 + i * 0.8) * waveAmplitude;
-                ctx.lineTo(x, waveY);
+            for (let px = 0; px <= TEXTURE_SIZE; px += 3) {
+                const waveY = yBase + Math.sin(px * frequency + layer * 0.6 + i * 0.9) * waveAmplitude;
+                ctx.lineTo(px, waveY);
             }
             ctx.stroke();
         }
     }
 
-    // Light reflections and caustics
-    for (let i = 0; i < 30; i++) {
+    // === LIGHT CAUSTICS (sun reflections on bottom) ===
+    for (let i = 0; i < 25; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        const size = 2 + Math.random() * 6;
-        const brightness = 0.15 + Math.random() * 0.25;
+        const size = 4 + Math.random() * 10;
+        const brightness = 0.12 + Math.random() * 0.18;
 
         const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
-        gradient.addColorStop(0, `rgba(200, 235, 255, ${brightness})`);
-        gradient.addColorStop(0.5, `rgba(180, 220, 250, ${brightness * 0.5})`);
+        gradient.addColorStop(0, `rgba(200, 240, 255, ${brightness})`);
+        gradient.addColorStop(0.4, `rgba(180, 225, 250, ${brightness * 0.6})`);
         gradient.addColorStop(1, 'transparent');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(x, y, size, size * 0.5, Math.random() * Math.PI, 0, Math.PI * 2);
+        // Wobbly caustic shape
+        ctx.ellipse(x, y, size, size * (0.4 + Math.random() * 0.3), Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Foam patches near edges (suggesting shore proximity)
-    for (let i = 0; i < 6; i++) {
+    // === SURFACE HIGHLIGHTS (bright reflection spots) ===
+    for (let i = 0; i < 15; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        const size = 4 + Math.random() * 8;
+        const size = 2 + Math.random() * 4;
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.08 + Math.random() * 0.1})`;
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.15 + Math.random() * 0.2})`;
         ctx.beginPath();
-
-        // Irregular foam shape
-        for (let j = 0; j < 6; j++) {
-            const angle = (j / 6) * Math.PI * 2;
-            const dist = size * (0.6 + Math.random() * 0.4);
-            const px = x + Math.cos(angle) * dist;
-            const py = y + Math.sin(angle) * dist * 0.6;
-            if (j === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
+        ctx.ellipse(x, y, size, size * 0.4, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Subtle underwater particles/algae
-    for (let i = 0; i < 20; i++) {
+    // === SHALLOW EDGE AREAS (lighter, sandier) ===
+    for (let i = 0; i < 4; i++) {
         const x = Math.random() * TEXTURE_SIZE;
         const y = Math.random() * TEXTURE_SIZE;
-        ctx.fillStyle = `rgba(40, 90, 60, ${0.15 + Math.random() * 0.15})`;
+        const size = 25 + Math.random() * 40;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+        gradient.addColorStop(0, 'rgba(120, 180, 160, 0.2)');
+        gradient.addColorStop(0.5, 'rgba(100, 160, 150, 0.1)');
+        gradient.addColorStop(1, 'transparent');
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(x, y, 0.5 + Math.random() * 1.5, 0, Math.PI * 2);
+        ctx.ellipse(x, y, size, size * 0.6, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -945,7 +1069,8 @@ function createWaterTexture() {
 }
 
 /**
- * Create realistic sand texture
+ * Create realistic sand/dried earth texture
+ * Inspired by reference image - cracked dry earth with stones
  */
 function createSandTexture() {
     const canvas = document.createElement('canvas');
@@ -953,54 +1078,195 @@ function createSandTexture() {
     canvas.height = TEXTURE_SIZE;
     const ctx = canvas.getContext('2d');
 
-    // Sandy base
+    // === BASE: Warm sandy/earth tones with noise ===
     for (let y = 0; y < TEXTURE_SIZE; y++) {
         for (let x = 0; x < TEXTURE_SIZE; x++) {
-            const n = fractalNoise(x / 20, y / 20, 4, 6);
-            const r = Math.floor(170 + n * 40);
-            const g = Math.floor(145 + n * 35);
-            const b = Math.floor(100 + n * 30);
+            const n1 = fractalNoise(x / 30, y / 30, 4, 6);
+            const n2 = fractalNoise(x / 15, y / 15, 3, 30);
+            const n3 = fractalNoise(x / 60, y / 60, 2, 80);
+            const combined = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
+
+            // Warmer earth tones
+            const r = Math.floor(165 + combined * 45 + n3 * 20);
+            const g = Math.floor(140 + combined * 40 + n2 * 15);
+            const b = Math.floor(95 + combined * 30 + n3 * 10);
             ctx.fillStyle = `rgb(${r},${g},${b})`;
             ctx.fillRect(x, y, 1, 1);
         }
     }
 
-    // Sand grains
-    for (let i = 0; i < 400; i++) {
-        const x = Math.random() * TEXTURE_SIZE;
-        const y = Math.random() * TEXTURE_SIZE;
-        const shade = 0.7 + Math.random() * 0.3;
-        ctx.fillStyle = `rgba(${Math.floor(200 * shade)}, ${Math.floor(175 * shade)}, ${Math.floor(130 * shade)}, 0.6)`;
-        ctx.beginPath();
-        ctx.arc(x, y, 0.5 + Math.random() * 1, 0, Math.PI * 2);
-        ctx.fill();
+    // === DRIED MUD CRACKS (key feature from reference) ===
+    // Create a network of cracks like dried earth
+    ctx.strokeStyle = 'rgba(90, 75, 55, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+
+    // Major crack lines
+    const crackPoints = [];
+    for (let i = 0; i < 8; i++) {
+        crackPoints.push({
+            x: Math.random() * TEXTURE_SIZE,
+            y: Math.random() * TEXTURE_SIZE
+        });
     }
 
-    // Wind ripples
-    ctx.strokeStyle = 'rgba(190, 165, 120, 0.25)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 4; i++) {
-        ctx.beginPath();
-        const yBase = 20 + i * 30;
-        ctx.moveTo(0, yBase);
-        for (let x = 0; x <= TEXTURE_SIZE; x += 5) {
-            ctx.lineTo(x, yBase + Math.sin(x / 20 + i) * 3);
+    // Draw crack network
+    for (let i = 0; i < crackPoints.length; i++) {
+        const start = crackPoints[i];
+
+        // Connect to 2-3 nearby points
+        const connections = 2 + Math.floor(Math.random() * 2);
+        for (let c = 0; c < connections; c++) {
+            const targetIdx = (i + 1 + c) % crackPoints.length;
+            const end = crackPoints[targetIdx];
+
+            // Draw jagged crack line
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+
+            let cx = start.x;
+            let cy = start.y;
+            const segments = 4 + Math.floor(Math.random() * 4);
+
+            for (let s = 1; s <= segments; s++) {
+                const t = s / segments;
+                const targetX = start.x + (end.x - start.x) * t;
+                const targetY = start.y + (end.y - start.y) * t;
+
+                // Add jitter for natural crack appearance
+                cx = targetX + (Math.random() - 0.5) * 15;
+                cy = targetY + (Math.random() - 0.5) * 15;
+
+                ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
+
+            // Add branch cracks
+            if (Math.random() > 0.4) {
+                const branchX = start.x + (end.x - start.x) * (0.3 + Math.random() * 0.4);
+                const branchY = start.y + (end.y - start.y) * (0.3 + Math.random() * 0.4);
+                const branchLen = 15 + Math.random() * 25;
+                const branchAngle = Math.random() * Math.PI * 2;
+
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(branchX, branchY);
+                ctx.lineTo(
+                    branchX + Math.cos(branchAngle) * branchLen + (Math.random() - 0.5) * 8,
+                    branchY + Math.sin(branchAngle) * branchLen + (Math.random() - 0.5) * 8
+                );
+                ctx.stroke();
+                ctx.lineWidth = 1.5;
+            }
         }
+    }
+
+    // Finer crack details
+    ctx.strokeStyle = 'rgba(100, 85, 65, 0.35)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < 25; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const len = 8 + Math.random() * 20;
+        const angle = Math.random() * Math.PI * 2;
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(
+            x + Math.cos(angle) * len + (Math.random() - 0.5) * 5,
+            y + Math.sin(angle) * len + (Math.random() - 0.5) * 5
+        );
         ctx.stroke();
     }
 
-    // Small pebbles
-    for (let i = 0; i < 10; i++) {
-        ctx.fillStyle = `rgba(130, 110, 80, ${0.4 + Math.random() * 0.3})`;
+    // === SAND GRAINS AND TEXTURE ===
+    for (let i = 0; i < 500; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const shade = 0.6 + Math.random() * 0.4;
+        const size = 0.3 + Math.random() * 1.2;
+
+        ctx.fillStyle = `rgba(${Math.floor(190 * shade)}, ${Math.floor(165 * shade)}, ${Math.floor(120 * shade)}, 0.5)`;
         ctx.beginPath();
-        ctx.ellipse(
-            Math.random() * TEXTURE_SIZE,
-            Math.random() * TEXTURE_SIZE,
-            2 + Math.random() * 3,
-            1.5 + Math.random() * 2,
-            Math.random() * Math.PI,
-            0, Math.PI * 2
-        );
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === STONES AND PEBBLES (prominent in reference) ===
+    for (let i = 0; i < 25; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 2 + Math.random() * 5;
+        const shade = 0.5 + Math.random() * 0.4;
+
+        // Stone shadow
+        ctx.fillStyle = `rgba(80, 65, 50, 0.4)`;
+        ctx.beginPath();
+        ctx.ellipse(x + 1.5, y + 1.5, size, size * 0.6, Math.random() * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stone body
+        const gray = Math.floor((110 + Math.random() * 50) * shade);
+        ctx.fillStyle = `rgb(${gray + 15}, ${gray + 10}, ${gray})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.6, Math.random() * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Stone highlight
+        ctx.fillStyle = `rgba(200, 190, 175, 0.3)`;
+        ctx.beginPath();
+        ctx.ellipse(x - size * 0.25, y - size * 0.15, size * 0.35, size * 0.2, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Larger rocks (sparse)
+    for (let i = 0; i < 5; i++) {
+        if (Math.random() > 0.6) continue;
+
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 6 + Math.random() * 10;
+        const shade = 0.55 + Math.random() * 0.35;
+
+        // Shadow
+        ctx.fillStyle = `rgba(60, 50, 40, 0.5)`;
+        ctx.beginPath();
+        ctx.ellipse(x + 3, y + 3, size, size * 0.55, Math.random() * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rock
+        const gray = Math.floor((100 + Math.random() * 40) * shade);
+        ctx.fillStyle = `rgb(${gray + 20}, ${gray + 15}, ${gray + 5})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.55, Math.random() * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Highlight
+        ctx.fillStyle = `rgba(190, 180, 165, 0.35)`;
+        ctx.beginPath();
+        ctx.ellipse(x - size * 0.3, y - size * 0.2, size * 0.4, size * 0.25, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // === SUBTLE COLOR VARIATIONS ===
+    for (let i = 0; i < 10; i++) {
+        const x = Math.random() * TEXTURE_SIZE;
+        const y = Math.random() * TEXTURE_SIZE;
+        const size = 20 + Math.random() * 35;
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+
+        if (Math.random() > 0.5) {
+            // Darker patch
+            gradient.addColorStop(0, 'rgba(130, 110, 80, 0.2)');
+        } else {
+            // Lighter patch
+            gradient.addColorStop(0, 'rgba(200, 180, 140, 0.15)');
+        }
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.7, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
