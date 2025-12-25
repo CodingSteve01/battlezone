@@ -150,7 +150,7 @@ const TreeGenerator = {
         const centerX = width / 2;
         const baseY = height - 15;
         const trunkHeight = height * 0.45;
-        const baseWidth = width * 0.08;
+        const baseWidth = width * 0.04; // Thinner trunk
         const topWidth = baseWidth * config.trunkTaper;
 
         // Main trunk gradient
@@ -250,12 +250,12 @@ const TreeGenerator = {
 
     drawRoots(ctx, centerX, baseY, baseWidth, config, rand) {
         ctx.strokeStyle = config.trunkColor;
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2; // Thinner roots to match thinner trunk
         ctx.lineCap = 'round';
 
         for (let i = 0; i < 4; i++) {
             const angle = (i / 4) * Math.PI - Math.PI / 2 + (rand() - 0.5) * 0.3;
-            const rootLength = 8 + rand() * 12;
+            const rootLength = 6 + rand() * 8; // Smaller roots
 
             ctx.beginPath();
             ctx.moveTo(centerX + Math.cos(angle + Math.PI / 2) * baseWidth * 0.7, baseY - 2);

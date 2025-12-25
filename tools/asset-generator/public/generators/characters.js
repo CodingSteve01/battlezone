@@ -57,10 +57,11 @@ const CharacterGenerator = {
     },
 
     poses: {
-        normal: { stance: 'standing', bodyTilt: 0, legSpread: 20, armAngle: 25 },
-        cover: { stance: 'crouching', bodyTilt: 5, legSpread: 35, armAngle: 45 },
-        attack: { stance: 'action', bodyTilt: -8, legSpread: 30, armAngle: 75 },
-        dead: { stance: 'fallen', bodyTilt: 90, legSpread: 15, armAngle: -30 }
+        // More natural poses with relaxed arm positions
+        normal: { stance: 'standing', bodyTilt: 0, legSpread: 22, armAngle: 15, shoulderDrop: 5 },
+        cover: { stance: 'crouching', bodyTilt: 8, legSpread: 40, armAngle: 35, shoulderDrop: 10 },
+        attack: { stance: 'action', bodyTilt: -5, legSpread: 28, armAngle: 55, shoulderDrop: 3 },
+        dead: { stance: 'fallen', bodyTilt: 90, legSpread: 15, armAngle: -30, shoulderDrop: 0 }
     },
 
     playerColors: [
@@ -161,16 +162,18 @@ const CharacterGenerator = {
 
     drawShadow(ctx, centerX, groundY, poseConfig) {
         ctx.save();
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = 0.35;
 
-        const shadowWidth = poseConfig.stance === 'crouching' ? 35 : 30;
-        const shadowHeight = poseConfig.stance === 'crouching' ? 12 : 10;
+        // Wider shadow to match wider body
+        const shadowWidth = poseConfig.stance === 'crouching' ? 42 : 38;
+        const shadowHeight = poseConfig.stance === 'crouching' ? 14 : 12;
 
         const gradient = ctx.createRadialGradient(
             centerX, groundY - 2, 0,
             centerX, groundY - 2, shadowWidth
         );
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = gradient;
@@ -187,14 +190,14 @@ const CharacterGenerator = {
         const isCrouching = poseConfig.stance === 'crouching';
 
         // In top-down view, the "length" we see is mostly the foreshortened vertical distance
-        const visibleLegLength = isCrouching ? 18 : 28;
+        const visibleLegLength = isCrouching ? 20 : 30;
 
-        // Thigh width varies by build
-        const thighWidth = classConfig.bodyBuild === 'heavy' ? 11 :
-                          classConfig.bodyBuild === 'lean' ? 8 : 9;
+        // Thigh width varies by build - increased for more substantial look
+        const thighWidth = classConfig.bodyBuild === 'heavy' ? 14 :
+                          classConfig.bodyBuild === 'lean' ? 10 : 12;
 
         // Lower leg (calf) width
-        const calfWidth = thighWidth * 0.75;
+        const calfWidth = thighWidth * 0.8;
 
         // Left leg (drawn first, slightly behind)
         this.drawLegTopDown(ctx, centerX - legSpread * 0.4, bodyY + 12,
@@ -216,28 +219,28 @@ const CharacterGenerator = {
 
         // Knee pads for heavy armor (visible from above)
         if (classConfig.armor === 'heavy') {
-            const kneeY = isCrouching ? bodyY + 22 : bodyY + 26;
+            const kneeY = isCrouching ? bodyY + 24 : bodyY + 28;
             const kneeOffsetX = legSpread * 0.55;
 
             // Left knee pad (top view - oval shape)
             ctx.fillStyle = '#2a2a2a';
             ctx.beginPath();
-            ctx.ellipse(centerX - kneeOffsetX, kneeY, 5, 6, -0.2, 0, Math.PI * 2);
+            ctx.ellipse(centerX - kneeOffsetX, kneeY, 7, 8, -0.2, 0, Math.PI * 2);
             ctx.fill();
             // Highlight
             ctx.fillStyle = '#3a3a3a';
             ctx.beginPath();
-            ctx.ellipse(centerX - kneeOffsetX - 1, kneeY - 1, 2.5, 3, -0.2, 0, Math.PI * 2);
+            ctx.ellipse(centerX - kneeOffsetX - 1, kneeY - 1, 3.5, 4, -0.2, 0, Math.PI * 2);
             ctx.fill();
 
             // Right knee pad
             ctx.fillStyle = '#2a2a2a';
             ctx.beginPath();
-            ctx.ellipse(centerX + kneeOffsetX, kneeY, 5, 6, 0.2, 0, Math.PI * 2);
+            ctx.ellipse(centerX + kneeOffsetX, kneeY, 7, 8, 0.2, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#3a3a3a';
             ctx.beginPath();
-            ctx.ellipse(centerX + kneeOffsetX + 1, kneeY - 1, 2.5, 3, 0.2, 0, Math.PI * 2);
+            ctx.ellipse(centerX + kneeOffsetX + 1, kneeY - 1, 3.5, 4, 0.2, 0, Math.PI * 2);
             ctx.fill();
         }
     },
@@ -341,9 +344,9 @@ const CharacterGenerator = {
 
     drawBootTopDown(ctx, x, y, isRight, isCrouching) {
         // Top-down boot view - we see the top of the boot and toe pointing forward/outward
-        const bootLength = isCrouching ? 10 : 12;
-        const bootWidth = 7;
-        const toeAngle = isRight ? 0.25 : -0.25; // Toes point slightly outward
+        const bootLength = isCrouching ? 12 : 14;
+        const bootWidth = 9;
+        const toeAngle = isRight ? 0.2 : -0.2; // Toes point slightly outward
 
         ctx.save();
         ctx.translate(x, y);
@@ -430,24 +433,50 @@ const CharacterGenerator = {
         ctx.translate(centerX, bodyY);
         ctx.rotate(tilt);
 
-        // Body width based on build
-        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
-                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+        // Wider body for more substantial human look
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 28 :
+                         classConfig.bodyBuild === 'lean' ? 22 : 25;
+        const shoulderWidth = bodyWidth * 1.15; // Broader shoulders
+        const waistWidth = bodyWidth * 0.85;    // Tapered waist
 
-        // Draw torso with gradient shading
-        const torsoGradient = ctx.createLinearGradient(-bodyWidth, -25, bodyWidth, 15);
+        // Draw torso with proper human shape - broad shoulders, tapered waist
+        const torsoGradient = ctx.createLinearGradient(-shoulderWidth, -28, shoulderWidth, 18);
         torsoGradient.addColorStop(0, uniform.light);
-        torsoGradient.addColorStop(0.3, uniform.base);
-        torsoGradient.addColorStop(0.7, uniform.base);
+        torsoGradient.addColorStop(0.25, uniform.base);
+        torsoGradient.addColorStop(0.75, uniform.base);
         torsoGradient.addColorStop(1, uniform.dark);
 
         ctx.fillStyle = torsoGradient;
         ctx.beginPath();
-        ctx.moveTo(-bodyWidth, -22);
-        ctx.lineTo(bodyWidth, -22);
-        ctx.lineTo(bodyWidth * 0.9, 18);
-        ctx.lineTo(-bodyWidth * 0.9, 18);
+        // Shoulders (wide)
+        ctx.moveTo(-shoulderWidth, -24);
+        ctx.lineTo(shoulderWidth, -24);
+        // Right side - taper to waist
+        ctx.quadraticCurveTo(shoulderWidth + 2, -5, waistWidth, 18);
+        // Bottom
+        ctx.lineTo(-waistWidth, 18);
+        // Left side - taper from waist to shoulder
+        ctx.quadraticCurveTo(-shoulderWidth - 2, -5, -shoulderWidth, -24);
         ctx.closePath();
+        ctx.fill();
+
+        // Chest depth/muscle definition
+        ctx.fillStyle = 'rgba(0,0,0,0.06)';
+        ctx.beginPath();
+        ctx.moveTo(-bodyWidth * 0.6, -18);
+        ctx.quadraticCurveTo(0, -10, bodyWidth * 0.6, -18);
+        ctx.lineTo(bodyWidth * 0.5, -5);
+        ctx.quadraticCurveTo(0, 0, -bodyWidth * 0.5, -5);
+        ctx.closePath();
+        ctx.fill();
+
+        // Side muscle definition
+        ctx.fillStyle = 'rgba(0,0,0,0.04)';
+        ctx.beginPath();
+        ctx.ellipse(-bodyWidth * 0.7, -5, 4, 12, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(bodyWidth * 0.7, -5, 4, 12, 0.15, 0, Math.PI * 2);
         ctx.fill();
 
         // Armor/vest overlay
@@ -486,43 +515,76 @@ const CharacterGenerator = {
 
     drawVest(ctx, bodyWidth, classConfig, playerColor) {
         const vestColor = classConfig.armor === 'heavy' ? '#3a3a3a' : '#4a4a4a';
-        const vestWidth = bodyWidth * 0.85;
+        const vestWidth = bodyWidth * 0.82;
+        const shoulderWidth = bodyWidth * 1.15;
 
-        // Main vest
+        // Main vest following body shape
         ctx.fillStyle = vestColor;
         ctx.beginPath();
-        ctx.moveTo(-vestWidth, -18);
-        ctx.lineTo(vestWidth, -18);
-        ctx.lineTo(vestWidth * 0.95, 12);
-        ctx.lineTo(-vestWidth * 0.95, 12);
+        ctx.moveTo(-vestWidth, -20);
+        ctx.lineTo(vestWidth, -20);
+        ctx.quadraticCurveTo(vestWidth + 1, -2, vestWidth * 0.85, 12);
+        ctx.lineTo(-vestWidth * 0.85, 12);
+        ctx.quadraticCurveTo(-vestWidth - 1, -2, -vestWidth, -20);
+        ctx.closePath();
+        ctx.fill();
+
+        // Shoulder straps
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.moveTo(-vestWidth - 3, -20);
+        ctx.lineTo(-vestWidth + 3, -20);
+        ctx.lineTo(-vestWidth * 0.6, -24);
+        ctx.lineTo(-vestWidth - 1, -24);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(vestWidth - 3, -20);
+        ctx.lineTo(vestWidth + 3, -20);
+        ctx.lineTo(vestWidth * 0.6, -24);
+        ctx.lineTo(vestWidth + 1, -24);
         ctx.closePath();
         ctx.fill();
 
         // MOLLE webbing pattern
         ctx.strokeStyle = '#2a2a2a';
-        ctx.lineWidth = 0.5;
+        ctx.lineWidth = 0.6;
         for (let i = 0; i < 4; i++) {
             const y = -14 + i * 7;
             ctx.beginPath();
-            ctx.moveTo(-vestWidth * 0.8, y);
-            ctx.lineTo(vestWidth * 0.8, y);
+            ctx.moveTo(-vestWidth * 0.75, y);
+            ctx.lineTo(vestWidth * 0.75, y);
             ctx.stroke();
         }
 
         // Armor plate highlight
         if (classConfig.armor === 'heavy') {
             ctx.fillStyle = '#4a4a4a';
-            ctx.fillRect(-10, -15, 20, 24);
+            ctx.fillRect(-12, -17, 24, 28);
             ctx.fillStyle = '#5a5a5a';
-            ctx.fillRect(-8, -13, 16, 2);
+            ctx.fillRect(-10, -15, 20, 2);
+            // Plate carrier texture
+            ctx.strokeStyle = 'rgba(80,80,80,0.3)';
+            ctx.lineWidth = 0.4;
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.moveTo(-10, -13 + i * 4);
+                ctx.lineTo(10, -13 + i * 4);
+                ctx.stroke();
+            }
         }
 
         // Magazine pouches
         ctx.fillStyle = '#3a3a3a';
         for (let i = -1; i <= 1; i++) {
-            ctx.fillRect(i * 8 - 3, 2, 6, 10);
+            ctx.fillRect(i * 9 - 3.5, 2, 7, 11);
             ctx.strokeStyle = '#2a2a2a';
-            ctx.strokeRect(i * 8 - 3, 2, 6, 10);
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(i * 9 - 3.5, 2, 7, 11);
+            // Pouch flap
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(i * 9 - 3.5, 2, 7, 3);
+            ctx.fillStyle = '#3a3a3a';
         }
     },
 
@@ -588,92 +650,250 @@ const CharacterGenerator = {
 
     drawArms(ctx, centerX, bodyY, poseConfig, uniform, skinTone, classConfig) {
         const armAngle = poseConfig.armAngle * Math.PI / 180;
-        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
-                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+        const shoulderDrop = poseConfig.shoulderDrop || 0;
 
-        // Arm length
-        const upperArmLength = 18;
-        const forearmLength = 16;
+        // Wider body dimensions to match new torso
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 28 :
+                         classConfig.bodyBuild === 'lean' ? 22 : 25;
+        const shoulderWidth = bodyWidth * 1.15;
 
-        // Left arm (background)
-        this.drawArm(ctx, centerX - bodyWidth + 2, bodyY - 18,
-                    Math.PI / 2 - armAngle * 0.3, upperArmLength, forearmLength,
+        // Arm proportions based on build
+        const upperArmLength = classConfig.bodyBuild === 'heavy' ? 20 : 18;
+        const forearmLength = classConfig.bodyBuild === 'heavy' ? 18 : 16;
+        const armWidth = classConfig.bodyBuild === 'heavy' ? 10 :
+                        classConfig.bodyBuild === 'lean' ? 7 : 8;
+
+        // Left arm (background) - more relaxed position
+        this.drawArmFilled(ctx, centerX - shoulderWidth + 3, bodyY - 22 + shoulderDrop,
+                    Math.PI / 2 - armAngle * 0.25, upperArmLength, forearmLength, armWidth,
                     uniform, skinTone, false, classConfig);
 
         // Right arm (foreground, holding weapon)
-        this.drawArm(ctx, centerX + bodyWidth - 2, bodyY - 18,
-                    Math.PI / 2 + armAngle, upperArmLength, forearmLength,
+        this.drawArmFilled(ctx, centerX + shoulderWidth - 3, bodyY - 22 + shoulderDrop,
+                    Math.PI / 2 + armAngle * 0.7, upperArmLength, forearmLength, armWidth,
                     uniform, skinTone, true, classConfig);
     },
 
-    drawArm(ctx, shoulderX, shoulderY, angle, upperLen, foreLen, uniform, skinTone, isRight, classConfig) {
+    drawArmFilled(ctx, shoulderX, shoulderY, angle, upperLen, foreLen, armWidth, uniform, skinTone, isRight, classConfig) {
+        // Calculate joint positions
         const elbowX = shoulderX + Math.cos(angle) * upperLen;
         const elbowY = shoulderY + Math.sin(angle) * upperLen;
-        const elbowAngle = angle + (isRight ? 0.5 : -0.3);
+        // Elbow bends more naturally
+        const elbowBend = isRight ? 0.45 : -0.35;
+        const elbowAngle = angle + elbowBend;
         const handX = elbowX + Math.cos(elbowAngle) * foreLen;
         const handY = elbowY + Math.sin(elbowAngle) * foreLen;
 
-        // Upper arm
-        ctx.strokeStyle = uniform.base;
-        ctx.lineWidth = 7;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(shoulderX, shoulderY);
-        ctx.lineTo(elbowX, elbowY);
-        ctx.stroke();
+        // Perpendicular angle for arm width
+        const perpAngle = angle + Math.PI / 2;
+        const elbowPerpAngle = elbowAngle + Math.PI / 2;
 
-        // Upper arm highlight
-        ctx.strokeStyle = uniform.light;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(shoulderX, shoulderY);
-        ctx.lineTo(elbowX, elbowY);
-        ctx.stroke();
+        ctx.save();
 
-        // Forearm
-        ctx.strokeStyle = uniform.base;
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(elbowX, elbowY);
-        ctx.lineTo(handX, handY);
-        ctx.stroke();
+        // === UPPER ARM (as filled shape) ===
+        const upperWidth = armWidth;
+        const elbowWidth = armWidth * 0.85;
 
-        // Glove
-        ctx.fillStyle = '#2a2a2a';
+        // Upper arm gradient
+        const upperGradient = ctx.createLinearGradient(
+            shoulderX - Math.cos(perpAngle) * upperWidth,
+            shoulderY - Math.sin(perpAngle) * upperWidth,
+            shoulderX + Math.cos(perpAngle) * upperWidth,
+            shoulderY + Math.sin(perpAngle) * upperWidth
+        );
+        upperGradient.addColorStop(0, uniform.dark);
+        upperGradient.addColorStop(0.3, uniform.base);
+        upperGradient.addColorStop(0.7, uniform.light);
+        upperGradient.addColorStop(1, uniform.base);
+
+        ctx.fillStyle = upperGradient;
         ctx.beginPath();
-        ctx.arc(handX, handY, 4, 0, Math.PI * 2);
+        // Shoulder (wide, rounded)
+        ctx.moveTo(
+            shoulderX - Math.cos(perpAngle) * upperWidth,
+            shoulderY - Math.sin(perpAngle) * upperWidth
+        );
+        ctx.lineTo(
+            shoulderX + Math.cos(perpAngle) * upperWidth,
+            shoulderY + Math.sin(perpAngle) * upperWidth
+        );
+        // Taper to elbow
+        ctx.lineTo(
+            elbowX + Math.cos(perpAngle) * elbowWidth,
+            elbowY + Math.sin(perpAngle) * elbowWidth
+        );
+        ctx.lineTo(
+            elbowX - Math.cos(perpAngle) * elbowWidth,
+            elbowY - Math.sin(perpAngle) * elbowWidth
+        );
+        ctx.closePath();
         ctx.fill();
 
-        // Glove highlight
-        ctx.fillStyle = '#3a3a3a';
+        // Shoulder cap (rounded muscle)
+        ctx.fillStyle = uniform.base;
         ctx.beginPath();
-        ctx.arc(handX - 1, handY - 1, 2, 0, Math.PI * 2);
+        ctx.ellipse(shoulderX, shoulderY, upperWidth, upperWidth * 0.7, angle, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Deltoid highlight
+        ctx.fillStyle = uniform.light;
+        ctx.globalAlpha = 0.3;
+        ctx.beginPath();
+        ctx.ellipse(
+            shoulderX - Math.cos(perpAngle) * upperWidth * 0.3,
+            shoulderY - Math.sin(perpAngle) * upperWidth * 0.3,
+            upperWidth * 0.5, upperWidth * 0.4, angle, 0, Math.PI * 2
+        );
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Bicep/tricep definition
+        const bicepCenterX = shoulderX + Math.cos(angle) * upperLen * 0.45;
+        const bicepCenterY = shoulderY + Math.sin(angle) * upperLen * 0.45;
+        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        ctx.beginPath();
+        ctx.ellipse(
+            bicepCenterX + Math.cos(perpAngle) * upperWidth * 0.3,
+            bicepCenterY + Math.sin(perpAngle) * upperWidth * 0.3,
+            upperLen * 0.25, upperWidth * 0.4, angle, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        // === ELBOW JOINT ===
+        ctx.fillStyle = uniform.dark;
+        ctx.beginPath();
+        ctx.ellipse(elbowX, elbowY, elbowWidth * 0.9, elbowWidth * 0.7, angle, 0, Math.PI * 2);
         ctx.fill();
 
         // Elbow pad for heavy armor
         if (classConfig.armor === 'heavy') {
             ctx.fillStyle = '#2a2a2a';
             ctx.beginPath();
-            ctx.ellipse(elbowX, elbowY, 4, 3, angle, 0, Math.PI * 2);
+            ctx.ellipse(elbowX, elbowY, elbowWidth + 2, elbowWidth * 0.8, angle, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#3a3a3a';
+            ctx.beginPath();
+            ctx.ellipse(elbowX, elbowY, elbowWidth, elbowWidth * 0.5, angle, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        // === FOREARM (as filled shape) ===
+        const forearmWidth = armWidth * 0.8;
+        const wristWidth = armWidth * 0.6;
+
+        // Forearm gradient
+        const foreGradient = ctx.createLinearGradient(
+            elbowX - Math.cos(elbowPerpAngle) * forearmWidth,
+            elbowY - Math.sin(elbowPerpAngle) * forearmWidth,
+            elbowX + Math.cos(elbowPerpAngle) * forearmWidth,
+            elbowY + Math.sin(elbowPerpAngle) * forearmWidth
+        );
+        foreGradient.addColorStop(0, uniform.dark);
+        foreGradient.addColorStop(0.3, uniform.base);
+        foreGradient.addColorStop(0.7, uniform.light);
+        foreGradient.addColorStop(1, uniform.base);
+
+        ctx.fillStyle = foreGradient;
+        ctx.beginPath();
+        // Elbow end
+        ctx.moveTo(
+            elbowX - Math.cos(elbowPerpAngle) * forearmWidth,
+            elbowY - Math.sin(elbowPerpAngle) * forearmWidth
+        );
+        ctx.lineTo(
+            elbowX + Math.cos(elbowPerpAngle) * forearmWidth,
+            elbowY + Math.sin(elbowPerpAngle) * forearmWidth
+        );
+        // Taper to wrist
+        ctx.lineTo(
+            handX + Math.cos(elbowPerpAngle) * wristWidth,
+            handY + Math.sin(elbowPerpAngle) * wristWidth
+        );
+        ctx.lineTo(
+            handX - Math.cos(elbowPerpAngle) * wristWidth,
+            handY - Math.sin(elbowPerpAngle) * wristWidth
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // Forearm muscle definition
+        const forearmMidX = elbowX + Math.cos(elbowAngle) * foreLen * 0.35;
+        const forearmMidY = elbowY + Math.sin(elbowAngle) * foreLen * 0.35;
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.ellipse(
+            forearmMidX - Math.cos(elbowPerpAngle) * forearmWidth * 0.2,
+            forearmMidY - Math.sin(elbowPerpAngle) * forearmWidth * 0.2,
+            foreLen * 0.2, forearmWidth * 0.5, elbowAngle, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        // === GLOVED HAND ===
+        const handSize = armWidth * 0.8;
+
+        // Glove base
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.ellipse(handX, handY, handSize, handSize * 0.8, elbowAngle, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Glove highlight
+        ctx.fillStyle = '#3a3a3a';
+        ctx.beginPath();
+        ctx.ellipse(
+            handX - Math.cos(elbowAngle + Math.PI/4) * handSize * 0.3,
+            handY - Math.sin(elbowAngle + Math.PI/4) * handSize * 0.3,
+            handSize * 0.5, handSize * 0.4, elbowAngle, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        // Finger hints
+        ctx.fillStyle = '#252525';
+        for (let i = -1; i <= 1; i++) {
+            const fingerAngle = elbowAngle + i * 0.25;
+            const fingerX = handX + Math.cos(fingerAngle) * handSize * 0.7;
+            const fingerY = handY + Math.sin(fingerAngle) * handSize * 0.7;
+            ctx.beginPath();
+            ctx.ellipse(fingerX, fingerY, handSize * 0.25, handSize * 0.2, fingerAngle, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Wrist cuff detail
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(
+            handX - Math.cos(elbowAngle) * handSize * 0.5,
+            handY - Math.sin(elbowAngle) * handSize * 0.5,
+            wristWidth * 1.1, wristWidth * 0.6, elbowAngle, 0, Math.PI * 2
+        );
+        ctx.fill();
+
+        ctx.restore();
     },
 
     drawWeapon(ctx, centerX, bodyY, poseConfig, classConfig) {
         if (poseConfig.stance === 'fallen') return;
 
-        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
-                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+        // Match the new wider body dimensions
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 28 :
+                         classConfig.bodyBuild === 'lean' ? 22 : 25;
+        const shoulderWidth = bodyWidth * 1.15;
         const armAngle = poseConfig.armAngle * Math.PI / 180;
+        const shoulderDrop = poseConfig.shoulderDrop || 0;
 
-        // Calculate hand position
-        const shoulderX = centerX + bodyWidth - 2;
-        const shoulderY = bodyY - 18;
-        const elbowX = shoulderX + Math.cos(Math.PI / 2 + armAngle) * 18;
-        const elbowY = shoulderY + Math.sin(Math.PI / 2 + armAngle) * 18;
-        const elbowAngle = Math.PI / 2 + armAngle + 0.5;
-        const handX = elbowX + Math.cos(elbowAngle) * 16;
-        const handY = elbowY + Math.sin(elbowAngle) * 16;
+        // Arm lengths matching drawArmFilled
+        const upperArmLength = classConfig.bodyBuild === 'heavy' ? 20 : 18;
+        const forearmLength = classConfig.bodyBuild === 'heavy' ? 18 : 16;
+
+        // Calculate hand position (matching drawArmFilled calculations for right arm)
+        const shoulderX = centerX + shoulderWidth - 3;
+        const shoulderY = bodyY - 22 + shoulderDrop;
+        const angle = Math.PI / 2 + armAngle * 0.7;
+        const elbowX = shoulderX + Math.cos(angle) * upperArmLength;
+        const elbowY = shoulderY + Math.sin(angle) * upperArmLength;
+        const elbowAngle = angle + 0.45; // Same elbowBend as in drawArmFilled
+        const handX = elbowX + Math.cos(elbowAngle) * forearmLength;
+        const handY = elbowY + Math.sin(elbowAngle) * forearmLength;
 
         ctx.save();
         ctx.translate(handX, handY);
@@ -858,18 +1078,37 @@ const CharacterGenerator = {
         const hasFacialHair = rand() > 0.6;     // 40% chance of facial hair
         const facialHairType = Math.floor(rand() * 3); // 0: stubble, 1: beard, 2: mustache
 
-        // Neck with shading
-        const neckGradient = ctx.createLinearGradient(centerX - 6, headY + 14, centerX + 6, headY + 22);
-        neckGradient.addColorStop(0, skinTone.base);
-        neckGradient.addColorStop(0.3, skinTone.shadow);
+        // Wider neck with shading to match broader shoulders
+        const neckWidth = 7;
+        const neckGradient = ctx.createLinearGradient(centerX - neckWidth, headY + 14, centerX + neckWidth, headY + 22);
+        neckGradient.addColorStop(0, skinTone.shadow);
+        neckGradient.addColorStop(0.3, skinTone.base);
+        neckGradient.addColorStop(0.7, skinTone.base);
         neckGradient.addColorStop(1, skinTone.shadow);
         ctx.fillStyle = neckGradient;
-        ctx.fillRect(centerX - 5, headY + 13, 10, 9);
+        ctx.fillRect(centerX - neckWidth, headY + 13, neckWidth * 2, 11);
+
+        // Neck muscle definition (trapezius visible from above)
+        ctx.fillStyle = skinTone.shadow;
+        ctx.beginPath();
+        ctx.moveTo(centerX - neckWidth - 3, headY + 20);
+        ctx.quadraticCurveTo(centerX - neckWidth, headY + 16, centerX - neckWidth + 2, headY + 14);
+        ctx.lineTo(centerX - neckWidth, headY + 14);
+        ctx.lineTo(centerX - neckWidth - 3, headY + 22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(centerX + neckWidth + 3, headY + 20);
+        ctx.quadraticCurveTo(centerX + neckWidth, headY + 16, centerX + neckWidth - 2, headY + 14);
+        ctx.lineTo(centerX + neckWidth, headY + 14);
+        ctx.lineTo(centerX + neckWidth + 3, headY + 22);
+        ctx.closePath();
+        ctx.fill();
 
         // Neck shadow detail
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
-        ctx.ellipse(centerX, headY + 14, 4, 2, 0, 0, Math.PI);
+        ctx.ellipse(centerX, headY + 14, 5, 2.5, 0, 0, Math.PI);
         ctx.fill();
 
         // Draw face with unique shape (not a simple ellipse)

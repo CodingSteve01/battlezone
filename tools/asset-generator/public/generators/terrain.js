@@ -1,10 +1,12 @@
 /**
  * Hexagonal Terrain Generator
- * Creates proper pointy-top hexagonal terrain textures matching the game engine
+ * Creates flat-top hexagonal terrain textures
  *
- * Game uses pointy-top hexagons where:
- * - Width (flat-to-flat) = sqrt(3) * radius
- * - Height (point-to-point) = 2 * radius
+ * Flat-top hex orientation (like game board hexes):
+ * - Vertices at left/right (pointy sides)
+ * - Flat edges at top/bottom
+ * - Width (point-to-point) = 2 * radius
+ * - Height (flat-to-flat) = sqrt(3) * radius
  * - Angles at: 0°, 60°, 120°, 180°, 240°, 300°
  */
 
@@ -103,16 +105,16 @@ const TerrainGenerator = {
         const detailNoise = new SimplexNoise(seed + 12345);
         const microNoise = new SimplexNoise(seed + 67890);
 
-        // For pointy-top hex: height = 2*radius, width = sqrt(3)*radius
+        // For flat-top hex: width = 2*radius, height = sqrt(3)*radius
         // Center the hex in the canvas
         const centerX = width / 2;
         const centerY = height / 2;
 
         // Calculate hex radius from dimensions
-        // Use the smaller of the two constraints
-        const radiusFromWidth = width / Math.sqrt(3);
-        const radiusFromHeight = height / 2;
-        const radius = Math.min(radiusFromWidth, radiusFromHeight) * 0.95;
+        // For flat-top: width = 2r, height = sqrt(3)*r
+        const radiusFromWidth = width / 2;
+        const radiusFromHeight = height / Math.sqrt(3);
+        const radius = Math.min(radiusFromWidth, radiusFromHeight) * 0.98;
 
         // Clear with transparency
         ctx.clearRect(0, 0, width, height);
@@ -134,8 +136,8 @@ const TerrainGenerator = {
     },
 
     /**
-     * Create pointy-top hexagon path (matching game's renderer.js)
-     * Angles: 0°, 60°, 120°, 180°, 240°, 300°
+     * Create flat-top hexagon path
+     * Angles: 0°, 60°, 120°, 180°, 240°, 300° (vertices on left/right, flat top/bottom)
      */
     createHexPath(ctx, cx, cy, radius) {
         ctx.beginPath();
@@ -251,41 +253,38 @@ const TerrainGenerator = {
     },
 
     /**
-     * Check if point is inside hex using the same geometry as game renderer
-     * Game uses angles at 0°, 60°, 120°, 180°, 240°, 300° (vertices on left/right)
+     * Check if point is inside flat-top hex
+     * Hex vertices at angles 0°, 60°, 120°, 180°, 240°, 300°
+     * This creates vertices at left/right with flat edges at top/bottom
      */
     isPointInHex(px, py, cx, cy, radius) {
         // Translate point to hex-relative coordinates
         const dx = px - cx;
         const dy = py - cy;
 
-        // The hex has 6 vertices at angles 0°, 60°, 120°, 180°, 240°, 300°
-        // This creates a hex with points on left (-r,0) and right (r,0)
-        // and flat edges at top and bottom
-
-        // For this hex orientation:
-        // - Horizontal extent: -radius to +radius (width = 2*radius)
-        // - Vertical extent: -radius*sqrt(3)/2 to +radius*sqrt(3)/2 (height = radius*sqrt(3))
+        // Flat-top hex geometry:
+        // - Vertices at (±r, 0) and (±r/2, ±r*sqrt(3)/2)
+        // - Width (point-to-point) = 2r
+        // - Height (flat-to-flat) = sqrt(3)*r
 
         const absX = Math.abs(dx);
         const absY = Math.abs(dy);
 
-        // The hex can be defined by three inequalities (using symmetry):
-        // 1. |x| <= radius (left and right bounds)
-        // 2. |y| <= radius * sqrt(3)/2 (top and bottom bounds)
-        // 3. The sloped edges: |x|/2 + |y|*sqrt(3)/3 <= radius * sqrt(3)/3 * sqrt(3)/2...
-        //    Simplified: For the diagonal edges, check: |x|/2 + |y|/(sqrt(3)) <= radius/2 + radius*sqrt(3)/(2*sqrt(3))
-        //    Actually: the edge from (r,0) to (r/2, r*sqrt(3)/2) has equation:
-        //    x + y/sqrt(3) <= r (for positive quadrant)
-
-        // Quick bounds check
+        // Bounding box check first
         if (absX > radius) return false;
         if (absY > radius * Math.sqrt(3) / 2) return false;
 
-        // Check diagonal edges: the line from vertex (r, 0) to vertex (r/2, r*sqrt(3)/2)
-        // Equation: x/r + y/(r*sqrt(3)/2) = 1, simplified: x + y*2/sqrt(3) <= r
-        // Or equivalently: x + y * 1.1547 <= r
-        return (absX + absY * 2 / Math.sqrt(3)) <= radius;
+        // Check diagonal edges
+        // The edge from (r, 0) to (r/2, r*sqrt(3)/2):
+        // Using two-point form: (y - 0) / (x - r) = (r*sqrt(3)/2 - 0) / (r/2 - r)
+        // y / (x - r) = (r*sqrt(3)/2) / (-r/2) = -sqrt(3)
+        // y = -sqrt(3) * (x - r) = -sqrt(3)*x + r*sqrt(3)
+        // Inside: y <= r*sqrt(3) - sqrt(3)*x
+        // Or: sqrt(3)*x + y <= r*sqrt(3)
+        // Simplified: x/r + y/(r*sqrt(3)) <= 1
+        // Or: absX + absY / sqrt(3) <= r
+
+        return (absX + absY / Math.sqrt(3)) <= radius;
     },
 
     /**
