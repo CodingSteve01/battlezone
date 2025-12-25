@@ -178,18 +178,32 @@ export function areAssetsLoaded() {
 export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex, facing = null) {
     const sprite = getUnitSprite(classType, playerIndex, status, facing);
 
+    // Sprite size - units should be smaller than hex size
+    const spriteSize = size * 1.2;
+
+    // Draw glow effect for selected units
+    if (isSelected) {
+        ctx.save();
+        ctx.shadowColor = playerColor;
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Draw multiple times for stronger glow
+        for (let i = 0; i < 3; i++) {
+            if (sprite) {
+                ctx.drawImage(sprite, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
+            } else {
+                drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, false);
+            }
+        }
+        ctx.restore();
+    }
+
+    // Draw the actual unit
     if (sprite) {
-        // Draw sprite from sprite sheet
-        const spriteSize = size * 2;
-        ctx.drawImage(
-            sprite,
-            cx - spriteSize / 2,
-            cy - spriteSize / 2,
-            spriteSize,
-            spriteSize
-        );
+        ctx.drawImage(sprite, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
     } else {
-        // Draw simple placeholder
         drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected);
     }
 }

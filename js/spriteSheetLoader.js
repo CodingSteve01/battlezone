@@ -139,14 +139,11 @@ async function loadAdditionalUnitDefinition(filename) {
 
 /**
  * Check if pre-extracted assets exist
+ * Since we now use sprite sheets directly, this always returns false
  */
 async function checkExtractedAssets() {
-    try {
-        const response = await fetch(`${EXTRACTED_PATH}/terrain/grass.png`, { method: 'HEAD' });
-        return response.ok;
-    } catch {
-        return false;
-    }
+    // We always use sprite sheet extraction now
+    return false;
 }
 
 /**

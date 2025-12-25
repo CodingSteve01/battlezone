@@ -4,13 +4,13 @@
   "type": "units",
   "globalSettings": {
     "outputSize": {
-      "width": 130,
-      "height": 130
+      "width": 80,
+      "height": 80
     },
     "backgroundRemoval": {
       "enabled": true,
       "color": "#ffffff",
-      "tolerance": 25,
+      "tolerance": 30,
       "antiAlias": true
     }
   },
