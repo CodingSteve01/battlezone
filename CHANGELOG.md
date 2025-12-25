@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.2...shadow-squad-v3.0.3) (2025-12-25)
+
+
+### Bug Fixes
+
+* **graphics:** fix grass blade scaling during zoom ([#95](https://github.com/CodingSteve01/battlezone/issues/95)) ([416e4ad](https://github.com/CodingSteve01/battlezone/commit/416e4adb41f61ff26306523170676e75c0695405))
+
 ## [3.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.1...shadow-squad-v3.0.2) (2025-12-24)
 
 
