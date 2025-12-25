@@ -6,7 +6,7 @@ import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
-import { getTexture, getTerrainSprite, getDetailSprite, drawUnit as drawUnitSprite, getPlaceholderColor, getRandomDetailSprite } from './assetLoader.js';
+import { getTexture, drawUnit as drawUnitSprite, getRandomDetailSprite, hasAnimatedTexture, getAnimatedTexture } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
