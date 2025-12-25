@@ -58,10 +58,12 @@ export async function initSpriteSheets() {
         console.log('[SpriteSheetLoader] Initializing...');
 
         // Load all JSON definitions
+        // Units can have multiple source files (main units + sniper)
         await Promise.all([
             loadDefinition('units', 'unit-sprites.json'),
             loadDefinition('terrain', 'terrain-hexes.json'),
-            loadDefinition('details', 'environment-details.json')
+            loadDefinition('details', 'environment-details.json'),
+            loadAdditionalUnitDefinition('sniper-sprites.json')
         ]);
 
         // Try to load pre-extracted sprites first
@@ -103,6 +105,35 @@ async function loadDefinition(type, filename) {
     } catch (err) {
         console.warn(`[SpriteSheetLoader] Could not load ${filename}:`, err.message);
         definitions[type] = { sprites: [] };
+    }
+}
+
+/**
+ * Load an additional unit definition file and merge it
+ * This allows units to come from multiple sprite sheets (e.g., sniper in 2x2 grid)
+ */
+async function loadAdditionalUnitDefinition(filename) {
+    try {
+        const response = await fetch(`${SPRITESHEETS_PATH}/${filename}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const additionalDef = await response.json();
+
+        // Store as separate definition for sprite sheet loading
+        if (!definitions.additionalUnits) {
+            definitions.additionalUnits = [];
+        }
+        definitions.additionalUnits.push(additionalDef);
+
+        // Merge sprites into main units definition
+        if (definitions.units && additionalDef.sprites) {
+            definitions.units.sprites = definitions.units.sprites || [];
+            definitions.units.sprites.push(...additionalDef.sprites);
+        }
+
+        console.log(`[SpriteSheetLoader] Loaded additional units: ${filename} (${additionalDef.sprites?.length || 0} sprites)`);
+    } catch (err) {
+        // Optional file - not an error if missing
+        console.log(`[SpriteSheetLoader] No additional unit file: ${filename}`);
     }
 }
 
@@ -205,17 +236,32 @@ async function loadExtractedUnitSprite(spritedef, playerIndex) {
  */
 async function loadAndExtractSpriteSheets() {
     // This is a fallback - in production, sprites should be pre-extracted
-    console.warn('[SpriteSheetLoader] Runtime extraction not fully implemented - use spritesheet-processor.html to extract sprites');
+    console.warn('[SpriteSheetLoader] Runtime extraction - loading from sprite sheets');
 
-    // Try to load sprite sheets
+    // Load main sprite sheets
     for (const [type, def] of Object.entries(definitions)) {
-        if (!def?.source) continue;
+        if (!def?.source || type === 'additionalUnits') continue;
 
         try {
             const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${def.source}`);
             await extractSpritesFromSheet(type, sheetImg, def);
         } catch (err) {
             console.warn(`[SpriteSheetLoader] Could not load sprite sheet ${def.source}:`, err.message);
+        }
+    }
+
+    // Load additional unit sprite sheets (e.g., sniper)
+    if (definitions.additionalUnits) {
+        for (const additionalDef of definitions.additionalUnits) {
+            if (!additionalDef?.source) continue;
+
+            try {
+                const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${additionalDef.source}`);
+                await extractSpritesFromSheet('units', sheetImg, additionalDef);
+                console.log(`[SpriteSheetLoader] Extracted from ${additionalDef.source}`);
+            } catch (err) {
+                console.warn(`[SpriteSheetLoader] Could not load additional sprite sheet ${additionalDef.source}:`, err.message);
+            }
         }
     }
 }
