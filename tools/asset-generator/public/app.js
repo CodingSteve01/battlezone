@@ -60,7 +60,9 @@ async function generateTerrain() {
     preview.innerHTML = '';
     generatedAssets.terrain = [];
 
-    const hexHeight = Math.round(settings.terrainSize * 0.75);
+    // For flat-top hex: width = 2*r, height = sqrt(3)*r
+    // So height/width = sqrt(3)/2 ≈ 0.866
+    const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
     const total = types.length * settings.variants;
     let count = 0;
 
@@ -233,7 +235,7 @@ async function createSpriteSheets() {
     // Terrain sprite sheet
     if (generatedAssets.terrain.length > 0) {
         const settings = getSettings();
-        const hexHeight = Math.round(settings.terrainSize * 0.75);
+        const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
         const sheet = createSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, hexHeight);
         addSheetPreview(preview, sheet.canvas, 'terrain-hexes.png', sheet.json);
     }
@@ -322,14 +324,25 @@ function addSheetPreview(container, canvas, filename, json) {
     canvasClone.style.maxWidth = '100%';
     div.appendChild(canvasClone);
 
-    // Download buttons
+    // Buttons container
     const btnContainer = document.createElement('div');
     btnContainer.style.marginTop = '10px';
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '10px';
+    btnContainer.style.flexWrap = 'wrap';
+
+    // Save to assets button (primary action)
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn';
+    saveBtn.style.width = 'auto';
+    saveBtn.style.background = '#22c55e';
+    saveBtn.textContent = '💾 Save to Assets';
+    saveBtn.onclick = () => saveToAssets(canvasClone, filename, json);
+    btnContainer.appendChild(saveBtn);
 
     const downloadBtn = document.createElement('button');
     downloadBtn.className = 'btn';
     downloadBtn.style.width = 'auto';
-    downloadBtn.style.marginRight = '10px';
     downloadBtn.textContent = '📥 Download PNG';
     downloadBtn.onclick = () => downloadCanvas(canvasClone, filename);
     btnContainer.appendChild(downloadBtn);
@@ -358,6 +371,63 @@ function downloadJSON(json, filename) {
     link.download = filename;
     link.href = URL.createObjectURL(blob);
     link.click();
+}
+
+// Save to assets/spritesheets folder via API
+async function saveToAssets(canvas, filename, json) {
+    try {
+        updateStatus(`Saving ${filename}...`);
+
+        const imageData = canvas.toDataURL('image/png');
+
+        const response = await fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename, imageData, jsonData: json })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Save failed');
+        }
+
+        updateStatus(`✓ Saved ${filename} to assets/spritesheets/`);
+    } catch (err) {
+        console.error('Save error:', err);
+        updateStatus(`❌ Error saving ${filename}: ${err.message}`);
+
+        // If API not available, fall back to download
+        if (err.message.includes('fetch')) {
+            updateStatus('API not available. Use the CLI tool for direct saving.');
+        }
+    }
+}
+
+// Save all sprite sheets to assets
+async function saveAllToAssets() {
+    if (generatedAssets.terrain.length === 0 &&
+        generatedAssets.trees.length === 0 &&
+        generatedAssets.bushes.length === 0 &&
+        generatedAssets.characters.length === 0) {
+        alert('Please generate some assets first!');
+        return;
+    }
+
+    updateStatus('Saving all assets...');
+
+    // Create sprite sheets if needed
+    await createSpriteSheets();
+
+    // Find all save buttons and click them
+    const saveButtons = document.querySelectorAll('#sheetsPreview button');
+    for (const btn of saveButtons) {
+        if (btn.textContent.includes('Save to Assets')) {
+            btn.click();
+            await new Promise(r => setTimeout(r, 500)); // Wait between saves
+        }
+    }
+
+    updateStatus('All assets saved to assets/spritesheets/');
 }
 
 // Download all as ZIP

@@ -47,45 +47,119 @@ function drawRoadDetails() { }
 function drawPathDetails() { }
 function drawRiverDetails() { }
 
-// Vegetation functions - draw sprites from sprite sheet
+// Vegetation functions - draw sprites from sprite sheet with variation
 function drawTree2D5(x, y, size, treeType, seed) {
     const sprite = getRandomDetailSprite('tree', seed * 0.001);
     if (sprite) {
-        // Trees are taller, scale appropriately
-        const spriteHeight = size * 2.5;
+        // Size variation: 0.7x to 1.3x base size
+        const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
+        const spriteHeight = size * 2.8 * sizeVariation;
         const spriteWidth = spriteHeight * (sprite.width / sprite.height);
-        ctx.drawImage(sprite, x - spriteWidth / 2, y - spriteHeight, spriteWidth, spriteHeight);
+
+        // Random horizontal mirror (50% chance)
+        const shouldMirror = seededRandom(seed * 2.2) > 0.5;
+
+        ctx.save();
+        if (shouldMirror) {
+            ctx.translate(x, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(sprite, -spriteWidth / 2, -spriteHeight, spriteWidth, spriteHeight);
+        } else {
+            ctx.drawImage(sprite, x - spriteWidth / 2, y - spriteHeight, spriteWidth, spriteHeight);
+        }
+        ctx.restore();
     }
 }
 
 function drawBush2D5(x, y, size, seed) {
     const sprite = getRandomDetailSprite('bush', seed * 0.001);
     if (sprite) {
-        const spriteSize = size * 1.5;
-        ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.8, spriteSize, spriteSize);
+        // Size variation: 0.6x to 1.4x
+        const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
+        const spriteSize = size * 1.6 * sizeVariation;
+
+        // Random horizontal mirror
+        const shouldMirror = seededRandom(seed * 2.4) > 0.5;
+
+        ctx.save();
+        if (shouldMirror) {
+            ctx.translate(x, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize * 0.8, spriteSize, spriteSize);
+        } else {
+            ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.8, spriteSize, spriteSize);
+        }
+        ctx.restore();
     }
 }
 
 function drawSmallShrub(x, y, size, seed) {
-    // Use grass sprite for small shrubs
     const sprite = getRandomDetailSprite('grass', seed * 0.001);
     if (sprite) {
-        const spriteSize = size * 1.2;
-        ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.6, spriteSize, spriteSize);
+        const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
+        const spriteSize = size * 1.3 * sizeVariation;
+        const shouldMirror = seededRandom(seed * 2.6) > 0.5;
+
+        ctx.save();
+        if (shouldMirror) {
+            ctx.translate(x, y);
+            ctx.scale(-1, 1);
+            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize * 0.6, spriteSize, spriteSize);
+        } else {
+            ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.6, spriteSize, spriteSize);
+        }
+        ctx.restore();
     }
 }
 
 function drawFlowerCluster(x, y, size, seed) {
-    // Use grass sprite for flowers (could be separate flower sprites later)
     const sprite = getRandomDetailSprite('grass', seed * 0.001);
     if (sprite) {
-        const spriteSize = size * 0.8;
+        const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
+        const spriteSize = size * 0.9 * sizeVariation;
         ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.5, spriteSize, spriteSize);
     }
 }
 
 function drawRockFormation2D5(x, y, size, seed) {
-    // Currently no rock details in sprite sheet - draw nothing
+    // Draw procedural rock since we don't have rock sprites yet
+    const sizeVariation = 0.5 + seededRandom(seed) * 0.8;
+    const rockSize = size * 0.6 * sizeVariation;
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    // Rock base color with variation
+    const grayValue = 80 + seededRandom(seed * 3) * 40;
+    ctx.fillStyle = `rgb(${grayValue}, ${grayValue - 5}, ${grayValue - 10})`;
+
+    // Draw irregular rock shape
+    ctx.beginPath();
+    const points = 6 + Math.floor(seededRandom(seed * 4) * 3);
+    for (let i = 0; i < points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+        const dist = rockSize * (0.6 + seededRandom(seed + i) * 0.4);
+        const px = Math.cos(angle) * dist;
+        const py = Math.sin(angle) * dist * 0.6 - rockSize * 0.3; // Flatten and raise
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight
+    ctx.fillStyle = `rgba(255, 255, 255, 0.15)`;
+    ctx.beginPath();
+    ctx.ellipse(-rockSize * 0.2, -rockSize * 0.4, rockSize * 0.25, rockSize * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Shadow
+    ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
+    ctx.beginPath();
+    ctx.ellipse(rockSize * 0.1, rockSize * 0.1, rockSize * 0.4, rockSize * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
 }
 
 // Post-processing stubs
@@ -346,12 +420,15 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        // Draw sprite texture - scale to fit hex
+        // Draw sprite texture - scale to fit hex with slight overlap to prevent seams
         context.save();
         context.clip();
-        // Draw the sprite image centered on the hex
-        const spriteSize = size * 2;
-        context.drawImage(texture, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
+        // Hex dimensions: width = 2*size, height = sqrt(3)*size
+        // Add 2px buffer to prevent anti-aliasing seams between tiles
+        const buffer = 2;
+        const spriteWidth = size * 2 + buffer;
+        const spriteHeight = size * Math.sqrt(3) + buffer;
+        context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
         context.restore();
 
         // Restore hex path for border drawing
@@ -745,9 +822,12 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     if (texture) {
         ctx.save();
         ctx.clip();
-        // Draw the sprite image centered on the hex
-        const spriteSize = size * 2;
-        ctx.drawImage(texture, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
+        // Hex dimensions: width = 2*size, height = sqrt(3)*size
+        // Add 2px buffer to prevent anti-aliasing seams between tiles
+        const buffer = 2;
+        const spriteWidth = size * 2 + buffer;
+        const spriteHeight = size * Math.sqrt(3) + buffer;
+        ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
         ctx.restore();
 
         // Draw hex shape again for stroke
@@ -1014,6 +1094,18 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             if ((baseSeed % 100) >= 15 && (baseSeed % 100) < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
             }
+            // Add occasional small rocks (~15% of tiles)
+            if ((baseSeed % 100) >= 70 && (baseSeed % 100) < 85) {
+                const rockX = cx + (seededRandom(baseSeed * 5) - 0.5) * size * 0.6;
+                const rockY = cy + (seededRandom(baseSeed * 6) - 0.5) * size * 0.4;
+                drawRockFormation2D5(rockX, rockY, s, baseSeed);
+            }
+            // Add occasional bushes (~10% of tiles)
+            if ((baseSeed % 100) >= 50 && (baseSeed % 100) < 60) {
+                const bushX = cx + (seededRandom(baseSeed * 7) - 0.5) * size * 0.5;
+                const bushY = cy + (seededRandom(baseSeed * 8) - 0.5) * size * 0.3;
+                drawBush2D5(bushX, bushY, s * 0.7, baseSeed + 100);
+            }
             break;
 
         case 'forest':
@@ -1023,9 +1115,17 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
 
         case 'rock':
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            // Multiple rock formations for impassable rock terrain
+            const rockCount = 3 + Math.floor(seededRandom(baseSeed * 12) * 3);
+            for (let r = 0; r < rockCount; r++) {
+                const rx = cx + (seededRandom(baseSeed * 13 + r) - 0.5) * size * 0.8;
+                const ry = cy + (seededRandom(baseSeed * 14 + r) - 0.5) * size * 0.6;
+                drawRockFormation2D5(rx, ry, s * 1.5, baseSeed + r * 50);
+            }
+            // Base shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
             ctx.beginPath();
-            ctx.ellipse(cx + 2, cy + s * 0.3, s * 0.7, s * 0.25, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + 2, cy + s * 0.3, s * 0.8, s * 0.3, 0, 0, Math.PI * 2);
             ctx.fill();
             break;
 
@@ -1053,6 +1153,13 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'hills':
             drawHillsDetails(cx, cy, s, baseSeed);
+            // Add multiple rocks to hills (tactical cover!)
+            const hillRockCount = 2 + Math.floor(seededRandom(baseSeed * 9) * 3);
+            for (let r = 0; r < hillRockCount; r++) {
+                const rockX = cx + (seededRandom(baseSeed * 10 + r) - 0.5) * size * 0.7;
+                const rockY = cy + (seededRandom(baseSeed * 11 + r) - 0.5) * size * 0.5;
+                drawRockFormation2D5(rockX, rockY, s * 1.2, baseSeed + r * 100);
+            }
             break;
 
         case 'road':
@@ -1779,7 +1886,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
             : (isSelected ? 'selected' : 'normal'));
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
-    drawUnitSprite(ctx, cx, cy - size * 0.15, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    // Size increased from 1.3 to 1.8 for better visibility at 100% zoom
+    drawUnitSprite(ctx, cx, cy - size * 0.2, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // Player number badge
     ctx.fillStyle = playerColor;

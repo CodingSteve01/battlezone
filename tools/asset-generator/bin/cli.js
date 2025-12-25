@@ -38,6 +38,45 @@ program
         // Serve static files from public directory
         const publicDir = path.join(__dirname, '..', 'public');
         app.use(express.static(publicDir));
+        app.use(express.json({ limit: '50mb' }));
+
+        // Assets directory - go up from tools/asset-generator/bin to project root
+        const projectRoot = path.resolve(__dirname, '..', '..', '..');
+        const assetsDir = path.join(projectRoot, 'assets', 'spritesheets');
+        if (!fs.existsSync(assetsDir)) {
+            fs.mkdirSync(assetsDir, { recursive: true });
+        }
+        console.log(chalk.gray(`  Assets will be saved to: ${assetsDir}`));
+
+        // API endpoint to save sprite sheets to assets folder
+        app.post('/api/save', async (req, res) => {
+            try {
+                const { filename, imageData, jsonData } = req.body;
+
+                if (!filename || !imageData) {
+                    return res.status(400).json({ error: 'Missing filename or imageData' });
+                }
+
+                // Save PNG file
+                const pngPath = path.join(assetsDir, filename);
+                const base64Data = imageData.replace(/^data:image\/png;base64,/, '');
+                fs.writeFileSync(pngPath, Buffer.from(base64Data, 'base64'));
+                console.log(chalk.green(`  ✓ Saved ${filename}`));
+
+                // Save JSON file
+                if (jsonData) {
+                    const jsonFilename = filename.replace('.png', '.json');
+                    const jsonPath = path.join(assetsDir, jsonFilename);
+                    fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 2));
+                    console.log(chalk.green(`  ✓ Saved ${jsonFilename}`));
+                }
+
+                res.json({ success: true, path: pngPath });
+            } catch (err) {
+                console.error(chalk.red('Error saving file:', err.message));
+                res.status(500).json({ error: err.message });
+            }
+        });
 
         // Ensure output directory exists
         const outputDir = path.join(process.cwd(), 'output');

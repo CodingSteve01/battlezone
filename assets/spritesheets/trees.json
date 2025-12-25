@@ -1,0 +1,477 @@
+{
+  "version": "1.0",
+  "dimensions": {
+    "width": 1536,
+    "height": 2280
+  },
+  "sprites": [
+    {
+      "id": "tree_oak_0",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_oak_1",
+      "bounds": {
+        "x": 256,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_oak_2",
+      "bounds": {
+        "x": 512,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_oak_3",
+      "bounds": {
+        "x": 768,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_oak_4",
+      "bounds": {
+        "x": 1024,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_oak_5",
+      "bounds": {
+        "x": 1280,
+        "y": 0,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "oak",
+        "variant": 5
+      }
+    },
+    {
+      "id": "tree_pine_0",
+      "bounds": {
+        "x": 0,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_pine_1",
+      "bounds": {
+        "x": 256,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_pine_2",
+      "bounds": {
+        "x": 512,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_pine_3",
+      "bounds": {
+        "x": 768,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_pine_4",
+      "bounds": {
+        "x": 1024,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_pine_5",
+      "bounds": {
+        "x": 1280,
+        "y": 380,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 5
+      }
+    },
+    {
+      "id": "tree_birch_0",
+      "bounds": {
+        "x": 0,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_birch_1",
+      "bounds": {
+        "x": 256,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_birch_2",
+      "bounds": {
+        "x": 512,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_birch_3",
+      "bounds": {
+        "x": 768,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_birch_4",
+      "bounds": {
+        "x": 1024,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_birch_5",
+      "bounds": {
+        "x": 1280,
+        "y": 760,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "birch",
+        "variant": 5
+      }
+    },
+    {
+      "id": "tree_willow_0",
+      "bounds": {
+        "x": 0,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_willow_1",
+      "bounds": {
+        "x": 256,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_willow_2",
+      "bounds": {
+        "x": 512,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_willow_3",
+      "bounds": {
+        "x": 768,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_willow_4",
+      "bounds": {
+        "x": 1024,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_willow_5",
+      "bounds": {
+        "x": 1280,
+        "y": 1140,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "willow",
+        "variant": 5
+      }
+    },
+    {
+      "id": "tree_maple_0",
+      "bounds": {
+        "x": 0,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_maple_1",
+      "bounds": {
+        "x": 256,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_maple_2",
+      "bounds": {
+        "x": 512,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_maple_3",
+      "bounds": {
+        "x": 768,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_maple_4",
+      "bounds": {
+        "x": 1024,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_maple_5",
+      "bounds": {
+        "x": 1280,
+        "y": 1520,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "maple",
+        "variant": 5
+      }
+    },
+    {
+      "id": "tree_dead_0",
+      "bounds": {
+        "x": 0,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tree_dead_1",
+      "bounds": {
+        "x": 256,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tree_dead_2",
+      "bounds": {
+        "x": 512,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tree_dead_3",
+      "bounds": {
+        "x": 768,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tree_dead_4",
+      "bounds": {
+        "x": 1024,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 4
+      }
+    },
+    {
+      "id": "tree_dead_5",
+      "bounds": {
+        "x": 1280,
+        "y": 1900,
+        "width": 256,
+        "height": 380
+      },
+      "metadata": {
+        "type": "dead",
+        "variant": 5
+      }
+    }
+  ]
+}

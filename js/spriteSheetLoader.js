@@ -33,10 +33,11 @@ const variantRegistry = {
 };
 
 // JSON definitions cache
-let definitions = {
+const definitions = {
     units: null,
     terrain: null,
-    details: null
+    details: null,
+    trees: null
 };
 
 // Loading state
@@ -63,6 +64,7 @@ export async function initSpriteSheets() {
             loadDefinition('units', 'unit-sprites.json'),
             loadDefinition('terrain', 'terrain-hexes.json'),
             loadDefinition('details', 'environment-details.json'),
+            loadDefinition('trees', 'trees.json'),
             loadAdditionalUnitDefinition('sniper-sprites.json')
         ]);
 
@@ -229,35 +231,53 @@ async function loadExtractedUnitSprite(spritedef, playerIndex) {
 }
 
 /**
+ * Get the sprite sheet PNG filename for a definition type
+ * Uses the source field if present, otherwise infers from type name
+ */
+function getSheetFilename(type, def) {
+    if (def?.source) return def.source;
+
+    // Infer PNG filename from type
+    const typeToFile = {
+        units: 'unit-sprites.png',
+        terrain: 'terrain-hexes.png',
+        details: 'environment-details.png',
+        trees: 'trees.png'
+    };
+    return typeToFile[type] || `${type}.png`;
+}
+
+/**
  * Load sprite sheets and extract at runtime
  */
 async function loadAndExtractSpriteSheets() {
-    // This is a fallback - in production, sprites should be pre-extracted
-    console.warn('[SpriteSheetLoader] Runtime extraction - loading from sprite sheets');
+    console.log('[SpriteSheetLoader] Loading sprite sheets...');
 
     // Load main sprite sheets
     for (const [type, def] of Object.entries(definitions)) {
-        if (!def?.source || type === 'additionalUnits') continue;
+        if (!def?.sprites || type === 'additionalUnits') continue;
 
+        const filename = getSheetFilename(type, def);
         try {
-            const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${def.source}`);
+            const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${filename}`);
             await extractSpritesFromSheet(type, sheetImg, def);
+            console.log(`[SpriteSheetLoader] Extracted ${def.sprites.length} sprites from ${filename}`);
         } catch (err) {
-            console.warn(`[SpriteSheetLoader] Could not load sprite sheet ${def.source}:`, err.message);
+            console.warn(`[SpriteSheetLoader] Could not load sprite sheet ${filename}:`, err.message);
         }
     }
 
     // Load additional unit sprite sheets (e.g., sniper)
     if (definitions.additionalUnits) {
         for (const additionalDef of definitions.additionalUnits) {
-            if (!additionalDef?.source) continue;
+            const filename = additionalDef?.source || 'sniper-sprites.png';
 
             try {
-                const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${additionalDef.source}`);
+                const sheetImg = await loadImage(`${SPRITESHEETS_PATH}/${filename}`);
                 await extractSpritesFromSheet('units', sheetImg, additionalDef);
-                console.log(`[SpriteSheetLoader] Extracted from ${additionalDef.source}`);
+                console.log(`[SpriteSheetLoader] Extracted from ${filename}`);
             } catch (err) {
-                console.warn(`[SpriteSheetLoader] Could not load additional sprite sheet ${additionalDef.source}:`, err.message);
+                console.warn(`[SpriteSheetLoader] Could not load additional sprite sheet ${filename}:`, err.message);
             }
         }
     }
@@ -290,18 +310,37 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
 
         // Create ImageBitmap for better performance
         const bitmap = await createImageBitmap(canvas);
-        spriteRegistry[type].set(sprite.id, bitmap);
 
-        // For units, generate player color variants
-        if (type === 'units' && definition.colorize?.enabled) {
-            const colors = definition.colorize.targetColors || CONFIG.PLAYER_COLORS;
-            for (let p = 0; p < colors.length; p++) {
-                const colored = colorizeCanvas(canvas, colors[p]);
-                const coloredBitmap = await createImageBitmap(colored);
-                const unitClass = sprite.metadata?.unitClass;
-                const state = sprite.metadata?.state || 'normal';
-                spriteRegistry.units.set(`${unitClass}_${state}_${p}`, coloredBitmap);
+        // Handle different sprite types
+        if (type === 'units') {
+            const unitClass = sprite.metadata?.unitClass;
+            const state = sprite.metadata?.state || 'normal';
+            const player = sprite.metadata?.player;
+
+            if (unitClass && player !== undefined) {
+                // New format: sprites already have player index
+                spriteRegistry.units.set(`${unitClass}_${state}_${player}`, bitmap);
+            } else if (definition.colorize?.enabled) {
+                // Old format: colorize to generate player variants
+                const colors = definition.colorize.targetColors || CONFIG.PLAYER_COLORS;
+                for (let p = 0; p < colors.length; p++) {
+                    const colored = colorizeCanvas(canvas, colors[p]);
+                    const coloredBitmap = await createImageBitmap(colored);
+                    spriteRegistry.units.set(`${unitClass}_${state}_${p}`, coloredBitmap);
+                }
+            } else {
+                // Fallback: just store by id
+                spriteRegistry.units.set(sprite.id, bitmap);
             }
+        } else if (type === 'trees') {
+            // Trees go into the details registry with tree_ prefix
+            const treeType = sprite.metadata?.type;
+            if (treeType) {
+                spriteRegistry.details.set(sprite.id, bitmap);
+            }
+        } else {
+            // Terrain and details: store by id
+            spriteRegistry[type].set(sprite.id, bitmap);
         }
     }
 }
@@ -383,7 +422,8 @@ function buildVariantRegistries() {
     // Build terrain variant registry
     if (definitions.terrain?.sprites) {
         for (const sprite of definitions.terrain.sprites) {
-            const type = sprite.metadata?.terrainType;
+            // Support both 'type' and 'terrainType' for flexibility
+            const type = sprite.metadata?.terrainType || sprite.metadata?.type;
             if (!type) continue;
 
             if (!variantRegistry.terrain[type]) {
@@ -415,14 +455,66 @@ function buildVariantRegistries() {
     // Build detail variant registry
     if (definitions.details?.sprites) {
         for (const sprite of definitions.details.sprites) {
-            const detailType = sprite.metadata?.detailType;
+            // Support both 'type' and 'detailType', with optional subtype
+            let detailType = sprite.metadata?.detailType || sprite.metadata?.type;
             if (!detailType) continue;
+
+            // If there's a subtype, combine them (e.g., bush_round, grass_tall)
+            const subtype = sprite.metadata?.subtype;
+            if (subtype) {
+                detailType = `${detailType}_${subtype}`;
+            }
 
             if (!variantRegistry.details[detailType]) {
                 variantRegistry.details[detailType] = { variants: [], ids: [] };
             }
             variantRegistry.details[detailType].variants.push(sprite.metadata?.variant || 0);
             variantRegistry.details[detailType].ids.push(sprite.id);
+        }
+    }
+
+    // Build tree variant registry (trees are stored in a separate definition)
+    if (definitions.trees?.sprites) {
+        // Also register all trees under generic 'tree' type for random selection
+        if (!variantRegistry.details['tree']) {
+            variantRegistry.details['tree'] = { variants: [], ids: [] };
+        }
+
+        for (const sprite of definitions.trees.sprites) {
+            const treeType = sprite.metadata?.type;
+            if (!treeType) continue;
+
+            // Register under specific type (tree_oak, tree_pine, etc.)
+            const detailType = `tree_${treeType}`;
+            if (!variantRegistry.details[detailType]) {
+                variantRegistry.details[detailType] = { variants: [], ids: [] };
+            }
+            variantRegistry.details[detailType].variants.push(sprite.metadata?.variant || 0);
+            variantRegistry.details[detailType].ids.push(sprite.id);
+
+            // Also register under generic 'tree' type
+            variantRegistry.details['tree'].variants.push(sprite.metadata?.variant || 0);
+            variantRegistry.details['tree'].ids.push(sprite.id);
+        }
+    }
+
+    // Create generic aliases for bush and grass detail types
+    // This allows getRandomDetailSprite('bush') to return any bush variant
+    const genericAliases = {
+        'bush': ['bush_round', 'bush_wild', 'bush_flowering', 'bush_berry', 'bush_fern'],
+        'grass': ['grass_short', 'grass_tall', 'grass_wheat', 'grass_reed']
+    };
+
+    for (const [genericType, subtypes] of Object.entries(genericAliases)) {
+        if (!variantRegistry.details[genericType]) {
+            variantRegistry.details[genericType] = { variants: [], ids: [] };
+        }
+        for (const subtype of subtypes) {
+            const info = variantRegistry.details[subtype];
+            if (info) {
+                variantRegistry.details[genericType].variants.push(...info.variants);
+                variantRegistry.details[genericType].ids.push(...info.ids);
+            }
         }
     }
 }
