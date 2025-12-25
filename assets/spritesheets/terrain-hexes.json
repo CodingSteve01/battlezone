@@ -14,206 +14,206 @@
     }
   },
   "grid": {
-    "cellWidth": 225,
-    "cellHeight": 270,
+    "cellWidth": 256,
+    "cellHeight": 256,
     "columns": 4,
     "rows": 8,
-    "offsetX": 25,
+    "offsetX": 0,
     "offsetY": 0,
-    "spacingX": 20,
+    "spacingX": 0,
     "spacingY": 0
   },
   "sprites": [
     {
       "id": "grass",
       "name": "Gras",
-      "bounds": { "x": 25, "y": 0, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 0, "width": 256, "height": 256 },
       "metadata": { "terrainType": "grass", "variant": 0 }
     },
     {
       "id": "grass_v1",
       "name": "Gras Variante 1",
-      "bounds": { "x": 270, "y": 0, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 0, "width": 256, "height": 256 },
       "metadata": { "terrainType": "grass", "variant": 1 }
     },
     {
       "id": "grass_v2",
       "name": "Gras Variante 2",
-      "bounds": { "x": 515, "y": 0, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 0, "width": 256, "height": 256 },
       "metadata": { "terrainType": "grass", "variant": 2 }
     },
     {
       "id": "grass_v3",
       "name": "Gras Variante 3",
-      "bounds": { "x": 760, "y": 0, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 0, "width": 256, "height": 256 },
       "metadata": { "terrainType": "grass", "variant": 3 }
     },
     {
       "id": "hills",
-      "name": "Hügel",
-      "bounds": { "x": 25, "y": 270, "width": 225, "height": 270 },
+      "name": "Huegel",
+      "bounds": { "x": 0, "y": 256, "width": 256, "height": 256 },
       "metadata": { "terrainType": "hills", "variant": 0 }
     },
     {
       "id": "hills_v1",
-      "name": "Hügel Variante 1",
-      "bounds": { "x": 270, "y": 270, "width": 225, "height": 270 },
+      "name": "Huegel Variante 1",
+      "bounds": { "x": 256, "y": 256, "width": 256, "height": 256 },
       "metadata": { "terrainType": "hills", "variant": 1 }
     },
     {
       "id": "hills_v2",
-      "name": "Hügel Variante 2",
-      "bounds": { "x": 515, "y": 270, "width": 225, "height": 270 },
+      "name": "Huegel Variante 2",
+      "bounds": { "x": 512, "y": 256, "width": 256, "height": 256 },
       "metadata": { "terrainType": "hills", "variant": 2 }
     },
     {
       "id": "hills_v3",
-      "name": "Hügel Variante 3",
-      "bounds": { "x": 760, "y": 270, "width": 225, "height": 270 },
+      "name": "Huegel Variante 3",
+      "bounds": { "x": 768, "y": 256, "width": 256, "height": 256 },
       "metadata": { "terrainType": "hills", "variant": 3 }
     },
     {
       "id": "sand",
       "name": "Sand",
-      "bounds": { "x": 25, "y": 540, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 512, "width": 256, "height": 256 },
       "metadata": { "terrainType": "sand", "variant": 0 }
     },
     {
       "id": "sand_v1",
       "name": "Sand Variante 1",
-      "bounds": { "x": 270, "y": 540, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 512, "width": 256, "height": 256 },
       "metadata": { "terrainType": "sand", "variant": 1 }
     },
     {
       "id": "sand_v2",
       "name": "Sand Variante 2",
-      "bounds": { "x": 515, "y": 540, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 512, "width": 256, "height": 256 },
       "metadata": { "terrainType": "sand", "variant": 2 }
     },
     {
       "id": "sand_v3",
       "name": "Sand Variante 3",
-      "bounds": { "x": 760, "y": 540, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 512, "width": 256, "height": 256 },
       "metadata": { "terrainType": "sand", "variant": 3 }
     },
     {
       "id": "water",
       "name": "Wasser",
-      "bounds": { "x": 25, "y": 810, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 768, "width": 256, "height": 256 },
       "metadata": { "terrainType": "water", "variant": 0 }
     },
     {
       "id": "water_v1",
       "name": "Wasser Variante 1",
-      "bounds": { "x": 270, "y": 810, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 768, "width": 256, "height": 256 },
       "metadata": { "terrainType": "water", "variant": 1 }
     },
     {
       "id": "water_v2",
       "name": "Wasser Variante 2",
-      "bounds": { "x": 515, "y": 810, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 768, "width": 256, "height": 256 },
       "metadata": { "terrainType": "water", "variant": 2 }
     },
     {
       "id": "water_v3",
       "name": "Wasser Variante 3",
-      "bounds": { "x": 760, "y": 810, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 768, "width": 256, "height": 256 },
       "metadata": { "terrainType": "water", "variant": 3 }
     },
     {
       "id": "rock",
       "name": "Felsen",
-      "bounds": { "x": 25, "y": 1080, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 1024, "width": 256, "height": 256 },
       "metadata": { "terrainType": "rock", "variant": 0 }
     },
     {
       "id": "rock_v1",
       "name": "Felsen Variante 1",
-      "bounds": { "x": 270, "y": 1080, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 1024, "width": 256, "height": 256 },
       "metadata": { "terrainType": "rock", "variant": 1 }
     },
     {
       "id": "rock_v2",
       "name": "Felsen Variante 2",
-      "bounds": { "x": 515, "y": 1080, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 1024, "width": 256, "height": 256 },
       "metadata": { "terrainType": "rock", "variant": 2 }
     },
     {
       "id": "rock_v3",
       "name": "Felsen Variante 3",
-      "bounds": { "x": 760, "y": 1080, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 1024, "width": 256, "height": 256 },
       "metadata": { "terrainType": "rock", "variant": 3 }
     },
     {
       "id": "forest",
       "name": "Wald",
-      "bounds": { "x": 25, "y": 1350, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 1280, "width": 256, "height": 256 },
       "metadata": { "terrainType": "forest", "variant": 0 }
     },
     {
       "id": "forest_v1",
       "name": "Wald Variante 1",
-      "bounds": { "x": 270, "y": 1350, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 1280, "width": 256, "height": 256 },
       "metadata": { "terrainType": "forest", "variant": 1 }
     },
     {
       "id": "forest_v2",
       "name": "Wald Variante 2",
-      "bounds": { "x": 515, "y": 1350, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 1280, "width": 256, "height": 256 },
       "metadata": { "terrainType": "forest", "variant": 2 }
     },
     {
       "id": "forest_v3",
       "name": "Wald Variante 3",
-      "bounds": { "x": 760, "y": 1350, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 1280, "width": 256, "height": 256 },
       "metadata": { "terrainType": "forest", "variant": 3 }
     },
     {
       "id": "swamp",
       "name": "Sumpf",
-      "bounds": { "x": 25, "y": 1620, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 1536, "width": 256, "height": 256 },
       "metadata": { "terrainType": "swamp", "variant": 0 }
     },
     {
       "id": "swamp_v1",
       "name": "Sumpf Variante 1",
-      "bounds": { "x": 270, "y": 1620, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 1536, "width": 256, "height": 256 },
       "metadata": { "terrainType": "swamp", "variant": 1 }
     },
     {
       "id": "swamp_v2",
       "name": "Sumpf Variante 2",
-      "bounds": { "x": 515, "y": 1620, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 1536, "width": 256, "height": 256 },
       "metadata": { "terrainType": "swamp", "variant": 2 }
     },
     {
       "id": "swamp_v3",
       "name": "Sumpf Variante 3",
-      "bounds": { "x": 760, "y": 1620, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 1536, "width": 256, "height": 256 },
       "metadata": { "terrainType": "swamp", "variant": 3 }
     },
     {
       "id": "river",
       "name": "Fluss",
-      "bounds": { "x": 25, "y": 1890, "width": 225, "height": 270 },
+      "bounds": { "x": 0, "y": 1792, "width": 256, "height": 256 },
       "metadata": { "terrainType": "river", "variant": 0 }
     },
     {
       "id": "river_v1",
       "name": "Fluss Variante 1",
-      "bounds": { "x": 270, "y": 1890, "width": 225, "height": 270 },
+      "bounds": { "x": 256, "y": 1792, "width": 256, "height": 256 },
       "metadata": { "terrainType": "river", "variant": 1 }
     },
     {
       "id": "river_v2",
       "name": "Fluss Variante 2",
-      "bounds": { "x": 515, "y": 1890, "width": 225, "height": 270 },
+      "bounds": { "x": 512, "y": 1792, "width": 256, "height": 256 },
       "metadata": { "terrainType": "river", "variant": 2 }
     },
     {
       "id": "river_v3",
       "name": "Fluss Variante 3",
-      "bounds": { "x": 760, "y": 1890, "width": 225, "height": 270 },
+      "bounds": { "x": 768, "y": 1792, "width": 256, "height": 256 },
       "metadata": { "terrainType": "river", "variant": 3 }
     }
   ]
