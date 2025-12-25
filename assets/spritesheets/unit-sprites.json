@@ -10,7 +10,8 @@
     "backgroundRemoval": {
       "enabled": true,
       "color": "#ffffff",
-      "tolerance": 15
+      "tolerance": 25,
+      "antiAlias": true
     }
   },
   "colorize": {

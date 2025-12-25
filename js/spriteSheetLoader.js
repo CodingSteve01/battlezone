@@ -338,11 +338,23 @@ function removeBackground(ctx, width, height, settings) {
         bgB = parseInt(hex.substr(4, 2), 16);
     }
 
+    const antiAlias = settings?.antiAlias !== false; // Default to true
+
     for (let i = 0; i < data.length; i += 4) {
-        if (Math.abs(data[i] - bgR) <= tolerance &&
-            Math.abs(data[i + 1] - bgG) <= tolerance &&
-            Math.abs(data[i + 2] - bgB) <= tolerance) {
-            data[i + 3] = 0;
+        const diffR = Math.abs(data[i] - bgR);
+        const diffG = Math.abs(data[i + 1] - bgG);
+        const diffB = Math.abs(data[i + 2] - bgB);
+        const maxDiff = Math.max(diffR, diffG, diffB);
+
+        if (maxDiff <= tolerance) {
+            if (antiAlias && maxDiff > tolerance * 0.5) {
+                // Semi-transparent for edge pixels (anti-aliasing)
+                const alpha = Math.round((maxDiff / tolerance) * 255);
+                data[i + 3] = Math.min(data[i + 3], alpha);
+            } else {
+                // Fully transparent for pixels clearly matching background
+                data[i + 3] = 0;
+            }
         }
     }
 
