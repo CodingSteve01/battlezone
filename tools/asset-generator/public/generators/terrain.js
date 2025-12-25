@@ -5,8 +5,9 @@
  * Features:
  * - Proper pointy-top hexagonal shape matching game renderer
  * - Multi-octave Simplex noise for sub-pixel detail
- * - Terrain-specific detail rendering (grass blades, rock cracks, etc.)
- * - 3D bevel effect matching game's hex borders
+ * - Terrain-specific detail rendering (grass blades, stones, pine cones)
+ * - Details can extend above hex boundary for natural look
+ * - No border/bevel (game renderer adds this)
  */
 
 const TerrainGenerator = {
@@ -97,28 +98,27 @@ const TerrainGenerator = {
         const detailNoise = new SimplexNoise(seed + 12345);
         const microNoise = new SimplexNoise(seed + 67890);
 
-        // Create hex clipping path (pointy-top orientation)
+        // Hex is centered with some margin for protruding details
         const centerX = size / 2;
-        const centerY = size / 2;
-        const radius = size / 2 - 2; // Slight inset to avoid edge artifacts
+        const centerY = size / 2 + size * 0.08; // Slightly lower to allow grass to extend up
+        const radius = size * 0.42; // Hex fits with room for details to protrude
 
+        // Step 1: Render base terrain clipped to hex
         ctx.save();
         this.createHexPath(ctx, centerX, centerY, radius);
         ctx.clip();
 
         // Render base terrain with multi-octave noise
-        this.renderBaseLayer(ctx, terrain, noise, size, variant);
+        this.renderBaseLayer(ctx, terrain, noise, size, variant, centerX, centerY, radius);
 
-        // Add detail layer based on terrain type
-        this.renderDetailLayer(ctx, terrain, detailNoise, microNoise, size, variant);
-
-        // Add subtle ambient occlusion at edges
-        this.renderEdgeShadow(ctx, centerX, centerY, radius);
+        // Add flat detail layer (cracks, ripples - things that don't protrude)
+        this.renderFlatDetails(ctx, terrain, detailNoise, microNoise, size, variant, centerX, centerY, radius);
 
         ctx.restore();
 
-        // Draw hex border with 3D bevel effect
-        this.renderHexBorder(ctx, centerX, centerY, radius, terrain);
+        // Step 2: Render protruding details OUTSIDE clip (grass, stones, pine cones)
+        // These can extend above the hex boundary
+        this.renderProtrudingDetails(ctx, terrain, detailNoise, microNoise, size, variant, centerX, centerY, radius);
 
         return canvas;
     },
@@ -153,7 +153,7 @@ const TerrainGenerator = {
     /**
      * Render base terrain layer with multi-octave noise
      */
-    renderBaseLayer(ctx, terrain, noise, size, variant) {
+    renderBaseLayer(ctx, terrain, noise, size, variant, cx, cy, radius) {
         const imageData = ctx.createImageData(size, size);
         const data = imageData.data;
 
@@ -212,20 +212,10 @@ const TerrainGenerator = {
     },
 
     /**
-     * Render terrain-specific detail layer
+     * Render flat details that stay within the hex (cracks, ripples, etc.)
      */
-    renderDetailLayer(ctx, terrain, noise, microNoise, size, variant) {
-        const cx = size / 2;
-        const cy = size / 2;
-        const radius = size / 2 - 4;
-
+    renderFlatDetails(ctx, terrain, noise, microNoise, size, variant, cx, cy, radius) {
         switch (terrain.detailType) {
-            case 'grass_blades':
-                this.renderGrassBlades(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius);
-                break;
-            case 'leaf_litter':
-                this.renderLeafLitter(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius);
-                break;
             case 'contour_lines':
                 this.renderContourLines(ctx, noise, size, terrain, variant, cx, cy, radius);
                 break;
@@ -243,6 +233,23 @@ const TerrainGenerator = {
                 break;
             case 'current':
                 this.renderRiverCurrent(ctx, noise, size, terrain, variant, cx, cy, radius);
+                break;
+        }
+    },
+
+    /**
+     * Render protruding details that can extend above hex (grass, leaves, stones)
+     */
+    renderProtrudingDetails(ctx, terrain, noise, microNoise, size, variant, cx, cy, radius) {
+        switch (terrain.detailType) {
+            case 'grass_blades':
+                this.renderTinyGrassBlades(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius);
+                break;
+            case 'leaf_litter':
+                this.renderTinyLeaves(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius);
+                break;
+            case 'cracks':
+                this.renderTinyStones(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius);
                 break;
         }
     },
@@ -267,10 +274,12 @@ const TerrainGenerator = {
     },
 
     /**
-     * Render individual grass blades
+     * Render tiny grass blades that can protrude above hex
+     * Drawn OUTSIDE clip region so they can extend upward
      */
-    renderGrassBlades(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius) {
-        const bladeCount = Math.floor(size * terrain.detailDensity * 1.5);
+    renderTinyGrassBlades(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius) {
+        // Sparse grass - small and thin in this perspective
+        const bladeCount = Math.floor(size * terrain.detailDensity * 0.4);
 
         ctx.lineCap = 'round';
 
@@ -279,29 +288,34 @@ const TerrainGenerator = {
 
         for (let i = 0; i < bladeCount; i++) {
             const seed = variant * 10000 + i;
-            const x = cx + (noise.noise2D(seed * 0.1, 0)) * radius * 0.9;
-            const y = cy + (noise.noise2D(0, seed * 0.1)) * radius * 0.9;
+            // Position grass mostly in upper part of hex so it protrudes upward
+            const angle = noise.noise2D(seed * 0.1, 0) * Math.PI * 2;
+            const dist = (0.3 + Math.abs(noise.noise2D(0, seed * 0.1)) * 0.6) * radius;
+            const x = cx + Math.cos(angle) * dist;
+            const baseY = cy + Math.sin(angle) * dist * 0.7; // Compress vertically
 
-            if (!this.isInsideHex(x, y, cx, cy, radius)) continue;
+            // Only draw grass near top half of hex
+            if (baseY > cy + radius * 0.3) continue;
 
-            const height = 4 + microNoise.noise2D(x * 0.1, y * 0.1) * 6;
-            const bend = microNoise.noise2D(x * 0.05, y * 0.05) * 0.5;
-            const thickness = 0.6 + Math.abs(microNoise.noise2D(x, y)) * 0.6;
+            // Very small and thin grass blades
+            const height = 2 + microNoise.noise2D(x * 0.2, baseY * 0.2) * 3;
+            const bend = microNoise.noise2D(x * 0.1, baseY * 0.1) * 0.3;
+            const thickness = 0.3 + Math.abs(microNoise.noise2D(x, baseY)) * 0.3;
 
-            // Draw blade with slight curve
+            // Draw thin blade extending upward (can go above hex)
             ctx.beginPath();
-            ctx.moveTo(x, y);
+            ctx.moveTo(x, baseY);
             ctx.quadraticCurveTo(
                 x + bend * height * 0.5,
-                y - height * 0.6,
+                baseY - height * 0.6,
                 x + bend * height,
-                y - height
+                baseY - height
             );
 
             // Gradient from dark base to light tip
-            const gradient = ctx.createLinearGradient(x, y, x, y - height);
-            gradient.addColorStop(0, `rgba(${darkRGB.r}, ${darkRGB.g}, ${darkRGB.b}, 0.7)`);
-            gradient.addColorStop(1, `rgba(${lightRGB.r}, ${lightRGB.g}, ${lightRGB.b}, 0.5)`);
+            const gradient = ctx.createLinearGradient(x, baseY, x, baseY - height);
+            gradient.addColorStop(0, `rgba(${darkRGB.r}, ${darkRGB.g}, ${darkRGB.b}, 0.6)`);
+            gradient.addColorStop(1, `rgba(${lightRGB.r}, ${lightRGB.g}, ${lightRGB.b}, 0.4)`);
 
             ctx.strokeStyle = gradient;
             ctx.lineWidth = thickness;
@@ -310,43 +324,92 @@ const TerrainGenerator = {
     },
 
     /**
-     * Render leaf litter for forest floor
+     * Render tiny leaves/twigs that can protrude above hex
      */
-    renderLeafLitter(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius) {
-        const leafCount = Math.floor(size * terrain.detailDensity * 0.6);
+    renderTinyLeaves(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius) {
+        const leafCount = Math.floor(size * terrain.detailDensity * 0.25);
 
         const leafColors = [
-            '#5a4a30', '#4a3a25', '#6a5a40', '#3a2a1a', // Browns
-            '#3d5a3a', '#4d6a4a', '#2d4a2a' // Dark greens
+            '#5a4a30', '#4a3a25', '#6a5a40', // Browns
+            '#3d5a3a', '#4d6a4a' // Dark greens
         ];
 
         for (let i = 0; i < leafCount; i++) {
             const seed = variant * 10000 + i;
-            const x = cx + (noise.noise2D(seed * 0.1, 0)) * radius * 0.85;
-            const y = cy + (noise.noise2D(0, seed * 0.1)) * radius * 0.85;
+            const angle = noise.noise2D(seed * 0.1, 0) * Math.PI * 2;
+            const dist = (0.2 + Math.abs(noise.noise2D(0, seed * 0.1)) * 0.7) * radius;
+            const x = cx + Math.cos(angle) * dist;
+            const baseY = cy + Math.sin(angle) * dist * 0.7;
 
-            if (!this.isInsideHex(x, y, cx, cy, radius)) continue;
-
-            const leafSize = 2 + Math.abs(microNoise.noise2D(x * 0.1, y * 0.1)) * 3;
-            const rotation = microNoise.noise2D(x * 0.05, y * 0.05) * Math.PI;
-            const colorIdx = Math.floor(Math.abs(noise.noise2D(x, y)) * leafColors.length);
+            // Very tiny leaves
+            const leafSize = 0.8 + Math.abs(microNoise.noise2D(x * 0.2, baseY * 0.2)) * 1.2;
+            const rotation = microNoise.noise2D(x * 0.1, baseY * 0.1) * Math.PI;
+            const colorIdx = Math.floor(Math.abs(noise.noise2D(x, baseY)) * leafColors.length);
             const color = leafColors[colorIdx % leafColors.length];
 
             ctx.save();
-            ctx.translate(x, y);
+            ctx.translate(x, baseY);
             ctx.rotate(rotation);
 
-            // Draw oval leaf shape
+            // Draw tiny oval leaf
             ctx.beginPath();
-            ctx.ellipse(0, 0, leafSize, leafSize * 0.5, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 0, leafSize, leafSize * 0.4, 0, 0, Math.PI * 2);
             ctx.fillStyle = color;
-            ctx.globalAlpha = 0.5 + Math.abs(microNoise.noise2D(i, 0)) * 0.4;
+            ctx.globalAlpha = 0.5 + Math.abs(microNoise.noise2D(i, 0)) * 0.3;
             ctx.fill();
+
+            // Some leaves have tiny stem extending upward
+            if (baseY < cy && Math.random() > 0.7) {
+                ctx.beginPath();
+                ctx.moveTo(0, -leafSize * 0.5);
+                ctx.lineTo(0, -leafSize * 2);
+                ctx.strokeStyle = '#4a3a25';
+                ctx.lineWidth = 0.3;
+                ctx.stroke();
+            }
 
             ctx.restore();
         }
 
         ctx.globalAlpha = 1;
+    },
+
+    /**
+     * Render tiny stones/pebbles on rock terrain
+     */
+    renderTinyStones(ctx, noise, microNoise, size, terrain, variant, cx, cy, radius) {
+        const stoneCount = Math.floor(terrain.detailDensity * 6);
+
+        for (let i = 0; i < stoneCount; i++) {
+            const seed = variant * 10000 + i + 5000;
+            const angle = noise.noise2D(seed * 0.15, 0) * Math.PI * 2;
+            const dist = (0.3 + Math.abs(noise.noise2D(0, seed * 0.15)) * 0.5) * radius;
+            const x = cx + Math.cos(angle) * dist;
+            const baseY = cy + Math.sin(angle) * dist * 0.7;
+
+            // Only some stones near edges protrude
+            if (baseY > cy - radius * 0.2) continue;
+
+            const stoneWidth = 1 + Math.abs(microNoise.noise2D(x * 0.1, baseY * 0.1)) * 2;
+            const stoneHeight = stoneWidth * (0.5 + Math.random() * 0.3);
+
+            ctx.save();
+            ctx.translate(x, baseY);
+
+            // Tiny irregular stone shape
+            ctx.beginPath();
+            ctx.ellipse(0, -stoneHeight / 2, stoneWidth, stoneHeight, 0, 0, Math.PI * 2);
+
+            // Stone with highlight
+            const stoneGrad = ctx.createLinearGradient(-stoneWidth, 0, stoneWidth, -stoneHeight);
+            stoneGrad.addColorStop(0, '#5a5858');
+            stoneGrad.addColorStop(0.4, '#7a7878');
+            stoneGrad.addColorStop(1, '#908a88');
+            ctx.fillStyle = stoneGrad;
+            ctx.fill();
+
+            ctx.restore();
+        }
     },
 
     /**
@@ -617,72 +680,6 @@ const TerrainGenerator = {
         }
 
         ctx.globalAlpha = 1;
-    },
-
-    /**
-     * Render subtle edge shadow for depth
-     */
-    renderEdgeShadow(ctx, cx, cy, radius) {
-        const gradient = ctx.createRadialGradient(cx, cy, radius * 0.5, cx, cy, radius);
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(0.75, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.12)');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, cx * 2, cy * 2);
-    },
-
-    /**
-     * Render 3D hex border matching game's bevel effect
-     */
-    renderHexBorder(ctx, cx, cy, radius, terrain) {
-        const vertices = [];
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            vertices.push({
-                x: cx + radius * Math.cos(angle),
-                y: cy + radius * Math.sin(angle)
-            });
-        }
-
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        const bevelWidth = Math.max(2, radius * 0.04);
-
-        // Top edges - highlight
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
-        ctx.lineWidth = bevelWidth;
-        ctx.beginPath();
-        ctx.moveTo(vertices[5].x, vertices[5].y);
-        ctx.lineTo(vertices[0].x, vertices[0].y);
-        ctx.lineTo(vertices[1].x, vertices[1].y);
-        ctx.stroke();
-
-        // Upper-left edge
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = bevelWidth * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(vertices[4].x, vertices[4].y);
-        ctx.lineTo(vertices[5].x, vertices[5].y);
-        ctx.stroke();
-
-        // Bottom edges - shadow
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
-        ctx.lineWidth = bevelWidth;
-        ctx.beginPath();
-        ctx.moveTo(vertices[2].x, vertices[2].y);
-        ctx.lineTo(vertices[3].x, vertices[3].y);
-        ctx.lineTo(vertices[4].x, vertices[4].y);
-        ctx.stroke();
-
-        // Lower-right edge
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.16)';
-        ctx.lineWidth = bevelWidth * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(vertices[1].x, vertices[1].y);
-        ctx.lineTo(vertices[2].x, vertices[2].y);
-        ctx.stroke();
     },
 
     /**
