@@ -6,57 +6,94 @@ import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
-import { getTexture, getAnimatedTexture, hasAnimatedTexture, drawUnit as drawUnitSprite, getPlaceholderColor } from './assetLoader.js';
+import { getTexture, getTerrainSprite, getDetailSprite, drawUnit as drawUnitSprite, getPlaceholderColor, getRandomDetailSprite } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
-import {
-    animationTick,
-    drawAnimatedGrass,
-    drawAnimatedWater,
-    drawShallowWater,
-    drawWheatField,
-    drawReeds,
-    drawSnowfall,
-    drawSnowDetails,
-    drawIceReflections,
-    drawFlowers,
-    drawHeather,
-    drawRuins,
-    drawGravel,
-    drawFarmland,
-    drawMud,
-    drawTerrainBlend,
-    getNeighborTerrains
-} from './animations.js';
-import { seededRandom } from './renderUtils.js';
-import {
-    initVegetationRenderer,
-    drawTree2D5,
-    drawBush2D5,
-    drawSmallShrub,
-    drawFlowerCluster
-} from './renderVegetation.js';
-import {
-    initTerrainRenderer,
-    drawRockFormation2D5,
-    drawHillsDetails,
-    drawRoadDetails,
-    drawPathDetails,
-    drawRiverDetails,
-    drawForestFloor
-} from './renderTerrain.js';
-import {
-    applyPostProcessing,
-    applyWeatherEffect,
-    setColorPreset,
-    getCurrentPreset,
-    getPresetList
-} from './postProcessing.js';
 
-// Re-export post-processing controls for external use
-export { setColorPreset, getCurrentPreset, getPresetList };
+// ===== STUB FUNCTIONS FOR REMOVED MODULES =====
+// These replace the old procedural rendering with simple alternatives
+
+function seededRandom(seed) {
+    const x = Math.sin(seed * 12.9898 + seed * 78.233) * 43758.5453;
+    return x - Math.floor(x);
+}
+
+function animationTick() { /* no-op */ }
+function getNeighborTerrains() { return []; }
+function drawTerrainBlend() { /* no-op */ }
+function initVegetationRenderer() { /* no-op */ }
+function initTerrainRenderer() { /* no-op */ }
+
+// Terrain detail stubs - draw nothing (use sprites instead)
+function drawAnimatedGrass() { }
+function drawAnimatedWater() { }
+function drawShallowWater() { }
+function drawWheatField() { }
+function drawReeds() { }
+function drawSnowfall() { }
+function drawSnowDetails() { }
+function drawIceReflections() { }
+function drawFlowers() { }
+function drawHeather() { }
+function drawRuins() { }
+function drawGravel() { }
+function drawFarmland() { }
+function drawMud() { }
+function drawForestFloor() { }
+function drawHillsDetails() { }
+function drawRoadDetails() { }
+function drawPathDetails() { }
+function drawRiverDetails() { }
+
+// Vegetation functions - draw sprites from sprite sheet
+function drawTree2D5(x, y, size, treeType, seed) {
+    const sprite = getRandomDetailSprite('tree', seed * 0.001);
+    if (sprite) {
+        // Trees are taller, scale appropriately
+        const spriteHeight = size * 2.5;
+        const spriteWidth = spriteHeight * (sprite.width / sprite.height);
+        ctx.drawImage(sprite, x - spriteWidth / 2, y - spriteHeight, spriteWidth, spriteHeight);
+    }
+}
+
+function drawBush2D5(x, y, size, seed) {
+    const sprite = getRandomDetailSprite('bush', seed * 0.001);
+    if (sprite) {
+        const spriteSize = size * 1.5;
+        ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.8, spriteSize, spriteSize);
+    }
+}
+
+function drawSmallShrub(x, y, size, seed) {
+    // Use grass sprite for small shrubs
+    const sprite = getRandomDetailSprite('grass', seed * 0.001);
+    if (sprite) {
+        const spriteSize = size * 1.2;
+        ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.6, spriteSize, spriteSize);
+    }
+}
+
+function drawFlowerCluster(x, y, size, seed) {
+    // Use grass sprite for flowers (could be separate flower sprites later)
+    const sprite = getRandomDetailSprite('grass', seed * 0.001);
+    if (sprite) {
+        const spriteSize = size * 0.8;
+        ctx.drawImage(sprite, x - spriteSize / 2, y - spriteSize * 0.5, spriteSize, spriteSize);
+    }
+}
+
+function drawRockFormation2D5(x, y, size, seed) {
+    // Currently no rock details in sprite sheet - draw nothing
+}
+
+// Post-processing stubs
+function applyPostProcessing(ctx) { /* no-op */ }
+function applyWeatherEffect() { /* no-op */ }
+export function setColorPreset() { }
+export function getCurrentPreset() { return 'default'; }
+export function getPresetList() { return ['default']; }
 
 let canvas, ctx;
 let texturesInitialized = false;
@@ -307,24 +344,17 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
     }
     context.closePath();
 
-    if (terrain && terrain.colorLight && terrain.colorDark) {
-        const gradient = context.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
-        context.fillStyle = gradient;
-        context.fill();
-    } else if (texture) {
+    // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
+    if (texture) {
+        // Draw sprite texture - scale to fit hex
         context.save();
         context.clip();
-        const pattern = context.createPattern(texture, 'repeat');
-        const { x: worldX, y: worldY } = hexToPixel(hexQ, hexR, size);
-        // Align texture to world coordinates for seamless terrain across hexes
-        pattern.setTransform(new DOMMatrix().translate(cx - worldX, cy - worldY));
-        context.fillStyle = pattern;
-        context.fillRect(cx - size, cy - size, size * 2, size * 2);
+        // Draw the sprite image centered on the hex
+        const spriteSize = size * 2;
+        context.drawImage(texture, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
         context.restore();
 
+        // Restore hex path for border drawing
         context.beginPath();
         for (let i = 0; i < 6; i++) {
             const angle = Math.PI / 3 * i;
@@ -334,7 +364,16 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
             else context.lineTo(px, py);
         }
         context.closePath();
+    } else if (terrain && terrain.colorLight && terrain.colorDark) {
+        // Fallback: gradient fill
+        const gradient = context.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
+        gradient.addColorStop(0, terrain.colorLight);
+        gradient.addColorStop(0.5, terrain.color);
+        gradient.addColorStop(1, terrain.colorDark);
+        context.fillStyle = gradient;
+        context.fill();
     } else {
+        // Final fallback: solid color
         context.fillStyle = fillColor;
         context.fill();
     }
@@ -702,22 +741,13 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
     }
     ctx.closePath();
 
-    // Fill with gradient for 3D effect
-    if (terrain && terrain.colorLight && terrain.colorDark) {
-        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-    } else if (texture) {
+    // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
+    if (texture) {
         ctx.save();
         ctx.clip();
-        const pattern = ctx.createPattern(texture, 'repeat');
-        // Anchor pattern to world coordinates so it doesn't slide when scrolling
-        pattern.setTransform(new DOMMatrix().translate(state.offsetX, state.offsetY));
-        ctx.fillStyle = pattern;
-        ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+        // Draw the sprite image centered on the hex
+        const spriteSize = size * 2;
+        ctx.drawImage(texture, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
         ctx.restore();
 
         // Draw hex shape again for stroke
@@ -730,6 +760,14 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
             else ctx.lineTo(px, py);
         }
         ctx.closePath();
+    } else if (terrain && terrain.colorLight && terrain.colorDark) {
+        // Fallback: gradient fill
+        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
+        gradient.addColorStop(0, terrain.colorLight);
+        gradient.addColorStop(0.5, terrain.color);
+        gradient.addColorStop(1, terrain.colorDark);
+        ctx.fillStyle = gradient;
+        ctx.fill();
     } else {
         ctx.fillStyle = fillColor;
         ctx.fill();
