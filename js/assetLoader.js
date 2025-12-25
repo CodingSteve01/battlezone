@@ -102,9 +102,13 @@ export function isUsingSpriteSheets() {
 /**
  * Get a unit sprite image
  * Returns sprite or null (renderer will use placeholder)
+ * @param {string} classType - Unit class (scout, assault, etc.)
+ * @param {number} playerIndex - Player index (0-3)
+ * @param {string} status - Unit state (normal, cover, attack, dead)
+ * @param {string} facing - Facing direction ('left' or 'right')
  */
-export function getUnitSprite(classType, playerIndex, status = 'normal') {
-    return SpriteSheet.getUnitSprite(classType, playerIndex, status);
+export function getUnitSprite(classType, playerIndex, status = 'normal', facing = null) {
+    return SpriteSheet.getUnitSprite(classType, playerIndex, status, facing);
 }
 
 /**
@@ -160,9 +164,19 @@ export function areAssetsLoaded() {
 
 /**
  * Draw a unit sprite or placeholder
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} cx - Center X position
+ * @param {number} cy - Center Y position
+ * @param {number} size - Unit size
+ * @param {string} playerColor - Player color for placeholder
+ * @param {string} classType - Unit class
+ * @param {string} status - Unit state
+ * @param {boolean} isSelected - Whether unit is selected
+ * @param {number} playerIndex - Player index
+ * @param {string} facing - Facing direction ('left' or 'right')
  */
-export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex) {
-    const sprite = getUnitSprite(classType, playerIndex, status);
+export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex, facing = null) {
+    const sprite = getUnitSprite(classType, playerIndex, status, facing);
 
     if (sprite) {
         // Draw sprite from sprite sheet
@@ -238,6 +252,26 @@ export function drawAPIndicator(ctx, cx, cy, currentAP, maxAP, size) {
         ctx.lineWidth = 1;
         ctx.stroke();
     }
+}
+
+/**
+ * Calculate facing direction based on target position
+ * @param {number} fromX - Source X position
+ * @param {number} toX - Target X position
+ * @returns {string} 'left' or 'right'
+ */
+export function getFacingDirection(fromX, toX) {
+    return toX < fromX ? 'left' : 'right';
+}
+
+/**
+ * Calculate facing direction from hex coordinates
+ * @param {number} fromQ - Source hex Q coordinate
+ * @param {number} toQ - Target hex Q coordinate
+ * @returns {string} 'left' or 'right'
+ */
+export function getFacingFromHex(fromQ, toQ) {
+    return toQ < fromQ ? 'left' : 'right';
 }
 
 // ============================================

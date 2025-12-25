@@ -19,6 +19,12 @@ const spriteRegistry = {
     details: new Map()     // detailType_variant -> ImageBitmap
 };
 
+// Cache for mirrored (horizontally flipped) sprites
+const mirroredSpriteCache = new Map();
+
+// Base facing direction from sprite sheet (from JSON definition)
+let baseFacingDirection = 'right';
+
 // Metadata registries - stores info about available variants
 const variantRegistry = {
     units: {},      // unitClass -> { states: [], playerCount: 4 }
@@ -88,6 +94,12 @@ async function loadDefinition(type, filename) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         definitions[type] = await response.json();
         console.log(`[SpriteSheetLoader] Loaded ${type} definition: ${definitions[type].sprites?.length || 0} sprites`);
+
+        // Read mirroring settings from units definition
+        if (type === 'units' && definitions[type].mirroring) {
+            baseFacingDirection = definitions[type].mirroring.baseDirection || 'right';
+            console.log(`[SpriteSheetLoader] Base facing direction: ${baseFacingDirection}`);
+        }
     } catch (err) {
         console.warn(`[SpriteSheetLoader] Could not load ${filename}:`, err.message);
         definitions[type] = { sprites: [] };
@@ -420,11 +432,53 @@ export function getAvailableTerrainTypes() {
 }
 
 /**
- * Get a unit sprite
+ * Get a unit sprite with optional facing direction
+ * @param {string} unitClass - The unit class (scout, assault, etc.)
+ * @param {number} playerIndex - Player index (0-3)
+ * @param {string} state - Unit state (normal, cover, attack, dead)
+ * @param {string} facing - Facing direction ('left' or 'right'), defaults to base direction
+ * @returns {ImageBitmap|HTMLCanvasElement|null} The sprite image or null if not found
  */
-export function getUnitSprite(unitClass, playerIndex, state = 'normal') {
+export function getUnitSprite(unitClass, playerIndex, state = 'normal', facing = null) {
     const key = `${unitClass}_${state}_${playerIndex}`;
-    return spriteRegistry.units.get(key) || null;
+    const sprite = spriteRegistry.units.get(key) || null;
+
+    if (!sprite) return null;
+
+    // If no facing specified or matches base direction, return original
+    if (!facing || facing === baseFacingDirection) {
+        return sprite;
+    }
+
+    // Need to mirror the sprite for opposite direction
+    const mirrorKey = `${key}_mirrored`;
+    if (mirroredSpriteCache.has(mirrorKey)) {
+        return mirroredSpriteCache.get(mirrorKey);
+    }
+
+    // Create mirrored version
+    const mirrored = createMirroredSprite(sprite);
+    mirroredSpriteCache.set(mirrorKey, mirrored);
+    return mirrored;
+}
+
+/**
+ * Create a horizontally flipped version of a sprite
+ * @param {ImageBitmap|HTMLImageElement|HTMLCanvasElement} sprite - Source sprite
+ * @returns {HTMLCanvasElement} Mirrored sprite canvas
+ */
+function createMirroredSprite(sprite) {
+    const canvas = document.createElement('canvas');
+    canvas.width = sprite.width;
+    canvas.height = sprite.height;
+    const ctx = canvas.getContext('2d');
+
+    // Flip horizontally
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprite, 0, 0);
+
+    return canvas;
 }
 
 /**
