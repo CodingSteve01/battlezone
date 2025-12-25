@@ -1,377 +1,914 @@
 /**
- * Character Generator (Browser)
+ * High-Detail Tactical Character Generator
+ * Creates realistic military/tactical soldier sprites
+ *
+ * Features:
+ * - Proper human anatomy and proportions
+ * - Detailed military gear and equipment
+ * - Class-specific appearances (sniper ghillie, medic gear, etc.)
+ * - Multi-layer shading and depth
+ * - Player color integration
  */
 
 const CharacterGenerator = {
+    // Class configurations with detailed gear specs
     classes: {
-        scout: { helmet: 'beret', armor: 'light', weapon: 'smg', bodyWidth: 32 },
-        assault: { helmet: 'tactical', armor: 'heavy', weapon: 'rifle', bodyWidth: 42 },
-        medic: { helmet: 'cap', armor: 'medium', weapon: 'pistol', bodyWidth: 38, cross: true },
-        sniper: { helmet: 'ghillie', armor: 'light', weapon: 'sniper', bodyWidth: 36 },
-        commando: { helmet: 'balaclava', armor: 'light', weapon: 'knife', bodyWidth: 35 }
+        scout: {
+            helmet: 'beret',
+            armor: 'light',
+            weapon: 'smg',
+            bodyBuild: 'lean',
+            gear: ['radio', 'binoculars'],
+            camouflage: 'woodland'
+        },
+        assault: {
+            helmet: 'tactical',
+            armor: 'heavy',
+            weapon: 'rifle',
+            bodyBuild: 'heavy',
+            gear: ['grenades', 'ammo_pouches'],
+            camouflage: 'digital'
+        },
+        medic: {
+            helmet: 'cap',
+            armor: 'medium',
+            weapon: 'pistol',
+            bodyBuild: 'medium',
+            gear: ['medkit', 'bandages'],
+            camouflage: 'woodland',
+            cross: true
+        },
+        sniper: {
+            helmet: 'ghillie',
+            armor: 'ghillie',
+            weapon: 'sniper',
+            bodyBuild: 'lean',
+            gear: ['scope', 'rangefinder'],
+            camouflage: 'ghillie'
+        },
+        commando: {
+            helmet: 'balaclava',
+            armor: 'stealth',
+            weapon: 'knife',
+            bodyBuild: 'athletic',
+            gear: ['garrote', 'throwing_knives'],
+            camouflage: 'black'
+        }
     },
 
     poses: {
-        normal: { stance: 'standing', armL: -15, armR: 15 },
-        cover: { stance: 'crouching', armL: -30, armR: 45 },
-        attack: { stance: 'action', armL: -45, armR: 80 },
-        dead: { stance: 'fallen', armL: 120, armR: -60 }
+        normal: { stance: 'standing', bodyTilt: 0, legSpread: 20, armAngle: 25 },
+        cover: { stance: 'crouching', bodyTilt: 5, legSpread: 35, armAngle: 45 },
+        attack: { stance: 'action', bodyTilt: -8, legSpread: 30, armAngle: 75 },
+        dead: { stance: 'fallen', bodyTilt: 90, legSpread: 15, armAngle: -30 }
     },
 
     playerColors: [
-        { name: 'green', primary: '#22c55e', secondary: '#16a34a' },
-        { name: 'red', primary: '#ef4444', secondary: '#dc2626' },
-        { name: 'blue', primary: '#3b82f6', secondary: '#2563eb' },
-        { name: 'yellow', primary: '#eab308', secondary: '#ca8a04' }
+        { name: 'green', primary: '#22c55e', secondary: '#16a34a', highlight: '#4ade80' },
+        { name: 'red', primary: '#ef4444', secondary: '#dc2626', highlight: '#f87171' },
+        { name: 'blue', primary: '#3b82f6', secondary: '#2563eb', highlight: '#60a5fa' },
+        { name: 'yellow', primary: '#eab308', secondary: '#ca8a04', highlight: '#facc15' }
     ],
 
-    skinTones: ['#FFDBB4', '#E5C298', '#C69C6D', '#A67C52', '#8D5524'],
+    skinTones: [
+        { base: '#FFDBB4', shadow: '#E5C298', highlight: '#FFE8CC' },
+        { base: '#E5C298', shadow: '#C69C6D', highlight: '#F5D4B0' },
+        { base: '#C69C6D', shadow: '#A67C52', highlight: '#D8B088' },
+        { base: '#A67C52', shadow: '#8D5524', highlight: '#B88C62' },
+        { base: '#8D5524', shadow: '#704020', highlight: '#A06A38' }
+    ],
 
-    generate(classType, pose, playerIndex, width = 256, height = 256) {
+    uniformColors: {
+        woodland: { base: '#4a5a3a', light: '#5a6a4a', dark: '#3a4a2a' },
+        digital: { base: '#5a6a5a', light: '#6a7a6a', dark: '#4a5a4a' },
+        ghillie: { base: '#4a5d23', light: '#5c6b34', dark: '#3a4a1d' },
+        black: { base: '#2a2a2a', light: '#3a3a3a', dark: '#1a1a1a' },
+        desert: { base: '#c4a878', light: '#d4b888', dark: '#b49868' }
+    },
+
+    generate(classType, pose, playerIndex, width = 130, height = 130) {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
 
-        ctx.clearRect(0, 0, width, height);
+        // Enable anti-aliasing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
         const classConfig = this.classes[classType] || this.classes.scout;
         const poseConfig = this.poses[pose] || this.poses.normal;
         const playerColor = this.playerColors[playerIndex % this.playerColors.length];
 
         const seed = classType.charCodeAt(0) * 10000 + pose.charCodeAt(0) * 100 + playerIndex;
-        const rand = ColorUtils.seededRandom(seed);
+        const rand = this.seededRandom(seed);
 
-        this.drawCharacter(ctx, classConfig, poseConfig, playerColor, rand, width, height);
+        // Pick consistent skin tone based on seed
+        const skinTone = this.skinTones[Math.floor(rand() * this.skinTones.length)];
+        const uniform = this.uniformColors[classConfig.camouflage] || this.uniformColors.woodland;
+
+        this.drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height);
 
         return canvas;
     },
 
-    drawCharacter(ctx, classConfig, poseConfig, playerColor, rand, width, height) {
+    seededRandom(seed) {
+        return function() {
+            seed = (seed * 9301 + 49297) % 233280;
+            return seed / 233280;
+        };
+    },
+
+    drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height) {
         const centerX = width / 2;
-        const baseY = height - 18;
+        const groundY = height - 12;
 
         ctx.save();
 
-        // Apply fallen rotation
+        // Handle fallen pose rotation
         if (poseConfig.stance === 'fallen') {
-            ctx.translate(centerX, baseY - 50);
+            ctx.translate(centerX, groundY - 40);
             ctx.rotate(Math.PI / 2);
-            ctx.translate(-centerX, -(baseY - 50));
+            ctx.translate(-centerX, -(groundY - 40));
         }
 
-        // Calculate positions based on stance
-        let torsoY = baseY - 95;
-        let headY = baseY - 148;
-        let legSpread = 22;
+        // Calculate body positions based on stance
+        const scale = poseConfig.stance === 'crouching' ? 0.75 : 1;
+        const bodyY = groundY - (poseConfig.stance === 'crouching' ? 55 : 70);
 
-        if (poseConfig.stance === 'crouching') {
-            torsoY = baseY - 68;
-            headY = baseY - 112;
-            legSpread = 32;
-        } else if (poseConfig.stance === 'action') {
-            torsoY = baseY - 90;
-            headY = baseY - 143;
-            legSpread = 28;
-        }
-
-        const shoulderWidth = classConfig.armor === 'heavy' ? 42 : classConfig.armor === 'light' ? 30 : 36;
-        const uniformColor = this.getUniformColor(rand);
-        const skinTone = this.skinTones[Math.floor(rand() * this.skinTones.length)];
-
-        // Draw shadow
+        // Draw shadow first
         if (poseConfig.stance !== 'fallen') {
-            ctx.save();
-            ctx.globalAlpha = 0.3;
-            ctx.fillStyle = '#000000';
-            ctx.beginPath();
-            ctx.ellipse(centerX, baseY - 4, 45, 12, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
+            this.drawShadow(ctx, centerX, groundY, poseConfig);
         }
 
-        // Draw legs
-        this.drawLegs(ctx, centerX, torsoY, baseY, legSpread, uniformColor);
+        // Draw body parts in correct order (back to front)
+        this.drawLegs(ctx, centerX, bodyY, groundY, poseConfig, uniform, classConfig);
+        this.drawTorso(ctx, centerX, bodyY, poseConfig, uniform, classConfig, playerColor);
+        this.drawArms(ctx, centerX, bodyY, poseConfig, uniform, skinTone, classConfig);
+        this.drawWeapon(ctx, centerX, bodyY, poseConfig, classConfig);
+        this.drawHead(ctx, centerX, bodyY, poseConfig, skinTone, uniform, classConfig, playerColor, rand);
 
-        // Draw body
-        this.drawBody(ctx, centerX, torsoY, shoulderWidth, classConfig.bodyWidth, uniformColor, classConfig, playerColor);
-
-        // Draw arms
-        this.drawArms(ctx, centerX, torsoY, shoulderWidth, poseConfig, uniformColor);
-
-        // Draw weapon
-        this.drawWeapon(ctx, centerX, torsoY, shoulderWidth, poseConfig, classConfig);
-
-        // Draw head
-        this.drawHead(ctx, centerX, headY, skinTone, classConfig, uniformColor, playerColor, rand);
-
-        // Draw team indicator
+        // Draw team indicator ring
         if (poseConfig.stance !== 'fallen') {
-            this.drawTeamIndicator(ctx, centerX, baseY, playerColor);
+            this.drawTeamIndicator(ctx, centerX, groundY, playerColor);
         }
 
         ctx.restore();
     },
 
-    drawLegs(ctx, centerX, torsoY, baseY, legSpread, uniformColor) {
-        const pantsColor = ColorUtils.darkenColor(uniformColor, 12);
+    drawShadow(ctx, centerX, groundY, poseConfig) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
 
-        ctx.lineWidth = 12;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = pantsColor;
+        const shadowWidth = poseConfig.stance === 'crouching' ? 35 : 30;
+        const shadowHeight = poseConfig.stance === 'crouching' ? 12 : 10;
 
-        // Left leg
+        const gradient = ctx.createRadialGradient(
+            centerX, groundY - 2, 0,
+            centerX, groundY - 2, shadowWidth
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.moveTo(centerX - legSpread * 0.3, torsoY + 18);
-        ctx.lineTo(centerX - legSpread, baseY - 4);
-        ctx.stroke();
-
-        // Right leg
-        ctx.beginPath();
-        ctx.moveTo(centerX + legSpread * 0.3, torsoY + 18);
-        ctx.lineTo(centerX + legSpread, baseY - 4);
-        ctx.stroke();
-
-        // Boots
-        ctx.fillStyle = '#1A1A1A';
-        ctx.beginPath();
-        ctx.ellipse(centerX - legSpread, baseY - 4, 10, 7, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX, groundY - 2, shadowWidth, shadowHeight, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(centerX + legSpread, baseY - 4, 10, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
+
+        ctx.restore();
     },
 
-    drawBody(ctx, centerX, torsoY, shoulderWidth, bodyWidth, uniformColor, classConfig, playerColor) {
-        // Torso
-        ctx.fillStyle = uniformColor;
+    drawLegs(ctx, centerX, bodyY, groundY, poseConfig, uniform, classConfig) {
+        const legSpread = poseConfig.legSpread;
+        const legLength = poseConfig.stance === 'crouching' ? 25 : 38;
+
+        // Draw pants with shading
+        const pantsGradient = ctx.createLinearGradient(
+            centerX - legSpread, bodyY,
+            centerX + legSpread, bodyY + legLength
+        );
+        pantsGradient.addColorStop(0, uniform.light);
+        pantsGradient.addColorStop(0.5, uniform.base);
+        pantsGradient.addColorStop(1, uniform.dark);
+
+        ctx.strokeStyle = pantsGradient;
+        ctx.lineCap = 'round';
+
+        // Left leg with thickness variation
+        for (let t = 0; t < 3; t++) {
+            ctx.lineWidth = 10 - t * 2;
+            ctx.globalAlpha = t === 0 ? 1 : 0.5;
+            ctx.beginPath();
+            if (poseConfig.stance === 'crouching') {
+                ctx.moveTo(centerX - 8, bodyY + 15);
+                ctx.quadraticCurveTo(
+                    centerX - legSpread - 5, bodyY + legLength / 2,
+                    centerX - legSpread + 3, groundY - 8
+                );
+            } else {
+                ctx.moveTo(centerX - 8, bodyY + 15);
+                ctx.lineTo(centerX - legSpread, groundY - 8);
+            }
+            ctx.stroke();
+        }
+
+        // Right leg
+        for (let t = 0; t < 3; t++) {
+            ctx.lineWidth = 10 - t * 2;
+            ctx.globalAlpha = t === 0 ? 1 : 0.5;
+            ctx.beginPath();
+            if (poseConfig.stance === 'crouching') {
+                ctx.moveTo(centerX + 8, bodyY + 15);
+                ctx.quadraticCurveTo(
+                    centerX + legSpread + 5, bodyY + legLength / 2,
+                    centerX + legSpread - 3, groundY - 8
+                );
+            } else {
+                ctx.moveTo(centerX + 8, bodyY + 15);
+                ctx.lineTo(centerX + legSpread, groundY - 8);
+            }
+            ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1;
+
+        // Boots with detail
+        this.drawBoot(ctx, centerX - legSpread, groundY - 6);
+        this.drawBoot(ctx, centerX + legSpread, groundY - 6);
+
+        // Knee pads for heavy armor
+        if (classConfig.armor === 'heavy') {
+            ctx.fillStyle = '#2a2a2a';
+            const kneeY = poseConfig.stance === 'crouching' ? bodyY + 20 : bodyY + 25;
+            ctx.beginPath();
+            ctx.ellipse(centerX - legSpread / 2 - 2, kneeY, 6, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + legSpread / 2 + 2, kneeY, 6, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    },
+
+    drawBoot(ctx, x, y) {
+        // Boot main body
+        ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
-        ctx.moveTo(centerX - shoulderWidth, torsoY - 28);
-        ctx.lineTo(centerX + shoulderWidth, torsoY - 28);
-        ctx.lineTo(centerX + bodyWidth * 0.75, torsoY + 28);
-        ctx.lineTo(centerX - bodyWidth * 0.75, torsoY + 28);
+        ctx.ellipse(x, y, 8, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Boot highlight
+        ctx.fillStyle = '#3a3a3a';
+        ctx.beginPath();
+        ctx.ellipse(x - 1, y - 2, 4, 2, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sole
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(x - 7, y + 2, 14, 3);
+    },
+
+    drawTorso(ctx, centerX, bodyY, poseConfig, uniform, classConfig, playerColor) {
+        const tilt = poseConfig.bodyTilt * Math.PI / 180;
+
+        ctx.save();
+        ctx.translate(centerX, bodyY);
+        ctx.rotate(tilt);
+
+        // Body width based on build
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
+                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+
+        // Draw torso with gradient shading
+        const torsoGradient = ctx.createLinearGradient(-bodyWidth, -25, bodyWidth, 15);
+        torsoGradient.addColorStop(0, uniform.light);
+        torsoGradient.addColorStop(0.3, uniform.base);
+        torsoGradient.addColorStop(0.7, uniform.base);
+        torsoGradient.addColorStop(1, uniform.dark);
+
+        ctx.fillStyle = torsoGradient;
+        ctx.beginPath();
+        ctx.moveTo(-bodyWidth, -22);
+        ctx.lineTo(bodyWidth, -22);
+        ctx.lineTo(bodyWidth * 0.9, 18);
+        ctx.lineTo(-bodyWidth * 0.9, 18);
         ctx.closePath();
         ctx.fill();
 
-        // Vest/Armor
-        if (classConfig.armor !== 'light') {
-            const vestColor = classConfig.armor === 'heavy' ? '#3D3D3D' : '#4A4A4A';
-            ctx.fillStyle = vestColor;
-            ctx.beginPath();
-            ctx.moveTo(centerX - shoulderWidth * 0.75, torsoY - 22);
-            ctx.lineTo(centerX + shoulderWidth * 0.75, torsoY - 22);
-            ctx.lineTo(centerX + bodyWidth * 0.55, torsoY + 18);
-            ctx.lineTo(centerX - bodyWidth * 0.55, torsoY + 18);
-            ctx.closePath();
-            ctx.fill();
-
-            // Armor plate
-            ctx.fillStyle = '#2D2D2D';
-            ctx.fillRect(centerX - 13, torsoY - 18, 26, 32);
+        // Armor/vest overlay
+        if (classConfig.armor === 'heavy' || classConfig.armor === 'medium') {
+            this.drawVest(ctx, bodyWidth, classConfig, playerColor);
+        } else if (classConfig.armor === 'stealth') {
+            this.drawStealthGear(ctx, bodyWidth);
+        } else if (classConfig.armor === 'ghillie') {
+            this.drawGhillieTorso(ctx, bodyWidth);
         }
 
         // Medic cross
         if (classConfig.cross) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(centerX - 3, torsoY - 12, 6, 22);
-            ctx.fillRect(centerX - 9, torsoY - 3, 18, 6);
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 2;
+            ctx.fillRect(-2, -12, 4, 16);
+            ctx.fillRect(-6, -6, 12, 4);
+            ctx.shadowBlur = 0;
         }
 
-        // Team color patch
+        // Team color shoulder patch
         ctx.fillStyle = playerColor.primary;
+        ctx.strokeStyle = playerColor.secondary;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(centerX - shoulderWidth + 7, torsoY - 22, 7, 0, Math.PI * 2);
+        ctx.arc(-bodyWidth + 4, -18, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Belt with pouches
+        this.drawBelt(ctx, bodyWidth, classConfig);
+
+        ctx.restore();
+    },
+
+    drawVest(ctx, bodyWidth, classConfig, playerColor) {
+        const vestColor = classConfig.armor === 'heavy' ? '#3a3a3a' : '#4a4a4a';
+        const vestWidth = bodyWidth * 0.85;
+
+        // Main vest
+        ctx.fillStyle = vestColor;
+        ctx.beginPath();
+        ctx.moveTo(-vestWidth, -18);
+        ctx.lineTo(vestWidth, -18);
+        ctx.lineTo(vestWidth * 0.95, 12);
+        ctx.lineTo(-vestWidth * 0.95, 12);
+        ctx.closePath();
         ctx.fill();
 
-        // Belt
-        ctx.fillStyle = '#2D2D2D';
-        ctx.fillRect(centerX - 28, torsoY + 13, 56, 7);
+        // MOLLE webbing pattern
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < 4; i++) {
+            const y = -14 + i * 7;
+            ctx.beginPath();
+            ctx.moveTo(-vestWidth * 0.8, y);
+            ctx.lineTo(vestWidth * 0.8, y);
+            ctx.stroke();
+        }
 
-        // Pouches
-        ctx.fillStyle = '#3D3D3D';
-        for (let i = 0; i < 3; i++) {
-            ctx.fillRect(centerX - 22 + i * 16, torsoY + 16, 10, 12);
+        // Armor plate highlight
+        if (classConfig.armor === 'heavy') {
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(-10, -15, 20, 24);
+            ctx.fillStyle = '#5a5a5a';
+            ctx.fillRect(-8, -13, 16, 2);
+        }
+
+        // Magazine pouches
+        ctx.fillStyle = '#3a3a3a';
+        for (let i = -1; i <= 1; i++) {
+            ctx.fillRect(i * 8 - 3, 2, 6, 10);
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.strokeRect(i * 8 - 3, 2, 6, 10);
         }
     },
 
-    drawArms(ctx, centerX, torsoY, shoulderWidth, poseConfig, uniformColor) {
-        ctx.lineWidth = 9;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = uniformColor;
+    drawStealthGear(ctx, bodyWidth) {
+        // Minimal tactical gear
+        ctx.fillStyle = '#1a1a1a';
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(-bodyWidth * 0.5, -10, bodyWidth, 20);
+        ctx.globalAlpha = 1;
 
-        const armLength = 40;
-        const leftRad = poseConfig.armL * Math.PI / 180;
-        const rightRad = poseConfig.armR * Math.PI / 180;
-
-        // Left arm
-        const leftShoulderX = centerX - shoulderWidth + 4;
-        const leftShoulderY = torsoY - 22;
+        // Straps
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(leftShoulderX, leftShoulderY);
-        ctx.lineTo(leftShoulderX + Math.cos(leftRad) * armLength, leftShoulderY + Math.sin(leftRad) * armLength);
+        ctx.moveTo(-bodyWidth * 0.7, -20);
+        ctx.lineTo(-bodyWidth * 0.3, 15);
         ctx.stroke();
-
-        // Right arm
-        const rightShoulderX = centerX + shoulderWidth - 4;
-        const rightShoulderY = torsoY - 22;
         ctx.beginPath();
-        ctx.moveTo(rightShoulderX, rightShoulderY);
-        ctx.lineTo(rightShoulderX + Math.cos(rightRad) * armLength, rightShoulderY + Math.sin(rightRad) * armLength);
+        ctx.moveTo(bodyWidth * 0.7, -20);
+        ctx.lineTo(bodyWidth * 0.3, 15);
         ctx.stroke();
-
-        // Gloves
-        ctx.fillStyle = '#2D2D2D';
-        ctx.beginPath();
-        ctx.arc(leftShoulderX + Math.cos(leftRad) * armLength, leftShoulderY + Math.sin(leftRad) * armLength, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(rightShoulderX + Math.cos(rightRad) * armLength, rightShoulderY + Math.sin(rightRad) * armLength, 5, 0, Math.PI * 2);
-        ctx.fill();
     },
 
-    drawWeapon(ctx, centerX, torsoY, shoulderWidth, poseConfig, classConfig) {
+    drawGhillieTorso(ctx, bodyWidth) {
+        // Ghillie strands on torso
+        const colors = ['#4a5d23', '#3a4a1d', '#5c6b34', '#6a7a44'];
+
+        for (let i = 0; i < 30; i++) {
+            const x = (Math.random() - 0.5) * bodyWidth * 2;
+            const y = -20 + Math.random() * 35;
+            const length = 5 + Math.random() * 10;
+            const angle = (Math.random() - 0.5) * 0.5;
+
+            ctx.strokeStyle = colors[Math.floor(Math.random() * colors.length)];
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + Math.sin(angle) * length, y + Math.cos(angle) * length);
+            ctx.stroke();
+        }
+    },
+
+    drawBelt(ctx, bodyWidth, classConfig) {
+        // Belt
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-bodyWidth * 0.9, 12, bodyWidth * 1.8, 5);
+
+        // Belt buckle
+        ctx.fillStyle = '#5a5a5a';
+        ctx.fillRect(-3, 12, 6, 5);
+
+        // Side pouches
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-bodyWidth * 0.85, 14, 8, 8);
+        ctx.fillRect(bodyWidth * 0.85 - 8, 14, 8, 8);
+
+        // Holster for pistol carriers
+        if (classConfig.weapon === 'pistol' || classConfig.gear.includes('pistol')) {
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(bodyWidth * 0.5, 14, 6, 12);
+        }
+    },
+
+    drawArms(ctx, centerX, bodyY, poseConfig, uniform, skinTone, classConfig) {
+        const armAngle = poseConfig.armAngle * Math.PI / 180;
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
+                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+
+        // Arm length
+        const upperArmLength = 18;
+        const forearmLength = 16;
+
+        // Left arm (background)
+        this.drawArm(ctx, centerX - bodyWidth + 2, bodyY - 18,
+                    Math.PI / 2 - armAngle * 0.3, upperArmLength, forearmLength,
+                    uniform, skinTone, false, classConfig);
+
+        // Right arm (foreground, holding weapon)
+        this.drawArm(ctx, centerX + bodyWidth - 2, bodyY - 18,
+                    Math.PI / 2 + armAngle, upperArmLength, forearmLength,
+                    uniform, skinTone, true, classConfig);
+    },
+
+    drawArm(ctx, shoulderX, shoulderY, angle, upperLen, foreLen, uniform, skinTone, isRight, classConfig) {
+        const elbowX = shoulderX + Math.cos(angle) * upperLen;
+        const elbowY = shoulderY + Math.sin(angle) * upperLen;
+        const elbowAngle = angle + (isRight ? 0.5 : -0.3);
+        const handX = elbowX + Math.cos(elbowAngle) * foreLen;
+        const handY = elbowY + Math.sin(elbowAngle) * foreLen;
+
+        // Upper arm
+        ctx.strokeStyle = uniform.base;
+        ctx.lineWidth = 7;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(shoulderX, shoulderY);
+        ctx.lineTo(elbowX, elbowY);
+        ctx.stroke();
+
+        // Upper arm highlight
+        ctx.strokeStyle = uniform.light;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(shoulderX, shoulderY);
+        ctx.lineTo(elbowX, elbowY);
+        ctx.stroke();
+
+        // Forearm
+        ctx.strokeStyle = uniform.base;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(elbowX, elbowY);
+        ctx.lineTo(handX, handY);
+        ctx.stroke();
+
+        // Glove
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.arc(handX, handY, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Glove highlight
+        ctx.fillStyle = '#3a3a3a';
+        ctx.beginPath();
+        ctx.arc(handX - 1, handY - 1, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Elbow pad for heavy armor
+        if (classConfig.armor === 'heavy') {
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.ellipse(elbowX, elbowY, 4, 3, angle, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    },
+
+    drawWeapon(ctx, centerX, bodyY, poseConfig, classConfig) {
         if (poseConfig.stance === 'fallen') return;
 
-        const rightRad = poseConfig.armR * Math.PI / 180;
-        const handX = centerX + shoulderWidth - 4 + Math.cos(rightRad) * 40;
-        const handY = torsoY - 22 + Math.sin(rightRad) * 40;
+        const bodyWidth = classConfig.bodyBuild === 'heavy' ? 22 :
+                         classConfig.bodyBuild === 'lean' ? 16 : 18;
+        const armAngle = poseConfig.armAngle * Math.PI / 180;
+
+        // Calculate hand position
+        const shoulderX = centerX + bodyWidth - 2;
+        const shoulderY = bodyY - 18;
+        const elbowX = shoulderX + Math.cos(Math.PI / 2 + armAngle) * 18;
+        const elbowY = shoulderY + Math.sin(Math.PI / 2 + armAngle) * 18;
+        const elbowAngle = Math.PI / 2 + armAngle + 0.5;
+        const handX = elbowX + Math.cos(elbowAngle) * 16;
+        const handY = elbowY + Math.sin(elbowAngle) * 16;
 
         ctx.save();
         ctx.translate(handX, handY);
-        ctx.rotate(rightRad + Math.PI / 4);
-
-        ctx.fillStyle = '#1A1A1A';
+        ctx.rotate(elbowAngle + Math.PI / 4);
 
         switch (classConfig.weapon) {
             case 'rifle':
-                ctx.fillRect(-4, -22, 8, 45);
-                ctx.fillRect(-7, -4, 14, 12);
+                this.drawRifle(ctx);
                 break;
             case 'smg':
-                ctx.fillRect(-3, -12, 6, 30);
-                ctx.fillRect(-5, 0, 10, 10);
+                this.drawSMG(ctx);
                 break;
             case 'sniper':
-                ctx.fillRect(-3, -30, 6, 60);
-                ctx.fillRect(-5, -8, 10, 7);
-                ctx.fillStyle = '#555555';
-                ctx.fillRect(-2, -26, 4, 12);
+                this.drawSniperRifle(ctx);
                 break;
             case 'pistol':
-                ctx.fillRect(-2.5, -6, 5, 18);
-                ctx.fillRect(-4, 5, 8, 7);
+                this.drawPistol(ctx);
                 break;
             case 'knife':
-                ctx.fillStyle = '#B0B0B0';
-                ctx.fillRect(-1.5, -18, 3, 22);
-                ctx.fillStyle = '#4A3728';
-                ctx.fillRect(-2.5, 4, 5, 10);
+                this.drawKnife(ctx);
                 break;
         }
 
         ctx.restore();
     },
 
-    drawHead(ctx, centerX, headY, skinTone, classConfig, uniformColor, playerColor, rand) {
-        // Face
-        ctx.fillStyle = skinTone;
+    drawRifle(ctx) {
+        // Stock
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-3, 12, 6, 16);
+
+        // Receiver
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-4, -5, 8, 20);
+
+        // Barrel
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-2, -22, 4, 20);
+
+        // Magazine
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-5, 2, 4, 12);
+
+        // Sight
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-2, -8, 4, 4);
+
+        // Grip
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-5, 8, 4, 8);
+    },
+
+    drawSMG(ctx) {
+        // Body
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-3, -10, 6, 22);
+
+        // Magazine
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-4, 4, 4, 10);
+
+        // Grip
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-4, 8, 4, 7);
+
+        // Stock (folded)
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(1, 8, 3, 8);
+    },
+
+    drawSniperRifle(ctx) {
+        // Stock
+        ctx.fillStyle = '#3a2a1a';
+        ctx.fillRect(-3, 15, 6, 20);
+
+        // Receiver
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-3, -8, 6, 25);
+
+        // Barrel
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-2, -30, 4, 25);
+
+        // Scope
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-3, -20, 6, 14);
+        ctx.fillStyle = '#4a7a9a';
         ctx.beginPath();
-        ctx.ellipse(centerX, headY + 18, 16, 20, 0, 0, Math.PI * 2);
+        ctx.arc(0, -20, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, -8, 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Bipod
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-2, -25);
+        ctx.lineTo(-6, -35);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(2, -25);
+        ctx.lineTo(6, -35);
+        ctx.stroke();
+
+        // Magazine
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-4, 0, 4, 8);
+    },
+
+    drawPistol(ctx) {
+        // Slide
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-2, -8, 4, 12);
+
+        // Grip
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-3, 2, 6, 10);
+
+        // Trigger guard
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(-1, 4, 3, 0, Math.PI);
+        ctx.stroke();
+    },
+
+    drawKnife(ctx) {
+        // Blade
+        ctx.fillStyle = '#c0c0c0';
+        ctx.beginPath();
+        ctx.moveTo(0, -18);
+        ctx.lineTo(2, -4);
+        ctx.lineTo(-2, -4);
+        ctx.closePath();
+        ctx.fill();
+
+        // Blade edge highlight
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, -18);
+        ctx.lineTo(-1, -4);
+        ctx.stroke();
+
+        // Guard
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-4, -4, 8, 3);
+
+        // Handle
+        ctx.fillStyle = '#4a3728';
+        ctx.fillRect(-2, -1, 4, 12);
+
+        // Handle wrap
+        ctx.strokeStyle = '#3a2718';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            ctx.moveTo(-2, 1 + i * 3);
+            ctx.lineTo(2, 1 + i * 3);
+            ctx.stroke();
+        }
+    },
+
+    drawHead(ctx, centerX, bodyY, poseConfig, skinTone, uniform, classConfig, playerColor, rand) {
+        const headY = bodyY - (poseConfig.stance === 'crouching' ? 32 : 38);
+
+        ctx.save();
+
+        // Neck
+        ctx.fillStyle = skinTone.shadow;
+        ctx.fillRect(centerX - 4, headY + 14, 8, 8);
+
+        // Head/face shape
+        const faceGradient = ctx.createRadialGradient(
+            centerX - 2, headY + 2, 0,
+            centerX, headY + 6, 14
+        );
+        faceGradient.addColorStop(0, skinTone.highlight);
+        faceGradient.addColorStop(0.5, skinTone.base);
+        faceGradient.addColorStop(1, skinTone.shadow);
+
+        ctx.fillStyle = faceGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY + 6, 11, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw helmet/headgear first (may cover parts of face)
+        switch (classConfig.helmet) {
+            case 'tactical':
+                this.drawTacticalHelmet(ctx, centerX, headY, uniform, playerColor);
+                break;
+            case 'beret':
+                this.drawBeret(ctx, centerX, headY, playerColor);
+                break;
+            case 'cap':
+                this.drawCap(ctx, centerX, headY, uniform);
+                break;
+            case 'ghillie':
+                this.drawGhillieHood(ctx, centerX, headY, rand);
+                break;
+            case 'balaclava':
+                this.drawBalaclava(ctx, centerX, headY, skinTone);
+                break;
+        }
+
+        // Eyes (unless covered by balaclava)
+        if (classConfig.helmet !== 'balaclava') {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 4, headY + 4, 2, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4, headY + 4, 2, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye highlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(centerX - 4.5, headY + 3.5, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + 3.5, headY + 3.5, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    },
+
+    drawTacticalHelmet(ctx, centerX, headY, uniform, playerColor) {
+        // Helmet shell
+        const helmetGradient = ctx.createLinearGradient(
+            centerX - 14, headY - 10,
+            centerX + 14, headY + 5
+        );
+        helmetGradient.addColorStop(0, uniform.light);
+        helmetGradient.addColorStop(0.5, uniform.base);
+        helmetGradient.addColorStop(1, uniform.dark);
+
+        ctx.fillStyle = helmetGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - 3, 14, 11, 0, Math.PI, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(centerX - 14, headY - 3, 28, 6);
+
+        // Helmet rim
+        ctx.fillStyle = uniform.dark;
+        ctx.fillRect(centerX - 13, headY + 1, 26, 3);
+
+        // NVG mount
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(centerX - 4, headY - 12, 8, 6);
+
+        // Velcro patch area
+        ctx.fillStyle = uniform.dark;
+        ctx.fillRect(centerX + 6, headY - 6, 6, 4);
+
+        // Team color stripe
+        ctx.fillStyle = playerColor.primary;
+        ctx.fillRect(centerX - 12, headY - 8, 3, 6);
+    },
+
+    drawBeret(ctx, centerX, headY, playerColor) {
+        // Beret shape
+        const beretGradient = ctx.createRadialGradient(
+            centerX + 4, headY - 6, 0,
+            centerX, headY - 2, 15
+        );
+        beretGradient.addColorStop(0, playerColor.highlight);
+        beretGradient.addColorStop(0.5, playerColor.primary);
+        beretGradient.addColorStop(1, playerColor.secondary);
+
+        ctx.fillStyle = beretGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX + 3, headY - 5, 13, 8, 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Beret badge/flash
+        ctx.fillStyle = '#c0c0c0';
+        ctx.beginPath();
+        ctx.arc(centerX - 6, headY - 3, 3, 0, Math.PI * 2);
+        ctx.fill();
+    },
+
+    drawCap(ctx, centerX, headY, uniform) {
+        // Cap crown
+        ctx.fillStyle = uniform.base;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - 4, 13, 8, 0, Math.PI, Math.PI * 2);
+        ctx.fill();
+
+        // Cap brim
+        ctx.fillStyle = uniform.dark;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - 1, 16, 5, 0, 0, Math.PI);
+        ctx.fill();
+
+        // Brim top
+        ctx.fillStyle = uniform.base;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - 1, 14, 3, 0, 0, Math.PI);
+        ctx.fill();
+    },
+
+    drawGhillieHood(ctx, centerX, headY, rand) {
+        // Base hood
+        ctx.fillStyle = '#4a5d23';
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY, 16, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ghillie strands
+        const colors = ['#4a5d23', '#3a4a1d', '#5c6b34', '#6a7a44', '#3a3a2a'];
+
+        for (let i = 0; i < 40; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = 12 + rand() * 8;
+            const x = centerX + Math.cos(angle) * (dist * 0.8);
+            const y = headY + Math.sin(angle) * dist * 0.9;
+            const length = 6 + rand() * 10;
+            const strandAngle = angle + (rand() - 0.5) * 0.8;
+
+            ctx.strokeStyle = colors[Math.floor(rand() * colors.length)];
+            ctx.lineWidth = 1 + rand();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(
+                x + Math.cos(strandAngle) * length,
+                y + Math.sin(strandAngle) * length
+            );
+            ctx.stroke();
+        }
+
+        // Face opening
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY + 4, 8, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+    },
+
+    drawBalaclava(ctx, centerX, headY, skinTone) {
+        // Balaclava covering head
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY + 4, 13, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Eye opening
+        ctx.fillStyle = skinTone.base;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY + 3, 9, 4, 0, 0, Math.PI * 2);
         ctx.fill();
 
         // Eyes
-        ctx.fillStyle = '#1A1A1A';
+        ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
-        ctx.ellipse(centerX - 5, headY + 16, 2.5, 1.8, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX - 3, headY + 3, 2, 1.5, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.beginPath();
-        ctx.ellipse(centerX + 5, headY + 16, 2.5, 1.8, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX + 3, headY + 3, 2, 1.5, 0, 0, Math.PI * 2);
         ctx.fill();
-
-        // Helmet/headgear
-        switch (classConfig.helmet) {
-            case 'tactical':
-                ctx.fillStyle = uniformColor;
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 4, 20, 16, 0, Math.PI, Math.PI * 2);
-                ctx.fill();
-                ctx.fillRect(centerX - 20, headY + 4, 40, 8);
-                ctx.fillStyle = '#1A1A1A';
-                ctx.fillRect(centerX - 4, headY - 7, 8, 7);
-                break;
-
-            case 'beret':
-                ctx.fillStyle = playerColor.primary;
-                ctx.beginPath();
-                ctx.ellipse(centerX + 4, headY + 1, 18, 10, 0.3, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-
-            case 'cap':
-                ctx.fillStyle = uniformColor;
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 6, 18, 9, 0, Math.PI, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = ColorUtils.darkenColor(uniformColor, 18);
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 6, 22, 5, 0, 0, Math.PI);
-                ctx.fill();
-                break;
-
-            case 'ghillie':
-                ctx.fillStyle = '#4A5D23';
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 4, 22, 20, 0, 0, Math.PI * 2);
-                ctx.fill();
-
-                for (let i = 0; i < 15; i++) {
-                    const angle = rand() * Math.PI * 2;
-                    const len = 8 + rand() * 12;
-                    ctx.strokeStyle = ['#4A5D23', '#3A4A1D', '#5C6B34'][Math.floor(rand() * 3)];
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(centerX + Math.cos(angle) * 18, headY + 4 + Math.sin(angle) * 16);
-                    ctx.lineTo(centerX + Math.cos(angle) * (18 + len), headY + 4 + Math.sin(angle) * (16 + len * 0.4));
-                    ctx.stroke();
-                }
-                break;
-
-            case 'balaclava':
-                ctx.fillStyle = '#1A1A1A';
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 12, 18, 22, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = skinTone;
-                ctx.beginPath();
-                ctx.ellipse(centerX, headY + 16, 12, 5, 0, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-        }
     },
 
-    drawTeamIndicator(ctx, centerX, baseY, playerColor) {
+    drawTeamIndicator(ctx, centerX, groundY, playerColor) {
         ctx.save();
-        ctx.globalAlpha = 0.7;
 
-        const grad = ctx.createRadialGradient(centerX, baseY - 4, 0, centerX, baseY - 4, 38);
-        grad.addColorStop(0, 'transparent');
-        grad.addColorStop(0.6, playerColor.primary);
-        grad.addColorStop(1, 'transparent');
+        // Glowing ring effect
+        const ringGradient = ctx.createRadialGradient(
+            centerX, groundY - 3, 15,
+            centerX, groundY - 3, 32
+        );
+        ringGradient.addColorStop(0, 'transparent');
+        ringGradient.addColorStop(0.4, playerColor.primary + '80');
+        ringGradient.addColorStop(0.7, playerColor.primary + '40');
+        ringGradient.addColorStop(1, 'transparent');
 
-        ctx.fillStyle = grad;
+        ctx.fillStyle = ringGradient;
         ctx.beginPath();
-        ctx.ellipse(centerX, baseY - 4, 38, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(centerX, groundY - 3, 32, 9, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        // Inner ring
+        ctx.strokeStyle = playerColor.primary;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.ellipse(centerX, groundY - 3, 22, 6, 0, 0, Math.PI * 2);
+        ctx.stroke();
 
         ctx.restore();
-    },
-
-    getUniformColor(rand) {
-        const h = 85 + rand() * 15;
-        const s = 25 + rand() * 15;
-        const l = 30 + rand() * 10;
-        const [r, g, b] = ColorUtils.hslToRgb(h / 360, s / 100, l / 100);
-        return ColorUtils.rgbToHex(r, g, b);
     }
 };
 
