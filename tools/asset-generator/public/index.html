@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Squad Asset Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.3);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #333;
+        }
+
+        .header h1 {
+            color: #4ade80;
+            font-size: 1.5em;
+        }
+
+        .container {
+            display: flex;
+            min-height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(0,0,0,0.2);
+            padding: 20px;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+        }
+
+        .main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section h3 {
+            color: #60a5fa;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+            margin-bottom: 10px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover { background: #2563eb; }
+        .btn:disabled { background: #555; cursor: not-allowed; }
+
+        .btn-success { background: #22c55e; }
+        .btn-success:hover { background: #16a34a; }
+
+        .btn-warning { background: #eab308; color: #000; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 13px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .preview-grid.large {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+
+        .preview-item {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .preview-item canvas {
+            background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 20px 20px;
+            border-radius: 4px;
+            max-width: 100%;
+        }
+
+        .preview-item .label {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #888;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar .fill {
+            height: 100%;
+            background: #4ade80;
+            transition: width 0.3s;
+        }
+
+        .status {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.2);
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .tab.active {
+            background: #16213e;
+            color: #4ade80;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .sprite-sheet-preview {
+            max-width: 100%;
+            overflow-x: auto;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .sprite-sheet-preview canvas {
+            max-width: none;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .checkbox-group input:checked + span {
+            color: #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 Shadow Squad Asset Generator</h1>
+        <div>
+            <button class="btn btn-success" onclick="downloadAll()">📦 Download All</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="section">
+                <h3>Generate Assets</h3>
+                <button class="btn" onclick="generateTerrain()">🏞️ Generate Terrain</button>
+                <button class="btn" onclick="generateTrees()">🌲 Generate Trees</button>
+                <button class="btn" onclick="generateBushes()">🌿 Generate Bushes</button>
+                <button class="btn" onclick="generateCharacters()">🎖️ Generate Characters</button>
+                <button class="btn btn-success" onclick="generateAll()">⚡ Generate All</button>
+            </div>
+
+            <div class="section">
+                <h3>Settings</h3>
+                <div class="form-group">
+                    <label>Variants per type</label>
+                    <input type="number" id="variants" value="4" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label>Terrain tile size</label>
+                    <select id="terrainSize">
+                        <option value="128">128x96</option>
+                        <option value="256" selected>256x192</option>
+                        <option value="512">512x384</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Character size</label>
+                    <select id="charSize">
+                        <option value="128">128x128</option>
+                        <option value="256" selected>256x256</option>
+                        <option value="512">512x512</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Terrain Types</h3>
+                <div class="checkbox-group" id="terrainTypes">
+                    <label><input type="checkbox" checked value="grass"><span>Grass</span></label>
+                    <label><input type="checkbox" checked value="forest"><span>Forest</span></label>
+                    <label><input type="checkbox" checked value="hills"><span>Hills</span></label>
+                    <label><input type="checkbox" checked value="rock"><span>Rock</span></label>
+                    <label><input type="checkbox" checked value="water"><span>Water</span></label>
+                    <label><input type="checkbox" checked value="sand"><span>Sand</span></label>
+                    <label><input type="checkbox" checked value="swamp"><span>Swamp</span></label>
+                    <label><input type="checkbox" checked value="river"><span>River</span></label>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Tree Types</h3>
+                <div class="checkbox-group" id="treeTypes">
+                    <label><input type="checkbox" checked value="oak"><span>Oak</span></label>
+                    <label><input type="checkbox" checked value="pine"><span>Pine</span></label>
+                    <label><input type="checkbox" checked value="birch"><span>Birch</span></label>
+                    <label><input type="checkbox" checked value="willow"><span>Willow</span></label>
+                    <label><input type="checkbox" checked value="maple"><span>Maple</span></label>
+                    <label><input type="checkbox" checked value="dead"><span>Dead</span></label>
+                </div>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="progress-bar"><div class="fill" id="progress" style="width: 0%"></div></div>
+            <div class="status" id="status">Ready to generate assets</div>
+
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('terrain')">Terrain</button>
+                <button class="tab" onclick="showTab('trees')">Trees</button>
+                <button class="tab" onclick="showTab('bushes')">Bushes</button>
+                <button class="tab" onclick="showTab('characters')">Characters</button>
+                <button class="tab" onclick="showTab('sheets')">Sprite Sheets</button>
+            </div>
+
+            <div id="terrain" class="tab-content active">
+                <div class="preview-grid" id="terrainPreview"></div>
+            </div>
+            <div id="trees" class="tab-content">
+                <div class="preview-grid large" id="treesPreview"></div>
+            </div>
+            <div id="bushes" class="tab-content">
+                <div class="preview-grid large" id="bushesPreview"></div>
+            </div>
+            <div id="characters" class="tab-content">
+                <div class="preview-grid large" id="charactersPreview"></div>
+            </div>
+            <div id="sheets" class="tab-content">
+                <div class="sprite-sheet-preview" id="sheetsPreview"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="generators/noise.js"></script>
+    <script src="generators/color.js"></script>
+    <script src="generators/terrain.js"></script>
+    <script src="generators/trees.js"></script>
+    <script src="generators/bushes.js"></script>
+    <script src="generators/characters.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
