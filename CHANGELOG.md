@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.3...shadow-squad-v3.1.0) (2025-12-25)
+
+
+### Features
+
+* Implement tile and sprite sheet processing system ([#97](https://github.com/CodingSteve01/battlezone/issues/97)) ([ff254ed](https://github.com/CodingSteve01/battlezone/commit/ff254ed766e96da51ec22921a0e5667abc3b8e42))
+
 ## [3.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.2...shadow-squad-v3.0.3) (2025-12-25)
 
 
