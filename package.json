@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate-assets && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -14,20 +14,19 @@
     "test:e2e:headed": "playwright test --headed",
     "lint": "eslint js/ tests/",
     "lint:fix": "eslint js/ tests/ --fix",
-    "validate": "npm run lint && npm run test && npm run test:e2e",
-    "generate-assets": "node scripts/generate-assets.js"
+    "validate": "npm run lint && npm run test && npm run test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@playwright/test": "^1.57.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.0.16",
     "eslint": "^9.15.0",
     "eslint-plugin-import": "^2.32.0",
     "globals": "^15.12.0",
     "jsdom": "^25.0.0",
     "playwright": "^1.57.0",
     "vite": "^6.0.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.0.16"
   },
   "keywords": [
     "game",

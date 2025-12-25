@@ -1,0 +1,33 @@
+{
+  "name": "shadow-squad-assets",
+  "version": "1.0.0",
+  "description": "Procedural asset generator for Shadow Squad tactical game",
+  "type": "module",
+  "bin": {
+    "shadow-squad-assets": "./bin/cli.js",
+    "ssa": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js",
+    "dev": "node bin/cli.js"
+  },
+  "dependencies": {
+    "chalk": "^5.6.0",
+    "commander": "^12.1.0",
+    "express": "^4.18.2",
+    "open": "^10.1.0",
+    "ora": "^9.0.0"
+  },
+  "keywords": [
+    "game-assets",
+    "procedural-generation",
+    "sprite-sheet",
+    "l-system",
+    "tactical-game"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

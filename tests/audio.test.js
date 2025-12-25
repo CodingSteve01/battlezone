@@ -43,17 +43,24 @@ const mockAudioContext = {
     }))
 };
 
+// Create a constructor function that can be used with 'new'
+function MockAudioContext() {
+    return mockAudioContext;
+}
+
 // Set up global AudioContext mock
-global.AudioContext = vi.fn(() => mockAudioContext);
+global.AudioContext = vi.fn(MockAudioContext);
 global.window = { AudioContext: global.AudioContext };
 
 describe('audio', () => {
     let audio;
 
     beforeEach(async () => {
-        vi.clearAllMocks();
         // Reset module state by re-importing
         vi.resetModules();
+        // Recreate mocks to ensure fresh call counts after module reset
+        global.AudioContext = vi.fn(MockAudioContext);
+        global.window = { AudioContext: global.AudioContext };
         audio = await import('../js/audio.js');
     });
 

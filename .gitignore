@@ -20,7 +20,14 @@ npm-debug.log*
 
 # Build artifacts
 dist/
-assets/
+
+# Generated assets (terrain, units, details PNGs - generated at deploy time)
+assets/terrain/
+assets/units/
+assets/details/
+
+# Keep sprite sheet definitions (JSON files for sprite extraction)
+!assets/spritesheets/
 
 # Playwright
 test-results/

@@ -272,7 +272,7 @@ export function playWeaponSound(unitClass) {
         case 'medic':
             playMedicShot();
             break;
-        case 'ninja':
+        case 'commando':
             playNinjaAttack();
             break;
         default:

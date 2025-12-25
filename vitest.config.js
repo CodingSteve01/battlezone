@@ -8,7 +8,7 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'html', 'lcov'],
             include: ['js/**/*.js'],
-            exclude: ['js/main.js', 'js/renderer.js', 'js/input.js', 'js/assets.js']
+            exclude: ['js/main.js', 'js/renderer.js', 'js/input.js', 'js/spriteSheetLoader.js']
         }
     }
 });

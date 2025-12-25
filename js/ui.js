@@ -206,7 +206,7 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
                         }
                         break;
                     case 'sniper':
-                    case 'ninja':
+                    case 'commando':
                         // Suggest cloaking if not hidden
                         if (!unit.cloaked && !unit.hiding) {
                             tip = '👁️ Tarnung empfohlen!';

@@ -1,0 +1,789 @@
+{
+  "version": "1.0",
+  "dimensions": {
+    "width": 1024,
+    "height": 3330
+  },
+  "sprites": [
+    {
+      "id": "grass_v0",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "grass",
+        "variant": 0
+      }
+    },
+    {
+      "id": "grass_v1",
+      "bounds": {
+        "x": 256,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "grass",
+        "variant": 1
+      }
+    },
+    {
+      "id": "grass_v2",
+      "bounds": {
+        "x": 512,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "grass",
+        "variant": 2
+      }
+    },
+    {
+      "id": "grass_v3",
+      "bounds": {
+        "x": 768,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "grass",
+        "variant": 3
+      }
+    },
+    {
+      "id": "forest_v0",
+      "bounds": {
+        "x": 0,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "forest",
+        "variant": 0
+      }
+    },
+    {
+      "id": "forest_v1",
+      "bounds": {
+        "x": 256,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "forest",
+        "variant": 1
+      }
+    },
+    {
+      "id": "forest_v2",
+      "bounds": {
+        "x": 512,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "forest",
+        "variant": 2
+      }
+    },
+    {
+      "id": "forest_v3",
+      "bounds": {
+        "x": 768,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "forest",
+        "variant": 3
+      }
+    },
+    {
+      "id": "hills_v0",
+      "bounds": {
+        "x": 0,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "hills",
+        "variant": 0
+      }
+    },
+    {
+      "id": "hills_v1",
+      "bounds": {
+        "x": 256,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "hills",
+        "variant": 1
+      }
+    },
+    {
+      "id": "hills_v2",
+      "bounds": {
+        "x": 512,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "hills",
+        "variant": 2
+      }
+    },
+    {
+      "id": "hills_v3",
+      "bounds": {
+        "x": 768,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "hills",
+        "variant": 3
+      }
+    },
+    {
+      "id": "rock_v0",
+      "bounds": {
+        "x": 0,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "rock",
+        "variant": 0
+      }
+    },
+    {
+      "id": "rock_v1",
+      "bounds": {
+        "x": 256,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "rock",
+        "variant": 1
+      }
+    },
+    {
+      "id": "rock_v2",
+      "bounds": {
+        "x": 512,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "rock",
+        "variant": 2
+      }
+    },
+    {
+      "id": "rock_v3",
+      "bounds": {
+        "x": 768,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "rock",
+        "variant": 3
+      }
+    },
+    {
+      "id": "water_v0",
+      "bounds": {
+        "x": 0,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "water",
+        "variant": 0
+      }
+    },
+    {
+      "id": "water_v1",
+      "bounds": {
+        "x": 256,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "water",
+        "variant": 1
+      }
+    },
+    {
+      "id": "water_v2",
+      "bounds": {
+        "x": 512,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "water",
+        "variant": 2
+      }
+    },
+    {
+      "id": "water_v3",
+      "bounds": {
+        "x": 768,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "water",
+        "variant": 3
+      }
+    },
+    {
+      "id": "sand_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "sand",
+        "variant": 0
+      }
+    },
+    {
+      "id": "sand_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "sand",
+        "variant": 1
+      }
+    },
+    {
+      "id": "sand_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "sand",
+        "variant": 2
+      }
+    },
+    {
+      "id": "sand_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "sand",
+        "variant": 3
+      }
+    },
+    {
+      "id": "swamp_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "swamp",
+        "variant": 0
+      }
+    },
+    {
+      "id": "swamp_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "swamp",
+        "variant": 1
+      }
+    },
+    {
+      "id": "swamp_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "swamp",
+        "variant": 2
+      }
+    },
+    {
+      "id": "swamp_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "swamp",
+        "variant": 3
+      }
+    },
+    {
+      "id": "river_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "river",
+        "variant": 0
+      }
+    },
+    {
+      "id": "river_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "river",
+        "variant": 1
+      }
+    },
+    {
+      "id": "river_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "river",
+        "variant": 2
+      }
+    },
+    {
+      "id": "river_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "river",
+        "variant": 3
+      }
+    },
+    {
+      "id": "road_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 0
+      }
+    },
+    {
+      "id": "road_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 1
+      }
+    },
+    {
+      "id": "road_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 2
+      }
+    },
+    {
+      "id": "road_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 3
+      }
+    },
+    {
+      "id": "path_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 0
+      }
+    },
+    {
+      "id": "path_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 1
+      }
+    },
+    {
+      "id": "path_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 2
+      }
+    },
+    {
+      "id": "path_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 3
+      }
+    },
+    {
+      "id": "snow_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 0
+      }
+    },
+    {
+      "id": "snow_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 1
+      }
+    },
+    {
+      "id": "snow_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 2
+      }
+    },
+    {
+      "id": "snow_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 3
+      }
+    },
+    {
+      "id": "pine_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 0
+      }
+    },
+    {
+      "id": "pine_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 1
+      }
+    },
+    {
+      "id": "pine_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 2
+      }
+    },
+    {
+      "id": "pine_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tallgrass_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tallgrass_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tallgrass_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tallgrass_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 3
+      }
+    },
+    {
+      "id": "mud_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 0
+      }
+    },
+    {
+      "id": "mud_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 1
+      }
+    },
+    {
+      "id": "mud_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 2
+      }
+    },
+    {
+      "id": "mud_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 3
+      }
+    },
+    {
+      "id": "clearing_v0",
+      "bounds": {
+        "x": 0,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 0
+      }
+    },
+    {
+      "id": "clearing_v1",
+      "bounds": {
+        "x": 256,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 1
+      }
+    },
+    {
+      "id": "clearing_v2",
+      "bounds": {
+        "x": 512,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 2
+      }
+    },
+    {
+      "id": "clearing_v3",
+      "bounds": {
+        "x": 768,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 3
+      }
+    }
+  ]
+}
