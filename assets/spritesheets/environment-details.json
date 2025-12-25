@@ -1,0 +1,146 @@
+{
+  "version": "1.0",
+  "source": "environment-details.png",
+  "type": "details",
+  "globalSettings": {
+    "outputSize": {
+      "width": 256,
+      "height": 256
+    },
+    "backgroundRemoval": {
+      "enabled": true,
+      "color": "#ffffff",
+      "tolerance": 15
+    }
+  },
+  "sprites": [
+    {
+      "id": "tree_0_0",
+      "name": "Laubbaum groß",
+      "bounds": { "x": 40, "y": 20, "width": 200, "height": 280 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 0, "subVariant": 0 },
+      "tags": ["tree", "deciduous", "large"]
+    },
+    {
+      "id": "tree_0_1",
+      "name": "Laubbaum mittel",
+      "bounds": { "x": 260, "y": 20, "width": 180, "height": 280 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 0, "subVariant": 1 },
+      "tags": ["tree", "deciduous", "medium"]
+    },
+    {
+      "id": "tree_1_0",
+      "name": "Nadelbaum",
+      "bounds": { "x": 470, "y": 20, "width": 160, "height": 300 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 1, "subVariant": 0 },
+      "tags": ["tree", "conifer", "pine"]
+    },
+    {
+      "id": "tree_2_0",
+      "name": "Kleiner Baum",
+      "bounds": { "x": 660, "y": 40, "width": 140, "height": 260 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 2, "subVariant": 0 },
+      "tags": ["tree", "small"]
+    },
+    {
+      "id": "tree_3_0",
+      "name": "Toter Baum 1",
+      "bounds": { "x": 830, "y": 20, "width": 120, "height": 280 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 3, "subVariant": 0 },
+      "tags": ["tree", "dead", "bare"]
+    },
+    {
+      "id": "tree_3_1",
+      "name": "Toter Baum 2",
+      "bounds": { "x": 970, "y": 20, "width": 120, "height": 280 },
+      "anchor": { "x": 0.5, "y": 0.95 },
+      "metadata": { "detailType": "tree", "variant": 3, "subVariant": 1 },
+      "tags": ["tree", "dead", "bare"]
+    },
+    {
+      "id": "bush_0",
+      "name": "Busch 1",
+      "bounds": { "x": 60, "y": 360, "width": 160, "height": 120 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "bush", "variant": 0 },
+      "tags": ["bush", "hedge"]
+    },
+    {
+      "id": "bush_1",
+      "name": "Busch 2",
+      "bounds": { "x": 260, "y": 360, "width": 160, "height": 120 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "bush", "variant": 1 },
+      "tags": ["bush", "hedge"]
+    },
+    {
+      "id": "bush_2",
+      "name": "Busch 3",
+      "bounds": { "x": 460, "y": 360, "width": 160, "height": 120 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "bush", "variant": 2 },
+      "tags": ["bush", "hedge"]
+    },
+    {
+      "id": "bush_3",
+      "name": "Busch 4",
+      "bounds": { "x": 660, "y": 360, "width": 160, "height": 120 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "bush", "variant": 3 },
+      "tags": ["bush", "hedge"]
+    },
+    {
+      "id": "bush_4",
+      "name": "Busch 5",
+      "bounds": { "x": 860, "y": 360, "width": 160, "height": 120 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "bush", "variant": 4 },
+      "tags": ["bush", "hedge"]
+    },
+    {
+      "id": "grass_0",
+      "name": "Gras Büschel 1",
+      "bounds": { "x": 60, "y": 520, "width": 140, "height": 100 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "grass", "variant": 0 },
+      "tags": ["grass", "tuft"]
+    },
+    {
+      "id": "grass_1",
+      "name": "Gras Büschel 2",
+      "bounds": { "x": 240, "y": 520, "width": 140, "height": 100 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "grass", "variant": 1 },
+      "tags": ["grass", "tuft"]
+    },
+    {
+      "id": "grass_2",
+      "name": "Gras Büschel 3",
+      "bounds": { "x": 420, "y": 520, "width": 140, "height": 100 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "grass", "variant": 2 },
+      "tags": ["grass", "tuft"]
+    },
+    {
+      "id": "grass_3",
+      "name": "Gras Büschel 4",
+      "bounds": { "x": 600, "y": 520, "width": 140, "height": 100 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "grass", "variant": 3 },
+      "tags": ["grass", "tuft"]
+    },
+    {
+      "id": "grass_4",
+      "name": "Gras Büschel 5",
+      "bounds": { "x": 780, "y": 520, "width": 140, "height": 100 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "detailType": "grass", "variant": 4 },
+      "tags": ["grass", "tuft"]
+    }
+  ]
+}

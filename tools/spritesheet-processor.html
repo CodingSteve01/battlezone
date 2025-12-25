@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Squad - Sprite Sheet Processor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #22c55e;
+            border-bottom: 2px solid #22c55e;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        h2 {
+            color: #3b82f6;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #eab308;
+            margin-top: 20px;
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: #2a2a4e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+        button {
+            background: #22c55e;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #16a34a;
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        button.secondary {
+            background: #3b82f6;
+        }
+        button.secondary:hover {
+            background: #2563eb;
+        }
+        button.warning {
+            background: #eab308;
+            color: #000;
+        }
+        button.warning:hover {
+            background: #ca8a04;
+        }
+        input, select, textarea {
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        input[type="file"] {
+            padding: 8px;
+        }
+        input[type="number"] {
+            width: 100px;
+        }
+        input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+        .inline-label {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+        .sprite-canvas-container {
+            position: relative;
+            overflow: auto;
+            max-height: 600px;
+            background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 20px 20px;
+            border: 2px solid #444;
+            border-radius: 4px;
+        }
+        #spriteCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        .bounds-overlay {
+            position: absolute;
+            border: 2px solid #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+            pointer-events: none;
+        }
+        .bounds-overlay.selected {
+            border-color: #eab308;
+            background: rgba(234, 179, 8, 0.2);
+        }
+        .bounds-label {
+            position: absolute;
+            top: -20px;
+            left: 0;
+            font-size: 10px;
+            background: #22c55e;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+        .bounds-overlay.selected .bounds-label {
+            background: #eab308;
+        }
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .preview-item {
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .preview-item:hover {
+            border-color: #3b82f6;
+        }
+        .preview-item.selected {
+            border-color: #eab308;
+        }
+        .preview-item canvas {
+            background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 10px 10px;
+            max-width: 100%;
+            border-radius: 4px;
+        }
+        .preview-item .name {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #aaa;
+            word-break: break-all;
+        }
+        .preview-item .size {
+            font-size: 10px;
+            color: #666;
+        }
+        .log {
+            background: #0a0a15;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .log-entry {
+            margin: 3px 0;
+        }
+        .log-entry.success { color: #22c55e; }
+        .log-entry.info { color: #3b82f6; }
+        .log-entry.warning { color: #eab308; }
+        .log-entry.error { color: #ef4444; }
+        .progress {
+            background: #333;
+            border-radius: 4px;
+            height: 20px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .bounds-editor {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .bounds-editor label {
+            display: flex;
+            flex-direction: column;
+        }
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background: #1a1a2e;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            margin: 0;
+        }
+        .tab.active {
+            background: #2a2a4e;
+            color: #22c55e;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .json-editor {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .color-preview {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 5px;
+            border: 1px solid #666;
+        }
+        .player-colors {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .player-color-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th {
+            background: #1a1a2e;
+            color: #3b82f6;
+        }
+        tr:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        .sprite-type-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .sprite-type-badge.units { background: #22c55e; color: #000; }
+        .sprite-type-badge.terrain { background: #3b82f6; color: #fff; }
+        .sprite-type-badge.details { background: #eab308; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sprite Sheet Processor</h1>
+        <p>Extrahiert einzelne Sprites aus Sprite Sheets basierend auf JSON-Definitionen.</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('load')">1. Laden</button>
+            <button class="tab" onclick="showTab('edit')">2. Bearbeiten</button>
+            <button class="tab" onclick="showTab('preview')">3. Vorschau</button>
+            <button class="tab" onclick="showTab('export')">4. Export</button>
+        </div>
+
+        <!-- TAB 1: Load -->
+        <div id="tab-load" class="tab-content active">
+            <div class="row">
+                <div class="col">
+                    <div class="panel">
+                        <h3>Sprite Sheet Bild laden</h3>
+                        <input type="file" id="imageInput" accept="image/*" onchange="loadImage(event)">
+                        <p style="color:#888;font-size:12px;">Unterstützte Formate: PNG, JPG, WebP</p>
+                    </div>
+                    <div class="panel">
+                        <h3>JSON Definition laden</h3>
+                        <input type="file" id="jsonInput" accept=".json" onchange="loadJSON(event)">
+                        <p style="color:#888;font-size:12px;">Oder JSON aus Vorlage wählen:</p>
+                        <button class="secondary" onclick="loadTemplate('units')">Unit Sprites</button>
+                        <button class="secondary" onclick="loadTemplate('terrain')">Terrain Hexes</button>
+                        <button class="secondary" onclick="loadTemplate('details')">Environment Details</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="panel">
+                        <h3>Geladene Dateien</h3>
+                        <table>
+                            <tr>
+                                <td>Bild:</td>
+                                <td id="loaded-image">-</td>
+                            </tr>
+                            <tr>
+                                <td>Bildgröße:</td>
+                                <td id="loaded-image-size">-</td>
+                            </tr>
+                            <tr>
+                                <td>JSON:</td>
+                                <td id="loaded-json">-</td>
+                            </tr>
+                            <tr>
+                                <td>Typ:</td>
+                                <td id="loaded-type">-</td>
+                            </tr>
+                            <tr>
+                                <td>Sprites:</td>
+                                <td id="loaded-sprites">-</td>
+                            </tr>
+                        </table>
+                        <button onclick="showTab('edit')" disabled id="btn-to-edit">Weiter zu Bearbeiten</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Edit -->
+        <div id="tab-edit" class="tab-content">
+            <div class="row">
+                <div class="col" style="flex: 2;">
+                    <div class="panel">
+                        <h3>Sprite Sheet Ansicht</h3>
+                        <div class="sprite-canvas-container" id="canvasContainer">
+                            <canvas id="spriteCanvas"></canvas>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <label class="inline-label">
+                                <input type="checkbox" id="showBounds" checked onchange="redrawCanvas()">
+                                Bounds anzeigen
+                            </label>
+                            <label class="inline-label">
+                                <input type="checkbox" id="showLabels" checked onchange="redrawCanvas()">
+                                Labels anzeigen
+                            </label>
+                            <label class="inline-label">
+                                Zoom: <input type="range" id="zoomSlider" min="25" max="200" value="100"
+                                       style="width:100px;margin:0 10px;" onchange="setZoom(this.value)">
+                                <span id="zoomValue">100%</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="panel">
+                        <h3>Sprite bearbeiten</h3>
+                        <label>Sprite auswählen:
+                            <select id="spriteSelect" onchange="selectSprite(this.value)">
+                                <option value="">-- Sprite wählen --</option>
+                            </select>
+                        </label>
+                        <div id="boundsEditor" style="display:none;">
+                            <h4 style="margin:15px 0 10px;color:#888;">Bounds (Pixel)</h4>
+                            <div class="bounds-editor">
+                                <label>X: <input type="number" id="bounds-x" onchange="updateBounds()"></label>
+                                <label>Y: <input type="number" id="bounds-y" onchange="updateBounds()"></label>
+                                <label>Breite: <input type="number" id="bounds-w" onchange="updateBounds()"></label>
+                                <label>Höhe: <input type="number" id="bounds-h" onchange="updateBounds()"></label>
+                            </div>
+                            <h4 style="margin:15px 0 10px;color:#888;">Ausgabe</h4>
+                            <div class="bounds-editor">
+                                <label>Breite: <input type="number" id="output-w" onchange="updateOutput()"></label>
+                                <label>Höhe: <input type="number" id="output-h" onchange="updateOutput()"></label>
+                            </div>
+                            <div style="margin-top: 15px;">
+                                <label class="inline-label">
+                                    <input type="checkbox" id="sprite-flipX" onchange="updateSpriteOptions()">
+                                    Horizontal spiegeln
+                                </label>
+                                <label class="inline-label">
+                                    <input type="checkbox" id="sprite-flipY" onchange="updateSpriteOptions()">
+                                    Vertikal spiegeln
+                                </label>
+                            </div>
+                            <h4 style="margin:15px 0 10px;color:#888;">Live-Vorschau</h4>
+                            <div style="text-align:center;">
+                                <canvas id="previewCanvas" width="150" height="150"
+                                        style="background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 10px 10px; border-radius:4px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h3>JSON bearbeiten</h3>
+                        <textarea id="jsonEditor" class="json-editor" onchange="parseJSONEditor()"></textarea>
+                        <button onclick="formatJSON()">JSON formatieren</button>
+                        <button class="secondary" onclick="downloadJSON()">JSON speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Preview -->
+        <div id="tab-preview" class="tab-content">
+            <div class="panel">
+                <h3>Extrahierte Sprites</h3>
+                <button onclick="extractAllSprites()">Alle Sprites extrahieren</button>
+                <label class="inline-label" style="margin-left: 20px;">
+                    <input type="checkbox" id="removeBackground" checked>
+                    Hintergrund entfernen
+                </label>
+                <label class="inline-label">
+                    <input type="checkbox" id="generatePlayerColors">
+                    Spielerfarben generieren
+                </label>
+                <div class="progress">
+                    <div class="progress-bar" id="extractProgress"></div>
+                </div>
+                <div class="preview-grid" id="extractedSprites"></div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Export -->
+        <div id="tab-export" class="tab-content">
+            <div class="panel">
+                <h3>Export Optionen</h3>
+                <div class="row">
+                    <div class="col">
+                        <label>Ausgabeformat:
+                            <select id="exportFormat">
+                                <option value="png">PNG (mit Transparenz)</option>
+                                <option value="webp">WebP (komprimiert)</option>
+                            </select>
+                        </label>
+                        <label>Dateinamens-Präfix:
+                            <input type="text" id="exportPrefix" value="">
+                        </label>
+                        <label>Ausgabeordner-Struktur:
+                            <select id="exportStructure">
+                                <option value="flat">Flach (alle in einem Ordner)</option>
+                                <option value="type">Nach Typ (terrain/, units/, details/)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="col">
+                        <h4>Spielerfarben (für Units)</h4>
+                        <div class="player-colors">
+                            <div class="player-color-item">
+                                <span>Spieler 1:</span>
+                                <input type="color" value="#22c55e" id="color-p0">
+                                <span class="color-preview" style="background:#22c55e;"></span>
+                            </div>
+                            <div class="player-color-item">
+                                <span>Spieler 2:</span>
+                                <input type="color" value="#ef4444" id="color-p1">
+                                <span class="color-preview" style="background:#ef4444;"></span>
+                            </div>
+                            <div class="player-color-item">
+                                <span>Spieler 3:</span>
+                                <input type="color" value="#3b82f6" id="color-p2">
+                                <span class="color-preview" style="background:#3b82f6;"></span>
+                            </div>
+                            <div class="player-color-item">
+                                <span>Spieler 4:</span>
+                                <input type="color" value="#eab308" id="color-p3">
+                                <span class="color-preview" style="background:#eab308;"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button onclick="exportAllAsZip()">Alle als ZIP exportieren</button>
+                    <button class="secondary" onclick="exportSelected()">Ausgewählte exportieren</button>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" id="exportProgress"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3>Export Log</h3>
+                <div class="log" id="exportLog"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSZip for ZIP export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <script>
+        // ===== STATE =====
+        let loadedImage = null;
+        let jsonDefinition = null;
+        let extractedSprites = [];
+        let selectedSpriteIndex = -1;
+        let zoom = 1;
+
+        // ===== TAB MANAGEMENT =====
+        function showTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.tab[onclick*="${tabId}"]`).classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            if (tabId === 'edit') {
+                redrawCanvas();
+            }
+        }
+
+        // ===== IMAGE LOADING =====
+        function loadImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    loadedImage = img;
+                    document.getElementById('loaded-image').textContent = file.name;
+                    document.getElementById('loaded-image-size').textContent = `${img.width} x ${img.height} px`;
+                    checkReady();
+                    redrawCanvas();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ===== JSON LOADING =====
+        function loadJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    jsonDefinition = JSON.parse(e.target.result);
+                    updateJSONDisplay(file.name);
+                } catch (err) {
+                    alert('Fehler beim Parsen der JSON-Datei: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function loadTemplate(type) {
+            try {
+                const response = await fetch(`../assets/spritesheets/${type === 'units' ? 'unit-sprites' : type === 'terrain' ? 'terrain-hexes' : 'environment-details'}.json`);
+                if (!response.ok) throw new Error('Template nicht gefunden');
+                jsonDefinition = await response.json();
+                updateJSONDisplay(`${type}-template.json`);
+            } catch (err) {
+                alert('Fehler beim Laden des Templates: ' + err.message);
+            }
+        }
+
+        function updateJSONDisplay(filename) {
+            document.getElementById('loaded-json').textContent = filename;
+            document.getElementById('loaded-type').innerHTML =
+                `<span class="sprite-type-badge ${jsonDefinition.type}">${jsonDefinition.type}</span>`;
+            document.getElementById('loaded-sprites').textContent = jsonDefinition.sprites?.length || 0;
+            document.getElementById('jsonEditor').value = JSON.stringify(jsonDefinition, null, 2);
+
+            // Populate sprite select
+            const select = document.getElementById('spriteSelect');
+            select.innerHTML = '<option value="">-- Sprite wählen --</option>';
+            jsonDefinition.sprites?.forEach((sprite, i) => {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = sprite.name || sprite.id;
+                select.appendChild(option);
+            });
+
+            checkReady();
+            redrawCanvas();
+        }
+
+        function checkReady() {
+            const ready = loadedImage && jsonDefinition;
+            document.getElementById('btn-to-edit').disabled = !ready;
+        }
+
+        // ===== CANVAS DRAWING =====
+        function redrawCanvas() {
+            if (!loadedImage) return;
+
+            const canvas = document.getElementById('spriteCanvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = loadedImage.width * zoom;
+            canvas.height = loadedImage.height * zoom;
+
+            ctx.imageSmoothingEnabled = zoom >= 1;
+            ctx.drawImage(loadedImage, 0, 0, canvas.width, canvas.height);
+
+            // Draw bounds overlays
+            if (jsonDefinition && document.getElementById('showBounds')?.checked) {
+                const container = document.getElementById('canvasContainer');
+                container.querySelectorAll('.bounds-overlay').forEach(el => el.remove());
+
+                jsonDefinition.sprites?.forEach((sprite, i) => {
+                    const bounds = sprite.bounds;
+                    if (!bounds) return;
+
+                    const overlay = document.createElement('div');
+                    overlay.className = 'bounds-overlay' + (i === selectedSpriteIndex ? ' selected' : '');
+                    overlay.style.left = (bounds.x * zoom) + 'px';
+                    overlay.style.top = (bounds.y * zoom) + 'px';
+                    overlay.style.width = (bounds.width * zoom) + 'px';
+                    overlay.style.height = (bounds.height * zoom) + 'px';
+
+                    if (document.getElementById('showLabels')?.checked) {
+                        const label = document.createElement('div');
+                        label.className = 'bounds-label';
+                        label.textContent = sprite.id;
+                        overlay.appendChild(label);
+                    }
+
+                    overlay.onclick = () => selectSprite(i);
+                    container.appendChild(overlay);
+                });
+            }
+        }
+
+        function setZoom(value) {
+            zoom = value / 100;
+            document.getElementById('zoomValue').textContent = value + '%';
+            redrawCanvas();
+        }
+
+        // ===== SPRITE SELECTION & EDITING =====
+        function selectSprite(index) {
+            if (index === '' || index === null) {
+                selectedSpriteIndex = -1;
+                document.getElementById('boundsEditor').style.display = 'none';
+                redrawCanvas();
+                return;
+            }
+
+            selectedSpriteIndex = parseInt(index);
+            document.getElementById('spriteSelect').value = index;
+            document.getElementById('boundsEditor').style.display = 'block';
+
+            const sprite = jsonDefinition.sprites[selectedSpriteIndex];
+            if (!sprite) return;
+
+            // Update bounds inputs
+            document.getElementById('bounds-x').value = sprite.bounds?.x || 0;
+            document.getElementById('bounds-y').value = sprite.bounds?.y || 0;
+            document.getElementById('bounds-w').value = sprite.bounds?.width || 100;
+            document.getElementById('bounds-h').value = sprite.bounds?.height || 100;
+
+            // Update output size
+            const globalOutput = jsonDefinition.globalSettings?.outputSize;
+            const spriteOutput = sprite.outputSize;
+            document.getElementById('output-w').value = spriteOutput?.width || globalOutput?.width || sprite.bounds?.width || 100;
+            document.getElementById('output-h').value = spriteOutput?.height || globalOutput?.height || sprite.bounds?.height || 100;
+
+            // Update options
+            document.getElementById('sprite-flipX').checked = sprite.flipX || false;
+            document.getElementById('sprite-flipY').checked = sprite.flipY || false;
+
+            redrawCanvas();
+            updatePreview();
+        }
+
+        function updateBounds() {
+            if (selectedSpriteIndex < 0) return;
+
+            const sprite = jsonDefinition.sprites[selectedSpriteIndex];
+            sprite.bounds = {
+                x: parseInt(document.getElementById('bounds-x').value) || 0,
+                y: parseInt(document.getElementById('bounds-y').value) || 0,
+                width: parseInt(document.getElementById('bounds-w').value) || 100,
+                height: parseInt(document.getElementById('bounds-h').value) || 100
+            };
+
+            document.getElementById('jsonEditor').value = JSON.stringify(jsonDefinition, null, 2);
+            redrawCanvas();
+            updatePreview();
+        }
+
+        function updateOutput() {
+            if (selectedSpriteIndex < 0) return;
+
+            const sprite = jsonDefinition.sprites[selectedSpriteIndex];
+            sprite.outputSize = {
+                width: parseInt(document.getElementById('output-w').value) || 100,
+                height: parseInt(document.getElementById('output-h').value) || 100
+            };
+
+            document.getElementById('jsonEditor').value = JSON.stringify(jsonDefinition, null, 2);
+            updatePreview();
+        }
+
+        function updateSpriteOptions() {
+            if (selectedSpriteIndex < 0) return;
+
+            const sprite = jsonDefinition.sprites[selectedSpriteIndex];
+            sprite.flipX = document.getElementById('sprite-flipX').checked;
+            sprite.flipY = document.getElementById('sprite-flipY').checked;
+
+            document.getElementById('jsonEditor').value = JSON.stringify(jsonDefinition, null, 2);
+            updatePreview();
+        }
+
+        function updatePreview() {
+            if (selectedSpriteIndex < 0 || !loadedImage) return;
+
+            const sprite = jsonDefinition.sprites[selectedSpriteIndex];
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const outputW = sprite.outputSize?.width || jsonDefinition.globalSettings?.outputSize?.width || sprite.bounds.width;
+            const outputH = sprite.outputSize?.height || jsonDefinition.globalSettings?.outputSize?.height || sprite.bounds.height;
+
+            canvas.width = 150;
+            canvas.height = 150;
+
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate scale to fit preview
+            const scale = Math.min(140 / outputW, 140 / outputH);
+            const drawW = outputW * scale;
+            const drawH = outputH * scale;
+            const drawX = (canvas.width - drawW) / 2;
+            const drawY = (canvas.height - drawH) / 2;
+
+            // Extract and draw sprite
+            const extracted = extractSprite(sprite);
+            if (extracted) {
+                ctx.drawImage(extracted, drawX, drawY, drawW, drawH);
+            }
+        }
+
+        // ===== SPRITE EXTRACTION =====
+        function extractSprite(sprite, removeBackground = false) {
+            if (!loadedImage || !sprite.bounds) return null;
+
+            const { x, y, width, height } = sprite.bounds;
+            const outputW = sprite.outputSize?.width || jsonDefinition.globalSettings?.outputSize?.width || width;
+            const outputH = sprite.outputSize?.height || jsonDefinition.globalSettings?.outputSize?.height || height;
+
+            // Create temp canvas to extract from source
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(loadedImage, x, y, width, height, 0, 0, width, height);
+
+            // Handle background removal
+            if (removeBackground) {
+                const bgSettings = sprite.backgroundRemoval || jsonDefinition.globalSettings?.backgroundRemoval;
+                if (bgSettings?.enabled !== false) {
+                    removeBackgroundColor(tempCtx, width, height, bgSettings);
+                }
+            }
+
+            // Create output canvas
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = outputW;
+            outCanvas.height = outputH;
+            const outCtx = outCanvas.getContext('2d');
+
+            // Apply transformations
+            outCtx.save();
+            if (sprite.flipX || sprite.flipY) {
+                outCtx.translate(sprite.flipX ? outputW : 0, sprite.flipY ? outputH : 0);
+                outCtx.scale(sprite.flipX ? -1 : 1, sprite.flipY ? -1 : 1);
+            }
+
+            outCtx.drawImage(tempCanvas, 0, 0, width, height, 0, 0, outputW, outputH);
+            outCtx.restore();
+
+            return outCanvas;
+        }
+
+        function removeBackgroundColor(ctx, width, height, settings) {
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            const tolerance = settings?.tolerance || 15;
+
+            // Detect background color from corners if 'auto'
+            let bgR, bgG, bgB;
+            if (settings?.color === 'auto' || !settings?.color) {
+                // Sample corners
+                const samples = [
+                    [0, 0],
+                    [width - 1, 0],
+                    [0, height - 1],
+                    [width - 1, height - 1]
+                ];
+                let sumR = 0, sumG = 0, sumB = 0;
+                samples.forEach(([sx, sy]) => {
+                    const i = (sy * width + sx) * 4;
+                    sumR += data[i];
+                    sumG += data[i + 1];
+                    sumB += data[i + 2];
+                });
+                bgR = Math.round(sumR / 4);
+                bgG = Math.round(sumG / 4);
+                bgB = Math.round(sumB / 4);
+            } else {
+                // Parse hex color
+                const hex = settings.color.replace('#', '');
+                bgR = parseInt(hex.substr(0, 2), 16);
+                bgG = parseInt(hex.substr(2, 2), 16);
+                bgB = parseInt(hex.substr(4, 2), 16);
+            }
+
+            // Remove matching colors
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                if (Math.abs(r - bgR) <= tolerance &&
+                    Math.abs(g - bgG) <= tolerance &&
+                    Math.abs(b - bgB) <= tolerance) {
+                    data[i + 3] = 0; // Set alpha to 0
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        // ===== EXTRACT ALL SPRITES =====
+        async function extractAllSprites() {
+            if (!loadedImage || !jsonDefinition) {
+                alert('Bitte erst Bild und JSON laden!');
+                return;
+            }
+
+            extractedSprites = [];
+            const container = document.getElementById('extractedSprites');
+            container.innerHTML = '';
+            const progressBar = document.getElementById('extractProgress');
+            const removeBackground = document.getElementById('removeBackground').checked;
+            const generateColors = document.getElementById('generatePlayerColors').checked;
+
+            const sprites = jsonDefinition.sprites;
+            const total = sprites.length * (generateColors && jsonDefinition.type === 'units' ? 4 : 1);
+            let processed = 0;
+
+            for (const sprite of sprites) {
+                const extracted = extractSprite(sprite, removeBackground);
+                if (!extracted) continue;
+
+                // Generate player color variants for units
+                if (generateColors && jsonDefinition.type === 'units') {
+                    const colors = ['#22c55e', '#ef4444', '#3b82f6', '#eab308'];
+                    for (let p = 0; p < colors.length; p++) {
+                        const colored = colorizeSprite(extracted, colors[p]);
+                        const item = {
+                            id: `${sprite.id}_p${p}`,
+                            name: `${sprite.name} (Spieler ${p + 1})`,
+                            canvas: colored,
+                            metadata: { ...sprite.metadata, player: p }
+                        };
+                        extractedSprites.push(item);
+                        addPreviewItem(item, container);
+                        processed++;
+                        progressBar.style.width = (processed / total * 100) + '%';
+                        await new Promise(r => setTimeout(r, 10));
+                    }
+                } else {
+                    const item = {
+                        id: sprite.id,
+                        name: sprite.name,
+                        canvas: extracted,
+                        metadata: sprite.metadata
+                    };
+                    extractedSprites.push(item);
+                    addPreviewItem(item, container);
+                    processed++;
+                    progressBar.style.width = (processed / total * 100) + '%';
+                    await new Promise(r => setTimeout(r, 10));
+                }
+            }
+
+            progressBar.style.width = '100%';
+        }
+
+        function colorizeSprite(sourceCanvas, targetColor) {
+            const canvas = document.createElement('canvas');
+            canvas.width = sourceCanvas.width;
+            canvas.height = sourceCanvas.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(sourceCanvas, 0, 0);
+
+            // Simple colorization - overlay multiply blend
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = targetColor;
+            ctx.globalAlpha = 0.3;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            return canvas;
+        }
+
+        function addPreviewItem(item, container) {
+            const div = document.createElement('div');
+            div.className = 'preview-item';
+            div.onclick = () => {
+                document.querySelectorAll('.preview-item').forEach(d => d.classList.remove('selected'));
+                div.classList.add('selected');
+            };
+
+            const previewCanvas = document.createElement('canvas');
+            const scale = Math.min(130 / item.canvas.width, 130 / item.canvas.height);
+            previewCanvas.width = item.canvas.width * scale;
+            previewCanvas.height = item.canvas.height * scale;
+            const pCtx = previewCanvas.getContext('2d');
+            pCtx.drawImage(item.canvas, 0, 0, previewCanvas.width, previewCanvas.height);
+            div.appendChild(previewCanvas);
+
+            const name = document.createElement('div');
+            name.className = 'name';
+            name.textContent = item.id;
+            div.appendChild(name);
+
+            const size = document.createElement('div');
+            size.className = 'size';
+            size.textContent = `${item.canvas.width}x${item.canvas.height}`;
+            div.appendChild(size);
+
+            container.appendChild(div);
+        }
+
+        // ===== JSON EDITOR =====
+        function parseJSONEditor() {
+            try {
+                jsonDefinition = JSON.parse(document.getElementById('jsonEditor').value);
+                updateJSONDisplay('(bearbeitet)');
+            } catch (err) {
+                // Don't alert on every keystroke
+            }
+        }
+
+        function formatJSON() {
+            try {
+                const json = JSON.parse(document.getElementById('jsonEditor').value);
+                document.getElementById('jsonEditor').value = JSON.stringify(json, null, 2);
+            } catch (err) {
+                alert('Ungültiges JSON: ' + err.message);
+            }
+        }
+
+        function downloadJSON() {
+            const json = document.getElementById('jsonEditor').value;
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${jsonDefinition?.type || 'sprites'}-definition.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ===== EXPORT =====
+        async function exportAllAsZip() {
+            if (extractedSprites.length === 0) {
+                alert('Bitte erst Sprites extrahieren!');
+                return;
+            }
+
+            const log = document.getElementById('exportLog');
+            log.innerHTML = '';
+            const progressBar = document.getElementById('exportProgress');
+
+            const zip = new JSZip();
+            const format = document.getElementById('exportFormat').value;
+            const prefix = document.getElementById('exportPrefix').value;
+            const structure = document.getElementById('exportStructure').value;
+            const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
+
+            addLog('info', `Starte Export von ${extractedSprites.length} Sprites...`);
+
+            for (let i = 0; i < extractedSprites.length; i++) {
+                const sprite = extractedSprites[i];
+                let folder = '';
+
+                if (structure === 'type' && sprite.metadata) {
+                    if (sprite.metadata.unitClass) folder = 'units/';
+                    else if (sprite.metadata.terrainType) folder = 'terrain/';
+                    else if (sprite.metadata.detailType) folder = 'details/';
+                }
+
+                const filename = `${folder}${prefix}${sprite.id}.${format}`;
+
+                const blob = await new Promise(resolve =>
+                    sprite.canvas.toBlob(resolve, mimeType, 0.9)
+                );
+                zip.file(filename, blob);
+
+                progressBar.style.width = ((i + 1) / extractedSprites.length * 100) + '%';
+                addLog('success', `Exportiert: ${filename}`);
+
+                await new Promise(r => setTimeout(r, 5));
+            }
+
+            addLog('info', 'Erstelle ZIP-Archiv...');
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+            const url = URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${jsonDefinition?.type || 'sprites'}-export.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            addLog('success', `ZIP-Archiv erstellt: ${(zipBlob.size / 1024).toFixed(1)} KB`);
+        }
+
+        function exportSelected() {
+            const selected = document.querySelector('.preview-item.selected');
+            if (!selected) {
+                alert('Bitte ein Sprite in der Vorschau auswählen!');
+                return;
+            }
+
+            const index = Array.from(document.querySelectorAll('.preview-item')).indexOf(selected);
+            const sprite = extractedSprites[index];
+            if (!sprite) return;
+
+            const format = document.getElementById('exportFormat').value;
+            const mimeType = format === 'webp' ? 'image/webp' : 'image/png';
+
+            sprite.canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${sprite.id}.${format}`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }, mimeType, 0.9);
+        }
+
+        function addLog(type, message) {
+            const log = document.getElementById('exportLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // ===== CANVAS CLICK HANDLER =====
+        document.getElementById('spriteCanvas').addEventListener('click', (e) => {
+            if (!jsonDefinition) return;
+
+            const rect = e.target.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
+
+            // Find clicked sprite
+            for (let i = 0; i < jsonDefinition.sprites.length; i++) {
+                const sprite = jsonDefinition.sprites[i];
+                const b = sprite.bounds;
+                if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
+                    selectSprite(i);
+                    return;
+                }
+            }
+        });
+
+        // Initial state
+        document.getElementById('boundsEditor').style.display = 'none';
+    </script>
+</body>
+</html>

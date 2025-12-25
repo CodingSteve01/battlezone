@@ -1,0 +1,174 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shadow Squad Sprite Sheet Definition",
+  "description": "Defines how to extract individual sprites/tiles from a sprite sheet image",
+  "type": "object",
+  "required": ["version", "source", "type", "sprites"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for future compatibility",
+      "enum": ["1.0"]
+    },
+    "source": {
+      "type": "string",
+      "description": "Source image filename (relative to spritesheets folder)"
+    },
+    "type": {
+      "type": "string",
+      "description": "Type of sprite sheet",
+      "enum": ["units", "terrain", "details", "effects"]
+    },
+    "globalSettings": {
+      "type": "object",
+      "description": "Default settings applied to all sprites unless overridden",
+      "properties": {
+        "outputSize": {
+          "type": "object",
+          "description": "Default output dimensions for extracted sprites",
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "padding": {
+          "type": "integer",
+          "description": "Default padding around sprites in pixels",
+          "default": 0
+        },
+        "backgroundRemoval": {
+          "type": "object",
+          "description": "Background removal settings",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "color": {
+              "type": "string",
+              "description": "Background color to remove (hex or 'auto' for edge detection)"
+            },
+            "tolerance": {
+              "type": "integer",
+              "description": "Color matching tolerance (0-255)",
+              "default": 10
+            }
+          }
+        },
+        "scale": {
+          "type": "number",
+          "description": "Default scale factor for output",
+          "default": 1.0
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "description": "Grid-based extraction (for uniform sprite sheets)",
+      "properties": {
+        "cellWidth": { "type": "integer", "minimum": 1 },
+        "cellHeight": { "type": "integer", "minimum": 1 },
+        "columns": { "type": "integer", "minimum": 1 },
+        "rows": { "type": "integer", "minimum": 1 },
+        "offsetX": { "type": "integer", "default": 0 },
+        "offsetY": { "type": "integer", "default": 0 },
+        "spacingX": { "type": "integer", "default": 0 },
+        "spacingY": { "type": "integer", "default": 0 }
+      }
+    },
+    "sprites": {
+      "type": "array",
+      "description": "Individual sprite definitions",
+      "items": {
+        "type": "object",
+        "required": ["id", "bounds"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for this sprite (used for output filename)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name"
+          },
+          "bounds": {
+            "type": "object",
+            "description": "Source rectangle in the sprite sheet",
+            "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": { "type": "integer", "minimum": 0 },
+              "y": { "type": "integer", "minimum": 0 },
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "anchor": {
+            "type": "object",
+            "description": "Anchor point for positioning (relative to bounds)",
+            "properties": {
+              "x": { "type": "number", "default": 0.5 },
+              "y": { "type": "number", "default": 1.0 }
+            }
+          },
+          "outputSize": {
+            "type": "object",
+            "description": "Override output dimensions for this sprite",
+            "properties": {
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "scale": {
+            "type": "number",
+            "description": "Override scale factor for this sprite"
+          },
+          "rotation": {
+            "type": "number",
+            "description": "Rotation in degrees (clockwise)",
+            "default": 0
+          },
+          "flipX": {
+            "type": "boolean",
+            "description": "Flip horizontally",
+            "default": false
+          },
+          "flipY": {
+            "type": "boolean",
+            "description": "Flip vertically",
+            "default": false
+          },
+          "backgroundRemoval": {
+            "type": "object",
+            "description": "Override background removal for this sprite"
+          },
+          "colorize": {
+            "type": "object",
+            "description": "Apply color tinting for player variants",
+            "properties": {
+              "enabled": { "type": "boolean", "default": false },
+              "baseColor": { "type": "string", "description": "Color to replace" },
+              "targetColors": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Target colors for each player variant"
+              }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Tags for categorization (e.g., ['player0', 'selected'])"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional custom metadata",
+            "properties": {
+              "unitClass": { "type": "string" },
+              "state": { "type": "string" },
+              "terrainType": { "type": "string" },
+              "variant": { "type": "integer" },
+              "detailType": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
