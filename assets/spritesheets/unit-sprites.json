@@ -18,11 +18,17 @@
     "description": "Generate player-colored variants from base sprites",
     "targetColors": ["#22c55e", "#ef4444", "#3b82f6", "#eab308"]
   },
+  "mirroring": {
+    "enabled": true,
+    "description": "Generate horizontally flipped variants for opposite facing direction",
+    "baseDirection": "right",
+    "generateMirror": true
+  },
   "grid": {
     "cellWidth": 256,
     "cellHeight": 256,
     "columns": 4,
-    "rows": 4,
+    "rows": 5,
     "offsetX": 0,
     "offsetY": 0,
     "spacingX": 0,
@@ -34,7 +40,7 @@
       "name": "Scout - Normal",
       "bounds": { "x": 0, "y": 0, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "scout", "state": "normal" },
+      "metadata": { "unitClass": "scout", "state": "normal", "facing": "right" },
       "tags": ["scout", "normal", "standing"]
     },
     {
@@ -42,7 +48,7 @@
       "name": "Scout - Deckung",
       "bounds": { "x": 256, "y": 0, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "scout", "state": "cover" },
+      "metadata": { "unitClass": "scout", "state": "cover", "facing": "right" },
       "tags": ["scout", "cover", "kneeling"]
     },
     {
@@ -50,7 +56,7 @@
       "name": "Scout - Angriff",
       "bounds": { "x": 512, "y": 0, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "scout", "state": "attack" },
+      "metadata": { "unitClass": "scout", "state": "attack", "facing": "right" },
       "tags": ["scout", "attack", "moving"]
     },
     {
@@ -66,7 +72,7 @@
       "name": "Assault - Normal",
       "bounds": { "x": 0, "y": 256, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "assault", "state": "normal" },
+      "metadata": { "unitClass": "assault", "state": "normal", "facing": "right" },
       "tags": ["assault", "normal", "standing"]
     },
     {
@@ -74,7 +80,7 @@
       "name": "Assault - Deckung",
       "bounds": { "x": 256, "y": 256, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "assault", "state": "cover" },
+      "metadata": { "unitClass": "assault", "state": "cover", "facing": "right" },
       "tags": ["assault", "cover", "kneeling"]
     },
     {
@@ -82,7 +88,7 @@
       "name": "Assault - Angriff",
       "bounds": { "x": 512, "y": 256, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "assault", "state": "attack" },
+      "metadata": { "unitClass": "assault", "state": "attack", "facing": "right" },
       "tags": ["assault", "attack", "moving"]
     },
     {
@@ -98,7 +104,7 @@
       "name": "Medic - Normal",
       "bounds": { "x": 0, "y": 512, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "medic", "state": "normal" },
+      "metadata": { "unitClass": "medic", "state": "normal", "facing": "right" },
       "tags": ["medic", "normal", "standing"]
     },
     {
@@ -106,7 +112,7 @@
       "name": "Medic - Deckung",
       "bounds": { "x": 256, "y": 512, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "medic", "state": "cover" },
+      "metadata": { "unitClass": "medic", "state": "cover", "facing": "right" },
       "tags": ["medic", "cover", "kneeling"]
     },
     {
@@ -114,7 +120,7 @@
       "name": "Medic - Angriff",
       "bounds": { "x": 512, "y": 512, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "medic", "state": "attack" },
+      "metadata": { "unitClass": "medic", "state": "attack", "facing": "right" },
       "tags": ["medic", "attack", "moving"]
     },
     {
@@ -130,7 +136,7 @@
       "name": "Commando - Normal",
       "bounds": { "x": 0, "y": 768, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "ninja", "state": "normal" },
+      "metadata": { "unitClass": "ninja", "state": "normal", "facing": "right" },
       "tags": ["ninja", "commando", "normal", "stealth"]
     },
     {
@@ -138,7 +144,7 @@
       "name": "Commando - Deckung",
       "bounds": { "x": 256, "y": 768, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "ninja", "state": "cover" },
+      "metadata": { "unitClass": "ninja", "state": "cover", "facing": "right" },
       "tags": ["ninja", "commando", "cover", "stealth"]
     },
     {
@@ -146,7 +152,7 @@
       "name": "Commando - Angriff",
       "bounds": { "x": 512, "y": 768, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.95 },
-      "metadata": { "unitClass": "ninja", "state": "attack" },
+      "metadata": { "unitClass": "ninja", "state": "attack", "facing": "right" },
       "tags": ["ninja", "commando", "attack", "stealth"]
     },
     {
@@ -156,6 +162,38 @@
       "anchor": { "x": 0.5, "y": 0.9 },
       "metadata": { "unitClass": "ninja", "state": "dead" },
       "tags": ["ninja", "commando", "dead"]
+    },
+    {
+      "id": "sniper_normal",
+      "name": "Sniper - Normal",
+      "bounds": { "x": 0, "y": 1024, "width": 256, "height": 256 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "unitClass": "sniper", "state": "normal", "facing": "left" },
+      "tags": ["sniper", "normal", "prone", "aiming"]
+    },
+    {
+      "id": "sniper_cover",
+      "name": "Sniper - Deckung",
+      "bounds": { "x": 256, "y": 1024, "width": 256, "height": 256 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "unitClass": "sniper", "state": "cover", "facing": "left" },
+      "tags": ["sniper", "cover", "prone", "hidden"]
+    },
+    {
+      "id": "sniper_attack",
+      "name": "Sniper - Angriff",
+      "bounds": { "x": 512, "y": 1024, "width": 256, "height": 256 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "unitClass": "sniper", "state": "attack", "facing": "left" },
+      "tags": ["sniper", "attack", "prone", "firing"]
+    },
+    {
+      "id": "sniper_dead",
+      "name": "Sniper - Tot",
+      "bounds": { "x": 768, "y": 1024, "width": 256, "height": 256 },
+      "anchor": { "x": 0.5, "y": 0.9 },
+      "metadata": { "unitClass": "sniper", "state": "dead" },
+      "tags": ["sniper", "dead", "prone"]
     }
   ]
 }
