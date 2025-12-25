@@ -28,7 +28,7 @@
     "cellWidth": 256,
     "cellHeight": 256,
     "columns": 4,
-    "rows": 5,
+    "rows": 4,
     "offsetX": 0,
     "offsetY": 0,
     "spacingX": 0,
@@ -157,43 +157,11 @@
     },
     {
       "id": "ninja_dead",
-      "name": "Commando - Tot",
+      "name": "Commando - Dead",
       "bounds": { "x": 768, "y": 768, "width": 256, "height": 256 },
       "anchor": { "x": 0.5, "y": 0.9 },
       "metadata": { "unitClass": "ninja", "state": "dead" },
       "tags": ["ninja", "commando", "dead"]
-    },
-    {
-      "id": "sniper_normal",
-      "name": "Sniper - Normal",
-      "bounds": { "x": 0, "y": 1024, "width": 256, "height": 256 },
-      "anchor": { "x": 0.5, "y": 0.9 },
-      "metadata": { "unitClass": "sniper", "state": "normal", "facing": "left" },
-      "tags": ["sniper", "normal", "prone", "aiming"]
-    },
-    {
-      "id": "sniper_cover",
-      "name": "Sniper - Deckung",
-      "bounds": { "x": 256, "y": 1024, "width": 256, "height": 256 },
-      "anchor": { "x": 0.5, "y": 0.9 },
-      "metadata": { "unitClass": "sniper", "state": "cover", "facing": "left" },
-      "tags": ["sniper", "cover", "prone", "hidden"]
-    },
-    {
-      "id": "sniper_attack",
-      "name": "Sniper - Angriff",
-      "bounds": { "x": 512, "y": 1024, "width": 256, "height": 256 },
-      "anchor": { "x": 0.5, "y": 0.9 },
-      "metadata": { "unitClass": "sniper", "state": "attack", "facing": "left" },
-      "tags": ["sniper", "attack", "prone", "firing"]
-    },
-    {
-      "id": "sniper_dead",
-      "name": "Sniper - Tot",
-      "bounds": { "x": 768, "y": 1024, "width": 256, "height": 256 },
-      "anchor": { "x": 0.5, "y": 0.9 },
-      "metadata": { "unitClass": "sniper", "state": "dead" },
-      "tags": ["sniper", "dead", "prone"]
     }
   ]
 }
