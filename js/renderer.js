@@ -424,8 +424,8 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.save();
         context.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Add 2px buffer to prevent anti-aliasing seams between tiles
-        const buffer = 2;
+        // Buffer proportional to size to prevent anti-aliasing seams
+        const buffer = Math.max(4, size * 0.04);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
@@ -823,8 +823,8 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.save();
         ctx.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Add 2px buffer to prevent anti-aliasing seams between tiles
-        const buffer = 2;
+        // Buffer proportional to size to prevent anti-aliasing seams
+        const buffer = Math.max(4, size * 0.04);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
@@ -953,27 +953,30 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
     const BUSH_SORT_OFFSET = size * 0.38;     // Bushes similar to shrubs
 
     if (type === 'forest' || type === 'pine') {
-        // Dense forest with multiple trees for realistic appearance
-        // Main trees: 3-5 per hex for proper forest density
-        const baseTreeCount = 3 + Math.abs(baseSeed % 3);
-        const hexRadius = s * 0.9;
+        // Mixed forest with trees distributed across entire hex including edges
+        // Main trees: 4-6 per hex for dense forest feel
+        const baseTreeCount = 4 + Math.abs(baseSeed % 3);
+        const hexRadius = s * 1.1; // Extend beyond hex center for edge trees
 
         for (let i = 0; i < baseTreeCount; i++) {
-            // Distribute trees across the hex using golden angle for natural spacing
+            // Distribute trees more widely, including edges and bottom
             const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-            const angle = i * goldenAngle + seededRandom(baseSeed + i) * 0.5;
-            const radius = hexRadius * (0.3 + seededRandom(baseSeed + i * 7) * 0.6);
+            const angle = i * goldenAngle + seededRandom(baseSeed + i) * 0.8;
+            // Allow trees to reach edges (0.5 to 1.0 of radius)
+            const radius = hexRadius * (0.2 + seededRandom(baseSeed + i * 7) * 0.8);
 
-            const tx = cx + Math.cos(angle) * radius * 0.7;
-            const ty = cy + Math.sin(angle) * radius * 0.5; // Compress Y for isometric effect
+            const tx = cx + Math.cos(angle) * radius * 0.85;
+            // Full Y range for isometric effect - trees can be at bottom
+            const ty = cy + Math.sin(angle) * radius * 0.7;
 
-            // Vary tree sizes - larger in center, smaller at edges
-            const distFromCenter = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / hexRadius;
-            const sizeVariation = 1.2 - distFromCenter * 0.4;
-            const treeSize = s * (1.2 + seededRandom(baseSeed + i * 10 + 2) * 0.5) * sizeVariation;
+            // Large size variation for mixed forest (0.5x to 1.8x)
+            const baseSizeVar = 0.5 + seededRandom(baseSeed + i * 10 + 2) * 1.3;
+            const treeSize = s * baseSizeVar * 1.4;
 
-            // Pine terrain uses mostly pine trees (type 0), forest uses all types
-            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 5);
+            // Mixed forest: use all tree types with weighted distribution
+            const treeType = type === 'pine'
+                ? 0
+                : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 6);
 
             elements.push({
                 type: 'tree',
@@ -984,22 +987,22 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             });
         }
 
-        // Add background/smaller trees for depth (draw first, appear behind)
-        const bgTreeCount = 2 + Math.abs((baseSeed + 50) % 2);
-        for (let i = 0; i < bgTreeCount; i++) {
-            const angle = seededRandom(baseSeed + i * 20 + 200) * Math.PI * 2;
-            const radius = hexRadius * (0.4 + seededRandom(baseSeed + i * 20 + 201) * 0.5);
+        // Add edge/corner trees that extend beyond hex boundaries
+        const edgeTreeCount = 2 + Math.abs((baseSeed + 50) % 3);
+        for (let i = 0; i < edgeTreeCount; i++) {
+            // Place trees at hex edges (left, right, bottom corners)
+            const edgeAngle = (i / edgeTreeCount) * Math.PI * 2 + seededRandom(baseSeed + i * 20 + 200) * 0.6;
+            const edgeRadius = hexRadius * (0.85 + seededRandom(baseSeed + i * 20 + 201) * 0.3);
 
-            const tx = cx + Math.cos(angle) * radius * 0.6;
-            // Place background trees higher (smaller Y = further back in 2.5D)
-            const ty = cy - s * 0.3 + Math.sin(angle) * radius * 0.3;
+            const tx = cx + Math.cos(edgeAngle) * edgeRadius * 0.9;
+            const ty = cy + Math.sin(edgeAngle) * edgeRadius * 0.7;
 
-            // Background trees are smaller
-            const treeSize = s * (0.7 + seededRandom(baseSeed + i * 20 + 202) * 0.3);
-            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 5);
+            // Edge trees have varied sizes - some tall, some short
+            const treeSize = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
+            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 6);
 
             elements.push({
-                type: 'tree-bg',
+                type: 'tree-edge',
                 x: tx,
                 y: ty,
                 sortY: ty + BG_TREE_SORT_OFFSET,

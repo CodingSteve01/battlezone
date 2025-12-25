@@ -49,11 +49,11 @@ const TerrainGenerator = {
             noiseScale: 0.04
         },
         water: {
-            baseColor: '#3a6a85',
-            lightColor: '#4a7a98',
-            darkColor: '#2a5a70',
-            midColor: '#356580',
-            accentColor: '#5a8aaa',
+            baseColor: '#2a5570',
+            lightColor: '#3a6585',
+            darkColor: '#1a4560',
+            midColor: '#2a5068',
+            accentColor: '#4a7595',
             detailType: 'water',
             noiseScale: 0.015
         },
@@ -76,11 +76,11 @@ const TerrainGenerator = {
             noiseScale: 0.025
         },
         river: {
-            baseColor: '#3a6c8a',
-            lightColor: '#4a7c9a',
-            darkColor: '#2a5c7a',
-            midColor: '#356885',
-            accentColor: '#5a8caa',
+            baseColor: '#2a6078',
+            lightColor: '#4a8098',
+            darkColor: '#1a4a60',
+            midColor: '#2a5570',
+            accentColor: '#5a90a8',
             detailType: 'flowing_water',
             noiseScale: 0.02
         }

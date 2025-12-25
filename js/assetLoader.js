@@ -209,43 +209,38 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
 }
 
 /**
- * Draw a simple unit placeholder (colored circle with class icon)
+ * Draw a simple unit placeholder (colored silhouette)
+ * No letter shown - just a minimal indicator when sprites are loading
  */
 function drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected) {
-    const radius = size * 0.6;
+    const radius = size * 0.4;
 
     // Selection ring
     if (isSelected) {
         ctx.beginPath();
         ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
         ctx.stroke();
     }
 
-    // Unit circle
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    // Simple silhouette shape (head + body)
     ctx.fillStyle = playerColor;
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(cx, cy - radius * 0.5, radius * 0.35, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
+
+    // Body (oval)
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + radius * 0.2, radius * 0.4, radius * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outline
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1;
     ctx.stroke();
-
-    // Class initial
-    const initials = {
-        scout: 'S',
-        assault: 'A',
-        medic: 'M',
-        sniper: 'N',
-        commando: 'C'
-    };
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${size * 0.5}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials[classType] || '?', cx, cy);
 }
 
 /**

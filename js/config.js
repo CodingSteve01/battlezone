@@ -1,7 +1,7 @@
 // ===== GAME CONFIGURATION =====
 
 export const CONFIG = {
-    BASE_HEX_SIZE: 55,
+    BASE_HEX_SIZE: 110,
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb'],
     UNITS_PER_PLAYER: 3,

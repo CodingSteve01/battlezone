@@ -40,7 +40,7 @@ const TreeGenerator = {
             shape: 'oval',
             foliageDensity: 0.7,
             trunkTaper: 0.9,
-            branchiness: 0.5
+            branchiness: 0.2
         },
         dead: {
             trunkColor: '#5a4a38',
