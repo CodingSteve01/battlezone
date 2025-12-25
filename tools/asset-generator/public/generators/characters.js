@@ -179,92 +179,245 @@ const CharacterGenerator = {
     },
 
     drawLegs(ctx, centerX, bodyY, groundY, poseConfig, uniform, classConfig) {
+        // Top-down perspective: legs are foreshortened, we see thigh tops and boot tops
         const legSpread = poseConfig.legSpread;
-        const legLength = poseConfig.stance === 'crouching' ? 25 : 38;
+        const isCrouching = poseConfig.stance === 'crouching';
 
-        // Draw pants with shading
-        const pantsGradient = ctx.createLinearGradient(
-            centerX - legSpread, bodyY,
-            centerX + legSpread, bodyY + legLength
-        );
-        pantsGradient.addColorStop(0, uniform.light);
-        pantsGradient.addColorStop(0.5, uniform.base);
-        pantsGradient.addColorStop(1, uniform.dark);
+        // In top-down view, the "length" we see is mostly the foreshortened vertical distance
+        const visibleLegLength = isCrouching ? 18 : 28;
 
-        ctx.strokeStyle = pantsGradient;
-        ctx.lineCap = 'round';
+        // Thigh width varies by build
+        const thighWidth = classConfig.bodyBuild === 'heavy' ? 11 :
+                          classConfig.bodyBuild === 'lean' ? 8 : 9;
 
-        // Left leg with thickness variation
-        for (let t = 0; t < 3; t++) {
-            ctx.lineWidth = 10 - t * 2;
-            ctx.globalAlpha = t === 0 ? 1 : 0.5;
-            ctx.beginPath();
-            if (poseConfig.stance === 'crouching') {
-                ctx.moveTo(centerX - 8, bodyY + 15);
-                ctx.quadraticCurveTo(
-                    centerX - legSpread - 5, bodyY + legLength / 2,
-                    centerX - legSpread + 3, groundY - 8
-                );
-            } else {
-                ctx.moveTo(centerX - 8, bodyY + 15);
-                ctx.lineTo(centerX - legSpread, groundY - 8);
-            }
-            ctx.stroke();
-        }
+        // Lower leg (calf) width
+        const calfWidth = thighWidth * 0.75;
 
-        // Right leg
-        for (let t = 0; t < 3; t++) {
-            ctx.lineWidth = 10 - t * 2;
-            ctx.globalAlpha = t === 0 ? 1 : 0.5;
-            ctx.beginPath();
-            if (poseConfig.stance === 'crouching') {
-                ctx.moveTo(centerX + 8, bodyY + 15);
-                ctx.quadraticCurveTo(
-                    centerX + legSpread + 5, bodyY + legLength / 2,
-                    centerX + legSpread - 3, groundY - 8
-                );
-            } else {
-                ctx.moveTo(centerX + 8, bodyY + 15);
-                ctx.lineTo(centerX + legSpread, groundY - 8);
-            }
-            ctx.stroke();
-        }
+        // Left leg (drawn first, slightly behind)
+        this.drawLegTopDown(ctx, centerX - legSpread * 0.4, bodyY + 12,
+                           -legSpread * 0.5, visibleLegLength,
+                           thighWidth, calfWidth, uniform, isCrouching, false);
 
-        ctx.globalAlpha = 1;
+        // Right leg (slightly in front due to perspective)
+        this.drawLegTopDown(ctx, centerX + legSpread * 0.4, bodyY + 12,
+                           legSpread * 0.5, visibleLegLength,
+                           thighWidth, calfWidth, uniform, isCrouching, true);
 
-        // Boots with detail
-        this.drawBoot(ctx, centerX - legSpread, groundY - 6);
-        this.drawBoot(ctx, centerX + legSpread, groundY - 6);
+        // Boots with top-down perspective
+        const bootLeftX = centerX - legSpread * 0.9;
+        const bootRightX = centerX + legSpread * 0.9;
+        const bootY = groundY - 6;
 
-        // Knee pads for heavy armor
+        this.drawBootTopDown(ctx, bootLeftX, bootY, false, isCrouching);
+        this.drawBootTopDown(ctx, bootRightX, bootY, true, isCrouching);
+
+        // Knee pads for heavy armor (visible from above)
         if (classConfig.armor === 'heavy') {
+            const kneeY = isCrouching ? bodyY + 22 : bodyY + 26;
+            const kneeOffsetX = legSpread * 0.55;
+
+            // Left knee pad (top view - oval shape)
             ctx.fillStyle = '#2a2a2a';
-            const kneeY = poseConfig.stance === 'crouching' ? bodyY + 20 : bodyY + 25;
             ctx.beginPath();
-            ctx.ellipse(centerX - legSpread / 2 - 2, kneeY, 6, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(centerX - kneeOffsetX, kneeY, 5, 6, -0.2, 0, Math.PI * 2);
             ctx.fill();
+            // Highlight
+            ctx.fillStyle = '#3a3a3a';
             ctx.beginPath();
-            ctx.ellipse(centerX + legSpread / 2 + 2, kneeY, 6, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(centerX - kneeOffsetX - 1, kneeY - 1, 2.5, 3, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Right knee pad
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.ellipse(centerX + kneeOffsetX, kneeY, 5, 6, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#3a3a3a';
+            ctx.beginPath();
+            ctx.ellipse(centerX + kneeOffsetX + 1, kneeY - 1, 2.5, 3, 0.2, 0, Math.PI * 2);
             ctx.fill();
         }
     },
 
-    drawBoot(ctx, x, y) {
-        // Boot main body
+    drawLegTopDown(ctx, hipX, hipY, spreadX, length, thighW, calfW, uniform, isCrouching, isRight) {
+        // Top-down view: legs appear as foreshortened cylinders, we see the top surfaces
+        const kneeY = hipY + length * 0.55;
+        const ankleY = hipY + length;
+        const kneeX = hipX + spreadX * 0.6;
+        const ankleX = hipX + spreadX;
+
+        ctx.save();
+
+        // Thigh - draw as a tapered shape viewed from above
+        // Create gradient for 3D shading
+        const thighGrad = ctx.createLinearGradient(
+            hipX - thighW, hipY,
+            hipX + thighW, kneeY
+        );
+        thighGrad.addColorStop(0, uniform.light);
+        thighGrad.addColorStop(0.3, uniform.base);
+        thighGrad.addColorStop(0.7, uniform.base);
+        thighGrad.addColorStop(1, uniform.dark);
+
+        ctx.fillStyle = thighGrad;
+        ctx.beginPath();
+        // Hip attachment (wide)
+        ctx.moveTo(hipX - thighW * 0.8, hipY);
+        ctx.lineTo(hipX + thighW * 0.8, hipY);
+        // Taper to knee
+        ctx.quadraticCurveTo(
+            hipX + spreadX * 0.3 + thighW * 0.7, hipY + length * 0.3,
+            kneeX + thighW * 0.6, kneeY
+        );
+        ctx.lineTo(kneeX - thighW * 0.6, kneeY);
+        ctx.quadraticCurveTo(
+            hipX + spreadX * 0.3 - thighW * 0.7, hipY + length * 0.3,
+            hipX - thighW * 0.8, hipY
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // Thigh top surface (the part we see from above) - lighter
+        ctx.fillStyle = uniform.light;
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.ellipse(hipX, hipY + 2, thighW * 0.7, thighW * 0.35,
+                   isRight ? 0.15 : -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        // Lower leg / calf
+        const calfGrad = ctx.createLinearGradient(
+            kneeX - calfW, kneeY,
+            ankleX + calfW, ankleY
+        );
+        calfGrad.addColorStop(0, uniform.base);
+        calfGrad.addColorStop(0.5, uniform.base);
+        calfGrad.addColorStop(1, uniform.dark);
+
+        ctx.fillStyle = calfGrad;
+        ctx.beginPath();
+        ctx.moveTo(kneeX - calfW * 0.7, kneeY);
+        ctx.lineTo(kneeX + calfW * 0.7, kneeY);
+        // Taper to ankle
+        ctx.quadraticCurveTo(
+            kneeX + spreadX * 0.25 + calfW * 0.5, kneeY + length * 0.25,
+            ankleX + calfW * 0.4, ankleY
+        );
+        ctx.lineTo(ankleX - calfW * 0.4, ankleY);
+        ctx.quadraticCurveTo(
+            kneeX + spreadX * 0.25 - calfW * 0.5, kneeY + length * 0.25,
+            kneeX - calfW * 0.7, kneeY
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        // Crouching adds more visible foreshortening - show bent knee angle
+        if (isCrouching) {
+            // Knee joint visible from above as a darker area
+            ctx.fillStyle = uniform.dark;
+            ctx.beginPath();
+            ctx.ellipse(kneeX, kneeY, calfW * 0.65, calfW * 0.4,
+                       isRight ? 0.2 : -0.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Pants seam/crease detail
+        ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(hipX + (isRight ? 1 : -1), hipY + 3);
+        ctx.quadraticCurveTo(
+            kneeX + (isRight ? 1 : -1), kneeY - 3,
+            ankleX + (isRight ? 1 : -1), ankleY - 3
+        );
+        ctx.stroke();
+
+        ctx.restore();
+    },
+
+    drawBootTopDown(ctx, x, y, isRight, isCrouching) {
+        // Top-down boot view - we see the top of the boot and toe pointing forward/outward
+        const bootLength = isCrouching ? 10 : 12;
+        const bootWidth = 7;
+        const toeAngle = isRight ? 0.25 : -0.25; // Toes point slightly outward
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(toeAngle);
+
+        // Boot sole (shadow underneath)
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(1, 2, bootWidth - 1, bootLength * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main boot body - viewed from above, it's an elongated oval
+        const bootGrad = ctx.createLinearGradient(-bootWidth, 0, bootWidth, 0);
+        bootGrad.addColorStop(0, '#1a1a1a');
+        bootGrad.addColorStop(0.3, '#2a2a2a');
+        bootGrad.addColorStop(0.7, '#2a2a2a');
+        bootGrad.addColorStop(1, '#1a1a1a');
+
+        ctx.fillStyle = bootGrad;
+        ctx.beginPath();
+        // Boot shape - heel at back (positive y), toe at front (negative y)
+        ctx.moveTo(-bootWidth * 0.5, bootLength * 0.35); // heel left
+        ctx.lineTo(bootWidth * 0.5, bootLength * 0.35);  // heel right
+        ctx.quadraticCurveTo(bootWidth * 0.7, 0, bootWidth * 0.45, -bootLength * 0.4);
+        ctx.quadraticCurveTo(0, -bootLength * 0.55, -bootWidth * 0.45, -bootLength * 0.4);
+        ctx.quadraticCurveTo(-bootWidth * 0.7, 0, -bootWidth * 0.5, bootLength * 0.35);
+        ctx.closePath();
+        ctx.fill();
+
+        // Boot top surface (the part we're looking down at) - leather texture
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.ellipse(0, -bootLength * 0.1, bootWidth * 0.55, bootLength * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Ankle opening (dark hole where leg goes in)
+        ctx.fillStyle = '#0a0a0a';
+        ctx.beginPath();
+        ctx.ellipse(0, bootLength * 0.15, bootWidth * 0.35, bootLength * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Boot cap / toe reinforcement
         ctx.fillStyle = '#1a1a1a';
         ctx.beginPath();
-        ctx.ellipse(x, y, 8, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, -bootLength * 0.35, bootWidth * 0.4, bootLength * 0.12, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Boot highlight
-        ctx.fillStyle = '#3a3a3a';
+        // Highlight on boot top
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
         ctx.beginPath();
-        ctx.ellipse(x - 1, y - 2, 4, 2, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(-bootWidth * 0.15, -bootLength * 0.15, bootWidth * 0.25, bootLength * 0.15, -0.3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Sole
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(x - 7, y + 2, 14, 3);
+        // Lace area detail (eyelets visible from above)
+        ctx.fillStyle = '#1a1a1a';
+        for (let i = 0; i < 3; i++) {
+            const laceY = bootLength * 0.05 - i * bootLength * 0.12;
+            ctx.beginPath();
+            ctx.arc(-bootWidth * 0.15, laceY, 1, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(bootWidth * 0.15, laceY, 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Laces
+        ctx.strokeStyle = '#3a3020';
+        ctx.lineWidth = 0.8;
+        for (let i = 0; i < 3; i++) {
+            const laceY = bootLength * 0.05 - i * bootLength * 0.12;
+            ctx.beginPath();
+            ctx.moveTo(-bootWidth * 0.15, laceY);
+            ctx.lineTo(bootWidth * 0.15, laceY);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     },
 
     drawTorso(ctx, centerX, bodyY, poseConfig, uniform, classConfig, playerColor) {
