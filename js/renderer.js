@@ -6,8 +6,7 @@ import { hexToPixel, hexDistance } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
-import { initTextures } from './assets.js';
-import { getTexture, getAnimatedTexture, hasAnimatedTexture, drawUnit as drawUnitSprite } from './assetLoader.js';
+import { getTexture, getAnimatedTexture, hasAnimatedTexture, drawUnit as drawUnitSprite, getPlaceholderColor } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
@@ -565,11 +564,8 @@ export function initRenderer() {
     initVegetationRenderer(ctx);
     initTerrainRenderer(ctx);
 
-    // Initialize textures once
-    if (!texturesInitialized) {
-        initTextures();
-        texturesInitialized = true;
-    }
+    // Mark textures as initialized (now handled by assetLoader)
+    texturesInitialized = true;
 
     resizeCanvas();
 

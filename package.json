@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate-assets && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -14,8 +14,7 @@
     "test:e2e:headed": "playwright test --headed",
     "lint": "eslint js/ tests/",
     "lint:fix": "eslint js/ tests/ --fix",
-    "validate": "npm run lint && npm run test && npm run test:e2e",
-    "generate-assets": "node scripts/generate-assets.js"
+    "validate": "npm run lint && npm run test && npm run test:e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

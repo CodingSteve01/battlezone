@@ -1,23 +1,32 @@
 /**
  * Asset Loader Module for Shadow Squad
  *
- * Unified interface for loading game assets using the Sprite Sheet System.
- *
- * Loading priority:
- * 1. Sprite Sheet System (JSON-defined, pre-extracted PNGs)
- * 2. Runtime Canvas Generation (fallback for particles, overlays, missing sprites)
- *
- * The sprite sheet system uses JSON definitions to describe sprites,
- * making it easy to add new graphics without code changes.
+ * Loads game assets from the Sprite Sheet System.
+ * If sprites are not available, simple colored placeholders are rendered.
+ * No runtime canvas generation - sprites only.
  */
 
-import { initTextures, getTexture as getRuntimeTexture, drawHumanSprite, drawAPIndicator } from './assets.js';
 import { CONFIG } from './config.js';
 import * as SpriteSheet from './spriteSheetLoader.js';
 
 // Loading state
 let assetsLoaded = false;
 let loadingPromise = null;
+
+// Placeholder colors for missing assets
+const PLACEHOLDER_COLORS = {
+    grass: '#6a9a58',
+    forest: '#3d6a4a',
+    hills: '#7a8c5a',
+    rock: '#7a7878',
+    water: '#4a7a95',
+    sand: '#d4b888',
+    swamp: '#5a6a45',
+    road: '#9a8a70',
+    path: '#8a7860',
+    river: '#4a7c9a',
+    default: '#808080'
+};
 
 /**
  * Initialize the asset loader
@@ -28,18 +37,15 @@ export async function initAssetLoader() {
     }
 
     loadingPromise = (async () => {
-        console.log('[AssetLoader] Initializing...');
+        console.log('[AssetLoader] Initializing sprite sheet system...');
 
-        // Initialize sprite sheet system
         try {
             await SpriteSheet.initSpriteSheets();
             console.log('[AssetLoader] Sprite sheet system ready');
         } catch (err) {
             console.warn('[AssetLoader] Sprite sheet system error:', err.message);
+            console.warn('[AssetLoader] Game will use placeholder graphics');
         }
-
-        // Initialize runtime generation as fallback for particles/overlays
-        initTextures();
 
         assetsLoaded = true;
         console.log('[AssetLoader] Ready');
@@ -50,20 +56,22 @@ export async function initAssetLoader() {
 
 /**
  * Get a terrain texture
- * Uses sprite sheet system, falls back to runtime generation
+ * Returns sprite or null (renderer will use placeholder)
  */
 export function getTexture(type, q = 0, r = 0) {
-    // Try sprite sheet system first
-    const sprite = SpriteSheet.getTerrainSprite(type, q, r);
-    if (sprite) return sprite;
+    return SpriteSheet.getTerrainSprite(type, q, r);
+}
 
-    // Fallback to runtime generation
-    return getRuntimeTexture(type);
+/**
+ * Get placeholder color for a terrain type
+ */
+export function getPlaceholderColor(type) {
+    return PLACEHOLDER_COLORS[type] || PLACEHOLDER_COLORS.default;
 }
 
 /**
  * Get an animated terrain texture frame
- * Currently uses runtime generation (sprite sheet animation not yet implemented)
+ * Not yet implemented for sprite sheets
  */
 export function getAnimatedTexture(type, frameIndex) {
     // TODO: Implement animated sprite sheet support
@@ -74,12 +82,11 @@ export function getAnimatedTexture(type, frameIndex) {
  * Check if a terrain type has animated frames
  */
 export function hasAnimatedTexture(type) {
-    // TODO: Implement animated sprite sheet support
     return false;
 }
 
 /**
- * Check if we're using static assets (always true with sprite sheet system)
+ * Check if we're using static assets
  */
 export function isUsingStaticAssets() {
     return SpriteSheet.isSpriteSheetLoaded();
@@ -94,7 +101,7 @@ export function isUsingSpriteSheets() {
 
 /**
  * Get a unit sprite image
- * Uses sprite sheet system, returns null if not found (caller uses runtime drawing)
+ * Returns sprite or null (renderer will use placeholder)
  */
 export function getUnitSprite(classType, playerIndex, status = 'normal') {
     return SpriteSheet.getUnitSprite(classType, playerIndex, status);
@@ -111,11 +118,8 @@ export function getDetailElement(type, variant = 0) {
  * Get a tree sprite
  */
 export function getTreeSprite(treeType, variant = 0) {
-    // Try combined key first (e.g., "tree_0_0")
     const sprite = SpriteSheet.getDetailSprite('tree', treeType);
     if (sprite) return sprite;
-
-    // Try with subvariant
     return SpriteSheet.getDetailSprite(`tree_${treeType}`, variant);
 }
 
@@ -142,7 +146,6 @@ export function getGrassSprite(variant = 0) {
 
 /**
  * Get a random detail sprite of a given type
- * Useful for procedural placement of terrain details
  */
 export function getRandomDetailSprite(detailType, seed = Math.random()) {
     return SpriteSheet.getRandomDetailSprite(detailType, seed);
@@ -156,7 +159,7 @@ export function areAssetsLoaded() {
 }
 
 /**
- * Draw a unit (using sprite if available, otherwise runtime drawing)
+ * Draw a unit sprite or placeholder
  */
 export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex) {
     const sprite = getUnitSprite(classType, playerIndex, status);
@@ -172,8 +175,68 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
             spriteSize
         );
     } else {
-        // Fallback to runtime drawing
-        drawHumanSprite(ctx, cx, cy, size, playerColor, classType, isSelected, status);
+        // Draw simple placeholder
+        drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected);
+    }
+}
+
+/**
+ * Draw a simple unit placeholder (colored circle with class icon)
+ */
+function drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected) {
+    const radius = size * 0.6;
+
+    // Selection ring
+    if (isSelected) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    // Unit circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = playerColor;
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Class initial
+    const initials = {
+        scout: 'S',
+        assault: 'A',
+        medic: 'M',
+        sniper: 'N',
+        ninja: 'C'
+    };
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${size * 0.5}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials[classType] || '?', cx, cy);
+}
+
+/**
+ * Draw AP indicator dots
+ */
+export function drawAPIndicator(ctx, cx, cy, currentAP, maxAP, size) {
+    const dotRadius = 3;
+    const spacing = 8;
+    const startX = cx - ((maxAP - 1) * spacing) / 2;
+    const y = cy + size * 0.8;
+
+    for (let i = 0; i < maxAP; i++) {
+        ctx.beginPath();
+        ctx.arc(startX + i * spacing, y, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = i < currentAP ? '#22c55e' : '#333333';
+        ctx.fill();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
     }
 }
 
@@ -181,47 +244,26 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
 // SPRITE INFORMATION API
 // ============================================
 
-/**
- * Get available terrain types from sprite sheet system
- */
 export function getAvailableTerrainTypes() {
     return SpriteSheet.getAvailableTerrainTypes();
 }
 
-/**
- * Get number of variants for a terrain type
- */
 export function getTerrainVariantCount(type) {
     return SpriteSheet.getTerrainVariantCount(type);
 }
 
-/**
- * Get available unit classes from sprite sheet system
- */
 export function getAvailableUnitClasses() {
     return SpriteSheet.getAvailableUnitClasses();
 }
 
-/**
- * Get available states for a unit class
- */
 export function getUnitStates(unitClass) {
     return SpriteSheet.getUnitStates(unitClass);
 }
 
-/**
- * Get available detail types from sprite sheet system
- */
 export function getAvailableDetailTypes() {
     return SpriteSheet.getAvailableDetailTypes();
 }
 
-/**
- * Get number of variants for a detail type
- */
 export function getDetailVariantCount(type) {
     return SpriteSheet.getDetailVariantCount(type);
 }
-
-// Re-export runtime drawing functions for particles/overlays
-export { drawHumanSprite, drawAPIndicator };
