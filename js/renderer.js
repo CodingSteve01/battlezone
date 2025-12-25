@@ -1141,16 +1141,106 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             });
         }
     } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
-        // Large bushes on grass are foreground elements
+        // Add variety to open terrain with bushes, rocks, and occasional trees
         const grassType = Math.abs(baseSeed) % 100;
-        if (grassType < 15) {
-            const bushSize = s * 0.8;
+
+        // Large bushes on grass (20% of tiles)
+        if (grassType < 20) {
+            const bushX = cx + (seededRandom(baseSeed + 500) - 0.5) * s * 0.6;
+            const bushY = cy + (seededRandom(baseSeed + 501) - 0.5) * s * 0.4;
+            const bushSize = s * (0.7 + seededRandom(baseSeed + 502) * 0.4);
             elements.push({
                 type: 'bush',
-                x: cx,
-                y: cy,
-                sortY: cy + BUSH_SORT_OFFSET,
-                draw: () => drawBush2D5(cx, cy, bushSize, baseSeed)
+                x: bushX,
+                y: bushY,
+                sortY: bushY + BUSH_SORT_OFFSET,
+                draw: () => drawBush2D5(bushX, bushY, bushSize, baseSeed)
+            });
+        }
+
+        // Small shrubs scattered across grass (30% of tiles)
+        if (grassType >= 20 && grassType < 50) {
+            const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
+            for (let i = 0; i < shrubCount; i++) {
+                const shrubX = cx + (seededRandom(baseSeed + i * 10 + 520) - 0.5) * s * 1.2;
+                const shrubY = cy + (seededRandom(baseSeed + i * 10 + 521) - 0.5) * s * 0.8;
+                const shrubSize = s * (0.25 + seededRandom(baseSeed + i * 10 + 522) * 0.2);
+                elements.push({
+                    type: 'shrub',
+                    x: shrubX,
+                    y: shrubY,
+                    sortY: shrubY + SHRUB_SORT_OFFSET,
+                    draw: () => drawSmallShrub(shrubX, shrubY, shrubSize, baseSeed + i + 523)
+                });
+            }
+        }
+
+        // Occasional solitary trees on open terrain (8% of tiles)
+        if (grassType >= 70 && grassType < 78) {
+            const treeX = cx + (seededRandom(baseSeed + 600) - 0.5) * s * 0.4;
+            const treeY = cy + (seededRandom(baseSeed + 601) - 0.5) * s * 0.3 + TREE_Y_OFFSET;
+            const treeSize = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
+            const treeType = Math.floor(seededRandom(baseSeed + 603) * 4); // Oak, birch, etc.
+            elements.push({
+                type: 'tree-solitary',
+                x: treeX,
+                y: treeY,
+                sortY: treeY + TREE_SORT_OFFSET,
+                draw: () => drawTree2D5(treeX, treeY, treeSize, treeType, baseSeed + 604)
+            });
+        }
+
+        // Rocky outcrops on heather/hills-adjacent grass (10% of heather)
+        if (type === 'heather' && grassType >= 80 && grassType < 90) {
+            const rockX = cx + (seededRandom(baseSeed + 700) - 0.5) * s * 0.5;
+            const rockY = cy + (seededRandom(baseSeed + 701) - 0.5) * s * 0.4;
+            elements.push({
+                type: 'rock-small',
+                x: rockX,
+                y: rockY,
+                sortY: rockY + SHRUB_SORT_OFFSET,
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.0, baseSeed + 702)
+            });
+        }
+    } else if (type === 'hills') {
+        // Hills get some scattered rocks and occasional shrubs
+        const hillsType = Math.abs(baseSeed) % 100;
+
+        if (hillsType < 40) {
+            const rockX = cx + (seededRandom(baseSeed + 800) - 0.5) * s * 0.6;
+            const rockY = cy + (seededRandom(baseSeed + 801) - 0.5) * s * 0.4;
+            elements.push({
+                type: 'rock-hills',
+                x: rockX,
+                y: rockY,
+                sortY: rockY + TREE_SORT_OFFSET,
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.5, baseSeed + 802)
+            });
+        }
+
+        if (hillsType >= 60 && hillsType < 80) {
+            const shrubX = cx + (seededRandom(baseSeed + 810) - 0.5) * s * 0.8;
+            const shrubY = cy + (seededRandom(baseSeed + 811) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'shrub-hills',
+                x: shrubX,
+                y: shrubY,
+                sortY: shrubY + SHRUB_SORT_OFFSET,
+                draw: () => drawSmallShrub(shrubX, shrubY, s * 0.35, baseSeed + 812)
+            });
+        }
+    } else if (type === 'sand') {
+        // Sand gets occasional driftwood or coastal rocks
+        const sandType = Math.abs(baseSeed) % 100;
+        if (sandType < 15) {
+            const rockX = cx + (seededRandom(baseSeed + 900) - 0.5) * s * 0.8;
+            const rockY = cy + (seededRandom(baseSeed + 901) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'rock-sand',
+                x: rockX,
+                y: rockY,
+                sortY: rockY + SHRUB_SORT_OFFSET,
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 0.8, baseSeed + 902)
             });
         }
     } else if (type === 'rock' || type === 'cliff') {
@@ -1163,14 +1253,57 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             draw: () => drawRockFormation2D5(cx, cy, s * 2.2, baseSeed)
         });
     } else if (type === 'ruins') {
-        // Ruins have some rock formations
-        if (seededRandom(baseSeed) > 0.5) {
+        // Ruins have rock formations and broken walls
+        const ruinsType = Math.abs(baseSeed) % 100;
+        if (ruinsType < 60) {
+            const rockX = cx + (seededRandom(baseSeed + 1000) - 0.5) * s * 0.5;
+            const rockY = cy + (seededRandom(baseSeed + 1001) - 0.5) * s * 0.4;
             elements.push({
                 type: 'rock',
-                x: cx,
-                y: cy,
-                sortY: cy + SHRUB_SORT_OFFSET,  // Smaller ruins rocks
-                draw: () => drawRockFormation2D5(cx, cy, s * 1.5, baseSeed)
+                x: rockX,
+                y: rockY,
+                sortY: rockY + TREE_SORT_OFFSET,
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.8, baseSeed)
+            });
+        }
+        // Add some shrubs growing through ruins
+        if (ruinsType >= 40 && ruinsType < 70) {
+            const shrubX = cx + (seededRandom(baseSeed + 1010) - 0.5) * s * 0.8;
+            const shrubY = cy + (seededRandom(baseSeed + 1011) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'shrub-ruins',
+                x: shrubX,
+                y: shrubY,
+                sortY: shrubY + SHRUB_SORT_OFFSET,
+                draw: () => drawSmallShrub(shrubX, shrubY, s * 0.4, baseSeed + 1012)
+            });
+        }
+    } else if (type === 'swamp') {
+        // Swamp gets dead trees and reeds
+        const swampType = Math.abs(baseSeed) % 100;
+        if (swampType < 25) {
+            // Dead tree stump
+            const stumpX = cx + (seededRandom(baseSeed + 1100) - 0.5) * s * 0.6;
+            const stumpY = cy + (seededRandom(baseSeed + 1101) - 0.5) * s * 0.4 + TREE_Y_OFFSET;
+            const stumpSize = s * (0.6 + seededRandom(baseSeed + 1102) * 0.4);
+            elements.push({
+                type: 'dead-tree',
+                x: stumpX,
+                y: stumpY,
+                sortY: stumpY + TREE_SORT_OFFSET,
+                draw: () => drawTree2D5(stumpX, stumpY, stumpSize, 5, baseSeed + 1103) // Type 5 for dead/sparse tree
+            });
+        }
+        // Reed clusters
+        if (swampType >= 30 && swampType < 60) {
+            const reedX = cx + (seededRandom(baseSeed + 1110) - 0.5) * s * 0.9;
+            const reedY = cy + (seededRandom(baseSeed + 1111) - 0.5) * s * 0.7;
+            elements.push({
+                type: 'reeds',
+                x: reedX,
+                y: reedY,
+                sortY: reedY + SHRUB_SORT_OFFSET,
+                draw: () => drawSmallShrub(reedX, reedY, s * 0.3, baseSeed + 1112)
             });
         }
     }
@@ -1986,209 +2119,20 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
 
+    // Determine sprite status - note: 'selected' is not a sprite state, use 'normal' instead
+    // Selection is indicated by the ring around the unit, not a different sprite
     const unitStatus = unit.hiding
         ? 'cover'
         : (isSelected && state.selectedAction === 'attack'
             ? 'attack'
-            : (isSelected ? 'selected' : 'normal'));
+            : 'normal');
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
     // Size increased from 1.3 to 1.8 for better visibility at 100% zoom
     drawUnitSprite(ctx, cx, cy - size * 0.2, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
-    // Player number badge
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    ctx.arc(cx + size * 0.5, cy - size * 0.6, size * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
-
-    // Level badge (left side)
-    const level = unit.level || 1;
-    if (level > 1) {
-        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
-        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
-
-        ctx.fillStyle = levelColor;
-        ctx.beginPath();
-        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
-        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
-    }
-
-    // Shield indicator (if unit has shield from power-up)
-    if (unit.shield) {
-        ctx.globalAlpha = 1;  // Reset for indicators
-        ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
-        ctx.fillText('🛡️', cx, cy - size - 5);
-        ctx.shadowBlur = 0;
-    }
-
-    // Hiding/Cover indicator - unit is in cover
-    if (unit.hiding) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 12;
-        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🌲', cx - size * 0.5, cy - size - 5);
-        ctx.shadowBlur = 0;
-
-        // Draw speech bubble for cover status (only for current player's units)
-        if (unit.player === state.currentPlayer) {
-            drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'In Deckung', '#22c55e', size);
-        }
-
-        // Draw cover effect around unit
-        ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
-
-    // Cloak indicator (visible to owner) with speech bubble
-    if (unit.cloaked && unit.player === state.viewingPlayer) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 15;
-
-        // Draw speech bubble for stealth status
-        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'Getarnt!', '#a855f7', size);
-
-        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
-        ctx.shadowBlur = 0;
-    }
-
-    // Enemy cloaked unit detected - show shimmer/distortion indicator
-    if (unit.cloaked && unit.player !== state.viewingPlayer) {
-        ctx.globalAlpha = 0.8;
-        ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 10;
-
-        // Pulsing detection indicator
-        const pulse = 0.7 + Math.sin(Date.now() / 300) * 0.3;
-        ctx.strokeStyle = `rgba(168, 85, 247, ${pulse * 0.6})`;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.shadowBlur = 0;
-    }
-
-    // Revealed after attack indicator - enemy can see unit was here
-    if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
-        ctx.globalAlpha = 0.9;
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚠️', cx + size * 0.6, cy - size * 0.6);
-        ctx.shadowBlur = 0;
-    }
-
-    // Sprint active indicator (Scout)
-    if (unit.usedSpecial && unit.class === 'scout') {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🏃', cx + size * 0.6, cy - size * 0.8);
-        ctx.shadowBlur = 0;
-    }
-
-    // Powershot active indicator (Assault)
-    if (unit.usedSpecial && unit.class === 'assault' && unit.damage > UNIT_CLASSES.assault.damage) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('💥', cx + size * 0.6, cy - size * 0.8);
-        ctx.shadowBlur = 0;
-    }
-
-    // Damage boost indicator
-    if (unit.damageBoost && unit.damageBoost > 0) {
-        ctx.fillStyle = '#ef4444';
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
-    }
-
-    // "Spotted!" indicator - shown when enemy unit can be seen (for own units that might be detected)
-    if (unit.spotted && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.4, 'Entdeckt!', '#ef4444', size);
-    }
-
-    // HP bar with gradient
-    const hpPct = unit.currentHp / unit.maxHp;
-    const barWidth = size * 1.6;
-    const barHeight = 8;
-    const barY = cy + size * 0.65;
-
-    // Bar background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
-    ctx.fill();
-
-    // HP bar fill with gradient
-    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
-    if (hpPct > 0.5) {
-        barGradient.addColorStop(0, '#22c55e');
-        barGradient.addColorStop(1, '#16a34a');
-    } else if (hpPct > 0.25) {
-        barGradient.addColorStop(0, '#eab308');
-        barGradient.addColorStop(1, '#ca8a04');
-    } else {
-        barGradient.addColorStop(0, '#ef4444');
-        barGradient.addColorStop(1, '#dc2626');
-    }
-
-    ctx.fillStyle = barGradient;
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 3);
-    ctx.fill();
-
-    // HP text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(barHeight * 0.9)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
+    // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
+    // separately in drawUnitOverlay() to ensure they're always on top of trees
 
     // Attackable indicator
     if (isAttackable && !isSelected) {
@@ -2273,6 +2217,186 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     }
 
     ctx.restore();
+}
+
+/**
+ * Draw unit overlay - all HUD elements (badges, indicators, HP bar) on top of everything
+ * Called after all depth-sorted elements to ensure visibility
+ */
+function drawUnitOverlay(unit, cx, cy) {
+    const size = state.hexSize * 0.65;
+    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
+
+    ctx.save();
+
+    // Player number badge
+    ctx.fillStyle = playerColor;
+    ctx.beginPath();
+    ctx.arc(cx + size * 0.5, cy - size * 0.6, size * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
+
+    // Level badge (left side)
+    const level = unit.level || 1;
+    if (level > 1) {
+        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
+        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
+
+        ctx.fillStyle = levelColor;
+        ctx.beginPath();
+        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
+        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
+    }
+
+    // Shield indicator (if unit has shield from power-up)
+    if (unit.shield) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#3b82f6';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
+        ctx.fillText('🛡️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Hiding/Cover indicator - unit is in cover
+    if (unit.hiding) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 12;
+        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🌲', cx - size * 0.5, cy - size - 5);
+        ctx.shadowBlur = 0;
+
+        // Draw speech bubble for cover status (only for current player's units)
+        if (unit.player === state.currentPlayer) {
+            drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'In Deckung', '#22c55e', size);
+        }
+    }
+
+    // Cloak indicator (visible to owner) with speech bubble
+    if (unit.cloaked && unit.player === state.viewingPlayer) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#a855f7';
+        ctx.shadowBlur = 15;
+
+        // Draw speech bubble for stealth status
+        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'Getarnt!', '#a855f7', size);
+
+        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
+        ctx.shadowBlur = 0;
+    }
+
+    // Revealed after attack indicator
+    if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
+        ctx.globalAlpha = 0.9;
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 8;
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚠️', cx + size * 0.6, cy - size * 0.6);
+        ctx.shadowBlur = 0;
+    }
+
+    // Sprint active indicator (Scout)
+    if (unit.usedSpecial && unit.class === 'scout') {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🏃', cx + size * 0.6, cy - size * 0.8);
+        ctx.shadowBlur = 0;
+    }
+
+    // Powershot active indicator (Assault)
+    if (unit.usedSpecial && unit.class === 'assault' && unit.damage > UNIT_CLASSES.assault.damage) {
+        ctx.globalAlpha = 1;
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 10;
+        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💥', cx + size * 0.6, cy - size * 0.8);
+        ctx.shadowBlur = 0;
+    }
+
+    // Damage boost indicator
+    if (unit.damageBoost && unit.damageBoost > 0) {
+        ctx.fillStyle = '#ef4444';
+        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
+    }
+
+    // "Spotted!" indicator
+    if (unit.spotted && unit.player === state.currentPlayer) {
+        ctx.globalAlpha = 1;
+        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.4, 'Entdeckt!', '#ef4444', size);
+    }
+
+    ctx.restore();
+
+    // HP bar with gradient
+    const hpPct = unit.currentHp / unit.maxHp;
+    const barWidth = size * 1.6;
+    const barHeight = 8;
+    const barY = cy + size * 0.65;
+
+    // Bar background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
+    ctx.fill();
+
+    // HP bar fill with gradient
+    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
+    if (hpPct > 0.5) {
+        barGradient.addColorStop(0, '#22c55e');
+        barGradient.addColorStop(1, '#16a34a');
+    } else if (hpPct > 0.25) {
+        barGradient.addColorStop(0, '#eab308');
+        barGradient.addColorStop(1, '#ca8a04');
+    } else {
+        barGradient.addColorStop(0, '#ef4444');
+        barGradient.addColorStop(1, '#dc2626');
+    }
+
+    ctx.fillStyle = barGradient;
+    ctx.beginPath();
+    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 3);
+    ctx.fill();
+
+    // HP text
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(barHeight * 0.9)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
 }
 
 /**
@@ -2505,18 +2629,18 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 
         const fogLevel = getFogLevel(hex.q, hex.r);
 
-        // Draw subtle grid lines based on fog level
+        // Draw grid lines - more visible for better gameplay clarity
         ctx.beginPath();
         drawHexPath(sx, sy, state.hexSize);
 
         if (fogLevel === 'visible') {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
         } else if (fogLevel === 'explored') {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
         } else {
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
         }
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
     });
 
@@ -2685,32 +2809,41 @@ export function render() {
                 const hexTerrain = TERRAIN[hex.type];
                 const offersCover = hexTerrain && hexTerrain.canHide;
 
-                // Draw simple movement range highlight (green, or darker green for cover)
+                // Draw movement range highlight (green, or darker green for cover)
+                // Made more visible with higher alpha values
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize * 0.85);
-                ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.25)' : 'rgba(34, 197, 94, 0.15)';
+                drawHexPath(sx, sy, state.hexSize * 0.88);
+                ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
                 ctx.fill();
 
-                // Subtle border with cost indicator for high-cost terrain
-                ctx.strokeStyle = offersCover ? 'rgba(16, 185, 129, 0.6)' : 'rgba(34, 197, 94, 0.4)';
-                ctx.lineWidth = offersCover ? 2 : 1.5;
+                // Clear visible border
+                ctx.strokeStyle = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
+                ctx.lineWidth = offersCover ? 3 : 2.5;
                 ctx.stroke();
 
-                // Show cover icon for hexes that offer hiding
+                // Show cover icon for hexes that offer hiding - larger and more visible
                 if (offersCover) {
-                    ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
+                    ctx.globalAlpha = 0.9;
+                    ctx.font = `${Math.round(state.hexSize * 0.45)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('🛡️', sx, sy - state.hexSize * 0.25);
+                    ctx.globalAlpha = 1;
                 }
 
-                // Show movement cost on each hex for better clarity
+                // Show movement cost on each hex - larger and clearer
                 if (pathData.cost > 0) {
-                    ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.9)' : 'rgba(34, 197, 94, 0.9)';
-                    ctx.font = `bold ${Math.round(state.hexSize * 0.25)}px sans-serif`;
+                    // Background pill for cost
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.beginPath();
+                    ctx.roundRect(sx - state.hexSize * 0.18, sy + state.hexSize * 0.38, state.hexSize * 0.36, state.hexSize * 0.22, 4);
+                    ctx.fill();
+
+                    ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
+                    ctx.font = `bold ${Math.round(state.hexSize * 0.2)}px sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`${pathData.cost}`, sx, sy + state.hexSize * 0.5);
+                    ctx.fillText(`${pathData.cost}`, sx, sy + state.hexSize * 0.49);
                 }
             }
         }
@@ -2866,17 +2999,21 @@ export function render() {
                 ctx.lineTo(endSx + s * 0.5, endSy - s * 0.4);
                 ctx.stroke();
 
-                // Cost badge
+                // Cost badge - larger and more visible
                 const cost = pathWithCosts[lastReachableIndex].totalCost;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.beginPath();
-                ctx.roundRect(endSx - 18, endSy + btnSize + 8, 36, 18, 4);
+                ctx.roundRect(endSx - 26, endSy + btnSize + 6, 52, 24, 6);
                 ctx.fill();
-                ctx.fillStyle = '#22c55e';
-                ctx.font = 'bold 11px sans-serif';
+                // Border for visibility
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = '#4ade80';
+                ctx.font = 'bold 14px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 17);
+                ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 18);
 
                 // Show multi-turn indicator if applicable
                 if (isMultiTurnPath) {
@@ -2989,7 +3126,10 @@ export function render() {
             type: 'unit',
             x: sx,
             y: sy,
-            sortY: sy + state.hexSize * 0.4, // Sort by feet position
+            // Sort units at their "feet" position for proper depth between trees
+            // Trees sort at their base (y + 0.4) with extra Y offset (0.25)
+            // Units should sort between background trees (0.25) and foreground trees (0.65)
+            sortY: sy + state.hexSize * 0.5,
             draw: () => drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable, isBlocked, blockedInfo),
             unit: unit
         };
@@ -3002,6 +3142,11 @@ export function render() {
     // Draw all elements in sorted order
     allDrawables.forEach(drawable => {
         drawable.draw();
+    });
+
+    // Second pass: Draw all unit overlays (badges, indicators, HP bars) on top of everything
+    unitDrawables.forEach(drawable => {
+        drawUnitOverlay(drawable.unit, drawable.x, drawable.y);
     });
 
     // Update and draw particles only when active
@@ -3017,8 +3162,14 @@ export function render() {
         const sy = state.offsetY + pos.y;
         const rangeRadius = getEffectiveRange(currentUnit) * state.hexSize * 1.75;
 
-        // Gradient range circle
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+        // Fill area for better visibility
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Gradient range circle - more visible
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
         ctx.lineWidth = 3;
         ctx.setLineDash([15, 8]);
         ctx.beginPath();
@@ -3026,8 +3177,8 @@ export function render() {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Inner glow
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.2)';
+        // Inner glow - stronger
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
         ctx.lineWidth = 8;
         ctx.beginPath();
         ctx.arc(sx, sy, rangeRadius - 5, 0, Math.PI * 2);

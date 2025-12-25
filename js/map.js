@@ -97,6 +97,7 @@ function createHex(q, r, distFromCenter, radius) {
     const moistureNoise = fractalNoise(q, r, 14, 3, 2);
     const vegetationNoise = fractalNoise(q, r, 10, 3, 3);
     const roughnessNoise = fractalNoise(q, r, 8, 2, 4);
+    const varietyNoise = fractalNoise(q, r, 6, 2, 5);
 
     let type = 'grass';
 
@@ -104,7 +105,7 @@ function createHex(q, r, distFromCenter, radius) {
     if (elevationNoise > 0.78 || (elevationNoise > 0.7 && roughnessNoise > 0.6)) {
         // High elevation = rocks/mountains
         type = 'rock';
-    } else if (elevationNoise > 0.62) {
+    } else if (elevationNoise > 0.65) {
         // Medium-high elevation = hills
         type = 'hills';
     } else if (elevationNoise < 0.25 && moistureNoise > 0.65 && distFromCenter > 2) {
@@ -113,19 +114,39 @@ function createHex(q, r, distFromCenter, radius) {
     } else if (elevationNoise < 0.32 && moistureNoise > 0.55 && distFromCenter > 1) {
         // Low elevation + medium moisture = swamp (near water)
         type = 'swamp';
-    } else if (moistureNoise > 0.6 && vegetationNoise > 0.45) {
-        // High moisture + vegetation = forest
-        type = 'forest';
+    } else if (moistureNoise > 0.62 && vegetationNoise > 0.5) {
+        // High moisture + high vegetation = dense forest
+        type = varietyNoise > 0.6 ? 'pine' : 'forest';
+    } else if (moistureNoise > 0.5 && vegetationNoise > 0.4) {
+        // Medium moisture + vegetation = lighter forest/clearing
+        type = varietyNoise > 0.7 ? 'clearing' : 'forest';
     } else if (moistureNoise < 0.28 && elevationNoise < 0.45) {
         // Low moisture + low elevation = sand
         type = 'sand';
+    } else if (elevationNoise > 0.5 && moistureNoise < 0.4) {
+        // Higher ground + drier = heather moorland
+        type = varietyNoise > 0.55 ? 'heather' : 'grass';
     }
     // Default: grass
 
-    // Add some randomness to prevent too uniform patterns
+    // Add variety to grass areas
     const rand = smoothNoise(q, r, 2, 9);
-    if (type === 'grass' && rand < 0.06) {
-        type = vegetationNoise > 0.5 ? 'forest' : 'hills';
+    if (type === 'grass') {
+        if (rand < 0.08 && vegetationNoise > 0.45) {
+            // Add flowers to some grass tiles
+            type = 'flowers';
+        } else if (rand < 0.12 && varietyNoise > 0.6) {
+            // Add occasional scattered trees (forest)
+            type = vegetationNoise > 0.5 ? 'forest' : 'hills';
+        } else if (rand < 0.15 && elevationNoise > 0.45) {
+            // Add heather patches
+            type = 'heather';
+        }
+    }
+
+    // Add ancient ruins scattered across the map (rare)
+    if (type === 'grass' && varietyNoise > 0.85 && distFromCenter > 3 && rand < 0.03) {
+        type = 'ruins';
     }
 
     // Keep edges more passable
