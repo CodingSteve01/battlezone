@@ -199,7 +199,7 @@ export function getSpawnPositions() {
     const baseOffset = CONFIG.SPAWN_OFFSET[state.settings.size];
     const offset = Math.min(baseOffset, radius - 2);
 
-    // Define all possible spawn locations (6 directions for variety)
+    // Define all possible spawn locations (8 directions for up to 8 players)
     const allSpawnLocations = [
         // West
         [
@@ -236,6 +236,18 @@ export function getSpawnPositions() {
             { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) },
             { q: Math.floor(offset * 0.6) - 1, r: Math.floor(offset * 0.6) },
             { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) - 1 }
+        ],
+        // North (for 7+ players)
+        [
+            { q: 0, r: -offset },
+            { q: 1, r: -offset },
+            { q: -1, r: -offset + 1 }
+        ],
+        // South (for 8 players)
+        [
+            { q: 0, r: offset },
+            { q: -1, r: offset },
+            { q: 1, r: offset - 1 }
         ]
     ];
 
@@ -247,8 +259,8 @@ export function getSpawnPositions() {
     // Shuffle spawn locations for variety
     const shuffled = shuffleArray(validatedLocations);
 
-    // Return only the number of spawns needed for active players
-    return shuffled.slice(0, 4);
+    // Return only the number of spawns needed for active players (up to 8)
+    return shuffled.slice(0, 8);
 }
 
 /**

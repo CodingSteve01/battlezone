@@ -181,30 +181,22 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
     // Sprite size - units should be smaller than hex size
     const spriteSize = size * 1.2;
 
-    // Draw glow effect for selected units
+    // Draw the unit with subtle glow if selected
     if (isSelected) {
         ctx.save();
         ctx.shadowColor = playerColor;
-        ctx.shadowBlur = 20;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-
-        // Draw multiple times for stronger glow
-        for (let i = 0; i < 3; i++) {
-            if (sprite) {
-                ctx.drawImage(sprite, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
-            } else {
-                drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, false);
-            }
-        }
-        ctx.restore();
+        ctx.shadowBlur = 12;
     }
 
-    // Draw the actual unit
+    // Draw the unit
     if (sprite) {
         ctx.drawImage(sprite, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
     } else {
         drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected);
+    }
+
+    if (isSelected) {
+        ctx.restore();
     }
 }
 
@@ -214,15 +206,6 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
  */
 function drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected) {
     const radius = size * 0.4;
-
-    // Selection ring
-    if (isSelected) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-    }
 
     // Simple silhouette shape (head + body)
     ctx.fillStyle = playerColor;

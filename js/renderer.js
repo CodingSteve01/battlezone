@@ -2,7 +2,7 @@
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits } from './state.js';
-import { hexToPixel, hexDistance } from './hexMath.js';
+import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
@@ -21,8 +21,105 @@ function seededRandom(seed) {
 }
 
 function animationTick() { /* no-op */ }
-function getNeighborTerrains() { return []; }
-function drawTerrainBlend() { /* no-op */ }
+
+/**
+ * Get terrain types of neighboring hexes
+ * Returns array of 6 terrain types (or null if no neighbor exists), indexed by direction
+ * Direction 0 = right (1,0), then clockwise
+ */
+function getNeighborTerrains(hexMap, q, r) {
+    const neighbors = getNeighbors(q, r);
+    return neighbors.map(n => {
+        const key = `${n.q},${n.r}`;
+        const hex = hexMap.get(key);
+        return hex ? hex.type : null;
+    });
+}
+
+/**
+ * Draw terrain transition blend overlays
+ * Creates smooth transitions between different terrain types
+ */
+function drawTerrainBlend(ctx, cx, cy, size, terrainType, neighborTerrains) {
+    if (!neighborTerrains || neighborTerrains.length !== 6) return;
+
+    const currentTerrain = TERRAIN[terrainType];
+    if (!currentTerrain) return;
+
+    // Hex edge angles (starting from right, going clockwise)
+    const edgeAngles = [0, 60, 120, 180, 240, 300].map(a => a * Math.PI / 180);
+
+    ctx.save();
+
+    // For each neighbor, check if terrain differs and draw blend
+    for (let i = 0; i < 6; i++) {
+        const neighborType = neighborTerrains[i];
+        if (!neighborType || neighborType === terrainType) continue;
+
+        const neighborTerrain = TERRAIN[neighborType];
+        if (!neighborTerrain) continue;
+
+        // Determine blend priority - some terrains should blend "over" others
+        // Water > rock > forest > grass (lower priority terrains blend onto higher)
+        const priority = { water: 5, deepwater: 5, rock: 4, cliff: 4, forest: 3, pine: 3, swamp: 2, mud: 2 };
+        const currentPriority = priority[terrainType] || 1;
+        const neighborPriority = priority[neighborType] || 1;
+
+        // Only draw blend if neighbor has higher priority (it would blend onto us)
+        if (neighborPriority <= currentPriority) continue;
+
+        // Calculate edge center point
+        const angle1 = edgeAngles[i];
+        const angle2 = edgeAngles[(i + 1) % 6];
+        const edgeMidAngle = (angle1 + angle2) / 2;
+
+        // Create gradient from edge center toward hex center
+        const edgeDist = size * 0.95;
+        const gradientStart = {
+            x: cx + Math.cos(edgeMidAngle) * edgeDist,
+            y: cy + Math.sin(edgeMidAngle) * edgeDist
+        };
+        const gradientEnd = {
+            x: cx + Math.cos(edgeMidAngle) * size * 0.3,
+            y: cy + Math.sin(edgeMidAngle) * size * 0.3
+        };
+
+        // Draw triangular blend zone at this edge
+        const corner1 = {
+            x: cx + Math.cos(angle1) * size,
+            y: cy + Math.sin(angle1) * size
+        };
+        const corner2 = {
+            x: cx + Math.cos(angle2) * size,
+            y: cy + Math.sin(angle2) * size
+        };
+
+        // Create gradient with neighbor's color fading in
+        const gradient = ctx.createLinearGradient(
+            gradientStart.x, gradientStart.y,
+            gradientEnd.x, gradientEnd.y
+        );
+
+        // Use neighbor's color at edge, fading to transparent
+        const blendColor = neighborTerrain.colorDark || neighborTerrain.color;
+        gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
+        gradient.addColorStop(0.4, blendColor + '55');
+        gradient.addColorStop(0.7, blendColor + '22');
+        gradient.addColorStop(1, 'transparent');
+
+        // Draw blend triangle
+        ctx.beginPath();
+        ctx.moveTo(corner1.x, corner1.y);
+        ctx.lineTo(corner2.x, corner2.y);
+        ctx.lineTo(cx, cy);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    ctx.restore();
+}
+
 function initVegetationRenderer() { /* no-op */ }
 function initTerrainRenderer() { /* no-op */ }
 
@@ -424,8 +521,8 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.save();
         context.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer proportional to size to prevent anti-aliasing seams
-        const buffer = Math.max(4, size * 0.04);
+        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
+        const buffer = Math.max(6, size * 0.06);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
@@ -749,8 +846,8 @@ function calculateHexSize() {
     // Calculate hex size to fit
     const hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
 
-    // Clamp to reasonable range - larger minimum for better visuals
-    const baseSize = Math.max(30, Math.min(65, hexSize));
+    // Clamp to reasonable range - doubled for better visibility at 100% zoom
+    const baseSize = Math.max(60, Math.min(130, hexSize));
 
     // Apply zoom level
     return baseSize * state.zoomLevel;
@@ -823,8 +920,8 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.save();
         ctx.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer proportional to size to prevent anti-aliasing seams
-        const buffer = Math.max(4, size * 0.04);
+        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
+        const buffer = Math.max(6, size * 0.06);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
@@ -952,6 +1049,9 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
     const SHRUB_SORT_OFFSET = size * 0.35;    // Shrubs between trees and ground
     const BUSH_SORT_OFFSET = size * 0.38;     // Bushes similar to shrubs
 
+    // Tree Y offset - position trees lower in tile (1/3 tile deeper)
+    const TREE_Y_OFFSET = size * 0.25;
+
     if (type === 'forest' || type === 'pine') {
         // Mixed forest with trees distributed across entire hex including edges
         // Main trees: 4-6 per hex for dense forest feel
@@ -966,8 +1066,8 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const radius = hexRadius * (0.2 + seededRandom(baseSeed + i * 7) * 0.8);
 
             const tx = cx + Math.cos(angle) * radius * 0.85;
-            // Full Y range for isometric effect - trees can be at bottom
-            const ty = cy + Math.sin(angle) * radius * 0.7;
+            // Full Y range for isometric effect - trees positioned lower in tile
+            const ty = cy + Math.sin(angle) * radius * 0.7 + TREE_Y_OFFSET;
 
             // Large size variation for mixed forest (0.5x to 1.8x)
             const baseSizeVar = 0.5 + seededRandom(baseSeed + i * 10 + 2) * 1.3;
@@ -995,7 +1095,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const edgeRadius = hexRadius * (0.85 + seededRandom(baseSeed + i * 20 + 201) * 0.3);
 
             const tx = cx + Math.cos(edgeAngle) * edgeRadius * 0.9;
-            const ty = cy + Math.sin(edgeAngle) * edgeRadius * 0.7;
+            const ty = cy + Math.sin(edgeAngle) * edgeRadius * 0.7 + TREE_Y_OFFSET;
 
             // Edge trees have varied sizes - some tall, some short
             const treeSize = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
@@ -1861,26 +1961,30 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         return; // Don't draw the actual unit sprite
     }
 
-    // Selection glow effect
-    if (isSelected) {
-        ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = 20;
-
-        // Pulsing selection ring
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 8, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-
     // Ground shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
     ctx.ellipse(cx, cy + size * 0.7, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.shadowBlur = 0;
+    // Base ring around unit - dashed normally, solid when selected
+    if (isSelected) {
+        // Selected: solid thick ring in player color
+        ctx.strokeStyle = playerColor;
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]);
+    } else {
+        // Normal: thin dashed ring in player color
+        ctx.strokeStyle = playerColor;
+        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+    }
+    ctx.beginPath();
+    ctx.arc(cx, cy, size * 0.9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
 
     const unitStatus = unit.hiding
         ? 'cover'

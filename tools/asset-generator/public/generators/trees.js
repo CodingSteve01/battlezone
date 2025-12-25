@@ -93,6 +93,9 @@ const TreeGenerator = {
         // Draw shadow first (beneath tree)
         this.drawShadow(ctx, width, height, config, rand);
 
+        // Draw grass base at bottom of tree for realistic grounding
+        this.drawGrassBase(ctx, width, height, config, rand);
+
         // Draw trunk with bark texture
         this.drawTrunk(ctx, width, height, config, rand);
 
@@ -142,6 +145,68 @@ const TreeGenerator = {
         ctx.beginPath();
         ctx.ellipse(shadowX, shadowY, shadowWidth, shadowHeight, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.restore();
+    },
+
+    drawGrassBase(ctx, width, height, config, rand) {
+        // Draw a small grass patch at the base of the tree for realistic grounding
+        const centerX = width / 2;
+        const baseY = height - 10;
+
+        // Grass colors - natural green tones
+        const grassColors = ['#4a7a3a', '#5a8a4a', '#3a6a2a', '#6a9a5a', '#4a6a35', '#5a7a40'];
+        const darkGrass = '#2a4a1a';
+
+        ctx.save();
+
+        // Draw multiple grass blade clusters
+        const clusterCount = 12 + Math.floor(rand() * 8);
+
+        for (let cluster = 0; cluster < clusterCount; cluster++) {
+            // Position clusters around the base
+            const clusterX = centerX + (rand() - 0.5) * width * 0.35;
+            const clusterY = baseY + (rand() - 0.5) * 10;
+
+            // Draw several blades per cluster
+            const bladeCount = 3 + Math.floor(rand() * 4);
+
+            for (let i = 0; i < bladeCount; i++) {
+                const bladeX = clusterX + (rand() - 0.5) * 8;
+                const bladeHeight = 6 + rand() * 12;
+                const bladeLean = (rand() - 0.5) * 6;
+                const bladeWidth = 1 + rand() * 1.5;
+
+                // Pick grass color
+                const colorIdx = Math.floor(rand() * grassColors.length);
+                ctx.strokeStyle = rand() > 0.3 ? grassColors[colorIdx] : darkGrass;
+                ctx.lineWidth = bladeWidth;
+                ctx.lineCap = 'round';
+
+                // Draw grass blade as curved line
+                ctx.beginPath();
+                ctx.moveTo(bladeX, clusterY);
+                ctx.quadraticCurveTo(
+                    bladeX + bladeLean * 0.5,
+                    clusterY - bladeHeight * 0.5,
+                    bladeX + bladeLean,
+                    clusterY - bladeHeight
+                );
+                ctx.stroke();
+            }
+        }
+
+        // Add some small ground details (dirt patches, small stones)
+        for (let i = 0; i < 5; i++) {
+            const detailX = centerX + (rand() - 0.5) * width * 0.3;
+            const detailY = baseY + rand() * 5;
+            const detailSize = 1 + rand() * 2;
+
+            ctx.fillStyle = rand() > 0.5 ? '#5a4a3a' : '#6a5a4a';
+            ctx.beginPath();
+            ctx.ellipse(detailX, detailY, detailSize, detailSize * 0.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         ctx.restore();
     },

@@ -2,7 +2,7 @@
   "version": "1.0",
   "dimensions": {
     "width": 1024,
-    "height": 1776
+    "height": 3330
   },
   "sprites": [
     {
@@ -418,6 +418,370 @@
       },
       "metadata": {
         "type": "river",
+        "variant": 3
+      }
+    },
+    {
+      "id": "road_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 0
+      }
+    },
+    {
+      "id": "road_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 1
+      }
+    },
+    {
+      "id": "road_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 2
+      }
+    },
+    {
+      "id": "road_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "road",
+        "variant": 3
+      }
+    },
+    {
+      "id": "path_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 0
+      }
+    },
+    {
+      "id": "path_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 1
+      }
+    },
+    {
+      "id": "path_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 2
+      }
+    },
+    {
+      "id": "path_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "path",
+        "variant": 3
+      }
+    },
+    {
+      "id": "snow_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 0
+      }
+    },
+    {
+      "id": "snow_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 1
+      }
+    },
+    {
+      "id": "snow_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 2
+      }
+    },
+    {
+      "id": "snow_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "snow",
+        "variant": 3
+      }
+    },
+    {
+      "id": "pine_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 0
+      }
+    },
+    {
+      "id": "pine_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 1
+      }
+    },
+    {
+      "id": "pine_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 2
+      }
+    },
+    {
+      "id": "pine_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "pine",
+        "variant": 3
+      }
+    },
+    {
+      "id": "tallgrass_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 0
+      }
+    },
+    {
+      "id": "tallgrass_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 1
+      }
+    },
+    {
+      "id": "tallgrass_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 2
+      }
+    },
+    {
+      "id": "tallgrass_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2664,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "tallgrass",
+        "variant": 3
+      }
+    },
+    {
+      "id": "mud_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 0
+      }
+    },
+    {
+      "id": "mud_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 1
+      }
+    },
+    {
+      "id": "mud_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 2
+      }
+    },
+    {
+      "id": "mud_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2886,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "mud",
+        "variant": 3
+      }
+    },
+    {
+      "id": "clearing_v0",
+      "bounds": {
+        "x": 0,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 0
+      }
+    },
+    {
+      "id": "clearing_v1",
+      "bounds": {
+        "x": 256,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 1
+      }
+    },
+    {
+      "id": "clearing_v2",
+      "bounds": {
+        "x": 512,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
+        "variant": 2
+      }
+    },
+    {
+      "id": "clearing_v3",
+      "bounds": {
+        "x": 768,
+        "y": 3108,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "type": "clearing",
         "variant": 3
       }
     }

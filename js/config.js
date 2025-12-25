@@ -1,9 +1,9 @@
 // ===== GAME CONFIGURATION =====
 
 export const CONFIG = {
-    BASE_HEX_SIZE: 110,
-    PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308'],
-    PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb'],
+    BASE_HEX_SIZE: 170,
+    PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
+    PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
     UNITS_PER_PLAYER: 3,
     AP_PER_TURN: 4,
     MAX_ROUNDS: 30,
@@ -12,18 +12,18 @@ export const CONFIG = {
     // Balance: Limit attacks per unit per turn to prevent one unit from dominating
     MAX_ATTACKS_PER_UNIT: 1,  // Each unit can attack max 1 time per turn
 
-    // Map sizes (radius in hexes)
+    // Map sizes (radius in hexes) - increased for up to 8 players
     MAP_SIZES: {
-        small: 8,
-        medium: 12,
-        large: 16
+        small: 12,
+        medium: 18,
+        large: 24
     },
 
-    // Spawn distance from center (reduced for faster encounters)
+    // Spawn distance from center
     SPAWN_OFFSET: {
-        small: 4,    // Was 6 - now teams start closer
-        medium: 7,   // Was 10 - reduces ~6 hexes of search distance
-        large: 10    // Was 14 - still big, but manageable
+        small: 8,
+        medium: 12,
+        large: 18
     },
 
     // Number of pre-generated terrain variants per type (e.g., grass_v1.png)
