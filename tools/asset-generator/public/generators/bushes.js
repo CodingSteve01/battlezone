@@ -11,7 +11,7 @@ const BushGenerator = {
             leafHighlight: '#7aba75',
             leafShadow: '#1a4a18',
             stemColor: '#4a3a28',
-            leafSize: { min: 6, max: 12 },
+            leafSize: { min: 2, max: 4 },
             leafDensity: 0.9,
             layers: 4
         },
@@ -21,7 +21,7 @@ const BushGenerator = {
             leafHighlight: '#8aba80',
             leafShadow: '#2a5a20',
             stemColor: '#5a4a30',
-            leafSize: { min: 5, max: 10 },
+            leafSize: { min: 2, max: 4 },
             leafDensity: 0.7,
             layers: 3
         },
@@ -31,7 +31,7 @@ const BushGenerator = {
             leafHighlight: '#6aca68',
             leafShadow: '#1a5a1a',
             stemColor: '#4a3a20',
-            leafSize: { min: 5, max: 9 },
+            leafSize: { min: 2, max: 3 },
             leafDensity: 0.85,
             layers: 3,
             flowers: true
@@ -42,7 +42,7 @@ const BushGenerator = {
             leafHighlight: '#5a9a58',
             leafShadow: '#0a3a10',
             stemColor: '#3a2a18',
-            leafSize: { min: 6, max: 11 },
+            leafSize: { min: 2, max: 4 },
             leafDensity: 0.8,
             layers: 3,
             berries: true
@@ -62,7 +62,7 @@ const BushGenerator = {
             leafHighlight: '#3a7a38',
             leafShadow: '#0a3a0a',
             stemColor: '#3a2a15',
-            leafSize: { min: 8, max: 14 },
+            leafSize: { min: 3, max: 5 },
             leafDensity: 0.75,
             layers: 3,
             spiky: true,
@@ -101,16 +101,21 @@ const BushGenerator = {
 
     drawShadow(ctx, width, height) {
         ctx.save();
+        // Shadow positioned at bush base (bush center is at height * 0.6)
+        const shadowY = height * 0.72;
+        const shadowX = width / 2 + 3;
+        const shadowRadius = width * 0.28;
+
         const gradient = ctx.createRadialGradient(
-            width / 2 + 5, height - 12, 0,
-            width / 2 + 5, height - 12, width * 0.35
+            shadowX, shadowY, 0,
+            shadowX, shadowY, shadowRadius
         );
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-        gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.2)');
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.35)');
+        gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.15)');
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(width / 2 + 5, height - 12, width * 0.35, height * 0.08, 0, 0, Math.PI * 2);
+        ctx.ellipse(shadowX, shadowY, shadowRadius, height * 0.06, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     },

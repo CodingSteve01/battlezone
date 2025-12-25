@@ -86,7 +86,7 @@ const CharacterGenerator = {
         desert: { base: '#c4a878', light: '#d4b888', dark: '#b49868' }
     },
 
-    generate(classType, pose, playerIndex, width = 130, height = 130) {
+    generate(classType, pose, playerIndex, width = 130, height = 130, options = {}) {
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
@@ -95,6 +95,9 @@ const CharacterGenerator = {
         // Enable anti-aliasing
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+
+        // Default: no team indicator for standalone sprite generation
+        const showTeamIndicator = options.showTeamIndicator === true;
 
         const classConfig = this.classes[classType] || this.classes.scout;
         const poseConfig = this.poses[pose] || this.poses.normal;
@@ -107,7 +110,7 @@ const CharacterGenerator = {
         const skinTone = this.skinTones[Math.floor(rand() * this.skinTones.length)];
         const uniform = this.uniformColors[classConfig.camouflage] || this.uniformColors.woodland;
 
-        this.drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height);
+        this.drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height, showTeamIndicator);
 
         return canvas;
     },
@@ -119,7 +122,7 @@ const CharacterGenerator = {
         };
     },
 
-    drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height) {
+    drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height, showTeamIndicator = false) {
         const centerX = width / 2;
         const groundY = height - 12;
 
@@ -148,8 +151,8 @@ const CharacterGenerator = {
         this.drawWeapon(ctx, centerX, bodyY, poseConfig, classConfig);
         this.drawHead(ctx, centerX, bodyY, poseConfig, skinTone, uniform, classConfig, playerColor, rand);
 
-        // Draw team indicator ring
-        if (poseConfig.stance !== 'fallen') {
+        // Draw team indicator ring (only if explicitly requested)
+        if (showTeamIndicator && poseConfig.stance !== 'fallen') {
             this.drawTeamIndicator(ctx, centerX, groundY, playerColor);
         }
 

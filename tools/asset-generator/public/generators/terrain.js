@@ -165,8 +165,10 @@ const TerrainGenerator = {
         }).join('');
     },
 
+
     /**
      * Render base terrain with multi-octave fractal noise
+     * Uses proper hex masking since putImageData ignores clip paths
      */
     renderBaseLayer(ctx, terrain, noise, width, height, variant, cx, cy, radius) {
         const imageData = ctx.createImageData(width, height);
@@ -180,6 +182,18 @@ const TerrainGenerator = {
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+
+                // Check if pixel is inside hex
+                if (!this.isPointInHex(x, y, cx, cy, radius)) {
+                    // Outside hex - transparent
+                    data[idx] = 0;
+                    data[idx + 1] = 0;
+                    data[idx + 2] = 0;
+                    data[idx + 3] = 0;
+                    continue;
+                }
+
                 // Multi-octave fractal noise (6 octaves for fine detail)
                 let value = 0;
                 let amplitude = 1;
@@ -226,7 +240,6 @@ const TerrainGenerator = {
                     b = lightRGB.b + (accentRGB.b - lightRGB.b) * t;
                 }
 
-                const idx = (y * width + x) * 4;
                 data[idx] = Math.round(r);
                 data[idx + 1] = Math.round(g);
                 data[idx + 2] = Math.round(b);
@@ -235,6 +248,44 @@ const TerrainGenerator = {
         }
 
         ctx.putImageData(imageData, 0, 0);
+    },
+
+    /**
+     * Check if point is inside hex using the same geometry as game renderer
+     * Game uses angles at 0°, 60°, 120°, 180°, 240°, 300° (vertices on left/right)
+     */
+    isPointInHex(px, py, cx, cy, radius) {
+        // Translate point to hex-relative coordinates
+        const dx = px - cx;
+        const dy = py - cy;
+
+        // The hex has 6 vertices at angles 0°, 60°, 120°, 180°, 240°, 300°
+        // This creates a hex with points on left (-r,0) and right (r,0)
+        // and flat edges at top and bottom
+
+        // For this hex orientation:
+        // - Horizontal extent: -radius to +radius (width = 2*radius)
+        // - Vertical extent: -radius*sqrt(3)/2 to +radius*sqrt(3)/2 (height = radius*sqrt(3))
+
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        // The hex can be defined by three inequalities (using symmetry):
+        // 1. |x| <= radius (left and right bounds)
+        // 2. |y| <= radius * sqrt(3)/2 (top and bottom bounds)
+        // 3. The sloped edges: |x|/2 + |y|*sqrt(3)/3 <= radius * sqrt(3)/3 * sqrt(3)/2...
+        //    Simplified: For the diagonal edges, check: |x|/2 + |y|/(sqrt(3)) <= radius/2 + radius*sqrt(3)/(2*sqrt(3))
+        //    Actually: the edge from (r,0) to (r/2, r*sqrt(3)/2) has equation:
+        //    x + y/sqrt(3) <= r (for positive quadrant)
+
+        // Quick bounds check
+        if (absX > radius) return false;
+        if (absY > radius * Math.sqrt(3) / 2) return false;
+
+        // Check diagonal edges: the line from vertex (r, 0) to vertex (r/2, r*sqrt(3)/2)
+        // Equation: x/r + y/(r*sqrt(3)/2) = 1, simplified: x + y*2/sqrt(3) <= r
+        // Or equivalently: x + y * 1.1547 <= r
+        return (absX + absY * 2 / Math.sqrt(3)) <= radius;
     },
 
     /**

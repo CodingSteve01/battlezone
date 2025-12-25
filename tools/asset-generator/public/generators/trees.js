@@ -1,6 +1,6 @@
 /**
  * Realistic Tree Generator
- * Creates detailed tree sprites with proper foliage, bark texture, and shading
+ * Creates detailed tree sprites with tiny leaves, micro-branches, bark texture, and proper shadows
  */
 
 const TreeGenerator = {
@@ -9,11 +9,11 @@ const TreeGenerator = {
             trunkColor: '#4a3a28',
             trunkHighlight: '#6a5a48',
             trunkShadow: '#2a1a10',
-            leafColors: ['#3a6a35', '#4a7a45', '#5a8a55', '#2a5a28'],
-            leafHighlight: '#6a9a65',
-            leafShadow: '#1a4a18',
+            leafColors: ['#2a5a25', '#3a6a35', '#4a7a45', '#3a5a30', '#2a4a22', '#4a6a3a', '#355a2d'],
+            leafHighlight: '#5a8a55',
+            leafShadow: '#1a3a15',
             shape: 'round',
-            foliageDensity: 0.85,
+            foliageDensity: 0.9,
             trunkTaper: 0.7,
             branchiness: 0.6
         },
@@ -21,11 +21,11 @@ const TreeGenerator = {
             trunkColor: '#3a2a1a',
             trunkHighlight: '#5a4a38',
             trunkShadow: '#1a0a00',
-            leafColors: ['#2a5a30', '#3a6a40', '#1a4a28', '#2a5535'],
-            leafHighlight: '#4a7a50',
-            leafShadow: '#0a3a18',
+            leafColors: ['#1a4a25', '#2a5a30', '#1a3a20', '#255530', '#1a4028'],
+            leafHighlight: '#3a6a40',
+            leafShadow: '#0a2a12',
             shape: 'cone',
-            foliageDensity: 0.9,
+            foliageDensity: 0.95,
             trunkTaper: 0.85,
             branchiness: 0.3
         },
@@ -34,11 +34,11 @@ const TreeGenerator = {
             trunkHighlight: '#ffffff',
             trunkShadow: '#c8c0b8',
             barkMarks: '#2a2a2a',
-            leafColors: ['#5a9a48', '#6aaa58', '#7aba68', '#4a8a38'],
-            leafHighlight: '#8aca78',
-            leafShadow: '#3a7a28',
+            leafColors: ['#4a8a38', '#5a9a48', '#6aaa58', '#4a7a30', '#5a8a40'],
+            leafHighlight: '#7aba68',
+            leafShadow: '#3a6a25',
             shape: 'oval',
-            foliageDensity: 0.65,
+            foliageDensity: 0.7,
             trunkTaper: 0.9,
             branchiness: 0.5
         },
@@ -56,11 +56,11 @@ const TreeGenerator = {
             trunkColor: '#4a3a28',
             trunkHighlight: '#6a5a48',
             trunkShadow: '#2a1a10',
-            leafColors: ['#5a8a45', '#6a9a55', '#7aaa65', '#4a7a35'],
-            leafHighlight: '#8aba75',
-            leafShadow: '#3a6a25',
+            leafColors: ['#4a7a35', '#5a8a45', '#6a9a55', '#4a6a30', '#5a7a3a'],
+            leafHighlight: '#7aaa65',
+            leafShadow: '#3a5a22',
             shape: 'weeping',
-            foliageDensity: 0.75,
+            foliageDensity: 0.8,
             trunkTaper: 0.7,
             branchiness: 0.7
         },
@@ -68,11 +68,11 @@ const TreeGenerator = {
             trunkColor: '#4a3020',
             trunkHighlight: '#6a5040',
             trunkShadow: '#2a1008',
-            leafColors: ['#4a8a40', '#5a9a50', '#3a7a30', '#6aaa60'],
-            leafHighlight: '#7aba70',
-            leafShadow: '#2a6a20',
+            leafColors: ['#3a7a30', '#4a8a40', '#2a6a25', '#5a9a50', '#3a6a28'],
+            leafHighlight: '#6aaa55',
+            leafShadow: '#2a5a1a',
             shape: 'round',
-            foliageDensity: 0.9,
+            foliageDensity: 0.95,
             trunkTaper: 0.65,
             branchiness: 0.55
         }
@@ -90,14 +90,19 @@ const TreeGenerator = {
         const seed = type.charCodeAt(0) * 1000 + variant;
         const rand = this.seededRandom(seed);
 
-        // Draw shadow
+        // Draw shadow first (beneath tree)
         this.drawShadow(ctx, width, height, config, rand);
 
         // Draw trunk with bark texture
         this.drawTrunk(ctx, width, height, config, rand);
 
-        // Draw branches
+        // Draw branches (visible through and around foliage)
         this.drawBranches(ctx, width, height, config, rand);
+
+        // Draw micro-branches extending into foliage area
+        if (config.foliageDensity > 0) {
+            this.drawMicroBranches(ctx, width, height, config, rand);
+        }
 
         // Draw foliage if not dead tree
         if (config.foliageDensity > 0) {
@@ -116,21 +121,26 @@ const TreeGenerator = {
 
     drawShadow(ctx, width, height, config, rand) {
         ctx.save();
-        ctx.globalAlpha = 0.25;
 
-        const shadowWidth = width * 0.35;
-        const shadowHeight = height * 0.06;
+        // Large elliptical shadow on ground
+        const shadowWidth = width * 0.4;
+        const shadowHeight = height * 0.08;
+        const shadowX = width / 2 + 10;
+        const shadowY = height - 10;
 
+        // Multi-layer shadow for depth
         const gradient = ctx.createRadialGradient(
-            width / 2 + 8, height - 12, 0,
-            width / 2 + 8, height - 12, shadowWidth
+            shadowX, shadowY, 0,
+            shadowX, shadowY, shadowWidth
         );
-        gradient.addColorStop(0, 'rgba(0,0,0,0.5)');
-        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.45)');
+        gradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.25)');
+        gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.1)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.ellipse(width / 2 + 8, height - 12, shadowWidth, shadowHeight, 0, 0, Math.PI * 2);
+        ctx.ellipse(shadowX, shadowY, shadowWidth, shadowHeight, 0, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
@@ -313,6 +323,54 @@ const TreeGenerator = {
         }
     },
 
+    drawMicroBranches(ctx, width, height, config, rand) {
+        // Draw tiny twigs that extend into the foliage area
+        const centerX = width / 2;
+        const baseY = height - 15;
+        const trunkHeight = height * 0.45;
+        const foliageY = baseY - trunkHeight;
+
+        ctx.strokeStyle = config.trunkShadow;
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'round';
+
+        const twigCount = 20 + Math.floor(config.branchiness * 15);
+
+        for (let i = 0; i < twigCount; i++) {
+            const angle = rand() * Math.PI * 2;
+            const startDist = 5 + rand() * 15;
+            const startX = centerX + Math.cos(angle) * startDist;
+            const startY = foliageY - rand() * height * 0.25;
+            const twigLength = 8 + rand() * 20;
+            const twigAngle = angle + (rand() - 0.5) * 1.5;
+
+            ctx.globalAlpha = 0.4 + rand() * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(
+                startX + Math.cos(twigAngle) * twigLength,
+                startY + Math.sin(twigAngle) * twigLength * 0.6 - twigLength * 0.3
+            );
+            ctx.stroke();
+
+            // Tiny sub-twigs
+            if (rand() > 0.5) {
+                const subLen = twigLength * 0.4;
+                const midX = startX + Math.cos(twigAngle) * twigLength * 0.6;
+                const midY = startY + Math.sin(twigAngle) * twigLength * 0.3 - twigLength * 0.2;
+
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(midX, midY);
+                ctx.lineTo(midX + (rand() - 0.5) * subLen, midY - subLen * 0.5);
+                ctx.stroke();
+            }
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 1;
+    },
+
     drawFoliage(ctx, width, height, config, rand) {
         const centerX = width / 2;
         const baseY = height - 15;
@@ -339,58 +397,116 @@ const TreeGenerator = {
         const foliageWidth = width * 0.42;
         const foliageHeight = height * 0.45;
 
-        // Multiple layers of leaf clusters for depth
-        const layers = 4;
+        // Draw many tiny individual leaves instead of big clusters
+        const leafCount = Math.floor(400 + config.foliageDensity * 300);
 
-        for (let layer = 0; layer < layers; layer++) {
-            const layerOffset = (layer - layers / 2) * 8;
-            const layerScale = 1 - Math.abs(layer - layers / 2) * 0.1;
+        // Back layer (darker, deeper leaves)
+        for (let i = 0; i < leafCount * 0.4; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = rand() * foliageWidth * 0.85;
+            const x = centerX + Math.cos(angle) * dist;
+            const y = foliageY + Math.sin(angle) * dist * 0.65 + 10;
 
-            const clusterCount = Math.floor(15 + config.foliageDensity * 20);
-
-            for (let i = 0; i < clusterCount; i++) {
-                const angle = rand() * Math.PI * 2;
-                const dist = rand() * foliageWidth * layerScale * 0.9;
-                const x = centerX + Math.cos(angle) * dist;
-                const y = foliageY + Math.sin(angle) * dist * 0.7 + layerOffset;
-
-                this.drawLeafCluster(ctx, x, y, config, rand, layer / layers);
-            }
+            this.drawTinyLeaf(ctx, x, y, config, rand, 0.3);
         }
 
-        // Add highlights on top
-        this.drawFoliageHighlights(ctx, centerX, foliageY - foliageHeight * 0.3, foliageWidth * 0.6, foliageHeight * 0.4, config, rand);
+        // Middle layer
+        for (let i = 0; i < leafCount * 0.35; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = rand() * foliageWidth * 0.9;
+            const x = centerX + Math.cos(angle) * dist;
+            const y = foliageY + Math.sin(angle) * dist * 0.6;
+
+            this.drawTinyLeaf(ctx, x, y, config, rand, 0.55);
+        }
+
+        // Front layer (lighter, highlight leaves)
+        for (let i = 0; i < leafCount * 0.25; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = rand() * foliageWidth * 0.75;
+            const x = centerX + Math.cos(angle) * dist;
+            const y = foliageY + Math.sin(angle) * dist * 0.5 - 8;
+
+            this.drawTinyLeaf(ctx, x, y, config, rand, 0.85);
+        }
+
+        // Top highlight spots
+        for (let i = 0; i < 30; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = rand() * foliageWidth * 0.5;
+            const x = centerX + Math.cos(angle) * dist;
+            const y = foliageY - foliageHeight * 0.2 + Math.sin(angle) * dist * 0.3;
+
+            this.drawTinyLeaf(ctx, x, y, config, rand, 1.0);
+        }
     },
 
     drawConeFoliage(ctx, centerX, foliageY, width, height, config, rand) {
+        // CONE shape: narrow at TOP, wide at BOTTOM (like a real pine tree)
         const foliageHeight = height * 0.55;
-        const baseWidth = width * 0.35;
+        const maxWidth = width * 0.4;
 
-        // Draw cone-shaped foliage in tiers
-        const tiers = 6;
+        // Draw from bottom to top in tiers
+        const tiers = 8;
 
         for (let tier = 0; tier < tiers; tier++) {
+            // tier 0 = bottom (wide), tier = tiers-1 = top (narrow)
             const t = tier / (tiers - 1);
-            const tierY = foliageY + t * foliageHeight * 0.8;
-            const tierWidth = baseWidth * (1 - t * 0.85);
-            const tierHeight = foliageHeight / tiers * 1.2;
 
-            // Multiple clusters per tier
-            const clustersPerTier = Math.floor(6 + (1 - t) * 8);
+            // Y position: start at bottom, go up
+            const tierY = foliageY + foliageHeight * 0.7 - t * foliageHeight * 0.85;
 
-            for (let i = 0; i < clustersPerTier; i++) {
-                const angle = (i / clustersPerTier) * Math.PI * 2 + rand() * 0.3;
-                const dist = tierWidth * (0.5 + rand() * 0.5);
+            // Width: wide at bottom, narrow at top
+            const tierWidth = maxWidth * (1 - t * 0.9);
+
+            // Needle clusters for this tier
+            const needlesPerTier = Math.floor(20 + (1 - t) * 25);
+
+            for (let i = 0; i < needlesPerTier; i++) {
+                const angle = (i / needlesPerTier) * Math.PI * 2 + rand() * 0.5;
+                const dist = tierWidth * (0.4 + rand() * 0.6);
                 const x = centerX + Math.cos(angle) * dist;
-                const y = tierY - tierHeight * 0.3 + rand() * tierHeight * 0.6;
+                const y = tierY + (rand() - 0.5) * 15;
 
-                this.drawPineNeedles(ctx, x, y, config, rand, t);
+                this.drawPineNeedleCluster(ctx, x, y, config, rand, t);
             }
         }
 
-        // Top point
-        for (let i = 0; i < 5; i++) {
-            this.drawPineNeedles(ctx, centerX + (rand() - 0.5) * 10, foliageY - foliageHeight * 0.15 + rand() * 15, config, rand, 0);
+        // Top point - small cluster at the very top
+        for (let i = 0; i < 8; i++) {
+            const x = centerX + (rand() - 0.5) * 8;
+            const y = foliageY - foliageHeight * 0.15 + (rand() - 0.5) * 10;
+            this.drawPineNeedleCluster(ctx, x, y, config, rand, 0.1);
+        }
+    },
+
+    drawPineNeedleCluster(ctx, x, y, config, rand, depthFactor) {
+        // Draw a cluster of pine needles radiating from a point
+        const needleCount = 6 + Math.floor(rand() * 6);
+        const needleLength = 4 + rand() * 6;
+
+        // Darker needles at back, lighter at front
+        const colorIdx = Math.floor(rand() * config.leafColors.length);
+        let color = config.leafColors[colorIdx];
+
+        if (depthFactor > 0.7) {
+            color = config.leafHighlight;
+        } else if (depthFactor < 0.3) {
+            color = config.leafShadow;
+        }
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'round';
+
+        for (let i = 0; i < needleCount; i++) {
+            const angle = (i / needleCount) * Math.PI * 2 + rand() * 0.4;
+            const len = needleLength * (0.7 + rand() * 0.3);
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+            ctx.stroke();
         }
     },
 
@@ -398,53 +514,53 @@ const TreeGenerator = {
         const foliageWidth = width * 0.35;
         const foliageHeight = height * 0.4;
 
-        // Oval shape with looser clusters
-        const layers = 3;
+        // Many tiny leaves in oval shape
+        const leafCount = Math.floor(300 + config.foliageDensity * 200);
 
-        for (let layer = 0; layer < layers; layer++) {
-            const clusterCount = Math.floor(12 + config.foliageDensity * 15);
+        for (let layer = 0; layer < 3; layer++) {
+            const layerLeaves = leafCount / 3;
+            const depthFactor = (layer + 1) / 3;
 
-            for (let i = 0; i < clusterCount; i++) {
+            for (let i = 0; i < layerLeaves; i++) {
                 const angle = rand() * Math.PI * 2;
                 const distX = rand() * foliageWidth * 0.9;
                 const distY = rand() * foliageHeight * 0.7;
                 const x = centerX + Math.cos(angle) * distX;
-                const y = foliageY + Math.sin(angle) * distY * 0.5 - layer * 10;
+                const y = foliageY + Math.sin(angle) * distY * 0.5 - layer * 8;
 
-                this.drawLeafCluster(ctx, x, y, config, rand, layer / layers);
+                this.drawTinyLeaf(ctx, x, y, config, rand, depthFactor);
             }
         }
-
-        this.drawFoliageHighlights(ctx, centerX, foliageY - foliageHeight * 0.25, foliageWidth * 0.5, foliageHeight * 0.35, config, rand);
     },
 
     drawWeepingFoliage(ctx, centerX, foliageY, width, height, config, rand) {
         const foliageWidth = width * 0.4;
 
-        // Crown clusters
-        for (let i = 0; i < 20; i++) {
+        // Crown with tiny leaves
+        const crownLeaves = 200;
+        for (let i = 0; i < crownLeaves; i++) {
             const angle = rand() * Math.PI * 2;
-            const dist = rand() * foliageWidth * 0.6;
+            const dist = rand() * foliageWidth * 0.5;
             const x = centerX + Math.cos(angle) * dist;
             const y = foliageY + Math.sin(angle) * dist * 0.4;
 
-            this.drawLeafCluster(ctx, x, y, config, rand, 0.5);
+            this.drawTinyLeaf(ctx, x, y, config, rand, 0.6);
         }
 
         // Hanging branches with leaves
-        const hangingCount = 15;
+        const hangingCount = 18;
         for (let i = 0; i < hangingCount; i++) {
             const startAngle = (i / hangingCount) * Math.PI * 2;
-            const startDist = foliageWidth * (0.4 + rand() * 0.4);
+            const startDist = foliageWidth * (0.35 + rand() * 0.35);
             const startX = centerX + Math.cos(startAngle) * startDist;
-            const startY = foliageY + Math.sin(startAngle) * startDist * 0.3;
+            const startY = foliageY + Math.sin(startAngle) * startDist * 0.25;
 
-            const hangLength = 40 + rand() * 60;
-            const curve = (rand() - 0.5) * 30;
+            const hangLength = 50 + rand() * 70;
+            const curve = (rand() - 0.5) * 40;
 
             // Draw hanging strand
             ctx.strokeStyle = config.leafColors[Math.floor(rand() * config.leafColors.length)];
-            ctx.lineWidth = 1.5;
+            ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(startX, startY);
             ctx.quadraticCurveTo(
@@ -455,120 +571,59 @@ const TreeGenerator = {
             );
             ctx.stroke();
 
-            // Leaves along the strand
-            for (let j = 0; j < 6; j++) {
-                const t = j / 5;
-                const leafX = startX + curve * t * (1 - t * 0.5);
+            // Many tiny leaves along the strand
+            for (let j = 0; j < 12; j++) {
+                const t = j / 11;
+                const leafX = startX + curve * t * (1 - t * 0.5) + (rand() - 0.5) * 5;
                 const leafY = startY + hangLength * t;
-                this.drawSmallLeaf(ctx, leafX, leafY, config, rand);
+                this.drawTinyLeaf(ctx, leafX, leafY, config, rand, 0.5 + t * 0.3);
             }
         }
     },
 
-    drawLeafCluster(ctx, x, y, config, rand, depthFactor) {
-        const size = 12 + rand() * 18;
+    drawTinyLeaf(ctx, x, y, config, rand, depthFactor) {
+        // Very small leaf - just 2-4 pixels
+        const size = 1.5 + rand() * 2.5;
         const colorIdx = Math.floor(rand() * config.leafColors.length);
-        const baseColor = config.leafColors[colorIdx];
 
-        // Main cluster (radial gradient)
-        const gradient = ctx.createRadialGradient(
-            x - size * 0.2, y - size * 0.2, 0,
-            x, y, size
-        );
+        // Color based on depth
+        let color;
+        if (depthFactor > 0.75) {
+            color = config.leafHighlight;
+        } else if (depthFactor < 0.35) {
+            color = config.leafShadow;
+        } else {
+            color = config.leafColors[colorIdx];
+        }
 
-        // Adjust colors based on depth
-        const lightColor = depthFactor < 0.5 ? config.leafHighlight : baseColor;
-        const darkColor = depthFactor > 0.5 ? config.leafShadow : baseColor;
+        ctx.fillStyle = color;
 
-        gradient.addColorStop(0, lightColor);
-        gradient.addColorStop(0.4, baseColor);
-        gradient.addColorStop(1, darkColor);
+        // Simple leaf shape variations
+        const shapeType = Math.floor(rand() * 3);
 
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Add texture with smaller sub-clusters
-        for (let i = 0; i < 4; i++) {
-            const subAngle = rand() * Math.PI * 2;
-            const subDist = rand() * size * 0.5;
-            const subX = x + Math.cos(subAngle) * subDist;
-            const subY = y + Math.sin(subAngle) * subDist;
-            const subSize = size * (0.25 + rand() * 0.25);
-
-            ctx.fillStyle = rand() > 0.5 ? lightColor : baseColor;
-            ctx.globalAlpha = 0.4;
+        if (shapeType === 0) {
+            // Small ellipse
             ctx.beginPath();
-            ctx.arc(subX, subY, subSize, 0, Math.PI * 2);
+            ctx.ellipse(x, y, size, size * 0.6, rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (shapeType === 1) {
+            // Tiny pointed leaf
+            const rotation = rand() * Math.PI * 2;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            ctx.beginPath();
+            ctx.moveTo(0, -size);
+            ctx.quadraticCurveTo(size * 0.4, 0, 0, size * 0.7);
+            ctx.quadraticCurveTo(-size * 0.4, 0, 0, -size);
+            ctx.fill();
+            ctx.restore();
+        } else {
+            // Simple circle
+            ctx.beginPath();
+            ctx.arc(x, y, size * 0.7, 0, Math.PI * 2);
             ctx.fill();
         }
-
-        ctx.globalAlpha = 1;
-
-        // Individual leaf shapes on edges
-        if (rand() > 0.6) {
-            for (let i = 0; i < 3; i++) {
-                const leafAngle = rand() * Math.PI * 2;
-                const leafDist = size * 0.8;
-                this.drawSmallLeaf(ctx, x + Math.cos(leafAngle) * leafDist, y + Math.sin(leafAngle) * leafDist, config, rand);
-            }
-        }
-    },
-
-    drawSmallLeaf(ctx, x, y, config, rand) {
-        const size = 3 + rand() * 4;
-        const rotation = rand() * Math.PI;
-        const colorIdx = Math.floor(rand() * config.leafColors.length);
-
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
-
-        ctx.fillStyle = config.leafColors[colorIdx];
-        ctx.beginPath();
-        ctx.moveTo(0, -size);
-        ctx.quadraticCurveTo(size * 0.5, -size * 0.3, size * 0.3, size * 0.3);
-        ctx.quadraticCurveTo(0, size * 0.5, -size * 0.3, size * 0.3);
-        ctx.quadraticCurveTo(-size * 0.5, -size * 0.3, 0, -size);
-        ctx.fill();
-
-        ctx.restore();
-    },
-
-    drawPineNeedles(ctx, x, y, config, rand, depthFactor) {
-        const colorIdx = Math.floor(rand() * config.leafColors.length);
-        const color = depthFactor < 0.5 ? config.leafHighlight : config.leafColors[colorIdx];
-
-        const needleCount = 8 + Math.floor(rand() * 8);
-        const needleLength = 8 + rand() * 12;
-
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.lineCap = 'round';
-
-        for (let i = 0; i < needleCount; i++) {
-            const angle = (i / needleCount) * Math.PI * 2 + rand() * 0.3;
-            const length = needleLength * (0.6 + rand() * 0.4);
-
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + Math.cos(angle) * length, y + Math.sin(angle) * length);
-            ctx.stroke();
-        }
-
-        // Center cluster
-        ctx.fillStyle = config.leafShadow;
-        ctx.beginPath();
-        ctx.arc(x, y, 2 + rand() * 2, 0, Math.PI * 2);
-        ctx.fill();
-    },
-
-    drawFoliageHighlights(ctx, x, y, width, height, config, rand) {
-        ctx.fillStyle = 'rgba(255,255,255,0.08)';
-        ctx.beginPath();
-        ctx.ellipse(x - width * 0.2, y - height * 0.1, width * 0.4, height * 0.3, -0.3, 0, Math.PI * 2);
-        ctx.fill();
     }
 };
 
