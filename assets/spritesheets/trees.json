@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "dimensions": {
-    "width": 1536,
+    "width": 1024,
     "height": 2280
   },
   "sprites": [
@@ -58,32 +58,6 @@
       }
     },
     {
-      "id": "tree_oak_4",
-      "bounds": {
-        "x": 1024,
-        "y": 0,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "oak",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_oak_5",
-      "bounds": {
-        "x": 1280,
-        "y": 0,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "oak",
-        "variant": 5
-      }
-    },
-    {
       "id": "tree_pine_0",
       "bounds": {
         "x": 0,
@@ -133,32 +107,6 @@
       "metadata": {
         "type": "pine",
         "variant": 3
-      }
-    },
-    {
-      "id": "tree_pine_4",
-      "bounds": {
-        "x": 1024,
-        "y": 380,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "pine",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_pine_5",
-      "bounds": {
-        "x": 1280,
-        "y": 380,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "pine",
-        "variant": 5
       }
     },
     {
@@ -214,32 +162,6 @@
       }
     },
     {
-      "id": "tree_birch_4",
-      "bounds": {
-        "x": 1024,
-        "y": 760,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "birch",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_birch_5",
-      "bounds": {
-        "x": 1280,
-        "y": 760,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "birch",
-        "variant": 5
-      }
-    },
-    {
       "id": "tree_willow_0",
       "bounds": {
         "x": 0,
@@ -289,32 +211,6 @@
       "metadata": {
         "type": "willow",
         "variant": 3
-      }
-    },
-    {
-      "id": "tree_willow_4",
-      "bounds": {
-        "x": 1024,
-        "y": 1140,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "willow",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_willow_5",
-      "bounds": {
-        "x": 1280,
-        "y": 1140,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "willow",
-        "variant": 5
       }
     },
     {
@@ -370,32 +266,6 @@
       }
     },
     {
-      "id": "tree_maple_4",
-      "bounds": {
-        "x": 1024,
-        "y": 1520,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "maple",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_maple_5",
-      "bounds": {
-        "x": 1280,
-        "y": 1520,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "maple",
-        "variant": 5
-      }
-    },
-    {
       "id": "tree_dead_0",
       "bounds": {
         "x": 0,
@@ -445,32 +315,6 @@
       "metadata": {
         "type": "dead",
         "variant": 3
-      }
-    },
-    {
-      "id": "tree_dead_4",
-      "bounds": {
-        "x": 1024,
-        "y": 1900,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "dead",
-        "variant": 4
-      }
-    },
-    {
-      "id": "tree_dead_5",
-      "bounds": {
-        "x": 1280,
-        "y": 1900,
-        "width": 256,
-        "height": 380
-      },
-      "metadata": {
-        "type": "dead",
-        "variant": 5
       }
     }
   ]

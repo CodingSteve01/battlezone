@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "dimensions": {
-    "width": 1842,
+    "width": 1228,
     "height": 3096
   },
   "sprites": [
@@ -62,34 +62,6 @@
       }
     },
     {
-      "id": "bush_round_4",
-      "bounds": {
-        "x": 1228,
-        "y": 0,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "round",
-        "variant": 4
-      }
-    },
-    {
-      "id": "bush_round_5",
-      "bounds": {
-        "x": 1535,
-        "y": 0,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "round",
-        "variant": 5
-      }
-    },
-    {
       "id": "bush_wild_0",
       "bounds": {
         "x": 0,
@@ -143,34 +115,6 @@
         "type": "bush",
         "subtype": "wild",
         "variant": 3
-      }
-    },
-    {
-      "id": "bush_wild_4",
-      "bounds": {
-        "x": 1228,
-        "y": 344,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "wild",
-        "variant": 4
-      }
-    },
-    {
-      "id": "bush_wild_5",
-      "bounds": {
-        "x": 1535,
-        "y": 344,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "wild",
-        "variant": 5
       }
     },
     {
@@ -230,34 +174,6 @@
       }
     },
     {
-      "id": "bush_flowering_4",
-      "bounds": {
-        "x": 1228,
-        "y": 688,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "flowering",
-        "variant": 4
-      }
-    },
-    {
-      "id": "bush_flowering_5",
-      "bounds": {
-        "x": 1535,
-        "y": 688,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "flowering",
-        "variant": 5
-      }
-    },
-    {
       "id": "bush_berry_0",
       "bounds": {
         "x": 0,
@@ -311,34 +227,6 @@
         "type": "bush",
         "subtype": "berry",
         "variant": 3
-      }
-    },
-    {
-      "id": "bush_berry_4",
-      "bounds": {
-        "x": 1228,
-        "y": 1032,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "berry",
-        "variant": 4
-      }
-    },
-    {
-      "id": "bush_berry_5",
-      "bounds": {
-        "x": 1535,
-        "y": 1032,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "berry",
-        "variant": 5
       }
     },
     {
@@ -398,34 +286,6 @@
       }
     },
     {
-      "id": "bush_fern_4",
-      "bounds": {
-        "x": 1228,
-        "y": 1376,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "fern",
-        "variant": 4
-      }
-    },
-    {
-      "id": "bush_fern_5",
-      "bounds": {
-        "x": 1535,
-        "y": 1376,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "bush",
-        "subtype": "fern",
-        "variant": 5
-      }
-    },
-    {
       "id": "grass_short_0",
       "bounds": {
         "x": 0,
@@ -479,34 +339,6 @@
         "type": "grass",
         "subtype": "short",
         "variant": 3
-      }
-    },
-    {
-      "id": "grass_short_4",
-      "bounds": {
-        "x": 1228,
-        "y": 1720,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "short",
-        "variant": 4
-      }
-    },
-    {
-      "id": "grass_short_5",
-      "bounds": {
-        "x": 1535,
-        "y": 1720,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "short",
-        "variant": 5
       }
     },
     {
@@ -566,34 +398,6 @@
       }
     },
     {
-      "id": "grass_tall_4",
-      "bounds": {
-        "x": 1228,
-        "y": 2064,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "tall",
-        "variant": 4
-      }
-    },
-    {
-      "id": "grass_tall_5",
-      "bounds": {
-        "x": 1535,
-        "y": 2064,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "tall",
-        "variant": 5
-      }
-    },
-    {
       "id": "grass_wheat_0",
       "bounds": {
         "x": 0,
@@ -650,34 +454,6 @@
       }
     },
     {
-      "id": "grass_wheat_4",
-      "bounds": {
-        "x": 1228,
-        "y": 2408,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "wheat",
-        "variant": 4
-      }
-    },
-    {
-      "id": "grass_wheat_5",
-      "bounds": {
-        "x": 1535,
-        "y": 2408,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "wheat",
-        "variant": 5
-      }
-    },
-    {
       "id": "grass_reed_0",
       "bounds": {
         "x": 0,
@@ -731,34 +507,6 @@
         "type": "grass",
         "subtype": "reed",
         "variant": 3
-      }
-    },
-    {
-      "id": "grass_reed_4",
-      "bounds": {
-        "x": 1228,
-        "y": 2752,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "reed",
-        "variant": 4
-      }
-    },
-    {
-      "id": "grass_reed_5",
-      "bounds": {
-        "x": 1535,
-        "y": 2752,
-        "width": 307,
-        "height": 344
-      },
-      "metadata": {
-        "type": "grass",
-        "subtype": "reed",
-        "variant": 5
       }
     }
   ]
