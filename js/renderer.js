@@ -2712,7 +2712,7 @@ export function render() {
             }
         }
 
-        // Highlight reachable hexes for movement - simple green overlay (point-and-click system)
+        // Highlight reachable hexes for movement - traffic light color system based on terrain cost
         if (reachableHexes.size > 0 && fogLevel === 'visible') {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
@@ -2720,16 +2720,35 @@ export function render() {
                 // Check if this hex offers cover
                 const hexTerrain = TERRAIN[hex.type];
                 const offersCover = hexTerrain && hexTerrain.canHide;
+                const moveCost = hexTerrain ? hexTerrain.moveCost : 1;
 
-                // Draw movement range highlight (green, or darker green for cover)
-                // Made more visible with higher alpha values
+                // Traffic light color system based on terrain movement cost:
+                // Green (<=1 AP): Fast terrain (grass, road, path, sand, etc.)
+                // Yellow (2 AP): Medium terrain (forest, hills, snow, mud, etc.)
+                // Red (>=3 AP): Difficult terrain (if any exists)
+                let fillColor, strokeColor;
+                if (moveCost <= 1) {
+                    // Green - fast/easy terrain
+                    fillColor = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
+                    strokeColor = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
+                } else if (moveCost === 2) {
+                    // Yellow/Orange - medium terrain
+                    fillColor = offersCover ? 'rgba(234, 179, 8, 0.45)' : 'rgba(251, 191, 36, 0.35)';
+                    strokeColor = offersCover ? 'rgba(234, 179, 8, 0.9)' : 'rgba(251, 191, 36, 0.75)';
+                } else {
+                    // Red - difficult terrain (3+ AP)
+                    fillColor = offersCover ? 'rgba(239, 68, 68, 0.45)' : 'rgba(248, 113, 113, 0.35)';
+                    strokeColor = offersCover ? 'rgba(239, 68, 68, 0.9)' : 'rgba(248, 113, 113, 0.75)';
+                }
+
+                // Draw movement range highlight with traffic light colors
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize * 0.88);
-                ctx.fillStyle = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
+                ctx.fillStyle = fillColor;
                 ctx.fill();
 
                 // Clear visible border
-                ctx.strokeStyle = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
+                ctx.strokeStyle = strokeColor;
                 ctx.lineWidth = offersCover ? 3 : 2.5;
                 ctx.stroke();
 

@@ -104,7 +104,7 @@ export const TERRAIN = {
         colorDark: '#3a4a30',  // Deep swamp shadow
         walkable: true,
         cover: false,
-        moveCost: 3,
+        moveCost: 2,
         name: 'Sumpf'
     },
     road: {
@@ -134,7 +134,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 3,
+        moveCost: 2,
         name: 'Fluss'
     },
     // Natural enhanced terrain types
