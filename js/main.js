@@ -1,6 +1,6 @@
 // ===== MAIN ENTRY POINT =====
 
-import { state, resetState } from './state.js';
+import { state, resetState, initZone } from './state.js';
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
@@ -44,16 +44,30 @@ function startTeamSelection() {
 }
 
 /**
- * Generate a random team for AI
+ * Generate a balanced team for AI
+ * Wählt ein ausgewogenes Team basierend auf taktischen Rollen
  */
 function generateAITeam() {
-    const classes = Object.keys(UNIT_CLASSES);
-    const team = [];
-    for (let i = 0; i < CONFIG.UNITS_PER_PLAYER; i++) {
-        const randomClass = classes[Math.floor(Math.random() * classes.length)];
-        team.push(randomClass);
-    }
-    return team;
+    // Verschiedene taktische Kompositionen - alle ausgewogen
+    const teamCompositions = [
+        // Ausgewogen: Scout (Aufklärung), Assault (Frontlinie), Medic (Support)
+        ['scout', 'assault', 'medic'],
+        // Aggressiv: Assault (Tank), Commando (Flanke), Medic (Heilung)
+        ['assault', 'commando', 'medic'],
+        // Stealth: Scout (Aufklärung), Commando (Assassine), Sniper (Fernkampf)
+        ['scout', 'commando', 'sniper'],
+        // Klassisch: Scout (Aufklärung), Assault (Hauptkampf), Sniper (Support)
+        ['scout', 'assault', 'sniper'],
+        // Nahkampf-fokussiert: Assault, Commando, Medic
+        ['assault', 'commando', 'medic'],
+        // Defensiv: Medic, Sniper, Assault
+        ['medic', 'sniper', 'assault'],
+        // Aufklärer: Scout, Scout, Assault
+        ['scout', 'scout', 'assault'],
+    ];
+
+    // Wähle zufällig eine Komposition
+    return teamCompositions[Math.floor(Math.random() * teamCompositions.length)];
 }
 
 /**
@@ -275,6 +289,10 @@ function startGameWithTeams() {
     // Generate power-ups on the map
     generatePowerups();
 
+    // Initialize shrinking zone with map radius
+    const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || CONFIG.MAP_SIZES.medium;
+    initZone(mapRadius);
+
     // Initialize visibility
     updateVisibility();
 
@@ -389,6 +407,24 @@ async function init() {
             btn.classList.add('selected');
 
             state.settings.size = btn.dataset.size;
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
+    });
+
+    // Setup landscape/biome buttons
+    document.querySelectorAll('[data-landscape]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            document.querySelectorAll('[data-landscape]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            state.settings.landscape = btn.dataset.landscape;
         });
 
         btn.addEventListener('touchend', (e) => {

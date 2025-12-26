@@ -1,8 +1,35 @@
 // ===== MAP GENERATION =====
 
-import { CONFIG, TERRAIN } from './config.js';
+import { CONFIG, TERRAIN, BIOMES } from './config.js';
 import { state, setHex, getHex } from './state.js';
 import { hexDistance, isValidHex, getNeighbors } from './hexMath.js';
+
+/**
+ * Resolve the active biome from settings (handles 'random' option)
+ */
+function resolveActiveBiome() {
+    const landscape = state.settings.landscape;
+
+    if (landscape === 'random') {
+        // Pick a random biome
+        const biomeKeys = Object.keys(BIOMES);
+        const randomIndex = Math.floor(Math.random() * biomeKeys.length);
+        state.activeBiome = biomeKeys[randomIndex];
+    } else if (BIOMES[landscape]) {
+        state.activeBiome = landscape;
+    } else {
+        state.activeBiome = 'temperate';
+    }
+
+    return BIOMES[state.activeBiome];
+}
+
+/**
+ * Get the current active biome configuration
+ */
+function getActiveBiome() {
+    return BIOMES[state.activeBiome] || BIOMES.temperate;
+}
 
 /**
  * Generate a new map with the current settings
@@ -11,30 +38,44 @@ export function generateMap() {
     state.hexes = [];
     state.hexMap.clear();
 
+    // Resolve and set the active biome
+    const biome = resolveActiveBiome();
+
     const radius = CONFIG.MAP_SIZES[state.settings.size];
 
-    // Generate hexagonal grid
+    // Generate hexagonal grid with biome-specific terrain
     for (let q = -radius; q <= radius; q++) {
         for (let r = -radius; r <= radius; r++) {
             if (!isValidHex(q, r, radius)) continue;
 
             const distFromCenter = hexDistance({ q: 0, r: 0 }, { q, r });
-            const hex = createHex(q, r, distFromCenter, radius);
+            const hex = createHex(q, r, distFromCenter, radius, biome);
             setHex(hex);
         }
     }
 
+    // Apply biome-specific post-processing
+    applyBiomePostProcessing(biome, radius);
+
     // Clear spawn areas first
     clearSpawnAreas();
 
-    // Add some interesting features
-    addMapFeatures(radius);
+    // Add some interesting features (biome-aware)
+    addMapFeatures(radius, biome);
 
     // Ensure all walkable areas are connected
     ensureMapConnectivity(radius);
 
     // Final validation pass
     validateAndFixMap(radius);
+}
+
+/**
+ * Get the active biome name for display
+ */
+export function getActiveBiomeName() {
+    const biome = BIOMES[state.activeBiome];
+    return biome ? biome.nameDE : 'Gemäßigt';
 }
 
 /**
@@ -87,9 +128,9 @@ function fractalNoise(q, r, baseScale, octaves, seed) {
 }
 
 /**
- * Create a single hex with terrain using noise-based biomes
+ * Create a single hex with terrain using biome-specific noise generation
  */
-function createHex(q, r, distFromCenter, radius) {
+function createHex(q, r, distFromCenter, radius, biome) {
     const edgeFactor = distFromCenter / radius;
 
     // Use multiple noise layers for different terrain features
@@ -99,58 +140,115 @@ function createHex(q, r, distFromCenter, radius) {
     const roughnessNoise = fractalNoise(q, r, 8, 2, 4);
     const varietyNoise = fractalNoise(q, r, 6, 2, 5);
 
+    // Get biome-specific thresholds
+    const elev = biome.elevationThresholds;
+    const moist = biome.moistureThresholds;
+    const weights = biome.weights;
+
     let type = 'grass';
 
-    // Determine terrain based on noise values (biome system)
-    if (elevationNoise > 0.78 || (elevationNoise > 0.7 && roughnessNoise > 0.6)) {
-        // High elevation = rocks/mountains
-        type = 'rock';
-    } else if (elevationNoise > 0.65) {
+    // Determine terrain based on noise values using biome thresholds
+    if (elevationNoise > elev.rock || (elevationNoise > elev.rock - 0.08 && roughnessNoise > 0.6)) {
+        // High elevation = rocks/mountains (or cliff in highland)
+        type = (weights.cliff > 0.3 && varietyNoise > 0.5) ? 'cliff' : 'rock';
+    } else if (elevationNoise > elev.hills) {
         // Medium-high elevation = hills
         type = 'hills';
-    } else if (elevationNoise < 0.25 && moistureNoise > 0.65 && distFromCenter > 2) {
+        // Add gravel in highland biome
+        if (weights.gravel > 0.3 && varietyNoise > 0.6) {
+            type = 'gravel';
+        }
+    } else if (elevationNoise < elev.water && moistureNoise > moist.swamp + 0.1 && distFromCenter > 2) {
         // Low elevation + high moisture = water (lakes)
         type = 'water';
-    } else if (elevationNoise < 0.32 && moistureNoise > 0.55 && distFromCenter > 1) {
-        // Low elevation + medium moisture = swamp (near water)
+        // Use shallows in wetland biome
+        if (weights.shallows > 0.5 && varietyNoise > 0.4) {
+            type = 'shallows';
+        }
+    } else if (elevationNoise < elev.swamp && moistureNoise > moist.swamp && distFromCenter > 1) {
+        // Low elevation + medium moisture = swamp
         type = 'swamp';
-    } else if (moistureNoise > 0.62 && vegetationNoise > 0.5) {
+        // Add reeds in wetland/tropical
+        if (weights.reeds > 0.4 && varietyNoise > 0.5) {
+            type = 'reeds';
+        }
+        // Add mud in wetland
+        if (weights.mud > 0.4 && varietyNoise < 0.3) {
+            type = 'mud';
+        }
+    } else if (moistureNoise > moist.forest && vegetationNoise > 0.5) {
         // High moisture + high vegetation = dense forest
-        type = varietyNoise > 0.6 ? 'pine' : 'forest';
-    } else if (moistureNoise > 0.5 && vegetationNoise > 0.4) {
+        if (weights.pine > 0.5 && varietyNoise > 0.5) {
+            type = 'pine';
+        } else {
+            type = 'forest';
+        }
+    } else if (moistureNoise > moist.forest - 0.12 && vegetationNoise > 0.4) {
         // Medium moisture + vegetation = lighter forest/clearing
-        type = varietyNoise > 0.7 ? 'clearing' : 'forest';
-    } else if (moistureNoise < 0.28 && elevationNoise < 0.45) {
+        if (weights.tallgrass > 0.4 && varietyNoise > 0.6) {
+            type = 'tallgrass';
+        } else if (weights.clearing > 0.2 && varietyNoise > 0.7) {
+            type = 'clearing';
+        } else {
+            type = 'forest';
+        }
+    } else if (moistureNoise < moist.sand && elevationNoise < 0.45) {
         // Low moisture + low elevation = sand
         type = 'sand';
     } else if (elevationNoise > 0.5 && moistureNoise < 0.4) {
         // Higher ground + drier = heather moorland
-        type = varietyNoise > 0.55 ? 'heather' : 'grass';
-    }
-    // Default: grass
-
-    // Add variety to grass areas
-    const rand = smoothNoise(q, r, 2, 9);
-    if (type === 'grass') {
-        if (rand < 0.08 && vegetationNoise > 0.45) {
-            // Add flowers to some grass tiles
-            type = 'flowers';
-        } else if (rand < 0.12 && varietyNoise > 0.6) {
-            // Add occasional scattered trees (forest)
-            type = vegetationNoise > 0.5 ? 'forest' : 'hills';
-        } else if (rand < 0.15 && elevationNoise > 0.45) {
-            // Add heather patches
+        if (weights.heather > 0.3 && varietyNoise > 0.45) {
             type = 'heather';
         }
     }
+    // Default: grass
 
-    // Add ancient ruins scattered across the map (rare)
-    if (type === 'grass' && varietyNoise > 0.85 && distFromCenter > 3 && rand < 0.03) {
+    // Add variety to grass areas based on biome weights
+    const rand = smoothNoise(q, r, 2, 9);
+    if (type === 'grass') {
+        // Flowers based on biome weight
+        if (rand < 0.05 + weights.flowers * 0.1 && vegetationNoise > 0.45) {
+            type = 'flowers';
+        }
+        // Tallgrass in tropical/wetland
+        else if (rand < 0.1 && weights.tallgrass > 0.4 && vegetationNoise > 0.5) {
+            type = 'tallgrass';
+        }
+        // Scattered trees
+        else if (rand < 0.08 + weights.forest * 0.05 && varietyNoise > 0.6) {
+            type = vegetationNoise > 0.5 ? 'forest' : 'hills';
+        }
+        // Heather patches
+        else if (rand < 0.12 && weights.heather > 0.3 && elevationNoise > 0.45) {
+            type = 'heather';
+        }
+        // Moss in wet areas
+        else if (rand < 0.1 && moistureNoise > 0.55 && weights.swamp > 0.3) {
+            type = 'moss';
+        }
+    }
+
+    // Biome-specific special terrain
+    // Add snow in tundra biome
+    if (biome.specialTerrain?.addSnow && type === 'grass' && elevationNoise > 0.35) {
+        if (varietyNoise > 0.3) {
+            type = 'snow';
+        }
+    }
+
+    // Add ruins scattered across the map (rarity based on biome weight)
+    const ruinsChance = weights.ruins || 0.15;
+    if (type === 'grass' && varietyNoise > 0.85 && distFromCenter > 3 && rand < ruinsChance * 0.2) {
         type = 'ruins';
     }
 
     // Keep edges more passable
-    if (edgeFactor > 0.85 && !TERRAIN[type].walkable) {
+    if (edgeFactor > 0.85 && TERRAIN[type] && !TERRAIN[type].walkable) {
+        type = biome.specialTerrain?.addSnow ? 'snow' : 'grass';
+    }
+
+    // Fallback to grass if terrain type doesn't exist
+    if (!TERRAIN[type]) {
         type = 'grass';
     }
 
@@ -165,6 +263,26 @@ function createHex(q, r, distFromCenter, radius) {
         moveCost: terrain.moveCost,
         unit: null
     };
+}
+
+/**
+ * Apply biome-specific post-processing (e.g., replace water with ice in tundra)
+ */
+function applyBiomePostProcessing(biome, radius) {
+    if (!biome.specialTerrain) return;
+
+    state.hexes.forEach(hex => {
+        // Replace water with ice in tundra
+        if (biome.specialTerrain.replaceWater && hex.type === 'water') {
+            const replacementType = biome.specialTerrain.replaceWater;
+            if (TERRAIN[replacementType]) {
+                hex.type = replacementType;
+                hex.walkable = TERRAIN[replacementType].walkable;
+                hex.cover = TERRAIN[replacementType].cover;
+                hex.moveCost = TERRAIN[replacementType].moveCost;
+            }
+        }
+    });
 }
 
 /**
@@ -321,26 +439,53 @@ function clearSpawnAreas() {
 }
 
 /**
- * Add interesting map features (clusters, paths, etc.)
+ * Add interesting map features (clusters, paths, etc.) based on biome
  */
-function addMapFeatures(radius) {
-    // Add forest clusters - fewer and smaller
-    addClusters('forest', 2, Math.floor(radius / 3), radius);
+function addMapFeatures(radius, biome) {
+    const features = biome.features;
+    const weights = biome.weights;
 
-    // Add rock formations - smaller
-    addClusters('rock', 1, Math.floor(radius / 4), radius);
+    // Add forest clusters based on biome weight
+    if (weights.forest > 0.3) {
+        const forestType = weights.pine > weights.forest ? 'pine' : 'forest';
+        addClusters(forestType, Math.ceil(weights.forest * 3), Math.floor(radius / 3), radius);
+    }
 
-    // Add water bodies - smaller
-    addWaterBodies(Math.floor(radius / 5), radius);
+    // Add rock formations based on biome weight
+    if (weights.rock > 0.3) {
+        addClusters('rock', Math.ceil(weights.rock * 2), Math.floor(radius / 4), radius);
+    }
 
-    // Add rivers flowing across the map
-    addRivers(1, radius);
+    // Add water bodies based on biome weight
+    if (weights.water > 0.2) {
+        addWaterBodies(Math.floor(weights.water * radius / 4), radius);
+    }
 
-    // Add roads connecting areas
-    addRoads(radius);
+    // Add rivers based on biome features
+    if (features.rivers > 0) {
+        addRivers(features.rivers, radius);
+    }
 
-    // Add dirt paths for variety
-    addPaths(2, radius);
+    // Add roads if biome supports them
+    if (features.roads) {
+        addRoads(radius);
+    }
+
+    // Add dirt paths based on biome features
+    if (features.paths > 0) {
+        addPaths(features.paths, radius);
+    }
+
+    // Add biome-specific terrain clusters
+    if (weights.swamp > 0.5) {
+        addClusters('swamp', Math.ceil(weights.swamp * 2), Math.floor(radius / 4), radius);
+    }
+    if (weights.sand > 0.5) {
+        addClusters('sand', Math.ceil(weights.sand * 3), Math.floor(radius / 3), radius);
+    }
+    if (weights.snow && weights.snow > 0.5) {
+        addClusters('snow', Math.ceil(weights.snow * 3), Math.floor(radius / 3), radius);
+    }
 }
 
 /**

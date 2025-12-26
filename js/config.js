@@ -335,59 +335,218 @@ export const UNIT_CLASSES = {
     scout: {
         name: 'Scout',
         icon: '🧭',
-        hp: 60,
-        damage: 18,
+        hp: 70,             // Erhöht von 60 - robuster Aufklärer
+        damage: 22,         // Erhöht von 18 - besserer Schaden
         range: 4,
         move: 5,
-        vision: 7,          // Increased from 6 - best at finding enemies
+        vision: 8,          // Beste Sicht im Spiel - Hauptrolle: Aufklärung
         special: 'Sprint',
-        specialDesc: '+3 Bewegung'
+        specialDesc: '+3 Bewegung',
+        // Scout-Bonus: Findet versteckte Einheiten leichter
+        stealthDetectionRange: 3
     },
     assault: {
         name: 'Assault',
         icon: '🪖',
-        hp: 100,
-        damage: 35,
+        hp: 120,            // Erhöht von 100 - der Tank des Teams
+        damage: 40,         // Erhöht von 35 - hoher Burst-Schaden
         range: 2,
         move: 3,
-        vision: 5,          // Increased from 4
+        vision: 5,
         special: 'Powershot',
-        specialDesc: '+20 Schaden'
+        specialDesc: '+25 Schaden',  // Erhöht von +20
+        // Assault-Bonus: Weniger Schadensreduktion durch Deckung
+        armorPiercing: 0.5  // 50% der Deckungsreduktion ignorieren
     },
     medic: {
         name: 'Medic',
         icon: '⛑️',
-        hp: 80,
-        damage: 12,
-        range: 2,
+        hp: 90,             // Erhöht von 80 - überlebensfähiger
+        damage: 15,         // Erhöht von 12
+        range: 3,           // Erhöht von 2 - kann aus sicherer Distanz helfen
         move: 4,
-        vision: 6,          // Increased from 5
+        vision: 6,
         special: 'Heilung',
-        specialDesc: 'Heilt Team +30 HP'
+        specialDesc: 'Heilt Team +40 HP', // Erhöht von +30
+        healAmount: 40,     // Stärker heilen
+        healRange: 4        // Erhöhte Heilreichweite
     },
     sniper: {
         name: 'Sniper',
         icon: '🎯',
-        hp: 50,
-        damage: 45,
+        hp: 40,             // REDUZIERT von 50 - sehr fragil
+        damage: 38,         // REDUZIERT von 45 - nicht mehr 1-shot
         range: 6,
         move: 2,
-        vision: 8,          // Increased from 7 - excellent spotter
+        vision: 7,          // Reduziert von 8 - Scout ist jetzt bester Spotter
         special: 'Tarnung',
         specialDesc: 'Unsichtbar für 1 Runde',
-        stealthDetectionRange: 2
+        stealthDetectionRange: 2,
+        // Sniper-Schwäche: Braucht Zeit zum Nachladen
+        reloadPenalty: true // Kann nicht 2x in Folge angreifen (braucht Bewegung dazwischen)
     },
     commando: {
         name: 'Commando',
         icon: '⚔️',
-        hp: 65,
-        damage: 40,
+        hp: 75,             // Erhöht von 65 - robuster im Nahkampf
+        damage: 50,         // Erhöht von 40 - SEHR gefährlich im Nahkampf
         range: 1,           // Nahkampf
-        move: 4,
-        vision: 5,          // Kept at 5 - relies on stealth, not vision
+        move: 5,            // Erhöht von 4 - schneller anschleichen
+        vision: 5,
         special: 'Schleichen',
         specialDesc: 'Tarnung + Bonus-Bewegung',
-        stealthDetectionRange: 1,  // Noch schwerer zu entdecken
-        meleeBonus: 15      // Extra Schaden im Nahkampf
+        stealthDetectionRange: 1,  // Schwer zu entdecken
+        meleeBonus: 20,     // Erhöht von 15 - brutaler Nahkampf
+        // Commando-Bonus: Erste Attacke nach Stealth macht Bonusschaden
+        ambushBonus: 15     // Extra Schaden aus dem Hinterhalt
+    }
+};
+
+// Biome/Landscape configurations for map generation
+export const BIOMES = {
+    temperate: {
+        name: 'Temperate',
+        nameDE: 'Gemäßigt',
+        description: 'Balanced mix of forests, meadows, and hills',
+        // Terrain type weights (higher = more common)
+        weights: {
+            grass: 1.0,
+            forest: 0.8,
+            hills: 0.6,
+            rock: 0.4,
+            water: 0.5,
+            swamp: 0.3,
+            sand: 0.2,
+            flowers: 0.4,
+            heather: 0.3,
+            pine: 0.4,
+            clearing: 0.3,
+            ruins: 0.15
+        },
+        // Thresholds for noise-based generation
+        elevationThresholds: { rock: 0.78, hills: 0.65, water: 0.25, swamp: 0.32 },
+        moistureThresholds: { forest: 0.62, swamp: 0.55, sand: 0.28 },
+        features: { rivers: 1, roads: true, paths: 2 }
+    },
+    desert: {
+        name: 'Desert',
+        nameDE: 'Wüste',
+        description: 'Arid landscape with sand dunes and rocky outcrops',
+        weights: {
+            grass: 0.2,
+            forest: 0.1,
+            hills: 0.5,
+            rock: 0.8,
+            water: 0.1,
+            swamp: 0.0,
+            sand: 1.0,
+            flowers: 0.05,
+            heather: 0.1,
+            pine: 0.0,
+            clearing: 0.1,
+            ruins: 0.25
+        },
+        elevationThresholds: { rock: 0.65, hills: 0.50, water: 0.10, swamp: 0.15 },
+        moistureThresholds: { forest: 0.85, swamp: 0.90, sand: 0.55 },
+        features: { rivers: 0, roads: true, paths: 1 }
+    },
+    tundra: {
+        name: 'Tundra',
+        nameDE: 'Tundra',
+        description: 'Frozen landscape with snow, ice, and sparse vegetation',
+        weights: {
+            grass: 0.3,
+            forest: 0.2,
+            hills: 0.6,
+            rock: 0.7,
+            water: 0.3,
+            swamp: 0.1,
+            sand: 0.0,
+            flowers: 0.1,
+            heather: 0.2,
+            pine: 0.6,
+            clearing: 0.2,
+            ruins: 0.15,
+            snow: 1.0,
+            ice: 0.5
+        },
+        elevationThresholds: { rock: 0.70, hills: 0.55, water: 0.20, swamp: 0.25 },
+        moistureThresholds: { forest: 0.70, swamp: 0.75, sand: 0.15 },
+        features: { rivers: 1, roads: false, paths: 1 },
+        specialTerrain: { replaceWater: 'ice', addSnow: true }
+    },
+    tropical: {
+        name: 'Tropical',
+        nameDE: 'Tropisch',
+        description: 'Dense jungles with rivers, swamps, and lush vegetation',
+        weights: {
+            grass: 0.5,
+            forest: 1.0,
+            hills: 0.3,
+            rock: 0.2,
+            water: 0.6,
+            swamp: 0.7,
+            sand: 0.3,
+            flowers: 0.6,
+            heather: 0.0,
+            pine: 0.0,
+            clearing: 0.4,
+            ruins: 0.2,
+            reeds: 0.5,
+            tallgrass: 0.6
+        },
+        elevationThresholds: { rock: 0.85, hills: 0.72, water: 0.30, swamp: 0.38 },
+        moistureThresholds: { forest: 0.45, swamp: 0.40, sand: 0.15 },
+        features: { rivers: 2, roads: false, paths: 3 }
+    },
+    highland: {
+        name: 'Highland',
+        nameDE: 'Hochland',
+        description: 'Mountainous terrain with rocks, cliffs, and sparse meadows',
+        weights: {
+            grass: 0.6,
+            forest: 0.3,
+            hills: 1.0,
+            rock: 1.0,
+            water: 0.2,
+            swamp: 0.1,
+            sand: 0.1,
+            flowers: 0.2,
+            heather: 0.7,
+            pine: 0.4,
+            clearing: 0.3,
+            ruins: 0.3,
+            cliff: 0.6,
+            gravel: 0.5
+        },
+        elevationThresholds: { rock: 0.60, hills: 0.45, water: 0.15, swamp: 0.20 },
+        moistureThresholds: { forest: 0.70, swamp: 0.80, sand: 0.35 },
+        features: { rivers: 1, roads: true, paths: 1 }
+    },
+    wetland: {
+        name: 'Wetland',
+        nameDE: 'Feuchtgebiet',
+        description: 'Marshlands with shallow water, reeds, and muddy terrain',
+        weights: {
+            grass: 0.5,
+            forest: 0.4,
+            hills: 0.2,
+            rock: 0.1,
+            water: 0.8,
+            swamp: 1.0,
+            sand: 0.1,
+            flowers: 0.3,
+            heather: 0.1,
+            pine: 0.2,
+            clearing: 0.3,
+            ruins: 0.15,
+            reeds: 0.8,
+            shallows: 0.7,
+            mud: 0.6,
+            tallgrass: 0.5
+        },
+        elevationThresholds: { rock: 0.90, hills: 0.80, water: 0.35, swamp: 0.42 },
+        moistureThresholds: { forest: 0.55, swamp: 0.35, sand: 0.10 },
+        features: { rivers: 2, roads: false, paths: 2 }
     }
 };

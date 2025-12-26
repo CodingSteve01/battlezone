@@ -8,11 +8,15 @@ export const state = {
     settings: {
         players: 2,
         size: 'medium',
+        landscape: 'random',    // 'random', 'temperate', 'desert', 'tundra', 'tropical', 'highland', 'wetland'
         singlePlayer: false,
         renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
         particleQuality: 'high' // 'low', 'medium', 'high' - Partikelanzahl
     },
+
+    // Current active biome (resolved from 'random' or selected)
+    activeBiome: 'temperate',
 
     // Performance tracking for auto-quality
     frameCount: 0,
@@ -93,6 +97,14 @@ export const state = {
     lastEnemyContactRound: 0,       // Last round when any enemy was spotted
     roundsWithoutContact: 0,        // Consecutive rounds without seeing enemies
 
+    // === SHRINKING ZONE (Battle Royale Mechanik) ===
+    zoneRadius: 0,                  // Aktueller spielbarer Radius (schrumpft)
+    maxZoneRadius: 0,               // Ursprünglicher Kartenradius
+    zoneShrinkWarning: false,       // True wenn Zone bald schrumpft
+    lastCombatRound: 0,             // Letzte Runde mit Kampf (für beide Spieler)
+    zonePhase: 0,                   // Aktuelle Zone-Schrumpf-Phase (0 = keine Schrumpfung)
+    revealCooldown: 0,              // Cooldown für nächste Enthüllung versteckter Einheiten
+
     // Canvas dimensions
     canvasWidth: 0,
     canvasHeight: 0
@@ -152,6 +164,14 @@ export function resetState() {
     state.sharedAP = 0;
     state.maxSharedAP = 0;
     state.unitAttacksThisTurn = {};
+
+    // Shrinking Zone zurücksetzen
+    state.zoneRadius = 0;
+    state.maxZoneRadius = 0;
+    state.zoneShrinkWarning = false;
+    state.lastCombatRound = 0;
+    state.zonePhase = 0;
+    state.revealCooldown = 0;
 
     // Initialize per-player explored hexes and visible hexes
     state.playerExploredHexes = [];
@@ -369,6 +389,33 @@ export function updateContactTracking(enemiesVisible) {
     } else {
         state.roundsWithoutContact = state.round - state.lastEnemyContactRound;
     }
+}
+
+/**
+ * Initialize the shrinking zone with map radius
+ */
+export function initZone(mapRadius) {
+    state.maxZoneRadius = mapRadius;
+    state.zoneRadius = mapRadius;
+    state.zonePhase = 0;
+    state.lastCombatRound = 1;
+    state.zoneShrinkWarning = false;
+    state.revealCooldown = 0;
+}
+
+/**
+ * Check if a hex is within the safe zone
+ */
+export function isHexInZone(q, r) {
+    const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+    return dist <= state.zoneRadius;
+}
+
+/**
+ * Mark that combat happened this round
+ */
+export function markCombat() {
+    state.lastCombatRound = state.round;
 }
 
 /**

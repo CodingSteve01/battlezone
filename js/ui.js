@@ -259,7 +259,27 @@ function updateTargetInfo(unit) {
         const damageEl = document.getElementById('damage-info');
         const coverEl = document.getElementById('cover-info');
 
-        if (hitChanceEl) hitChanceEl.textContent = chance + '%';
+        // === VISUELLES FEEDBACK FÜR SCHUSSCHWIERIGKEIT ===
+        if (hitChanceEl) {
+            hitChanceEl.textContent = chance + '%';
+
+            // Farbcodierung basierend auf Trefferchance
+            hitChanceEl.classList.remove('shot-easy', 'shot-medium', 'shot-hard', 'shot-impossible');
+            if (chance >= 95) {
+                hitChanceEl.classList.add('shot-easy');
+                hitChanceEl.title = '✓ Einfacher Schuss - fast garantierter Treffer';
+            } else if (chance >= 85) {
+                hitChanceEl.classList.add('shot-easy');
+                hitChanceEl.title = '✓ Guter Schuss - hohe Trefferchance';
+            } else if (chance >= 75) {
+                hitChanceEl.classList.add('shot-medium');
+                hitChanceEl.title = '⚡ Mittelschwerer Schuss';
+            } else {
+                hitChanceEl.classList.add('shot-hard');
+                hitChanceEl.title = '⚠️ Schwieriger Schuss - Distanz am Limit!';
+            }
+        }
+
         if (damageEl) {
             // Show damage with any bonuses
             const bonusDmg = effectiveDamage - unit.damage;
@@ -270,25 +290,49 @@ function updateTargetInfo(unit) {
             }
         }
 
-        // Show cover effectiveness info
+        // === SCHUSSCHWIERIGKEIT-HINWEIS ===
         if (coverEl) {
-            if (state.targetedUnit.hiding) {
-                if (coverInfo.isFlanked) {
-                    coverEl.textContent = '⚠️ Flankiert! Deckung unwirksam';
-                    coverEl.className = 'cover-info flanked';
-                } else if (coverInfo.isHidingEffective) {
-                    coverEl.textContent = `🌲 Deckung wirksam (${coverInfo.coverEffectiveness}%)`;
-                    coverEl.className = 'cover-info effective';
-                } else {
-                    coverEl.textContent = '👁️ Deckung umgangen';
-                    coverEl.className = 'cover-info bypassed';
-                }
-            } else if (coverInfo.hasLineOfSightCover) {
-                coverEl.textContent = `🌲 Hindernisse: ${coverInfo.blockingTerrain.join(', ')}`;
-                coverEl.className = 'cover-info obstacles';
-            } else {
-                coverEl.textContent = '✓ Freie Sicht';
+            // Zeige primär die Schusschwierigkeit
+            const distInfo = coverInfo.distance;
+
+            if (unit.class === 'commando') {
+                // Commando trifft IMMER im Nahkampf
+                coverEl.textContent = '⚔️ Nahkampf - 100% Treffer!';
+                coverEl.className = 'cover-info guaranteed';
+            } else if (distInfo <= 2) {
+                // Nahschuss - fast garantiert
+                coverEl.textContent = '🎯 Nahschuss - garantierter Treffer';
+                coverEl.className = 'cover-info guaranteed';
+            } else if (chance >= 95) {
+                coverEl.textContent = '✓ Freie Sicht - einfacher Schuss';
                 coverEl.className = 'cover-info clear';
+            } else if (chance >= 85) {
+                // Gute Chance
+                if (coverInfo.hasLineOfSightCover) {
+                    coverEl.textContent = `🌲 Leichte Hindernisse`;
+                    coverEl.className = 'cover-info obstacles';
+                } else {
+                    coverEl.textContent = '✓ Guter Schuss';
+                    coverEl.className = 'cover-info clear';
+                }
+            } else if (chance >= 75) {
+                // Mittelschwer
+                if (state.targetedUnit.hiding) {
+                    if (coverInfo.isFlanked) {
+                        coverEl.textContent = '⚠️ Ziel in Deckung (flankiert)';
+                        coverEl.className = 'cover-info flanked';
+                    } else {
+                        coverEl.textContent = `🌲 Ziel in Deckung (-Schaden)`;
+                        coverEl.className = 'cover-info effective';
+                    }
+                } else {
+                    coverEl.textContent = '⚡ Mittlere Distanz';
+                    coverEl.className = 'cover-info obstacles';
+                }
+            } else {
+                // Schwieriger Schuss (nur bei maximaler Reichweite)
+                coverEl.textContent = `⚠️ Maximale Reichweite - schwieriger Schuss!`;
+                coverEl.className = 'cover-info hard-shot';
             }
         }
 

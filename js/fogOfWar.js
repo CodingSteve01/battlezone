@@ -321,6 +321,36 @@ export function updateSpottedStatus() {
 }
 
 /**
+ * Reveal all stealthed/cloaked enemy units temporarily
+ * Used by the shrinking zone mechanic
+ */
+export function revealAllEnemies() {
+    let revealed = 0;
+
+    state.units.forEach(unit => {
+        if (!unit.alive) return;
+
+        // Remove stealth from all units
+        if (unit.cloaked) {
+            unit.cloaked = false;
+            unit.revealedByZone = true;
+            revealed++;
+        }
+        if (unit.hiding) {
+            unit.hiding = false;
+            unit.revealedByZone = true;
+            revealed++;
+        }
+        if (unit.stealthActive) {
+            unit.stealthActive = false;
+            unit.revealedByZone = true;
+        }
+    });
+
+    return revealed;
+}
+
+/**
  * Calculate visibility alpha for a cloaked enemy unit based on distance to viewer's units.
  * Closer units are more visible (higher alpha).
  * @param {Object} cloakedUnit - The cloaked enemy unit
