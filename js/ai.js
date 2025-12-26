@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -542,6 +542,12 @@ async function executeRetreat(unit, enemies) {
             score += (10 - closestAlly) * 5;
         }
 
+        // Zone awareness - don't retreat outside the safe zone!
+        const targetInZone = isHexInZone(q, r);
+        if (!targetInZone) {
+            score -= 200;  // Heavy penalty for retreating outside zone
+        }
+
         if (score > bestScore) {
             bestScore = score;
             bestHex = { q, r, cost: data.cost };
@@ -734,6 +740,36 @@ function selectStrategicMoveTarget(unit, plan) {
         const terrainData = TERRAIN[hex.type];
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
+
+        // === ZONE AWARENESS ===
+        const unitInZone = isHexInZone(unit.q, unit.r);
+        const targetInZone = isHexInZone(q, r);
+
+        if (!unitInZone) {
+            // Unit is OUTSIDE zone - high priority to get back in!
+            if (targetInZone) {
+                score += 500;  // Massive bonus for getting into safe zone
+            } else {
+                // At least move toward center
+                const currentDistFromCenter = Math.max(Math.abs(unit.q), Math.abs(unit.r), Math.abs(-unit.q - unit.r));
+                const targetDistFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                if (targetDistFromCenter < currentDistFromCenter) {
+                    score += 100;  // Bonus for moving toward center
+                }
+            }
+        } else {
+            // Unit is inside zone - avoid moving outside
+            if (!targetInZone) {
+                score -= 300;  // Heavy penalty for leaving safe zone
+            } else {
+                // Stay away from zone edge if zone is shrinking
+                const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                const distFromEdge = state.zoneRadius - distFromCenter;
+                if (distFromEdge <= 2) {
+                    score -= 20;  // Small penalty for being near edge
+                }
+            }
+        }
 
         candidates.push({ q, r, score, cost: data.cost });
     });
