@@ -266,6 +266,30 @@ export function getFogLevel(q, r) {
         return 'explored';
     }
 
+    // DEFENSIVE: If both visibility arrays are empty/undefined for the viewing player,
+    // this could indicate a bug where visibility wasn't updated before rendering.
+    // In spectator mode (AI vs AI), fall back to checking if ANY player can see the hex.
+    // This prevents the dreaded "black screen" issue.
+    if ((!visibleHexes || visibleHexes.size === 0) && (!exploredHexes || exploredHexes.size === 0)) {
+        // Check if any player has visibility data
+        for (let p = 0; p < state.settings.players; p++) {
+            const playerVisible = state.playerVisibleHexes[p];
+            const playerExplored = state.playerExploredHexes[p];
+
+            if (playerVisible && playerVisible.has(key)) {
+                // Log this fallback scenario for debugging
+                if (!state._visibilityWarningLogged) {
+                    console.warn(`[FogOfWar] Using fallback visibility for player ${viewPlayer} - visibility arrays empty. Check updateVisibility() call order.`);
+                    state._visibilityWarningLogged = true;
+                }
+                return 'visible';
+            }
+            if (playerExplored && playerExplored.has(key)) {
+                return 'explored';
+            }
+        }
+    }
+
     return 'hidden';
 }
 

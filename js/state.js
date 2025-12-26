@@ -204,6 +204,9 @@ export function resetState() {
         state.playerExploredHexes.push(new Set());
         state.playerVisibleHexes.push(new Set());
     }
+
+    // Reset debug flags
+    state._visibilityWarningLogged = false;
 }
 
 /**
