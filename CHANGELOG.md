@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.1...shadow-squad-v3.3.2) (2025-12-26)
+
+
+### Bug Fixes
+
+* **gameplay:** balance movement costs and add traffic light indicators ([#107](https://github.com/CodingSteve01/battlezone/issues/107)) ([015bfbb](https://github.com/CodingSteve01/battlezone/commit/015bfbbfb9a9964f61f86e1dc422d71329e543ff))
+
 ## [3.3.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.0...shadow-squad-v3.3.1) (2025-12-26)
 
 
