@@ -2712,7 +2712,7 @@ export function render() {
             }
         }
 
-        // Highlight reachable hexes for movement - traffic light color system based on terrain cost
+        // Highlight reachable hexes for movement - traffic light color system based on cumulative path cost
         if (reachableHexes.size > 0 && fogLevel === 'visible') {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
@@ -2720,23 +2720,23 @@ export function render() {
                 // Check if this hex offers cover
                 const hexTerrain = TERRAIN[hex.type];
                 const offersCover = hexTerrain && hexTerrain.canHide;
-                const moveCost = hexTerrain ? hexTerrain.moveCost : 1;
 
-                // Traffic light color system based on terrain movement cost:
-                // Green (<=1 AP): Fast terrain (grass, road, path, sand, etc.)
-                // Yellow (2 AP): Medium terrain (forest, hills, snow, mud, etc.)
-                // Red (>=3 AP): Difficult terrain (if any exists)
+                // Traffic light color system based on cumulative path cost (total AP to reach):
+                // Green (1-2 AP): Close/easy to reach
+                // Yellow (3-4 AP): Medium distance
+                // Red (5+ AP): Far/expensive to reach
+                const totalPathCost = pathData.cost;
                 let fillColor, strokeColor;
-                if (moveCost <= 1) {
-                    // Green - fast/easy terrain
+                if (totalPathCost <= 2) {
+                    // Green - close/cheap to reach
                     fillColor = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
                     strokeColor = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
-                } else if (moveCost === 2) {
-                    // Yellow/Orange - medium terrain
+                } else if (totalPathCost <= 4) {
+                    // Yellow/Orange - medium distance
                     fillColor = offersCover ? 'rgba(234, 179, 8, 0.45)' : 'rgba(251, 191, 36, 0.35)';
                     strokeColor = offersCover ? 'rgba(234, 179, 8, 0.9)' : 'rgba(251, 191, 36, 0.75)';
                 } else {
-                    // Red - difficult terrain (3+ AP)
+                    // Red - far/expensive (5+ AP)
                     fillColor = offersCover ? 'rgba(239, 68, 68, 0.45)' : 'rgba(248, 113, 113, 0.35)';
                     strokeColor = offersCover ? 'rgba(239, 68, 68, 0.9)' : 'rgba(248, 113, 113, 0.75)';
                 }
@@ -3117,6 +3117,7 @@ function drawZoomIndicator(w, h) {
  */
 export const MINIMAP_CONFIG = {
     SIZE: 90,            // Minimap size in pixels (compact for mobile)
+    EXPANDED_SIZE: 380,  // Expanded minimap size (large view, nearly full screen)
     PADDING: 8,          // Padding from screen edge
     HEX_SIZE: 3,         // Size of each hex on minimap
     OPACITY: 0.5,        // Base opacity (more transparent)
@@ -3127,18 +3128,26 @@ export const MINIMAP_CONFIG = {
 // Track if minimap is being interacted with
 let minimapActive = false;
 let minimapHidden = false;
+let minimapExpanded = false;  // Track expanded/fullscreen state
 
 export function setMinimapActive(active) { minimapActive = active; }
 export function isMinimapHidden() { return minimapHidden; }
+export function isMinimapExpanded() { return minimapExpanded; }
 export function toggleMinimapVisibility() { minimapHidden = !minimapHidden; }
+export function setMinimapExpanded(expanded) { minimapExpanded = expanded; }
+export function toggleMinimapExpanded() { minimapExpanded = !minimapExpanded; }
 
 // Store last drawn minimap bounds for click detection
-let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false };
+let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false, expanded: false };
 export function getMinimapBounds() { return lastMinimapBounds; }
 
 // Store toggle button bounds for click detection
 let toggleButtonBounds = { x: 0, y: 0, size: 24 };
 export function getToggleButtonBounds() { return toggleButtonBounds; }
+
+// Store close button bounds for expanded minimap
+let closeButtonBounds = { x: 0, y: 0, size: 32 };
+export function getCloseButtonBounds() { return closeButtonBounds; }
 
 /**
  * Draw minimap toggle button
@@ -3176,52 +3185,120 @@ function drawMinimapToggle(mapX, mapY, mapSize) {
 }
 
 /**
+ * Draw close button for expanded minimap
+ */
+function drawMinimapCloseButton(mapX, mapY, mapSize) {
+    const btnSize = 32;
+    const btnX = mapX + mapSize - btnSize - 8;
+    const btnY = mapY + 8;
+
+    // Store bounds for click detection
+    closeButtonBounds = { x: btnX, y: btnY, size: btnSize };
+
+    ctx.save();
+
+    // Button background - dark with red tint
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnSize, btnSize, 6);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // X icon
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    const padding = 10;
+    ctx.beginPath();
+    ctx.moveTo(btnX + padding, btnY + padding);
+    ctx.lineTo(btnX + btnSize - padding, btnY + btnSize - padding);
+    ctx.moveTo(btnX + btnSize - padding, btnY + padding);
+    ctx.lineTo(btnX + padding, btnY + btnSize - padding);
+    ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
  * Draw strategic minimap showing terrain, units, and zone
+ * Supports both compact (corner) and expanded (center) modes
  * - Shows all terrain
  * - Shows own units (including eliminated ones marked with X)
  * - Shows enemies only when visible
  * - Shows shrinking zone boundary
+ * - Shows viewport rectangle with correct zoom level
  */
 function drawMinimap(w, h) {
     if (state.hexes.length === 0) return;
 
     const config = MINIMAP_CONFIG;
-    const size = config.SIZE;
-    const padding = config.PADDING;
+    const isExpanded = minimapExpanded;
 
-    // Position in top-left corner (below top bar)
-    const x = padding;
-    const y = padding + 55; // Offset for top bar
+    // Determine size and position based on mode
+    let size, x, y;
+    if (isExpanded) {
+        // Expanded mode: centered on screen, nearly full screen
+        size = Math.min(config.EXPANDED_SIZE, Math.min(w, h) - 40);
+        x = (w - size) / 2;
+        y = (h - size) / 2;
+    } else {
+        // Compact mode: top-left corner
+        size = config.SIZE;
+        x = config.PADDING;
+        y = config.PADDING + 55; // Offset for top bar
+    }
 
-    // Store bounds even if hidden (for toggle button)
-    lastMinimapBounds = { x, y, size, centerX: x + size / 2, centerY: y + size / 2, hexSize: 0, hidden: minimapHidden };
+    // Store bounds for interaction (even if hidden, for toggle button)
+    lastMinimapBounds = {
+        x, y, size,
+        centerX: x + size / 2,
+        centerY: y + size / 2,
+        hexSize: 0,
+        hidden: minimapHidden,
+        expanded: isExpanded
+    };
 
-    // Draw toggle button (always visible)
-    drawMinimapToggle(x, y, size);
+    // In compact mode, draw toggle button (always visible)
+    if (!isExpanded) {
+        drawMinimapToggle(x, y, size);
+    }
 
-    // If hidden, only show the toggle button
-    if (minimapHidden) {
+    // If hidden (only in compact mode), only show the toggle button
+    if (minimapHidden && !isExpanded) {
         return;
     }
 
     ctx.save();
-    // Use active opacity when being interacted with
-    ctx.globalAlpha = minimapActive ? config.OPACITY_ACTIVE : config.OPACITY;
 
-    // Background with rounded corners
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    // In expanded mode, draw dark backdrop
+    if (isExpanded) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(0, 0, w, h);
+    }
+
+    // Use higher opacity for expanded mode or when interacting
+    ctx.globalAlpha = isExpanded ? 1.0 : (minimapActive ? config.OPACITY_ACTIVE : config.OPACITY);
+
+    // Background with rounded corners - solid for expanded mode
+    ctx.fillStyle = isExpanded ? 'rgba(15, 15, 25, 1.0)' : 'rgba(0, 0, 0, 0.8)';
     ctx.beginPath();
-    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
+    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, isExpanded ? 12 : 6);
     ctx.fill();
 
-    // Border - brighter when active
-    ctx.strokeStyle = minimapActive ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = minimapActive ? 2 : 1;
+    // Border - highlight when expanded or active
+    ctx.strokeStyle = isExpanded ? 'rgba(16, 185, 129, 0.9)' : (minimapActive ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.25)');
+    ctx.lineWidth = isExpanded ? 3 : (minimapActive ? 2 : 1);
     ctx.stroke();
 
     // Calculate scale to fit map in minimap
     const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    const hexSize = Math.min(config.HEX_SIZE, (size / 2) / (mapRadius * 1.8));
+    const hexSize = isExpanded
+        ? Math.min(size / 2 / (mapRadius * 1.8), 8)  // Larger hexes for expanded view
+        : Math.min(config.HEX_SIZE, (size / 2) / (mapRadius * 1.8));
 
     // Center of minimap
     const centerX = x + size / 2;
@@ -3229,7 +3306,7 @@ function drawMinimap(w, h) {
 
     // Clip to minimap area
     ctx.beginPath();
-    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
+    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, isExpanded ? 12 : 6);
     ctx.clip();
 
     // Update bounds with hexSize for click detection
@@ -3247,9 +3324,9 @@ function drawMinimap(w, h) {
         // Check fog level for coloring
         const fogLevel = getFogLevel(hex.q, hex.r);
 
-        // Draw hex as small circle/diamond
+        // Draw hex as small circle/diamond (larger in expanded mode)
         ctx.beginPath();
-        ctx.arc(px, py, hexSize * 0.8, 0, Math.PI * 2);
+        ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
 
         if (fogLevel === 'hidden') {
             ctx.fillStyle = '#1a1a2e';
@@ -3266,7 +3343,7 @@ function drawMinimap(w, h) {
         // Draw zone circle
         const zoneRadiusPx = state.zoneRadius * hexSize * 1.8;
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = isExpanded ? 3 : 2;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.arc(centerX, centerY, zoneRadiusPx, 0, Math.PI * 2);
@@ -3276,6 +3353,7 @@ function drawMinimap(w, h) {
 
     // Draw units
     const currentPlayer = state.viewingPlayer;
+    const unitDotSize = isExpanded ? hexSize * 2 : hexSize * 1.5;
 
     // First, draw eliminated friendly units (grayed out with X)
     state.units.forEach(unit => {
@@ -3293,7 +3371,7 @@ function drawMinimap(w, h) {
 
         // Draw X over eliminated unit
         ctx.strokeStyle = '#ff4444';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = isExpanded ? 2 : 1.5;
         const xSize = hexSize * 0.8;
         ctx.beginPath();
         ctx.moveTo(px - xSize, py - xSize);
@@ -3313,12 +3391,12 @@ function drawMinimap(w, h) {
         // Draw unit dot with player color
         ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
         ctx.beginPath();
-        ctx.arc(px, py, hexSize * 1.5, 0, Math.PI * 2);
+        ctx.arc(px, py, unitDotSize, 0, Math.PI * 2);
         ctx.fill();
 
         // White outline
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = isExpanded ? 2 : 1;
         ctx.stroke();
     });
 
@@ -3335,23 +3413,25 @@ function drawMinimap(w, h) {
         // Draw enemy unit dot
         ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
         ctx.beginPath();
-        ctx.arc(px, py, hexSize * 1.5, 0, Math.PI * 2);
+        ctx.arc(px, py, unitDotSize, 0, Math.PI * 2);
         ctx.fill();
 
         // Red hostile outline
         ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = isExpanded ? 2.5 : 1.5;
         ctx.stroke();
     });
 
-    // Draw current viewport indicator
-    const viewportW = state.canvasWidth / state.hexSize / 2.5;
-    const viewportH = state.canvasHeight / state.hexSize / 2.5;
+    // Draw current viewport indicator (accounting for zoom level)
+    // The viewport size depends on canvas size, hex size, AND zoom level
+    const viewportW = state.canvasWidth / state.hexSize / state.zoomLevel / 2.5;
+    const viewportH = state.canvasHeight / state.hexSize / state.zoomLevel / 2.5;
     const viewX = centerX - state.cameraX / state.hexSize * hexSize * 1.5;
     const viewY = centerY - state.cameraY / state.hexSize * hexSize * Math.sqrt(3);
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 1;
+    // Viewport rectangle - more visible in expanded mode
+    ctx.strokeStyle = isExpanded ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = isExpanded ? 2 : 1;
     ctx.strokeRect(
         viewX - viewportW * hexSize,
         viewY - viewportH * hexSize,
@@ -3359,12 +3439,43 @@ function drawMinimap(w, h) {
         viewportH * hexSize * 2
     );
 
-    // Label
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('KARTE', x + size / 2, y - 8);
+    // Semi-transparent fill for viewport area in expanded mode
+    if (isExpanded) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(
+            viewX - viewportW * hexSize,
+            viewY - viewportH * hexSize,
+            viewportW * hexSize * 2,
+            viewportH * hexSize * 2
+        );
+    }
 
+    ctx.restore();
+
+    // Draw label and close button outside the clip region
+    ctx.save();
+    if (isExpanded) {
+        // Title for expanded view
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('KARTE', x + size / 2, y - 15);
+
+        // Hint text
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.fillText('Tippe um den Viewport zu verschieben', x + size / 2, y + size + 20);
+
+        // Draw close button
+        drawMinimapCloseButton(x, y, size);
+    } else {
+        // Label for compact view
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('KARTE', x + size / 2, y - 8);
+    }
     ctx.restore();
 }
 
