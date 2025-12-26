@@ -2308,6 +2308,40 @@ function desaturateAndDarken(color, saturation, brightness) {
 }
 
 /**
+ * Blend a color with red for danger zone indication
+ * @param color - Hex or rgb color string
+ * @param amount - 0 = original, 1 = full red
+ */
+function blendWithRed(color, amount) {
+    let R, G, B;
+
+    if (color.startsWith('#')) {
+        const num = parseInt(color.replace('#', ''), 16);
+        R = (num >> 16) & 0xFF;
+        G = (num >> 8) & 0xFF;
+        B = num & 0xFF;
+    } else if (color.startsWith('rgb')) {
+        const match = color.match(/\d+/g);
+        if (match) {
+            R = parseInt(match[0]);
+            G = parseInt(match[1]);
+            B = parseInt(match[2]);
+        } else {
+            return color;
+        }
+    } else {
+        return color;
+    }
+
+    // Blend toward red (239, 68, 68)
+    R = Math.round(R + (239 - R) * amount);
+    G = Math.round(G + (68 - G) * amount * 0.7); // Less green reduction
+    B = Math.round(B + (68 - B) * amount * 0.7); // Less blue reduction
+
+    return `rgb(${R},${G},${B})`;
+}
+
+/**
  * Update performance tracking and determine effective quality
  */
 function updatePerformance() {
@@ -3320,18 +3354,29 @@ function drawMinimap(w, h) {
         // Check fog level for coloring
         const fogLevel = getFogLevel(hex.q, hex.r);
 
+        // Check if hex is outside the safe zone
+        const outsideZone = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius && !isHexInZone(hex.q, hex.r);
+
         // Draw hex as small circle/diamond (larger in expanded mode)
         ctx.beginPath();
         ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
 
         if (fogLevel === 'hidden') {
-            ctx.fillStyle = '#1a1a2e';
+            ctx.fillStyle = outsideZone ? '#2a1a1e' : '#1a1a2e';
         } else if (fogLevel === 'explored') {
-            ctx.fillStyle = desaturateAndDarken(terrain.color, 0.4, 0.6);
+            const baseColor = desaturateAndDarken(terrain.color, 0.4, 0.6);
+            ctx.fillStyle = outsideZone ? blendWithRed(baseColor, 0.4) : baseColor;
         } else {
-            ctx.fillStyle = terrain.color;
+            ctx.fillStyle = outsideZone ? blendWithRed(terrain.color, 0.3) : terrain.color;
         }
         ctx.fill();
+
+        // Add red border for hexes outside zone
+        if (outsideZone && fogLevel !== 'hidden') {
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+            ctx.lineWidth = isExpanded ? 1.5 : 1;
+            ctx.stroke();
+        }
     });
 
     // Draw shrinking zone boundary (if active)
