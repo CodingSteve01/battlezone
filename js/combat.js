@@ -12,6 +12,7 @@ import {
     playHeal, playSprint, playPowershot, playCloak, playCover
 } from './audio.js';
 import { particles } from './particles.js';
+import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames } from './minigames.js';
 
 /**
  * Check if a unit can take cover on their current hex
@@ -386,9 +387,34 @@ function calculateCoverDamageReduction(attacker, defender) {
 }
 
 /**
- * Execute an attack
+ * Execute an attack with optional minigame
+ * This is the main entry point for attacks - starts minigame first if enabled
+ * Returns a Promise with the attack result
  */
-export function executeAttack(attacker, defender) {
+export async function executeAttackWithMinigame(attacker, defender) {
+    // Check if minigames are enabled
+    if (areMinigamesEnabled()) {
+        // Start the minigame for this unit class
+        const minigameResult = await startMinigame(attacker.class);
+        // Execute the attack with the minigame result
+        return executeAttack(attacker, defender, minigameResult);
+    } else {
+        // No minigame - execute attack directly with default "good" result
+        return executeAttack(attacker, defender, { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] });
+    }
+}
+
+/**
+ * Execute an attack
+ * @param {Object} attacker - The attacking unit
+ * @param {Object} defender - The defending unit
+ * @param {Object} minigameResult - Result from the attack minigame (optional)
+ */
+export function executeAttack(attacker, defender, minigameResult = null) {
+    // Default to GOOD result if no minigame result provided (for AI attacks, etc.)
+    if (!minigameResult) {
+        minigameResult = { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] };
+    }
     // Track ghost indicator for stealth units before revealing
     // This shows enemy where the attack came from
     const wasStealthed = attacker.cloaked || attacker.hiding ||
@@ -496,6 +522,18 @@ export function executeAttack(attacker, defender) {
     // Calculate base damage with all bonuses
     let damage = getEffectiveDamage(attacker);
 
+    // === MINIGAME DAMAGE MODIFIER ===
+    // Apply damage multiplier based on minigame performance
+    const damageMultiplier = minigameResult.multiplier.damage;
+    damage = Math.floor(damage * damageMultiplier);
+
+    // Show minigame result feedback
+    if (minigameResult.level === RESULT_LEVELS.PERFECT) {
+        showToast(`🎯 ${minigameResult.multiplier.label}`, 'special');
+    } else if (minigameResult.level === RESULT_LEVELS.MISS) {
+        showToast(`💨 ${minigameResult.multiplier.label} - Nur Streifschuss!`, 'miss');
+    }
+
     // Assault has damage variance
     if (attacker.class === 'assault') {
         damage += Math.floor(Math.random() * 15);
@@ -529,9 +567,13 @@ export function executeAttack(attacker, defender) {
         }
     }
 
-    // Calculate critical hit
+    // Calculate critical hit (with minigame bonus)
     const crit = calculateCritical(attacker, defender);
-    if (crit.isCrit) {
+    // Perfect minigame gives extra crit chance
+    const critBonus = minigameResult.multiplier.critBonus || 0;
+    const critRoll = Math.random();
+    const hasCrit = crit.isCrit || (critBonus > 0 && critRoll < critBonus);
+    if (hasCrit) {
         damage = Math.floor(damage * crit.multiplier);
     }
 
@@ -551,11 +593,11 @@ export function executeAttack(attacker, defender) {
         const rect = canvas.getBoundingClientRect();
         const screenX = rect.left + state.offsetX + defenderPosScreen.x;
         const screenY = rect.top + state.offsetY + defenderPosScreen.y - 20;
-        showFloatingDamage(screenX, screenY, damage, crit.isCrit);
+        showFloatingDamage(screenX, screenY, damage, hasCrit);
     }
 
     // Play hit sound and show message
-    if (crit.isCrit) {
+    if (hasCrit) {
         playCriticalHit();
         showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
         // Strong screen shake for critical hits
@@ -569,7 +611,7 @@ export function executeAttack(attacker, defender) {
 
     // Enhanced hit particle effects at defender position
     // Direction is from attacker to defender (impact direction)
-    particles.enhancedHitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection, attacker.class);
+    particles.enhancedHitEffect(defenderPos.x, defenderPos.y - 10, hasCrit, attackDirection, attacker.class);
 
     // Check for kill
     if (defender.currentHp <= 0) {
@@ -591,10 +633,10 @@ export function executeAttack(attacker, defender) {
             }, 1600 + i * 800);
         });
 
-        return { hit: true, damage, killed: true, crit: crit.isCrit, levelUps };
+        return { hit: true, damage, killed: true, crit: hasCrit, levelUps, minigameLevel: minigameResult.level };
     }
 
-    return { hit: true, damage, killed: false, crit: crit.isCrit };
+    return { hit: true, damage, killed: false, crit: hasCrit, minigameLevel: minigameResult.level };
 }
 
 /**
