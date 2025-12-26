@@ -2949,8 +2949,8 @@ export function render() {
         ctx.stroke();
     }
 
-    // Draw AP cost overlays - ALWAYS ON TOP of everything
-    if (apCostOverlays.length > 0) {
+    // Draw AP cost overlays - only when a path is being planned
+    if (apCostOverlays.length > 0 && state.currentPath && state.currentPath.length > 0) {
         apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
             // Background pill for cost
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
