@@ -415,6 +415,30 @@ async function init() {
         });
     });
 
+    // Landscape name and icon mapping
+    const landscapeInfo = {
+        random: { icon: '🎲', name: 'Zufällig' },
+        temperate: { icon: '🌳', name: 'Gemäßigt' },
+        desert: { icon: '🏜️', name: 'Wüste' },
+        tundra: { icon: '❄️', name: 'Tundra' },
+        tropical: { icon: '🌴', name: 'Tropisch' },
+        highland: { icon: '⛰️', name: 'Hochland' },
+        wetland: { icon: '🌿', name: 'Feuchtgebiet' }
+    };
+
+    // Function to update landscape preview
+    function updateLandscapePreview(landscape) {
+        const preview = document.getElementById('landscape-preview');
+        if (!preview) return;
+
+        const info = landscapeInfo[landscape] || landscapeInfo.random;
+        const iconEl = preview.querySelector('.landscape-preview-icon');
+        const nameEl = preview.querySelector('.landscape-preview-name');
+
+        if (iconEl) iconEl.textContent = info.icon;
+        if (nameEl) nameEl.textContent = info.name;
+    }
+
     // Setup landscape/biome buttons
     document.querySelectorAll('[data-landscape]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -425,6 +449,7 @@ async function init() {
             btn.classList.add('selected');
 
             state.settings.landscape = btn.dataset.landscape;
+            updateLandscapePreview(btn.dataset.landscape);
         });
 
         btn.addEventListener('touchend', (e) => {

@@ -3094,14 +3094,19 @@ function drawZoomIndicator(w, h) {
 // ===== MINIMAP =====
 
 /**
- * Minimap configuration
+ * Minimap configuration - exported for interaction handling
  */
-const MINIMAP_CONFIG = {
-    SIZE: 140,           // Minimap size in pixels
-    PADDING: 12,         // Padding from screen edge
+export const MINIMAP_CONFIG = {
+    SIZE: 110,           // Minimap size in pixels (smaller for better UI)
+    PADDING: 10,         // Padding from screen edge
     HEX_SIZE: 3,         // Size of each hex on minimap
-    OPACITY: 0.85        // Overall opacity
+    OPACITY: 0.9,        // Overall opacity
+    POSITION: 'top-left' // Position on screen
 };
+
+// Store last drawn minimap bounds for click detection
+let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0 };
+export function getMinimapBounds() { return lastMinimapBounds; }
 
 /**
  * Draw strategic minimap showing terrain, units, and zone
@@ -3117,9 +3122,9 @@ function drawMinimap(w, h) {
     const size = config.SIZE;
     const padding = config.PADDING;
 
-    // Position in bottom-right corner (above action buttons on mobile)
-    const x = w - size - padding;
-    const y = h - size - padding - 80; // Extra offset for mobile UI
+    // Position in top-left corner (below top bar)
+    const x = padding;
+    const y = padding + 55; // Offset for top bar
 
     ctx.save();
     ctx.globalAlpha = config.OPACITY;
@@ -3147,6 +3152,9 @@ function drawMinimap(w, h) {
     ctx.beginPath();
     ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
     ctx.clip();
+
+    // Store bounds for click detection
+    lastMinimapBounds = { x, y, size, centerX, centerY, hexSize };
 
     // Draw all hexes
     state.hexes.forEach(hex => {

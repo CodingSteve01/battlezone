@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas } from './renderer.js';
+import { render, resizeCanvas, getMinimapBounds } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
@@ -424,6 +424,78 @@ function applyZoom(zoomDelta, screenX, screenY) {
 }
 
 /**
+ * Check if a click/touch is on the minimap and handle navigation
+ * Returns true if click was on minimap (handled), false otherwise
+ */
+function handleMinimapClick(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    const bounds = getMinimapBounds();
+    if (!bounds || bounds.size === 0) return false;
+
+    // Check if click is within minimap bounds (with some padding)
+    const padding = 5;
+    if (canvasX >= bounds.x - padding &&
+        canvasX <= bounds.x + bounds.size + padding &&
+        canvasY >= bounds.y - padding &&
+        canvasY <= bounds.y + bounds.size + padding) {
+
+        // Convert minimap click to hex coordinates
+        const relX = canvasX - bounds.centerX;
+        const relY = canvasY - bounds.centerY;
+
+        // Reverse the hex-to-pixel conversion used in minimap drawing
+        // px = centerX + q * hexSize * 1.5
+        // py = centerY + (r + q * 0.5) * hexSize * sqrt(3)
+        const q = relX / (bounds.hexSize * 1.5);
+        const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
+
+        // Convert to world pixel position
+        const worldX = q * state.hexSize * 1.5;
+        const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
+
+        // Smooth scroll to position
+        scrollToPosition(-worldX, -worldY);
+
+        return true;
+    }
+
+    return false;
+}
+
+/**
+ * Smoothly scroll camera to a specific position
+ */
+export function scrollToPosition(targetCameraX, targetCameraY, duration = 300) {
+    const startCameraX = state.cameraX;
+    const startCameraY = state.cameraY;
+    const startTime = Date.now();
+
+    function animateScroll() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / duration);
+
+        // Ease out cubic
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        state.cameraX = startCameraX + (targetCameraX - startCameraX) * ease;
+        state.cameraY = startCameraY + (targetCameraY - startCameraY) * ease;
+
+        limitCameraBounds();
+        updateCameraOffset();
+        render();
+
+        if (progress < 1) {
+            requestAnimationFrame(animateScroll);
+        }
+    }
+
+    requestAnimationFrame(animateScroll);
+}
+
+/**
  * Handle tap or click at position - Unified Point-and-Click system
  * - Click own unit: Select it
  * - Click enemy: Attack if in range, otherwise move toward them
@@ -431,6 +503,11 @@ function applyZoom(zoomDelta, screenX, screenY) {
  */
 function handleTapOrClick(clientX, clientY) {
     if (state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer) {
+        return;
+    }
+
+    // Check if click is on minimap first
+    if (handleMinimapClick(clientX, clientY)) {
         return;
     }
 
