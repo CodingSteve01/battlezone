@@ -52,6 +52,7 @@ export const state = {
     round: 1,
     gameOver: false,
     animating: false,
+    introShown: false,  // Whether the game intro flyover has been shown
 
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }

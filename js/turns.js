@@ -7,7 +7,7 @@ import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWa
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
-import { centerOnCurrentUnit, executeQueuedPathsForPlayer } from './input.js';
+import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
@@ -178,16 +178,21 @@ export function nextPlayer() {
 /**
  * Handle ready button (after turn screen)
  */
-export function handleReady() {
+export async function handleReady() {
     showScreen(null);
     updateVisibility();
     updateUI();
     render();
 
-    // Center camera on first unit
-    requestAnimationFrame(() => {
-        centerOnCurrentUnit();
-    });
+    // Play intro flyover on first turn of the game
+    if (state.round === 1 && !state.introShown) {
+        await playGameIntro();
+    } else {
+        // Center camera on first unit
+        requestAnimationFrame(() => {
+            centerOnCurrentUnit();
+        });
+    }
 }
 
 /**

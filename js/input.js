@@ -929,6 +929,155 @@ export function scrollToUnit(unit, duration = 500) {
 }
 
 /**
+ * Smoothly animate zoom level
+ * @returns Promise that resolves when animation completes
+ */
+function animateZoom(targetZoom, duration = 500) {
+    return new Promise(resolve => {
+        const startZoom = state.zoomLevel;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
+ * Smoothly animate camera to position
+ * @returns Promise that resolves when animation completes
+ */
+function animateCameraTo(targetCameraX, targetCameraY, duration = 500) {
+    return new Promise(resolve => {
+        const startCameraX = state.cameraX;
+        const startCameraY = state.cameraY;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            state.cameraX = startCameraX + (targetCameraX - startCameraX) * ease;
+            state.cameraY = startCameraY + (targetCameraY - startCameraY) * ease;
+
+            limitCameraBounds();
+            updateCameraOffset();
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
+ * Play game intro flyover animation
+ * Shows an overview of the map and player's units
+ */
+export async function playGameIntro() {
+    if (state.introShown) return;
+
+    state.introShown = true;
+    state.animating = true;
+
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    if (playerUnits.length === 0) {
+        state.animating = false;
+        return;
+    }
+
+    // Calculate bounding box of player's units
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (const unit of playerUnits) {
+        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+        minX = Math.min(minX, pos.x);
+        maxX = Math.max(maxX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxY = Math.max(maxY, pos.y);
+    }
+
+    // Calculate center of units
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Calculate spread to determine zoom level
+    const spreadX = maxX - minX;
+    const spreadY = maxY - minY;
+    const spread = Math.max(spreadX, spreadY);
+
+    // Start zoomed out with overview
+    const overviewZoom = Math.max(0.5, Math.min(0.8, 400 / (spread + 200)));
+
+    // Step 1: Zoom out to show overview
+    state.cameraX = -centerX;
+    state.cameraY = -centerY;
+    state.zoomLevel = overviewZoom;
+    state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+    limitCameraBounds();
+    updateCameraOffset();
+    render();
+
+    await delay(800);
+
+    // Step 2: Pan across the units (show each unit briefly)
+    for (const unit of playerUnits.slice(0, 3)) { // Show max 3 units
+        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+        await animateCameraTo(-pos.x, -pos.y, 600);
+        await delay(400);
+    }
+
+    // Step 3: Zoom in to first unit
+    const firstUnit = playerUnits[0];
+    const firstPos = hexToPixel(firstUnit.q, firstUnit.r, CONFIG.BASE_HEX_SIZE);
+
+    // Animate to first unit position while zooming in
+    await Promise.all([
+        animateCameraTo(-firstPos.x, -firstPos.y, 800),
+        animateZoom(1.0, 800)
+    ]);
+
+    state.animating = false;
+}
+
+/**
+ * Utility: delay helper for async functions
+ */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Continue queued path for a unit if it exists
  */
 export function continueQueuedPath(unit) {
