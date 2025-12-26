@@ -372,12 +372,39 @@ function startGameWithTeams() {
     // before sizing the canvas. This is critical for AI vs AI games where
     // everything happens synchronously without user interaction.
     requestAnimationFrame(() => {
-        // Initialize canvas
+        // Initialize canvas - this may retry if container has 0 dimensions
         resizeCanvas();
 
-        // Start first turn
-        startTurn();
+        // Wait for canvas to be properly sized before starting the turn
+        // This is necessary because resizeCanvas() may need multiple retries
+        waitForCanvasReady(() => {
+            startTurn();
+        });
     });
+}
+
+/**
+ * Wait for canvas to be properly sized before executing callback
+ * Polls until canvas has valid dimensions (non-zero width/height)
+ */
+function waitForCanvasReady(callback, maxAttempts = 20) {
+    const canvas = document.getElementById('game-canvas');
+    let attempts = 0;
+
+    function check() {
+        attempts++;
+        if (canvas && canvas.width > 0 && canvas.height > 0) {
+            callback();
+        } else if (attempts < maxAttempts) {
+            setTimeout(check, 50);
+        } else {
+            // Fallback: start anyway after max attempts (1 second)
+            console.warn('Canvas not ready after max attempts, starting anyway');
+            callback();
+        }
+    }
+
+    check();
 }
 
 /**
