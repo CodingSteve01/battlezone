@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.2...shadow-squad-v3.4.0) (2025-12-26)
+
+
+### Features
+
+* **ui:** add interactive expandable minimap and path-based traffic lights ([#109](https://github.com/CodingSteve01/battlezone/issues/109)) ([97f833b](https://github.com/CodingSteve01/battlezone/commit/97f833b6a1742f1d0c1d3634ce486b765452581d))
+
 ## [3.3.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.1...shadow-squad-v3.3.2) (2025-12-26)
 
 
