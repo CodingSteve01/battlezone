@@ -392,10 +392,128 @@ export function showScreen(id) {
     }
 }
 
+// ===== NOTIFICATION MANAGER =====
+// Prevents notification flooding and respects verbosity settings
+
+const notificationManager = {
+    queue: [],
+    isShowing: false,
+    lastShown: 0,
+    minDelay: 800,      // Minimum time between notifications (ms)
+    recentMessages: [], // Track recent messages to prevent duplicates
+    maxRecent: 10       // How many recent messages to remember
+};
+
+/**
+ * Notification priority levels:
+ * - 'critical': Always shown (victory, defeat, zone damage)
+ * - 'important': Shown in normal+ (attacks, kills, special abilities)
+ * - 'info': Shown in normal+ but can be skipped if busy (movement, selection)
+ * - 'verbose': Only shown in verbose mode (unit selected, path saved, etc.)
+ */
+const NOTIFICATION_PRIORITY = {
+    // Critical - always shown
+    'levelup': 'critical',
+    'crit': 'critical',
+    'hit': 'important',
+    'miss': 'important',
+    'special': 'important',
+    'warning': 'important',
+    'powerup': 'important',
+    // Info - shown in normal mode
+    'info': 'info',
+    // Default
+    '': 'info'
+};
+
+/**
+ * Check if a notification should be shown based on settings
+ */
+function shouldShowNotification(type, message) {
+    const level = state.settings.notificationLevel || 'normal';
+    const priority = NOTIFICATION_PRIORITY[type] || 'info';
+
+    // Critical always shown
+    if (priority === 'critical') return true;
+
+    // Check verbosity level
+    if (level === 'minimal') {
+        // Only critical and important combat notifications
+        return priority === 'critical' || (priority === 'important' && (type === 'hit' || type === 'crit' || type === 'miss'));
+    }
+
+    if (level === 'normal') {
+        // Everything except verbose
+        return priority !== 'verbose';
+    }
+
+    // Verbose mode - show everything
+    return true;
+}
+
+/**
+ * Check if message was recently shown (prevent duplicates)
+ */
+function isRecentDuplicate(message) {
+    // Allow exact same messages if they're combat-related
+    if (message.includes('Schaden') || message.includes('eliminiert')) {
+        return false;
+    }
+
+    // Check if this exact message was shown in the last few
+    const isDuplicate = notificationManager.recentMessages.includes(message);
+    if (!isDuplicate) {
+        notificationManager.recentMessages.push(message);
+        if (notificationManager.recentMessages.length > notificationManager.maxRecent) {
+            notificationManager.recentMessages.shift();
+        }
+    }
+    return isDuplicate;
+}
+
 /**
  * Show a toast notification
  */
 export function showToast(message, type = '') {
+    // Check if notification should be shown based on settings
+    if (!shouldShowNotification(type, message)) {
+        return;
+    }
+
+    // Check for recent duplicates (except for combat messages)
+    if (isRecentDuplicate(message)) {
+        return;
+    }
+
+    // For critical/important messages, show immediately
+    const priority = NOTIFICATION_PRIORITY[type] || 'info';
+    if (priority === 'critical' || priority === 'important') {
+        showToastImmediate(message, type);
+        return;
+    }
+
+    // For info messages, check if we're flooding
+    const now = Date.now();
+    if (now - notificationManager.lastShown < notificationManager.minDelay) {
+        // Queue the message if it's not too long
+        if (notificationManager.queue.length < 3) {
+            notificationManager.queue.push({ message, type });
+            scheduleNextNotification();
+        }
+        // Otherwise skip this message (not important enough)
+        return;
+    }
+
+    showToastImmediate(message, type);
+}
+
+/**
+ * Actually display a toast notification
+ */
+function showToastImmediate(message, type) {
+    notificationManager.lastShown = Date.now();
+    notificationManager.isShowing = true;
+
     // Remove existing toast
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -411,16 +529,55 @@ export function showToast(message, type = '') {
         triggerScreenShake(type === 'crit' ? 'heavy' : 'light');
     }
 
-    // Calculate duration based on message length (min 3.5s, +40ms per char over 30)
-    const baseDuration = 3500;
+    // Calculate duration based on message length (min 2.5s for info, 3.5s for important)
+    const priority = NOTIFICATION_PRIORITY[type] || 'info';
+    const baseDuration = (priority === 'info') ? 2500 : 3500;
     const extraChars = Math.max(0, message.length - 30);
     const duration = baseDuration + extraChars * 40;
 
     // Set CSS animation duration to match
     toast.style.animationDuration = `${duration}ms`;
 
-    // Auto remove
-    setTimeout(() => toast.remove(), duration);
+    // Auto remove and process queue
+    setTimeout(() => {
+        toast.remove();
+        notificationManager.isShowing = false;
+        processNotificationQueue();
+    }, duration);
+}
+
+/**
+ * Schedule next notification from queue
+ */
+function scheduleNextNotification() {
+    if (notificationManager.queue.length === 0) return;
+
+    const timeSinceLastShow = Date.now() - notificationManager.lastShown;
+    const delay = Math.max(0, notificationManager.minDelay - timeSinceLastShow);
+
+    setTimeout(() => {
+        processNotificationQueue();
+    }, delay);
+}
+
+/**
+ * Process notification queue
+ */
+function processNotificationQueue() {
+    if (notificationManager.isShowing || notificationManager.queue.length === 0) return;
+
+    const next = notificationManager.queue.shift();
+    if (next) {
+        showToastImmediate(next.message, next.type);
+    }
+}
+
+/**
+ * Clear notification queue (e.g., when changing screens)
+ */
+export function clearNotificationQueue() {
+    notificationManager.queue = [];
+    notificationManager.recentMessages = [];
 }
 
 /**

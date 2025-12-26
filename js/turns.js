@@ -10,7 +10,7 @@ import { render } from './renderer.js';
 import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
-import { isAIPlayer, executeAITurn } from './ai.js';
+import { isAIPlayer, executeAITurn, isSpectatorMode } from './ai.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 // === SHRINKING ZONE CONSTANTS ===
@@ -49,10 +49,14 @@ export function startTurn() {
     state.pendingMoveDestination = null;
 
     // Determine viewing player perspective:
+    // - If spectator mode (all AI or humans eliminated), follow current AI's perspective
+    // - If current player is AI and humans exist, keep the human player's perspective
     // - If current player is human, view from their perspective
-    // - If current player is AI, keep the previous human player's perspective
-    if (isAIPlayer()) {
-        // AI is playing - find the first human player for viewing
+    if (isSpectatorMode()) {
+        // SPECTATOR MODE: Follow the current AI's perspective
+        state.viewingPlayer = state.currentPlayer;
+    } else if (isAIPlayer()) {
+        // AI is playing but humans still have units - find the first human for viewing
         let firstHuman = 0;
         for (let p = 0; p < state.settings.players; p++) {
             if (!isAIPlayer(p)) {

@@ -2,6 +2,7 @@
 
 import { state, getCurrentUnit } from './state.js';
 import { getAttackableUnits } from './units.js';
+import { showToast } from './ui.js';
 
 // Tutorial state
 const tutorialState = {
@@ -120,6 +121,9 @@ function saveTutorialProgress() {
  * Check if tutorial should start
  */
 export function shouldStartTutorial() {
+    // Don't show tutorial if setting is disabled
+    if (state.settings && state.settings.showTutorial === false) return false;
+
     // Don't show tutorial if player has dismissed it or already played
     if (tutorialState.dismissedForGame) return false;
 
@@ -287,7 +291,7 @@ export function showActionHint(actionType) {
 }
 
 /**
- * Reset tutorial (for testing)
+ * Reset tutorial (for testing or user request)
  */
 export function resetTutorial() {
     tutorialState.active = false;
@@ -305,6 +309,9 @@ export function resetTutorial() {
     }
 
     hideTutorialOverlay();
+
+    // Notify user
+    showToast('💡 Tutorial wird im nächsten Spiel angezeigt', 'info');
 }
 
 /**

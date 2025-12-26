@@ -13,7 +13,9 @@ export const state = {
         aiPlayers: [],          // Array of player indices controlled by AI (e.g., [1, 3] for players 2 and 4)
         renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
-        particleQuality: 'high' // 'low', 'medium', 'high' - Partikelanzahl
+        particleQuality: 'high', // 'low', 'medium', 'high' - Partikelanzahl
+        notificationLevel: 'normal', // 'minimal', 'normal', 'verbose' - Hinweis-Ausführlichkeit
+        showTutorial: true      // Tutorial-Hinweise anzeigen
     },
 
     // Current active biome (resolved from 'random' or selected)
