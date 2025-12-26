@@ -4,7 +4,7 @@ import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueued
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
-import { executeAttack, useSpecialAbility } from './combat.js';
+import { executeAttack, executeAttackWithMinigame, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -670,7 +670,7 @@ function handleTapOrClick(clientX, clientY) {
 /**
  * Handle click on enemy unit - auto-attack or move toward
  */
-function handleEnemyClick(unit, hex) {
+async function handleEnemyClick(unit, hex) {
     const enemy = hex.unit;
 
     // Check if enemy is in attack range
@@ -680,11 +680,13 @@ function handleEnemyClick(unit, hex) {
     if (canAttack && state.sharedAP >= 1) {
         // Enemy is in range - attack!
         if (state.targetedUnit && state.targetedUnit.id === enemy.id) {
-            // Second tap on same enemy - execute attack
-            const result = executeAttack(unit, enemy);
+            // Second tap on same enemy - execute attack with minigame
             state.targetedUnit = null;
             state.pendingMoveDestination = null;
             state.currentPath = null;
+
+            // Start the attack minigame and wait for result
+            const result = await executeAttackWithMinigame(unit, enemy);
 
             if (result.killed) {
                 checkWinCondition();
@@ -1412,15 +1414,17 @@ function stopPendingMoveAnimation() {
 /**
  * Handle attack action click
  */
-function handleAttackClick(unit, hex) {
+async function handleAttackClick(unit, hex) {
     if (hex.unit && hex.unit.player !== unit.player && hex.unit.alive) {
         const attackable = getAttackableUnits(unit);
         const canAttack = attackable.some(u => u.id === hex.unit.id);
 
         if (canAttack) {
             if (state.targetedUnit && state.targetedUnit.id === hex.unit.id) {
-                const result = executeAttack(unit, hex.unit);
                 state.targetedUnit = null;
+
+                // Execute attack with minigame
+                const result = await executeAttackWithMinigame(unit, hex.unit);
 
                 if (result.killed) {
                     checkWinCondition();
