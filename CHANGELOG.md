@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.4.1...shadow-squad-v3.5.0) (2025-12-26)
+
+
+### Features
+
+* **ui:** unify player type selection for all game modes ([#113](https://github.com/CodingSteve01/battlezone/issues/113)) ([acbcb79](https://github.com/CodingSteve01/battlezone/commit/acbcb7969888a60cdd14c6f5d0e65e2e3dbf974e))
+
 ## [3.4.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.4.0...shadow-squad-v3.4.1) (2025-12-26)
 
 
