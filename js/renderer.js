@@ -3097,16 +3097,64 @@ function drawZoomIndicator(w, h) {
  * Minimap configuration - exported for interaction handling
  */
 export const MINIMAP_CONFIG = {
-    SIZE: 110,           // Minimap size in pixels (smaller for better UI)
-    PADDING: 10,         // Padding from screen edge
+    SIZE: 90,            // Minimap size in pixels (compact for mobile)
+    PADDING: 8,          // Padding from screen edge
     HEX_SIZE: 3,         // Size of each hex on minimap
-    OPACITY: 0.9,        // Overall opacity
+    OPACITY: 0.5,        // Base opacity (more transparent)
+    OPACITY_ACTIVE: 0.95, // Opacity when touched/hovered
     POSITION: 'top-left' // Position on screen
 };
 
+// Track if minimap is being interacted with
+let minimapActive = false;
+let minimapHidden = false;
+
+export function setMinimapActive(active) { minimapActive = active; }
+export function isMinimapHidden() { return minimapHidden; }
+export function toggleMinimapVisibility() { minimapHidden = !minimapHidden; }
+
 // Store last drawn minimap bounds for click detection
-let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0 };
+let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false };
 export function getMinimapBounds() { return lastMinimapBounds; }
+
+// Store toggle button bounds for click detection
+let toggleButtonBounds = { x: 0, y: 0, size: 24 };
+export function getToggleButtonBounds() { return toggleButtonBounds; }
+
+/**
+ * Draw minimap toggle button
+ */
+function drawMinimapToggle(mapX, mapY, mapSize) {
+    const btnSize = 24;
+    const btnX = mapX + mapSize + 8;
+    const btnY = mapY;
+
+    // Store bounds for click detection
+    toggleButtonBounds = { x: btnX, y: btnY, size: btnSize };
+
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+
+    // Button background
+    ctx.fillStyle = minimapHidden ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 0, 0, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnSize, btnSize, 4);
+    ctx.fill();
+
+    // Button border
+    ctx.strokeStyle = minimapHidden ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Icon (map icon when hidden, X when visible)
+    ctx.fillStyle = minimapHidden ? '#10b981' : 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(minimapHidden ? '🗺️' : '✕', btnX + btnSize / 2, btnY + btnSize / 2);
+
+    ctx.restore();
+}
 
 /**
  * Draw strategic minimap showing terrain, units, and zone
@@ -3126,18 +3174,30 @@ function drawMinimap(w, h) {
     const x = padding;
     const y = padding + 55; // Offset for top bar
 
+    // Store bounds even if hidden (for toggle button)
+    lastMinimapBounds = { x, y, size, centerX: x + size / 2, centerY: y + size / 2, hexSize: 0, hidden: minimapHidden };
+
+    // Draw toggle button (always visible)
+    drawMinimapToggle(x, y, size);
+
+    // If hidden, only show the toggle button
+    if (minimapHidden) {
+        return;
+    }
+
     ctx.save();
-    ctx.globalAlpha = config.OPACITY;
+    // Use active opacity when being interacted with
+    ctx.globalAlpha = minimapActive ? config.OPACITY_ACTIVE : config.OPACITY;
 
     // Background with rounded corners
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.beginPath();
-    ctx.roundRect(x - 5, y - 5, size + 10, size + 10, 8);
+    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
     ctx.fill();
 
-    // Border
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
+    // Border - brighter when active
+    ctx.strokeStyle = minimapActive ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = minimapActive ? 2 : 1;
     ctx.stroke();
 
     // Calculate scale to fit map in minimap
@@ -3153,8 +3213,8 @@ function drawMinimap(w, h) {
     ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
     ctx.clip();
 
-    // Store bounds for click detection
-    lastMinimapBounds = { x, y, size, centerX, centerY, hexSize };
+    // Update bounds with hexSize for click detection
+    lastMinimapBounds.hexSize = hexSize;
 
     // Draw all hexes
     state.hexes.forEach(hex => {

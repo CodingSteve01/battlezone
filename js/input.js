@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas, getMinimapBounds } from './renderer.js';
+import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, setMinimapActive, toggleMinimapVisibility } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
@@ -424,16 +424,48 @@ function applyZoom(zoomDelta, screenX, screenY) {
 }
 
 /**
+ * Check if a click/touch is on the minimap toggle button
+ * Returns true if click was on toggle (handled), false otherwise
+ */
+function handleMinimapToggleClick(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    const toggleBounds = getToggleButtonBounds();
+    if (!toggleBounds) return false;
+
+    // Check if click is on toggle button
+    if (canvasX >= toggleBounds.x &&
+        canvasX <= toggleBounds.x + toggleBounds.size &&
+        canvasY >= toggleBounds.y &&
+        canvasY <= toggleBounds.y + toggleBounds.size) {
+
+        toggleMinimapVisibility();
+        playClick();
+        render();
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Check if a click/touch is on the minimap and handle navigation
  * Returns true if click was on minimap (handled), false otherwise
  */
 function handleMinimapClick(clientX, clientY) {
+    // First check toggle button
+    if (handleMinimapToggleClick(clientX, clientY)) {
+        return true;
+    }
+
     const rect = canvas.getBoundingClientRect();
     const canvasX = clientX - rect.left;
     const canvasY = clientY - rect.top;
 
     const bounds = getMinimapBounds();
-    if (!bounds || bounds.size === 0) return false;
+    if (!bounds || bounds.size === 0 || bounds.hidden) return false;
 
     // Check if click is within minimap bounds (with some padding)
     const padding = 5;
@@ -441,6 +473,10 @@ function handleMinimapClick(clientX, clientY) {
         canvasX <= bounds.x + bounds.size + padding &&
         canvasY >= bounds.y - padding &&
         canvasY <= bounds.y + bounds.size + padding) {
+
+        // Set minimap as active for visual feedback
+        setMinimapActive(true);
+        setTimeout(() => setMinimapActive(false), 300);
 
         // Convert minimap click to hex coordinates
         const relX = canvasX - bounds.centerX;
