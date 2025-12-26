@@ -11,6 +11,7 @@ import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
+import { scrollToUnit } from './input.js';
 
 // ===== AI MEMORY SYSTEM =====
 // Stores information about enemy positions, even when not visible
@@ -418,8 +419,20 @@ async function performUnitAI(unit, plan) {
 
 /**
  * Execute attack with proper rendering
+ * In single-player, scroll to the attacked friendly unit so the player can see the action
  */
 async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer) {
+    // In single-player, scroll to the target (friendly unit being attacked) before attack
+    if (isSinglePlayer && target.player === 0) {
+        // Scroll to the friendly unit being attacked
+        scrollToUnit(target, 400);
+        await delay(450);
+    } else if (isSinglePlayer && isUnitVisibleToViewer(unit)) {
+        // If attacking another enemy but AI is visible, scroll to the action
+        scrollToUnit(unit, 300);
+        await delay(350);
+    }
+
     state.targetedUnit = target;
     renderIfVisible();
     await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
@@ -438,7 +451,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlay
         updateUI();
         render();
     }
-    await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+    await delay(isUnitVisibleToViewer(unit) ? 500 : 100);
 }
 
 // ===== TACTICAL DECISIONS =====
@@ -982,6 +995,7 @@ function scoreSearchPosition(unit, q, r, plan) {
 
 /**
  * Execute AI movement with proper rendering
+ * In single-player, scroll to show visible enemy movements
  */
 async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
@@ -1018,6 +1032,19 @@ async function executeAIMove(unit, target) {
     }
 
     const isNowVisible = isUnitVisibleToViewer(unit);
+
+    // In single-player, scroll to visible enemy movement
+    if (isSinglePlayer && isNowVisible) {
+        if (!wasVisible) {
+            // Enemy just appeared - scroll to them with a warning
+            scrollToUnit(unit, 400);
+            await delay(450);
+        } else {
+            // Enemy was already visible, scroll to follow their movement
+            scrollToUnit(unit, 250);
+            await delay(300);
+        }
+    }
 
     if (!isSinglePlayer || wasVisible || isNowVisible) {
         render();
