@@ -401,3 +401,152 @@ export const UNIT_CLASSES = {
         ambushBonus: 15     // Extra Schaden aus dem Hinterhalt
     }
 };
+
+// Biome/Landscape configurations for map generation
+export const BIOMES = {
+    temperate: {
+        name: 'Temperate',
+        nameDE: 'Gemäßigt',
+        description: 'Balanced mix of forests, meadows, and hills',
+        // Terrain type weights (higher = more common)
+        weights: {
+            grass: 1.0,
+            forest: 0.8,
+            hills: 0.6,
+            rock: 0.4,
+            water: 0.5,
+            swamp: 0.3,
+            sand: 0.2,
+            flowers: 0.4,
+            heather: 0.3,
+            pine: 0.4,
+            clearing: 0.3,
+            ruins: 0.15
+        },
+        // Thresholds for noise-based generation
+        elevationThresholds: { rock: 0.78, hills: 0.65, water: 0.25, swamp: 0.32 },
+        moistureThresholds: { forest: 0.62, swamp: 0.55, sand: 0.28 },
+        features: { rivers: 1, roads: true, paths: 2 }
+    },
+    desert: {
+        name: 'Desert',
+        nameDE: 'Wüste',
+        description: 'Arid landscape with sand dunes and rocky outcrops',
+        weights: {
+            grass: 0.2,
+            forest: 0.1,
+            hills: 0.5,
+            rock: 0.8,
+            water: 0.1,
+            swamp: 0.0,
+            sand: 1.0,
+            flowers: 0.05,
+            heather: 0.1,
+            pine: 0.0,
+            clearing: 0.1,
+            ruins: 0.25
+        },
+        elevationThresholds: { rock: 0.65, hills: 0.50, water: 0.10, swamp: 0.15 },
+        moistureThresholds: { forest: 0.85, swamp: 0.90, sand: 0.55 },
+        features: { rivers: 0, roads: true, paths: 1 }
+    },
+    tundra: {
+        name: 'Tundra',
+        nameDE: 'Tundra',
+        description: 'Frozen landscape with snow, ice, and sparse vegetation',
+        weights: {
+            grass: 0.3,
+            forest: 0.2,
+            hills: 0.6,
+            rock: 0.7,
+            water: 0.3,
+            swamp: 0.1,
+            sand: 0.0,
+            flowers: 0.1,
+            heather: 0.2,
+            pine: 0.6,
+            clearing: 0.2,
+            ruins: 0.15,
+            snow: 1.0,
+            ice: 0.5
+        },
+        elevationThresholds: { rock: 0.70, hills: 0.55, water: 0.20, swamp: 0.25 },
+        moistureThresholds: { forest: 0.70, swamp: 0.75, sand: 0.15 },
+        features: { rivers: 1, roads: false, paths: 1 },
+        specialTerrain: { replaceWater: 'ice', addSnow: true }
+    },
+    tropical: {
+        name: 'Tropical',
+        nameDE: 'Tropisch',
+        description: 'Dense jungles with rivers, swamps, and lush vegetation',
+        weights: {
+            grass: 0.5,
+            forest: 1.0,
+            hills: 0.3,
+            rock: 0.2,
+            water: 0.6,
+            swamp: 0.7,
+            sand: 0.3,
+            flowers: 0.6,
+            heather: 0.0,
+            pine: 0.0,
+            clearing: 0.4,
+            ruins: 0.2,
+            reeds: 0.5,
+            tallgrass: 0.6
+        },
+        elevationThresholds: { rock: 0.85, hills: 0.72, water: 0.30, swamp: 0.38 },
+        moistureThresholds: { forest: 0.45, swamp: 0.40, sand: 0.15 },
+        features: { rivers: 2, roads: false, paths: 3 }
+    },
+    highland: {
+        name: 'Highland',
+        nameDE: 'Hochland',
+        description: 'Mountainous terrain with rocks, cliffs, and sparse meadows',
+        weights: {
+            grass: 0.6,
+            forest: 0.3,
+            hills: 1.0,
+            rock: 1.0,
+            water: 0.2,
+            swamp: 0.1,
+            sand: 0.1,
+            flowers: 0.2,
+            heather: 0.7,
+            pine: 0.4,
+            clearing: 0.3,
+            ruins: 0.3,
+            cliff: 0.6,
+            gravel: 0.5
+        },
+        elevationThresholds: { rock: 0.60, hills: 0.45, water: 0.15, swamp: 0.20 },
+        moistureThresholds: { forest: 0.70, swamp: 0.80, sand: 0.35 },
+        features: { rivers: 1, roads: true, paths: 1 }
+    },
+    wetland: {
+        name: 'Wetland',
+        nameDE: 'Feuchtgebiet',
+        description: 'Marshlands with shallow water, reeds, and muddy terrain',
+        weights: {
+            grass: 0.5,
+            forest: 0.4,
+            hills: 0.2,
+            rock: 0.1,
+            water: 0.8,
+            swamp: 1.0,
+            sand: 0.1,
+            flowers: 0.3,
+            heather: 0.1,
+            pine: 0.2,
+            clearing: 0.3,
+            ruins: 0.15,
+            reeds: 0.8,
+            shallows: 0.7,
+            mud: 0.6,
+            tallgrass: 0.5
+        },
+        elevationThresholds: { rock: 0.90, hills: 0.80, water: 0.35, swamp: 0.42 },
+        moistureThresholds: { forest: 0.55, swamp: 0.35, sand: 0.10 },
+        features: { rivers: 2, roads: false, paths: 2 }
+    }
+};

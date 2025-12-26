@@ -197,6 +197,31 @@ button:focus:not(:focus-visible),
     gap: 10px;
 }
 
+/* Landscape Selection */
+.landscape-section {
+    padding: 12px 16px;
+}
+
+.section-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.landscape-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.landscape-grid .option-btn {
+    min-width: 42px;
+    font-size: 18px;
+    padding: 8px 10px;
+}
+
 /* Audio Controls */
 .audio-section {
     padding: 12px 16px;

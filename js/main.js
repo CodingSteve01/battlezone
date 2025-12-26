@@ -415,6 +415,24 @@ async function init() {
         });
     });
 
+    // Setup landscape/biome buttons
+    document.querySelectorAll('[data-landscape]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            document.querySelectorAll('[data-landscape]').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            state.settings.landscape = btn.dataset.landscape;
+        });
+
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            btn.click();
+        });
+    });
+
     // Setup help toggle
     const helpToggle = document.getElementById('help-toggle');
     const helpPanel = document.getElementById('help-panel');
