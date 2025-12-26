@@ -315,6 +315,335 @@ export function clearRenderCaches() {
 }
 
 /**
+ * Get or create cached foreground elements (trees, rocks, bushes) for a hex.
+ * These are deterministic based on hex position, so they can be cached.
+ * @param {number} q - Hex q coordinate
+ * @param {number} r - Hex r coordinate
+ * @param {number} cx - Screen X center position
+ * @param {number} cy - Screen Y center position
+ * @param {number} size - Current hex size
+ * @param {string} type - Terrain type
+ * @returns {Array} Array of foreground element objects with draw functions
+ */
+function getCachedForegroundElements(q, r, cx, cy, size, type) {
+    const cacheKey = `${q},${r}`;
+
+    // Check if we have cached element definitions for this hex
+    if (!foregroundCache.has(cacheKey)) {
+        // Cache the element DEFINITIONS (positions, types, seeds) not draw functions
+        // This is cached at normalized values and scaled at draw time
+        const elements = collectForegroundElementDefinitions(size, type, q, r);
+        foregroundCache.set(cacheKey, elements);
+
+        // Limit foreground cache size
+        if (foregroundCache.size > MAX_CACHE_SIZE) {
+            const keysToRemove = Array.from(foregroundCache.keys()).slice(0, MAX_CACHE_SIZE / 5);
+            keysToRemove.forEach(key => foregroundCache.delete(key));
+        }
+    }
+
+    const cachedDefinitions = foregroundCache.get(cacheKey);
+
+    // Convert cached definitions to drawable objects with current screen coordinates
+    return cachedDefinitions.map(def => {
+        const actualX = cx + def.offsetX * size;
+        const actualY = cy + def.offsetY * size;
+        const actualSortY = cy + def.sortOffsetY * size;
+        const actualSize = def.sizeMultiplier * size;
+
+        return {
+            type: def.type,
+            x: actualX,
+            y: actualY,
+            sortY: actualSortY,
+            draw: () => def.drawFn(actualX, actualY, actualSize, def.extraParams)
+        };
+    });
+}
+
+/**
+ * Collect foreground element DEFINITIONS for caching.
+ * Returns normalized positions/offsets that can be scaled for any hex size.
+ */
+function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
+    const elements = [];
+    const s = 0.45; // Normalized size multiplier
+    const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
+
+    // Consistent sort offsets (normalized)
+    const TREE_SORT_OFFSET = 0.4;
+    const BG_TREE_SORT_OFFSET = 0.25;
+    const SHRUB_SORT_OFFSET = 0.35;
+    const BUSH_SORT_OFFSET = 0.38;
+    const TREE_Y_OFFSET = 0.25;
+
+    if (type === 'forest' || type === 'pine') {
+        const baseTreeCount = 4 + Math.abs(baseSeed % 3);
+        const hexRadius = s * 1.1;
+
+        for (let i = 0; i < baseTreeCount; i++) {
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+            const angle = i * goldenAngle + seededRandom(baseSeed + i) * 0.8;
+            const radius = hexRadius * (0.2 + seededRandom(baseSeed + i * 7) * 0.8);
+
+            const offsetX = Math.cos(angle) * radius * 0.85;
+            const offsetY = Math.sin(angle) * radius * 0.7 + TREE_Y_OFFSET;
+
+            const baseSizeVar = 0.5 + seededRandom(baseSeed + i * 10 + 2) * 1.3;
+            const sizeMultiplier = s * baseSizeVar * 1.4;
+
+            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 6);
+
+            elements.push({
+                type: 'tree',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + TREE_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { treeType, seed: baseSeed + i },
+                drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
+            });
+        }
+
+        // Edge trees
+        const edgeTreeCount = 2 + Math.abs((baseSeed + 50) % 3);
+        for (let i = 0; i < edgeTreeCount; i++) {
+            const edgeAngle = (i / edgeTreeCount) * Math.PI * 2 + seededRandom(baseSeed + i * 20 + 200) * 0.6;
+            const edgeRadius = hexRadius * (0.85 + seededRandom(baseSeed + i * 20 + 201) * 0.3);
+
+            const offsetX = Math.cos(edgeAngle) * edgeRadius * 0.9;
+            const offsetY = Math.sin(edgeAngle) * edgeRadius * 0.7 + TREE_Y_OFFSET;
+            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
+            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 6);
+
+            elements.push({
+                type: 'tree-edge',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + BG_TREE_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { treeType, seed: baseSeed + i + 100 },
+                drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
+            });
+        }
+
+        // Undergrowth
+        const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
+        for (let i = 0; i < undergrowthCount; i++) {
+            const offsetX = (seededRandom(baseSeed + i * 15 + 101) - 0.5) * s * 1.4;
+            const offsetY = (seededRandom(baseSeed + i * 15 + 102) - 0.5) * s * 0.9;
+            const sizeMultiplier = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
+
+            elements.push({
+                type: 'shrub',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { seed: baseSeed + i + 104 },
+                drawFn: (x, y, sz, params) => drawSmallShrub(x, y, sz, params.seed)
+            });
+        }
+
+        // Occasional large bush
+        if (seededRandom(baseSeed + 300) > 0.6) {
+            const offsetX = (seededRandom(baseSeed + 301) - 0.5) * s * 0.8;
+            const offsetY = (seededRandom(baseSeed + 302) - 0.5) * s * 0.6;
+            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.3);
+
+            elements.push({
+                type: 'bush',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + BUSH_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { seed: baseSeed + 304 },
+                drawFn: (x, y, sz, params) => drawBush2D5(x, y, sz, params.seed)
+            });
+        }
+    } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
+        const grassType = Math.abs(baseSeed) % 100;
+
+        if (grassType < 20) {
+            const offsetX = (seededRandom(baseSeed + 500) - 0.5) * s * 0.6;
+            const offsetY = (seededRandom(baseSeed + 501) - 0.5) * s * 0.4;
+            const sizeMultiplier = s * (0.7 + seededRandom(baseSeed + 502) * 0.4);
+            elements.push({
+                type: 'bush',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + BUSH_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { seed: baseSeed },
+                drawFn: (x, y, sz, params) => drawBush2D5(x, y, sz, params.seed)
+            });
+        }
+
+        if (grassType >= 20 && grassType < 50) {
+            const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
+            for (let i = 0; i < shrubCount; i++) {
+                const offsetX = (seededRandom(baseSeed + i * 10 + 520) - 0.5) * s * 1.2;
+                const offsetY = (seededRandom(baseSeed + i * 10 + 521) - 0.5) * s * 0.8;
+                const sizeMultiplier = s * (0.25 + seededRandom(baseSeed + i * 10 + 522) * 0.2);
+                elements.push({
+                    type: 'shrub',
+                    offsetX,
+                    offsetY,
+                    sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                    sizeMultiplier,
+                    extraParams: { seed: baseSeed + i + 523 },
+                    drawFn: (x, y, sz, params) => drawSmallShrub(x, y, sz, params.seed)
+                });
+            }
+        }
+
+        if (grassType >= 70 && grassType < 78) {
+            const offsetX = (seededRandom(baseSeed + 600) - 0.5) * s * 0.4;
+            const offsetY = (seededRandom(baseSeed + 601) - 0.5) * s * 0.3 + TREE_Y_OFFSET;
+            const sizeMultiplier = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
+            const treeType = Math.floor(seededRandom(baseSeed + 603) * 4);
+            elements.push({
+                type: 'tree-solitary',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + TREE_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { treeType, seed: baseSeed + 604 },
+                drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
+            });
+        }
+
+        if (type === 'heather' && grassType >= 80 && grassType < 90) {
+            const offsetX = (seededRandom(baseSeed + 700) - 0.5) * s * 0.5;
+            const offsetY = (seededRandom(baseSeed + 701) - 0.5) * s * 0.4;
+            elements.push({
+                type: 'rock-small',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier: s * 1.0,
+                extraParams: { seed: baseSeed + 702 },
+                drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
+            });
+        }
+    } else if (type === 'hills') {
+        const hillsType = Math.abs(baseSeed) % 100;
+
+        if (hillsType < 40) {
+            const offsetX = (seededRandom(baseSeed + 800) - 0.5) * s * 0.6;
+            const offsetY = (seededRandom(baseSeed + 801) - 0.5) * s * 0.4;
+            elements.push({
+                type: 'rock-hills',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + TREE_SORT_OFFSET,
+                sizeMultiplier: s * 1.5,
+                extraParams: { seed: baseSeed + 802 },
+                drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
+            });
+        }
+
+        if (hillsType >= 60 && hillsType < 80) {
+            const offsetX = (seededRandom(baseSeed + 810) - 0.5) * s * 0.8;
+            const offsetY = (seededRandom(baseSeed + 811) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'shrub-hills',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier: s * 0.35,
+                extraParams: { seed: baseSeed + 812 },
+                drawFn: (x, y, sz, params) => drawSmallShrub(x, y, sz, params.seed)
+            });
+        }
+    } else if (type === 'sand') {
+        const sandType = Math.abs(baseSeed) % 100;
+        if (sandType < 15) {
+            const offsetX = (seededRandom(baseSeed + 900) - 0.5) * s * 0.8;
+            const offsetY = (seededRandom(baseSeed + 901) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'rock-sand',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier: s * 0.8,
+                extraParams: { seed: baseSeed + 902 },
+                drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
+            });
+        }
+    } else if (type === 'rock' || type === 'cliff') {
+        elements.push({
+            type: 'rock',
+            offsetX: 0,
+            offsetY: 0,
+            sortOffsetY: TREE_SORT_OFFSET,
+            sizeMultiplier: s * 2.2,
+            extraParams: { seed: baseSeed },
+            drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
+        });
+    } else if (type === 'ruins') {
+        const ruinsType = Math.abs(baseSeed) % 100;
+        if (ruinsType < 60) {
+            const offsetX = (seededRandom(baseSeed + 1000) - 0.5) * s * 0.5;
+            const offsetY = (seededRandom(baseSeed + 1001) - 0.5) * s * 0.4;
+            elements.push({
+                type: 'rock',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + TREE_SORT_OFFSET,
+                sizeMultiplier: s * 1.8,
+                extraParams: { seed: baseSeed },
+                drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
+            });
+        }
+        if (ruinsType >= 40 && ruinsType < 70) {
+            const offsetX = (seededRandom(baseSeed + 1010) - 0.5) * s * 0.8;
+            const offsetY = (seededRandom(baseSeed + 1011) - 0.5) * s * 0.6;
+            elements.push({
+                type: 'shrub-ruins',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier: s * 0.4,
+                extraParams: { seed: baseSeed + 1012 },
+                drawFn: (x, y, sz, params) => drawSmallShrub(x, y, sz, params.seed)
+            });
+        }
+    } else if (type === 'swamp') {
+        const swampType = Math.abs(baseSeed) % 100;
+        if (swampType < 25) {
+            const offsetX = (seededRandom(baseSeed + 1100) - 0.5) * s * 0.6;
+            const offsetY = (seededRandom(baseSeed + 1101) - 0.5) * s * 0.4 + TREE_Y_OFFSET;
+            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 1102) * 0.4);
+            elements.push({
+                type: 'dead-tree',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + TREE_SORT_OFFSET,
+                sizeMultiplier,
+                extraParams: { treeType: 5, seed: baseSeed + 1103 },
+                drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
+            });
+        }
+        if (swampType >= 30 && swampType < 60) {
+            const offsetX = (seededRandom(baseSeed + 1110) - 0.5) * s * 0.9;
+            const offsetY = (seededRandom(baseSeed + 1111) - 0.5) * s * 0.7;
+            elements.push({
+                type: 'reeds',
+                offsetX,
+                offsetY,
+                sortOffsetY: offsetY + SHRUB_SORT_OFFSET,
+                sizeMultiplier: s * 0.3,
+                extraParams: { seed: baseSeed + 1112 },
+                drawFn: (x, y, sz, params) => drawSmallShrub(x, y, sz, params.seed)
+            });
+        }
+    }
+
+    return elements;
+}
+
+/**
  * Get the appropriate texture for a terrain type
  * Uses animated frame if available, otherwise falls back to static texture
  * @param {string} terrainType - The terrain type (e.g., 'water', 'grass')
@@ -703,9 +1032,66 @@ let animationLoopRunning = false;
 let animationFrameId = null;
 let lastFrameTime = 0;
 
+/**
+ * Detect if the device is a mobile/tablet (iPad, iPhone, Android tablet, etc.)
+ * Sets initial quality to 'medium' or 'low' for better performance on these devices
+ */
+function detectMobileDevice() {
+    const ua = navigator.userAgent || navigator.vendor || '';
+
+    // Check for iPad specifically (iPad on iOS 13+ reports as Mac)
+    const isIPad = /iPad/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // Check for iPhone/iPod
+    const isIPhone = /iPhone|iPod/.test(ua);
+
+    // Check for Android tablets/phones
+    const isAndroid = /Android/.test(ua);
+
+    // Check for general touch device with small screen
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.innerWidth <= 1024;
+
+    // High DPI can cause performance issues on tablets
+    const isHighDPI = window.devicePixelRatio >= 2;
+
+    return {
+        isMobile: isIPhone || (isAndroid && /Mobile/.test(ua)),
+        isTablet: isIPad || (isAndroid && !/Mobile/.test(ua)),
+        isIPad,
+        isTouchDevice,
+        isHighDPI,
+        shouldReduceQuality: isIPad || isIPhone || isAndroid || (isTouchDevice && isSmallScreen && isHighDPI)
+    };
+}
+
 export function initRenderer() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
+
+    // Detect mobile/tablet and set initial quality
+    const deviceInfo = detectMobileDevice();
+
+    if (deviceInfo.shouldReduceQuality) {
+        // Start with medium quality for tablets/mobile for smoother gameplay
+        if (state.settings.renderQuality === 'auto') {
+            if (deviceInfo.isIPad || deviceInfo.isTablet) {
+                // iPads and tablets: start at medium, may drop to low
+                state.effectiveQuality = 'medium';
+                console.log('iPad/Tablet detected - starting with medium quality');
+            } else if (deviceInfo.isMobile) {
+                // Phones: start at low quality
+                state.effectiveQuality = 'low';
+                console.log('Mobile device detected - starting with low quality');
+            }
+        }
+
+        // Reduce particle quality on mobile devices
+        if (state.settings.particleQuality === 'high') {
+            state.settings.particleQuality = 'medium';
+        }
+    }
 
     // Initialize sub-renderers with canvas context
     initVegetationRenderer(ctx);
@@ -2694,8 +3080,9 @@ export function render() {
         }
 
         // Collect foreground elements for 2.5D sorting (always needed for depth sorting)
+        // Use cached foreground element definitions for better performance
         if (fogLevel === 'visible' && shouldRenderForeground()) {
-            const elements = collectForegroundElements(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, state.hexSize, hex.type);
             foregroundElements.push(...elements);
         }
 
