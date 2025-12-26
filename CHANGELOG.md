@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.4.0...shadow-squad-v3.4.1) (2025-12-26)
+
+
+### Bug Fixes
+
+* **ui:** improve minimap controls - always visible with click-to-navigate ([#111](https://github.com/CodingSteve01/battlezone/issues/111)) ([681e23e](https://github.com/CodingSteve01/battlezone/commit/681e23eb209fb2c70ba1557ed321ff8b9b5b818b))
+
 ## [3.4.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.2...shadow-squad-v3.4.0) (2025-12-26)
 
 
