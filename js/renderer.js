@@ -3418,31 +3418,36 @@ function drawMinimap(w, h) {
         ctx.stroke();
     });
 
-    // Draw current viewport indicator (accounting for zoom level)
-    // The viewport size depends on canvas size, hex size, AND zoom level
-    const viewportW = state.canvasWidth / state.hexSize / state.zoomLevel / 2.5;
-    const viewportH = state.canvasHeight / state.hexSize / state.zoomLevel / 2.5;
-    const viewX = centerX - state.cameraX / state.hexSize * hexSize * 1.5;
-    const viewY = centerY - state.cameraY / state.hexSize * hexSize * Math.sqrt(3);
+    // Draw current viewport indicator
+    // Scale factor from main view to minimap coordinates
+    const scale = hexSize / state.hexSize;
+
+    // Viewport center position on minimap
+    const viewX = centerX - state.cameraX * scale;
+    const viewY = centerY - state.cameraY * scale;
+
+    // Viewport size on minimap (canvas dimensions scaled to minimap)
+    const viewportW = state.canvasWidth * scale;
+    const viewportH = state.canvasHeight * scale;
 
     // Viewport rectangle - more visible in expanded mode
     ctx.strokeStyle = isExpanded ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = isExpanded ? 2 : 1;
     ctx.strokeRect(
-        viewX - viewportW * hexSize,
-        viewY - viewportH * hexSize,
-        viewportW * hexSize * 2,
-        viewportH * hexSize * 2
+        viewX - viewportW / 2,
+        viewY - viewportH / 2,
+        viewportW,
+        viewportH
     );
 
     // Semi-transparent fill for viewport area in expanded mode
     if (isExpanded) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.fillRect(
-            viewX - viewportW * hexSize,
-            viewY - viewportH * hexSize,
-            viewportW * hexSize * 2,
-            viewportH * hexSize * 2
+            viewX - viewportW / 2,
+            viewY - viewportH / 2,
+            viewportW,
+            viewportH
         );
     }
 
