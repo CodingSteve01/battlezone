@@ -588,7 +588,8 @@ export function scrollToPosition(targetCameraX, targetCameraY, duration = 300) {
  * - Click empty hex: Move there
  */
 function handleTapOrClick(clientX, clientY) {
-    if (isAIPlayer() && state.currentPlayer !== state.viewingPlayer) {
+    // Block all input during AI turns (including spectator mode)
+    if (isAIPlayer()) {
         return;
     }
 
@@ -726,7 +727,8 @@ async function handleEnemyClick(unit, hex) {
  */
 function handlePathPreview(clientX, clientY) {
     if (state.gameOver) return;
-    if (isAIPlayer() && state.currentPlayer !== state.viewingPlayer) return;
+    // Block path preview during AI turns (including spectator mode)
+    if (isAIPlayer()) return;
     // Don't show path preview if targeting an enemy
     if (state.targetedUnit) return;
 
