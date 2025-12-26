@@ -185,6 +185,83 @@ export const PARTICLE_TYPES = {
         glow: true,
         flicker: true, // Blinkend
         drift: true
+    },
+
+    // === PROJECTILE EFFECTS ===
+
+    // Bullet tracer (fast moving projectile trail)
+    tracer: {
+        color: '#ffdd44',
+        colorVariance: ['#ffaa00', '#ffffff', '#ffff88'],
+        size: { min: 2, max: 4 },
+        lifetime: { min: 80, max: 150 },
+        speed: { min: 0, max: 10 },
+        gravity: 0,
+        fadeOut: true,
+        glow: true,
+        trail: true
+    },
+
+    // Bullet impact sparks (more dramatic)
+    impactSpark: {
+        color: '#ffaa44',
+        colorVariance: ['#ff6600', '#ffdd88', '#ffffff'],
+        size: { min: 1, max: 3 },
+        lifetime: { min: 100, max: 250 },
+        speed: { min: 80, max: 200 },
+        gravity: 180,
+        fadeOut: true,
+        glow: true
+    },
+
+    // Smoke puff at impact
+    smoke: {
+        color: 'rgba(100, 100, 100, 0.5)',
+        colorVariance: ['rgba(80, 80, 80, 0.4)', 'rgba(120, 120, 120, 0.5)'],
+        size: { min: 4, max: 10 },
+        lifetime: { min: 300, max: 600 },
+        speed: { min: 10, max: 30 },
+        gravity: -20,
+        fadeOut: true,
+        glow: false,
+        expandRate: 15
+    },
+
+    // Energy pulse (for special attacks)
+    energyPulse: {
+        color: 'rgba(255, 100, 50, 0.6)',
+        size: { min: 8, max: 15 },
+        lifetime: { min: 200, max: 350 },
+        speed: { min: 0, max: 0 },
+        gravity: 0,
+        fadeOut: true,
+        glow: true,
+        expandRate: 80
+    },
+
+    // Ground debris
+    debris: {
+        color: '#887766',
+        colorVariance: ['#776655', '#998877', '#665544'],
+        size: { min: 1.5, max: 3.5 },
+        lifetime: { min: 200, max: 400 },
+        speed: { min: 50, max: 120 },
+        gravity: 250,
+        fadeOut: true,
+        glow: false
+    },
+
+    // Shell casing ejection
+    shellCasing: {
+        color: '#ccaa44',
+        colorVariance: ['#bbaa33', '#ddbb55'],
+        size: { min: 1.5, max: 2.5 },
+        lifetime: { min: 400, max: 700 },
+        speed: { min: 30, max: 60 },
+        gravity: 150,
+        fadeOut: true,
+        glow: false,
+        rotate: true
     }
 };
 
@@ -574,6 +651,138 @@ class ParticleManager {
     powershotEffect(x, y, direction) {
         this.burst('powershot', x, y, 25, direction, Math.PI * 0.4);
         this.burst('spark', x, y, 10, direction, Math.PI * 0.3);
+    }
+
+    /**
+     * Creates a projectile animation with tracer trail
+     * The projectile travels from start to end position over duration
+     * @param {number} startX - Starting X position
+     * @param {number} startY - Starting Y position
+     * @param {number} endX - End X position
+     * @param {number} endY - End Y position
+     * @param {string} unitClass - Type of unit attacking (affects visual style)
+     * @param {boolean} isCrit - Whether this is a critical hit
+     * @param {function} onImpact - Callback when projectile reaches target
+     */
+    projectileAttack(startX, startY, endX, endY, unitClass, isCrit, onImpact) {
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const direction = Math.atan2(dy, dx);
+
+        // Duration based on distance (faster for closer targets)
+        const duration = Math.min(400, Math.max(150, distance * 0.8));
+
+        let currentStep = 0;
+        const startTime = performance.now();
+
+        // Projectile color based on unit class
+        const projectileColors = {
+            scout: '#44aaff',
+            assault: '#ff6644',
+            medic: '#44ff88',
+            sniper: '#ffdd44',
+            commando: '#ff44ff'
+        };
+        const color = projectileColors[unitClass] || '#ffdd44';
+
+        // Shell casing ejected at muzzle
+        const casingDir = direction + Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+        this.spawn('shellCasing', startX + Math.cos(casingDir) * 5, startY + Math.sin(casingDir) * 5, casingDir);
+
+        // Animate projectile
+        const animate = () => {
+            const elapsed = performance.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Current position with slight arc for assault
+            const arcHeight = unitClass === 'assault' ? Math.sin(progress * Math.PI) * 8 : 0;
+            const currentX = startX + dx * progress;
+            const currentY = startY + dy * progress - arcHeight;
+
+            // Spawn tracer particles along path
+            if (currentStep % 2 === 0) {
+                const tracerParticle = this.getParticle();
+                if (tracerParticle.init('tracer', currentX, currentY, direction + Math.PI)) {
+                    tracerParticle.color = color;
+                    this.activeParticles.push(tracerParticle);
+                }
+            }
+
+            currentStep++;
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                // Impact reached - call callback and create impact effects
+                if (onImpact) onImpact();
+            }
+        };
+
+        // Start animation
+        requestAnimationFrame(animate);
+    }
+
+    /**
+     * Enhanced hit effect with more dramatic visuals
+     */
+    enhancedHitEffect(x, y, isCritical = false, direction = null, unitClass = null) {
+        // Base impact spark burst (dramatic)
+        const sparkCount = isCritical ? 20 : 12;
+        this.burst('impactSpark', x, y, sparkCount, direction ? direction + Math.PI : null, Math.PI * 1.2);
+
+        // Smoke puff
+        this.burst('smoke', x, y, isCritical ? 4 : 2);
+
+        // Ground debris
+        this.burst('debris', x, y, isCritical ? 8 : 4, Math.PI * 0.5, Math.PI);
+
+        // Energy pulse for critical hits
+        if (isCritical) {
+            this.spawn('energyPulse', x, y);
+            this.burst('star', x, y, 6);
+        }
+
+        // Impact ring (always)
+        this.spawn('impactRing', x, y);
+
+        // Additional effects based on unit class
+        if (unitClass === 'assault') {
+            // Assault has explosive impact
+            this.spawn('energyPulse', x, y);
+            this.burst('spark', x, y, 8, null, Math.PI * 2);
+        } else if (unitClass === 'sniper') {
+            // Sniper has precise piercing effect
+            this.burst('tracer', x, y, 4, direction ? direction + Math.PI : null, Math.PI * 0.2);
+        }
+
+        // Gore mode adds blood
+        if (state.settings.gore) {
+            this.burst('blood', x, y, isCritical ? 12 : 6, direction ? direction + Math.PI : null, Math.PI * 0.8);
+            if (isCritical) {
+                this.spawn('bloodSplatter', x, y + 20);
+            }
+        }
+    }
+
+    /**
+     * Creates an enhanced muzzle flash with shell casing
+     */
+    enhancedMuzzleFlash(x, y, direction, unitClass = null) {
+        // Main flash
+        this.spawn('muzzleFlash', x, y, direction);
+
+        // Extra sparks
+        this.burst('spark', x, y, 5, direction, Math.PI * 0.4);
+
+        // Small smoke puff
+        this.spawn('smoke', x - Math.cos(direction) * 5, y - Math.sin(direction) * 5, direction + Math.PI);
+
+        // Assault has bigger flash
+        if (unitClass === 'assault') {
+            this.spawn('muzzleFlash', x + Math.cos(direction) * 3, y + Math.sin(direction) * 3, direction);
+            this.burst('powershot', x, y, 3, direction, Math.PI * 0.3);
+        }
     }
 
     /**

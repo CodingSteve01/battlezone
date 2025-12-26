@@ -861,4 +861,180 @@ function validateAndFixMap(radius) {
             }
         }
     });
+
+    // CRITICAL: Ensure no isolated pools exist that would trap units when zone shrinks
+    // This is especially important for shrinking zone mechanics
+    eliminateIsolatedPools(radius);
+}
+
+/**
+ * Eliminate isolated pools - areas that have no path to the map center
+ * This prevents units from being trapped when the shrinking zone pushes inward
+ */
+function eliminateIsolatedPools(radius) {
+    // Flood fill from center to find all hexes reachable from center
+    const reachableFromCenter = new Set();
+    const centerHex = getHex(0, 0);
+
+    // Make sure center is walkable
+    if (centerHex && !centerHex.walkable) {
+        centerHex.type = 'grass';
+        centerHex.walkable = true;
+        centerHex.cover = false;
+        centerHex.moveCost = 1;
+    }
+
+    if (!centerHex) return;
+
+    const queue = [centerHex];
+    reachableFromCenter.add('0,0');
+
+    while (queue.length > 0) {
+        const current = queue.shift();
+        const neighbors = getNeighbors(current.q, current.r);
+
+        for (const neighbor of neighbors) {
+            const key = `${neighbor.q},${neighbor.r}`;
+            if (reachableFromCenter.has(key)) continue;
+
+            const hex = getHex(neighbor.q, neighbor.r);
+            if (hex && hex.walkable) {
+                reachableFromCenter.add(key);
+                queue.push(hex);
+            }
+        }
+    }
+
+    // Find all walkable hexes NOT reachable from center (isolated pools)
+    const isolatedHexes = state.hexes.filter(h =>
+        h.walkable && !reachableFromCenter.has(`${h.q},${h.r}`)
+    );
+
+    // For each isolated pool, create an escape path to the nearest reachable hex
+    for (const isolatedHex of isolatedHexes) {
+        // Find nearest hex that IS reachable from center
+        let nearestReachable = null;
+        let minDist = Infinity;
+
+        for (const key of reachableFromCenter) {
+            const [q, r] = key.split(',').map(Number);
+            const dist = hexDistance(isolatedHex, { q, r });
+            if (dist < minDist) {
+                minDist = dist;
+                nearestReachable = { q, r };
+            }
+        }
+
+        if (nearestReachable && minDist > 0) {
+            // Create path from isolated hex to nearest reachable hex
+            // This breaks through the wall creating the pool
+            const dist = hexDistance(isolatedHex, nearestReachable);
+            for (let i = 0; i <= dist; i++) {
+                const t = i / dist;
+                const q = Math.round(isolatedHex.q + (nearestReachable.q - isolatedHex.q) * t);
+                const r = Math.round(isolatedHex.r + (nearestReachable.r - isolatedHex.r) * t);
+
+                const hex = getHex(q, r);
+                if (hex && !hex.walkable) {
+                    // Break through the wall
+                    hex.type = 'grass';
+                    hex.walkable = true;
+                    hex.cover = false;
+                    hex.moveCost = 1;
+                }
+                reachableFromCenter.add(`${q},${r}`);
+            }
+        }
+    }
+
+    // Additional pass: ensure there are no thin walls that could trap units
+    // Check for "chokepoints" - narrow passages that could be blocked
+    ensureEscapeRoutes(radius);
+}
+
+/**
+ * Ensure there are multiple escape routes from outer areas to center
+ * This prevents situations where a single wall blocks all paths inward
+ */
+function ensureEscapeRoutes(radius) {
+    // Check at several radii from edge to ensure paths exist
+    const checkRadii = [
+        Math.floor(radius * 0.7),
+        Math.floor(radius * 0.5),
+        Math.floor(radius * 0.3)
+    ];
+
+    const center = { q: 0, r: 0 };
+
+    for (const checkRadius of checkRadii) {
+        // Get all hexes at approximately this radius
+        const ringHexes = state.hexes.filter(h => {
+            const dist = hexDistance(center, h);
+            return dist >= checkRadius - 1 && dist <= checkRadius + 1 && h.walkable;
+        });
+
+        // For each walkable hex at this radius, verify it can reach center
+        for (const hex of ringHexes) {
+            // Quick check: can we reach center via A* (simplified)?
+            if (!canReachCenter(hex, center)) {
+                // Create direct path to center
+                const dist = hexDistance(hex, center);
+                for (let i = 0; i <= dist; i++) {
+                    const t = i / dist;
+                    const q = Math.round(hex.q + (center.q - hex.q) * t);
+                    const r = Math.round(hex.r + (center.r - hex.r) * t);
+
+                    const pathHex = getHex(q, r);
+                    if (pathHex && !pathHex.walkable) {
+                        pathHex.type = 'grass';
+                        pathHex.walkable = true;
+                        pathHex.cover = false;
+                        pathHex.moveCost = 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Check if a hex can reach the center (simplified BFS with limit)
+ */
+function canReachCenter(startHex, center) {
+    const visited = new Set();
+    const queue = [startHex];
+    visited.add(`${startHex.q},${startHex.r}`);
+
+    const maxSteps = 100; // Limit to prevent infinite loops
+    let steps = 0;
+
+    while (queue.length > 0 && steps < maxSteps) {
+        const current = queue.shift();
+        steps++;
+
+        // Check if we reached center
+        if (current.q === center.q && current.r === center.r) {
+            return true;
+        }
+
+        // Check neighbors
+        const neighbors = getNeighbors(current.q, current.r);
+        for (const neighbor of neighbors) {
+            const key = `${neighbor.q},${neighbor.r}`;
+            if (visited.has(key)) continue;
+
+            const hex = getHex(neighbor.q, neighbor.r);
+            if (hex && hex.walkable) {
+                visited.add(key);
+                // Prioritize hexes closer to center
+                if (hexDistance(hex, center) < hexDistance(current, center)) {
+                    queue.unshift(hex);
+                } else {
+                    queue.push(hex);
+                }
+            }
+        }
+    }
+
+    return false;
 }
