@@ -1551,7 +1551,9 @@ button:focus:not(:focus-visible),
     font-weight: 700;
     font-size: 16px;
     z-index: 200;
-    animation: toastAnim 1.8s forwards;
+    animation-name: toastAnim;
+    animation-duration: 3.5s; /* Default, overridden by JS based on message length */
+    animation-fill-mode: forwards;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     box-shadow: var(--shadow-lg), 0 0 40px rgba(0,0,0,0.5);
@@ -1702,7 +1704,7 @@ button:focus:not(:focus-visible),
     border-color: var(--yellow);
     color: var(--yellow);
     background: rgba(234, 179, 8, 0.15);
-    animation: critAnim 1.8s forwards;
+    animation-name: critAnim;
 }
 
 @keyframes critAnim {
