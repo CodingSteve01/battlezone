@@ -3,8 +3,8 @@
 
 import { state, getHex, getPlayerUnits, spendSharedAP } from './state.js';
 import { hexDistance } from './hexMath.js';
-import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits } from './units.js';
+import { getReachableHexes, findPath } from './pathfinding.js';
+import { moveUnitInstant, getAttackableUnits } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
@@ -994,8 +994,8 @@ function scoreSearchPosition(unit, q, r, plan) {
 // ===== MOVEMENT EXECUTION =====
 
 /**
- * Execute AI movement with proper rendering
- * In single-player, scroll to show visible enemy movements
+ * Execute AI movement with step-by-step animation
+ * In single-player, animate visible movements so player can follow
  */
 async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
@@ -1004,16 +1004,72 @@ async function executeAIMove(unit, target) {
     const isSinglePlayer = state.settings.singlePlayer;
     const wasVisible = isUnitVisibleToViewer(unit);
 
-    // Clear old position
-    const oldHex = getHex(unit.q, unit.r);
-    if (oldHex) oldHex.unit = null;
+    // Get the path from unit's current position to target
+    const pathResult = findPath(unit.q, unit.r, target.q, target.r, target.cost + 2);
 
-    // Move unit
-    unit.q = target.q;
-    unit.r = target.r;
-    targetHex.unit = unit;
+    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        // No valid path found - fall back to instant teleport
+        const oldHex = getHex(unit.q, unit.r);
+        if (oldHex) oldHex.unit = null;
 
-    // Spend from shared pool and track movement
+        unit.q = target.q;
+        unit.r = target.r;
+        targetHex.unit = unit;
+
+        spendSharedAP(target.cost);
+        updateVisibility();
+        if (isSinglePlayer) {
+            updateVisibilityForPlayer(0);
+        }
+        render();
+        updateUI();
+        return;
+    }
+
+    const path = pathResult.path;
+    const stepDelay = 120; // ms per step (faster than player animation)
+
+    // If unit starts visible, scroll to it first
+    if (isSinglePlayer && wasVisible) {
+        scrollToUnit(unit, 200);
+        await delay(250);
+    }
+
+    // Animate step by step
+    let unitBecameVisible = false;
+    for (let i = 1; i < path.length; i++) {
+        const nextPos = path[i];
+        const nextHex = getHex(nextPos.q, nextPos.r);
+
+        if (!nextHex) continue;
+
+        // Move unit one step
+        moveUnitInstant(unit, nextHex);
+
+        // Update visibility after each step
+        updateVisibility();
+        if (isSinglePlayer) {
+            updateVisibilityForPlayer(0);
+        }
+
+        const isNowVisible = isUnitVisibleToViewer(unit);
+
+        // Check if unit just became visible
+        if (isSinglePlayer && isNowVisible && !unitBecameVisible) {
+            unitBecameVisible = true;
+            // Scroll to show the newly visible enemy
+            scrollToUnit(unit, 300);
+            await delay(350);
+        }
+
+        // Only render if unit is visible (or in multiplayer)
+        if (!isSinglePlayer || isNowVisible) {
+            render();
+            await delay(stepDelay);
+        }
+    }
+
+    // Spend from shared pool after animation completes
     spendSharedAP(target.cost);
 
     // Mark this area as searched
@@ -1025,30 +1081,10 @@ async function executeAIMove(unit, target) {
         aiMemory.searchedAreas.delete(first);
     }
 
-    // Update visibility
-    updateVisibility();
-    if (isSinglePlayer) {
-        updateVisibilityForPlayer(0);
-    }
-
-    const isNowVisible = isUnitVisibleToViewer(unit);
-
-    // In single-player, scroll to visible enemy movement
-    if (isSinglePlayer && isNowVisible) {
-        if (!wasVisible) {
-            // Enemy just appeared - scroll to them with a warning
-            scrollToUnit(unit, 400);
-            await delay(450);
-        } else {
-            // Enemy was already visible, scroll to follow their movement
-            scrollToUnit(unit, 250);
-            await delay(300);
-        }
-    }
-
-    if (!isSinglePlayer || wasVisible || isNowVisible) {
-        render();
+    // Final update
+    if (!isSinglePlayer || wasVisible || unitBecameVisible) {
         updateUI();
+        render();
     }
 }
 
