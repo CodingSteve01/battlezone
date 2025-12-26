@@ -8,6 +8,8 @@ import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js
 import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 
+// Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
+
 /**
  * Center camera on a specific unit with smooth scrolling
  */
@@ -73,6 +75,11 @@ export function updateUI() {
     if (giveUpBtn) {
         giveUpBtn.disabled = state.gameOver;
     }
+
+    // Update waypoint cancel button (lazy import to avoid circular deps)
+    import('./input.js').then(({ updateWaypointUI }) => {
+        updateWaypointUI();
+    }).catch(() => {}); // Ignore if not yet loaded
 }
 
 /**
@@ -403,8 +410,16 @@ export function showToast(message, type = '') {
         triggerScreenShake(type === 'crit' ? 'heavy' : 'light');
     }
 
+    // Calculate duration based on message length (min 3.5s, +40ms per char over 30)
+    const baseDuration = 3500;
+    const extraChars = Math.max(0, message.length - 30);
+    const duration = baseDuration + extraChars * 40;
+
+    // Set CSS animation duration to match
+    toast.style.animationDuration = `${duration}ms`;
+
     // Auto remove
-    setTimeout(() => toast.remove(), 1800);
+    setTimeout(() => toast.remove(), duration);
 }
 
 /**

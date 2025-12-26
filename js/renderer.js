@@ -2308,6 +2308,40 @@ function desaturateAndDarken(color, saturation, brightness) {
 }
 
 /**
+ * Blend a color with red for danger zone indication
+ * @param color - Hex or rgb color string
+ * @param amount - 0 = original, 1 = full red
+ */
+function blendWithRed(color, amount) {
+    let R, G, B;
+
+    if (color.startsWith('#')) {
+        const num = parseInt(color.replace('#', ''), 16);
+        R = (num >> 16) & 0xFF;
+        G = (num >> 8) & 0xFF;
+        B = num & 0xFF;
+    } else if (color.startsWith('rgb')) {
+        const match = color.match(/\d+/g);
+        if (match) {
+            R = parseInt(match[0]);
+            G = parseInt(match[1]);
+            B = parseInt(match[2]);
+        } else {
+            return color;
+        }
+    } else {
+        return color;
+    }
+
+    // Blend toward red (239, 68, 68)
+    R = Math.round(R + (239 - R) * amount);
+    G = Math.round(G + (68 - G) * amount * 0.7); // Less green reduction
+    B = Math.round(B + (68 - B) * amount * 0.7); // Less blue reduction
+
+    return `rgb(${R},${G},${B})`;
+}
+
+/**
  * Update performance tracking and determine effective quality
  */
 function updatePerformance() {
@@ -2915,8 +2949,8 @@ export function render() {
         ctx.stroke();
     }
 
-    // Draw AP cost overlays - ALWAYS ON TOP of everything
-    if (apCostOverlays.length > 0) {
+    // Draw AP cost overlays - only when a path is being planned
+    if (apCostOverlays.length > 0 && state.currentPath && state.currentPath.length > 0) {
         apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
             // Background pill for cost
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
@@ -3127,15 +3161,11 @@ export const MINIMAP_CONFIG = {
 
 // Track if minimap is being interacted with
 let minimapActive = false;
-let minimapHidden = false;
 let minimapExpanded = false;  // Track expanded/fullscreen state
 
 export function setMinimapActive(active) { minimapActive = active; }
-export function isMinimapHidden() { return minimapHidden; }
 export function isMinimapExpanded() { return minimapExpanded; }
-export function toggleMinimapVisibility() { minimapHidden = !minimapHidden; }
 export function setMinimapExpanded(expanded) { minimapExpanded = expanded; }
-export function toggleMinimapExpanded() { minimapExpanded = !minimapExpanded; }
 
 // Store last drawn minimap bounds for click detection
 let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false, expanded: false };
@@ -3150,12 +3180,12 @@ let closeButtonBounds = { x: 0, y: 0, size: 32 };
 export function getCloseButtonBounds() { return closeButtonBounds; }
 
 /**
- * Draw minimap toggle button
+ * Draw minimap expand button (to open expanded view)
  */
-function drawMinimapToggle(mapX, mapY, mapSize) {
+function drawMinimapExpandButton(mapX, mapY, mapSize) {
     const btnSize = 24;
-    const btnX = mapX + mapSize + 8;
-    const btnY = mapY;
+    const btnX = mapX + mapSize - btnSize - 4;
+    const btnY = mapY + 4;
 
     // Store bounds for click detection
     toggleButtonBounds = { x: btnX, y: btnY, size: btnSize };
@@ -3164,22 +3194,32 @@ function drawMinimapToggle(mapX, mapY, mapSize) {
     ctx.globalAlpha = 0.8;
 
     // Button background
-    ctx.fillStyle = minimapHidden ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 0, 0, 0.6)';
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
     ctx.beginPath();
     ctx.roundRect(btnX, btnY, btnSize, btnSize, 4);
     ctx.fill();
 
     // Button border
-    ctx.strokeStyle = minimapHidden ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.3)';
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Icon (map icon when hidden, X when visible)
-    ctx.fillStyle = minimapHidden ? '#10b981' : 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(minimapHidden ? '🗺️' : '✕', btnX + btnSize / 2, btnY + btnSize / 2);
+    // Expand icon (⤢ or similar)
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    const padding = 6;
+    // Draw expand arrows (top-right and bottom-left corners)
+    ctx.beginPath();
+    // Top-right corner arrow
+    ctx.moveTo(btnX + btnSize - padding - 4, btnY + padding);
+    ctx.lineTo(btnX + btnSize - padding, btnY + padding);
+    ctx.lineTo(btnX + btnSize - padding, btnY + padding + 4);
+    // Bottom-left corner arrow
+    ctx.moveTo(btnX + padding + 4, btnY + btnSize - padding);
+    ctx.lineTo(btnX + padding, btnY + btnSize - padding);
+    ctx.lineTo(btnX + padding, btnY + btnSize - padding - 4);
+    ctx.stroke();
 
     ctx.restore();
 }
@@ -3252,25 +3292,15 @@ function drawMinimap(w, h) {
         y = config.PADDING + 55; // Offset for top bar
     }
 
-    // Store bounds for interaction (even if hidden, for toggle button)
+    // Store bounds for interaction
     lastMinimapBounds = {
         x, y, size,
         centerX: x + size / 2,
         centerY: y + size / 2,
         hexSize: 0,
-        hidden: minimapHidden,
+        hidden: false, // Compact minimap is always visible
         expanded: isExpanded
     };
-
-    // In compact mode, draw toggle button (always visible)
-    if (!isExpanded) {
-        drawMinimapToggle(x, y, size);
-    }
-
-    // If hidden (only in compact mode), only show the toggle button
-    if (minimapHidden && !isExpanded) {
-        return;
-    }
 
     ctx.save();
 
@@ -3324,18 +3354,29 @@ function drawMinimap(w, h) {
         // Check fog level for coloring
         const fogLevel = getFogLevel(hex.q, hex.r);
 
+        // Check if hex is outside the safe zone
+        const outsideZone = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius && !isHexInZone(hex.q, hex.r);
+
         // Draw hex as small circle/diamond (larger in expanded mode)
         ctx.beginPath();
         ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
 
         if (fogLevel === 'hidden') {
-            ctx.fillStyle = '#1a1a2e';
+            ctx.fillStyle = outsideZone ? '#2a1a1e' : '#1a1a2e';
         } else if (fogLevel === 'explored') {
-            ctx.fillStyle = desaturateAndDarken(terrain.color, 0.4, 0.6);
+            const baseColor = desaturateAndDarken(terrain.color, 0.4, 0.6);
+            ctx.fillStyle = outsideZone ? blendWithRed(baseColor, 0.4) : baseColor;
         } else {
-            ctx.fillStyle = terrain.color;
+            ctx.fillStyle = outsideZone ? blendWithRed(terrain.color, 0.3) : terrain.color;
         }
         ctx.fill();
+
+        // Add red border for hexes outside zone
+        if (outsideZone && fogLevel !== 'hidden') {
+            ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+            ctx.lineWidth = isExpanded ? 1.5 : 1;
+            ctx.stroke();
+        }
     });
 
     // Draw shrinking zone boundary (if active)
@@ -3422,31 +3463,36 @@ function drawMinimap(w, h) {
         ctx.stroke();
     });
 
-    // Draw current viewport indicator (accounting for zoom level)
-    // The viewport size depends on canvas size, hex size, AND zoom level
-    const viewportW = state.canvasWidth / state.hexSize / state.zoomLevel / 2.5;
-    const viewportH = state.canvasHeight / state.hexSize / state.zoomLevel / 2.5;
-    const viewX = centerX - state.cameraX / state.hexSize * hexSize * 1.5;
-    const viewY = centerY - state.cameraY / state.hexSize * hexSize * Math.sqrt(3);
+    // Draw current viewport indicator
+    // Scale factor from main view to minimap coordinates
+    const scale = hexSize / state.hexSize;
+
+    // Viewport center position on minimap
+    const viewX = centerX - state.cameraX * scale;
+    const viewY = centerY - state.cameraY * scale;
+
+    // Viewport size on minimap (canvas dimensions scaled to minimap)
+    const viewportW = state.canvasWidth * scale;
+    const viewportH = state.canvasHeight * scale;
 
     // Viewport rectangle - more visible in expanded mode
     ctx.strokeStyle = isExpanded ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = isExpanded ? 2 : 1;
     ctx.strokeRect(
-        viewX - viewportW * hexSize,
-        viewY - viewportH * hexSize,
-        viewportW * hexSize * 2,
-        viewportH * hexSize * 2
+        viewX - viewportW / 2,
+        viewY - viewportH / 2,
+        viewportW,
+        viewportH
     );
 
     // Semi-transparent fill for viewport area in expanded mode
     if (isExpanded) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.fillRect(
-            viewX - viewportW * hexSize,
-            viewY - viewportH * hexSize,
-            viewportW * hexSize * 2,
-            viewportH * hexSize * 2
+            viewX - viewportW / 2,
+            viewY - viewportH / 2,
+            viewportW,
+            viewportH
         );
     }
 
@@ -3475,6 +3521,9 @@ function drawMinimap(w, h) {
         ctx.font = '9px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('KARTE', x + size / 2, y - 8);
+
+        // Draw expand button for compact view
+        drawMinimapExpandButton(x, y, size);
     }
     ctx.restore();
 }

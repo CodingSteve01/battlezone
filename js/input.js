@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, setMinimapActive, toggleMinimapVisibility, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
+import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, setMinimapActive, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
@@ -424,11 +424,11 @@ function applyZoom(zoomDelta, screenX, screenY) {
 }
 
 /**
- * Check if a click/touch is on the minimap toggle button (compact mode)
- * Returns true if click was on toggle (handled), false otherwise
+ * Check if a click/touch is on the minimap expand button (compact mode)
+ * Returns true if click was on expand button (handled), false otherwise
  */
-function handleMinimapToggleClick(clientX, clientY) {
-    // Toggle button only visible in compact mode
+function handleMinimapExpandClick(clientX, clientY) {
+    // Expand button only visible in compact mode
     if (isMinimapExpanded()) return false;
 
     const rect = canvas.getBoundingClientRect();
@@ -438,13 +438,13 @@ function handleMinimapToggleClick(clientX, clientY) {
     const toggleBounds = getToggleButtonBounds();
     if (!toggleBounds) return false;
 
-    // Check if click is on toggle button
+    // Check if click is on expand button
     if (canvasX >= toggleBounds.x &&
         canvasX <= toggleBounds.x + toggleBounds.size &&
         canvasY >= toggleBounds.y &&
         canvasY <= toggleBounds.y + toggleBounds.size) {
 
-        toggleMinimapVisibility();
+        setMinimapExpanded(true);
         playClick();
         render();
         return true;
@@ -485,15 +485,16 @@ function handleMinimapCloseClick(clientX, clientY) {
 
 /**
  * Check if a click/touch is on the minimap and handle interaction
- * - Compact mode: Touch to expand
- * - Expanded mode: Touch to navigate viewport, or close button to collapse
+ * - Both modes: Touch to navigate viewport
+ * - Compact mode: Expand button to enlarge
+ * - Expanded mode: Close button or click outside to collapse
  * Returns true if click was on minimap (handled), false otherwise
  */
 function handleMinimapClick(clientX, clientY) {
     const expanded = isMinimapExpanded();
 
-    // First check toggle button (compact mode only)
-    if (!expanded && handleMinimapToggleClick(clientX, clientY)) {
+    // First check expand button (compact mode only)
+    if (!expanded && handleMinimapExpandClick(clientX, clientY)) {
         return true;
     }
 
@@ -507,7 +508,7 @@ function handleMinimapClick(clientX, clientY) {
     const canvasY = clientY - rect.top;
 
     const bounds = getMinimapBounds();
-    if (!bounds || bounds.size === 0 || bounds.hidden) return false;
+    if (!bounds || bounds.size === 0) return false;
 
     // Check if click is within minimap bounds (with some padding)
     const padding = 5;
@@ -516,44 +517,33 @@ function handleMinimapClick(clientX, clientY) {
         canvasY >= bounds.y - padding &&
         canvasY <= bounds.y + bounds.size + padding;
 
-    if (expanded) {
-        // In expanded mode: click within minimap navigates, click outside closes
-        if (isWithinMinimap) {
-            // Set minimap as active for visual feedback
-            setMinimapActive(true);
-            setTimeout(() => setMinimapActive(false), 300);
+    if (isWithinMinimap) {
+        // Both modes: click within minimap navigates viewport
+        setMinimapActive(true);
+        setTimeout(() => setMinimapActive(false), 300);
 
-            // Convert minimap click to hex coordinates
-            const relX = canvasX - bounds.centerX;
-            const relY = canvasY - bounds.centerY;
+        // Convert minimap click to hex coordinates
+        const relX = canvasX - bounds.centerX;
+        const relY = canvasY - bounds.centerY;
 
-            // Reverse the hex-to-pixel conversion used in minimap drawing
-            const q = relX / (bounds.hexSize * 1.5);
-            const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
+        // Reverse the hex-to-pixel conversion used in minimap drawing
+        const q = relX / (bounds.hexSize * 1.5);
+        const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
 
-            // Convert to world pixel position
-            const worldX = q * state.hexSize * 1.5;
-            const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
+        // Convert to world pixel position
+        const worldX = q * state.hexSize * 1.5;
+        const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
 
-            // Smooth scroll to position
-            scrollToPosition(-worldX, -worldY);
+        // Smooth scroll to position
+        scrollToPosition(-worldX, -worldY);
 
-            return true;
-        } else {
-            // Click outside expanded minimap - close it
-            setMinimapExpanded(false);
-            playClick();
-            render();
-            return true;
-        }
-    } else {
-        // In compact mode: click on minimap expands it
-        if (isWithinMinimap) {
-            setMinimapExpanded(true);
-            playClick();
-            render();
-            return true;
-        }
+        return true;
+    } else if (expanded) {
+        // Click outside expanded minimap - close it
+        setMinimapExpanded(false);
+        playClick();
+        render();
+        return true;
     }
 
     return false;
@@ -939,6 +929,155 @@ export function scrollToUnit(unit, duration = 500) {
 }
 
 /**
+ * Smoothly animate zoom level
+ * @returns Promise that resolves when animation completes
+ */
+function animateZoom(targetZoom, duration = 500) {
+    return new Promise(resolve => {
+        const startZoom = state.zoomLevel;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
+ * Smoothly animate camera to position
+ * @returns Promise that resolves when animation completes
+ */
+function animateCameraTo(targetCameraX, targetCameraY, duration = 500) {
+    return new Promise(resolve => {
+        const startCameraX = state.cameraX;
+        const startCameraY = state.cameraY;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            state.cameraX = startCameraX + (targetCameraX - startCameraX) * ease;
+            state.cameraY = startCameraY + (targetCameraY - startCameraY) * ease;
+
+            limitCameraBounds();
+            updateCameraOffset();
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
+ * Play game intro flyover animation
+ * Shows an overview of the map and player's units
+ */
+export async function playGameIntro() {
+    if (state.introShown) return;
+
+    state.introShown = true;
+    state.animating = true;
+
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    if (playerUnits.length === 0) {
+        state.animating = false;
+        return;
+    }
+
+    // Calculate bounding box of player's units
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+
+    for (const unit of playerUnits) {
+        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+        minX = Math.min(minX, pos.x);
+        maxX = Math.max(maxX, pos.x);
+        minY = Math.min(minY, pos.y);
+        maxY = Math.max(maxY, pos.y);
+    }
+
+    // Calculate center of units
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // Calculate spread to determine zoom level
+    const spreadX = maxX - minX;
+    const spreadY = maxY - minY;
+    const spread = Math.max(spreadX, spreadY);
+
+    // Start zoomed out with overview
+    const overviewZoom = Math.max(0.5, Math.min(0.8, 400 / (spread + 200)));
+
+    // Step 1: Zoom out to show overview
+    state.cameraX = -centerX;
+    state.cameraY = -centerY;
+    state.zoomLevel = overviewZoom;
+    state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+    limitCameraBounds();
+    updateCameraOffset();
+    render();
+
+    await delay(800);
+
+    // Step 2: Pan across the units (show each unit briefly)
+    for (const unit of playerUnits.slice(0, 3)) { // Show max 3 units
+        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+        await animateCameraTo(-pos.x, -pos.y, 600);
+        await delay(400);
+    }
+
+    // Step 3: Zoom in to first unit
+    const firstUnit = playerUnits[0];
+    const firstPos = hexToPixel(firstUnit.q, firstUnit.r, CONFIG.BASE_HEX_SIZE);
+
+    // Animate to first unit position while zooming in
+    await Promise.all([
+        animateCameraTo(-firstPos.x, -firstPos.y, 800),
+        animateZoom(1.0, 800)
+    ]);
+
+    state.animating = false;
+}
+
+/**
+ * Utility: delay helper for async functions
+ */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Continue queued path for a unit if it exists
  */
 export function continueQueuedPath(unit) {
@@ -1016,6 +1155,185 @@ export function continueQueuedPath(unit) {
 }
 
 /**
+ * Execute all queued paths for the current player automatically at turn start
+ * Returns a Promise that resolves when all movements are complete
+ */
+export async function executeQueuedPathsForPlayer() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    const unitsWithPaths = playerUnits.filter(unit => {
+        const queuedPath = getQueuedPath(unit.id);
+        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
+    });
+
+    if (unitsWithPaths.length === 0) return;
+
+    showToast(`📍 ${unitsWithPaths.length} Wegpunkt${unitsWithPaths.length > 1 ? 'e werden' : ' wird'} ausgeführt...`, 'info');
+
+    for (const unit of unitsWithPaths) {
+        if (!unit.alive) continue;
+        if (state.sharedAP <= 0) break;
+
+        const success = await executeQueuedPathForUnit(unit);
+        if (!success) continue;
+
+        // Small delay between units
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    render();
+    updateUI();
+}
+
+/**
+ * Execute a single queued path for a unit
+ * Returns a Promise that resolves when movement is complete
+ */
+async function executeQueuedPathForUnit(unit) {
+    const queuedPath = getQueuedPath(unit.id);
+    if (!queuedPath || !queuedPath.path) return false;
+
+    // Recalculate path from current position to target
+    const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
+
+    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        // Path is blocked or invalid
+        clearQueuedPath(unit.id);
+        showToast(`❌ Pfad für ${unit.name} blockiert`, 'warning');
+        return false;
+    }
+
+    // Calculate reachable portion with current AP
+    const maxMoveCost = state.sharedAP;
+    let cumulativeCost = 0;
+    const reachablePath = [pathResult.path[0]];
+    let totalCost = 0;
+    let lastReachableIndex = 0;
+
+    for (let i = 1; i < pathResult.path.length; i++) {
+        const point = pathResult.path[i];
+        const pointHex = getHex(point.q, point.r);
+        if (!pointHex) break;
+
+        const terrain = TERRAIN[pointHex.type];
+        cumulativeCost += terrain.moveCost;
+
+        if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
+            reachablePath.push(point);
+            totalCost = cumulativeCost;
+            lastReachableIndex = i;
+        } else if (pointHex.unit && pointHex.unit.id !== unit.id) {
+            // Path blocked by another unit
+            break;
+        }
+    }
+
+    if (reachablePath.length < 2 || totalCost === 0) {
+        // Can't move this turn, keep the path for next turn
+        return false;
+    }
+
+    // Check if we reached the destination
+    const isComplete = lastReachableIndex >= pathResult.path.length - 1;
+
+    // Update or clear queued path
+    if (!isComplete) {
+        const remainingPath = pathResult.path.slice(lastReachableIndex);
+        setQueuedPath(unit.id, remainingPath, queuedPath.targetQ, queuedPath.targetR);
+    } else {
+        clearQueuedPath(unit.id);
+    }
+
+    // Scroll to unit before moving
+    scrollToUnit(unit, 300);
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Execute the movement
+    return new Promise(resolve => {
+        playMoveStart();
+
+        // Reveal from cover when moving
+        if (unit.hiding) {
+            unit.hiding = false;
+        }
+
+        animateUnitMovement(unit, reachablePath, totalCost, () => {
+            playMoveEnd();
+
+            // Check for power-up pickup
+            const pickup = checkPowerupPickup(unit);
+            if (pickup) {
+                showPowerupPickup(pickup.powerup, pickup.result);
+            }
+
+            updateVisibility();
+
+            // Auto-take cover if on valid terrain
+            if (canAutoTakeCover(unit)) {
+                autoTakeCover(unit);
+            }
+
+            render();
+            updateUI();
+            resolve(true);
+        }, render);
+    });
+}
+
+/**
+ * Cancel all queued paths for the current player
+ */
+export function cancelAllQueuedPaths() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    let cancelled = 0;
+
+    playerUnits.forEach(unit => {
+        if (getQueuedPath(unit.id)) {
+            clearQueuedPath(unit.id);
+            cancelled++;
+        }
+    });
+
+    if (cancelled > 0) {
+        showToast(`🚫 ${cancelled} Wegpunkt${cancelled > 1 ? 'e' : ''} abgebrochen`, 'info');
+        render();
+    }
+
+    return cancelled;
+}
+
+/**
+ * Get count of units with queued paths for current player
+ */
+export function getQueuedPathCount() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    return playerUnits.filter(unit => {
+        const queuedPath = getQueuedPath(unit.id);
+        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
+    }).length;
+}
+
+/**
+ * Update the waypoint cancel button UI based on queued path count
+ */
+export function updateWaypointUI() {
+    const cancelBtn = document.getElementById('cancel-waypoints-btn');
+    const waypointCount = document.getElementById('waypoint-count');
+
+    if (!cancelBtn) return;
+
+    const count = getQueuedPathCount();
+
+    if (count > 0) {
+        cancelBtn.style.display = 'flex';
+        if (waypointCount) {
+            waypointCount.textContent = count;
+        }
+    } else {
+        cancelBtn.style.display = 'none';
+    }
+}
+
+/**
  * Start animation loop for pending move indicator
  */
 function startPendingMoveAnimation() {
@@ -1090,7 +1408,7 @@ function handleAttackClick(unit, hex) {
 function setupMenuButtons() {
     const readyBtn = document.getElementById('ready-btn');
     if (readyBtn) {
-        readyBtn.onclick = () => {
+        readyBtn.onclick = async () => {
             showScreen(null);
             updateVisibility();
             updateUI();
@@ -1099,6 +1417,11 @@ function setupMenuButtons() {
             requestAnimationFrame(() => {
                 centerOnCurrentUnit();
             });
+
+            // Execute any queued paths after a short delay
+            setTimeout(async () => {
+                await executeQueuedPathsForPlayer();
+            }, 500);
         };
     }
 
@@ -1127,6 +1450,15 @@ function setupMenuButtons() {
     const menuBtn = document.getElementById('menu-btn');
     if (menuBtn) {
         menuBtn.onclick = () => showScreen('menu');
+    }
+
+    // Cancel waypoints button
+    const cancelWaypointsBtn = document.getElementById('cancel-waypoints-btn');
+    if (cancelWaypointsBtn) {
+        cancelWaypointsBtn.onclick = () => {
+            cancelAllQueuedPaths();
+            updateWaypointUI();
+        };
     }
 
     // Round info dropdown toggle

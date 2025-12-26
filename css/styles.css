@@ -210,6 +210,62 @@ button:focus:not(:focus-visible),
     letter-spacing: 0.5px;
 }
 
+/* AI Config Grid */
+.ai-config-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.ai-config-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.ai-config-item .player-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+}
+
+.ai-config-item .type-toggle {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 50px;
+    text-align: center;
+}
+
+.ai-config-item .type-toggle:hover {
+    border-color: var(--primary);
+}
+
+.ai-config-item .type-toggle.ai {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%);
+    border-color: var(--orange);
+    color: var(--orange);
+}
+
+.ai-config-item .type-toggle.human {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.1) 100%);
+    border-color: var(--green);
+    color: var(--green);
+}
+
 .landscape-grid {
     display: flex;
     flex-wrap: wrap;
@@ -1327,6 +1383,27 @@ button:focus:not(:focus-visible),
     pointer-events: none;
 }
 
+/* Waypoint cancel button */
+.action-btn.waypoint-btn {
+    flex: 1;
+    gap: 4px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%);
+    border-color: var(--orange, #f97316);
+}
+
+.action-btn.waypoint-btn:hover {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.3) 0%, rgba(234, 88, 12, 0.2) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(251, 146, 60, 0.3);
+}
+
+.action-btn.waypoint-btn .label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #fdba74;
+}
+
 /* Suggested action - pulsing animation to draw attention */
 .action-btn.suggested {
     animation: suggestPulse 1.5s ease-in-out infinite;
@@ -1551,7 +1628,9 @@ button:focus:not(:focus-visible),
     font-weight: 700;
     font-size: 16px;
     z-index: 200;
-    animation: toastAnim 1.8s forwards;
+    animation-name: toastAnim;
+    animation-duration: 3.5s; /* Default, overridden by JS based on message length */
+    animation-fill-mode: forwards;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     box-shadow: var(--shadow-lg), 0 0 40px rgba(0,0,0,0.5);
@@ -1702,7 +1781,7 @@ button:focus:not(:focus-visible),
     border-color: var(--yellow);
     color: var(--yellow);
     background: rgba(234, 179, 8, 0.15);
-    animation: critAnim 1.8s forwards;
+    animation-name: critAnim;
 }
 
 @keyframes critAnim {

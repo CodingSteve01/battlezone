@@ -1,13 +1,13 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone } from './state.js';
+import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone, setOnAPDepletedCallback } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
-import { centerOnCurrentUnit } from './input.js';
+import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
@@ -48,9 +48,23 @@ export function startTurn() {
     state.currentPath = null;
     state.pendingMoveDestination = null;
 
-    // In single-player, always render from human player's perspective (player 0)
-    // In multiplayer, render from current player's perspective
-    state.viewingPlayer = state.settings.singlePlayer ? 0 : state.currentPlayer;
+    // Determine viewing player perspective:
+    // - If current player is human, view from their perspective
+    // - If current player is AI, keep the previous human player's perspective
+    if (isAIPlayer()) {
+        // AI is playing - find the first human player for viewing
+        let firstHuman = 0;
+        for (let p = 0; p < state.settings.players; p++) {
+            if (!isAIPlayer(p)) {
+                firstHuman = p;
+                break;
+            }
+        }
+        state.viewingPlayer = firstHuman;
+    } else {
+        // Human is playing - view from their perspective
+        state.viewingPlayer = state.currentPlayer;
+    }
 
     // Update fog of war
     updateVisibility();
@@ -59,17 +73,8 @@ export function startTurn() {
     const visibleEnemies = getVisibleEnemies();
     updatePreviouslyVisibleEnemies(visibleEnemies.map(e => e.id));
 
-    // Check if selected unit has a queued path
-    const currentUnit = units[0];
-    if (currentUnit) {
-        const queuedPath = getQueuedPath(currentUnit.id);
-        if (queuedPath && queuedPath.path) {
-            // Show notification about queued path
-            setTimeout(() => {
-                showToast('📍 Gespeicherter Wegpunkt vorhanden', 'info');
-            }, 500);
-        }
-    }
+    // Note: Queued paths are now automatically executed after turn screen is dismissed
+    // See executeQueuedPathsForPlayer() in input.js
 
     // Check if this is an AI player
     if (isAIPlayer()) {
@@ -108,6 +113,11 @@ export function startTurn() {
         requestAnimationFrame(() => {
             centerOnCurrentUnit();
         });
+
+        // Execute any queued paths after a short delay
+        setTimeout(async () => {
+            await executeQueuedPathsForPlayer();
+        }, 500);
         return;
     }
 
@@ -182,16 +192,21 @@ export function nextPlayer() {
 /**
  * Handle ready button (after turn screen)
  */
-export function handleReady() {
+export async function handleReady() {
     showScreen(null);
     updateVisibility();
     updateUI();
     render();
 
-    // Center camera on first unit
-    requestAnimationFrame(() => {
-        centerOnCurrentUnit();
-    });
+    // Play intro flyover on first turn of the game
+    if (state.round === 1 && !state.introShown) {
+        await playGameIntro();
+    } else {
+        // Center camera on first unit
+        requestAnimationFrame(() => {
+            centerOnCurrentUnit();
+        });
+    }
 }
 
 /**
@@ -486,3 +501,26 @@ export function getZoneInfo() {
         roundsWithoutCombat
     };
 }
+
+// ===== AUTO END TURN =====
+
+/**
+ * Auto-end turn when all AP is depleted
+ * Shows a brief notification before ending
+ */
+function autoEndTurn() {
+    // Don't auto-end during AI turns or if game is over
+    if (state.gameOver) return;
+    if (state.settings.singlePlayer && state.currentPlayer !== 0) return;
+
+    // Double-check AP is actually 0
+    if (state.sharedAP > 0) return;
+
+    showToast('⚡ Alle AP verbraucht - Zug wird beendet', 'info');
+    setTimeout(() => {
+        endTurn();
+    }, 1000);
+}
+
+// Set up the callback for auto-end turn
+setOnAPDepletedCallback(autoEndTurn);

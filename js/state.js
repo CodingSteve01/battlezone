@@ -9,7 +9,8 @@ export const state = {
         players: 2,
         size: 'medium',
         landscape: 'random',    // 'random', 'temperate', 'desert', 'tundra', 'tropical', 'highland', 'wetland'
-        singlePlayer: false,
+        singlePlayer: false,    // Legacy: true = all non-0 players are AI
+        aiPlayers: [],          // Array of player indices controlled by AI (e.g., [1, 3] for players 2 and 4)
         renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
         particleQuality: 'high' // 'low', 'medium', 'high' - Partikelanzahl
@@ -52,6 +53,7 @@ export const state = {
     round: 1,
     gameOver: false,
     animating: false,
+    introShown: false,  // Whether the game intro flyover has been shown
 
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }
@@ -283,13 +285,36 @@ export function initSharedAPPool(_player) {
     state.unitAttacksThisTurn = {};  // Reset attack tracking
 }
 
+// Callback for when AP is depleted (set by turns.js to avoid circular deps)
+let onAPDepleted = null;
+export function setOnAPDepletedCallback(callback) {
+    onAPDepleted = callback;
+}
+
 /**
  * Spend AP from the shared pool
  * Returns true if successful, false if not enough AP
+ * Triggers auto-end turn callback when AP reaches 0
  */
 export function spendSharedAP(amount) {
     if (state.sharedAP >= amount) {
         state.sharedAP -= amount;
+
+        // Check for auto-end turn when AP depleted (only for human players)
+        // Check both legacy singlePlayer mode and new aiPlayers array
+        const isHumanPlayer = state.settings.aiPlayers && state.settings.aiPlayers.length > 0
+            ? !state.settings.aiPlayers.includes(state.currentPlayer)
+            : (!state.settings.singlePlayer || state.currentPlayer === 0);
+
+        if (state.sharedAP <= 0 && onAPDepleted && isHumanPlayer) {
+            // Delay to let current action complete
+            setTimeout(() => {
+                if (state.sharedAP <= 0 && onAPDepleted) {
+                    onAPDepleted();
+                }
+            }, 800);
+        }
+
         return true;
     }
     return false;

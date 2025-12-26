@@ -48,6 +48,13 @@
                 </div>
             </div>
 
+            <div class="menu-section" id="ai-config-section" style="display: none;">
+                <div class="section-label">🎮 Spieler-Typen</div>
+                <div class="ai-config-grid" id="ai-config-grid">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
+
             <div class="menu-section">
                 <div class="option-grid">
                     <button class="option-btn" data-size="small">S</button>
@@ -164,6 +171,10 @@
                         <span class="icon">✨</span>
                         <span class="label" id="special-label">Spezial</span>
                         <span class="special-tip" id="special-tip"></span>
+                    </button>
+                    <button class="action-btn waypoint-btn" id="cancel-waypoints-btn" title="Geplante Wegpunkte abbrechen" style="display: none;">
+                        <span class="icon">🚫</span>
+                        <span class="label">Wegpunkte (<span id="waypoint-count">0</span>)</span>
                     </button>
                     <button class="end-turn-btn" id="end-turn-btn">Zug beenden</button>
                 </div>

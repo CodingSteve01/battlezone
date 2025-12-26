@@ -1,16 +1,17 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone } from './state.js';
 import { hexDistance } from './hexMath.js';
-import { getReachableHexes } from './pathfinding.js';
-import { getAttackableUnits } from './units.js';
+import { getReachableHexes, findPath } from './pathfinding.js';
+import { moveUnitInstant, getAttackableUnits } from './units.js';
 import { executeAttack, useSpecialAbility } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
+import { scrollToUnit } from './input.js';
 
 // ===== AI MEMORY SYSTEM =====
 // Stores information about enemy positions, even when not visible
@@ -41,10 +42,26 @@ export function resetAIMemory() {
 }
 
 /**
- * Check if current player is AI controlled
+ * Check if a player is AI controlled
+ * Supports both legacy singlePlayer mode and new aiPlayers array
  */
 export function isAIPlayer(playerIndex = state.currentPlayer) {
+    // New mode: check aiPlayers array
+    if (state.settings.aiPlayers && state.settings.aiPlayers.length > 0) {
+        return state.settings.aiPlayers.includes(playerIndex);
+    }
+    // Legacy mode: singlePlayer means all non-0 players are AI
     return state.settings.singlePlayer && playerIndex > 0;
+}
+
+/**
+ * Check if there are any human players in the game
+ */
+export function hasHumanPlayer() {
+    for (let p = 0; p < state.settings.players; p++) {
+        if (!isAIPlayer(p)) return true;
+    }
+    return false;
 }
 
 /**
@@ -418,8 +435,20 @@ async function performUnitAI(unit, plan) {
 
 /**
  * Execute attack with proper rendering
+ * In single-player, scroll to the attacked friendly unit so the player can see the action
  */
 async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer) {
+    // In single-player, scroll to the target (friendly unit being attacked) before attack
+    if (isSinglePlayer && target.player === 0) {
+        // Scroll to the friendly unit being attacked
+        scrollToUnit(target, 400);
+        await delay(450);
+    } else if (isSinglePlayer && isUnitVisibleToViewer(unit)) {
+        // If attacking another enemy but AI is visible, scroll to the action
+        scrollToUnit(unit, 300);
+        await delay(350);
+    }
+
     state.targetedUnit = target;
     renderIfVisible();
     await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
@@ -438,7 +467,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlay
         updateUI();
         render();
     }
-    await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+    await delay(isUnitVisibleToViewer(unit) ? 500 : 100);
 }
 
 // ===== TACTICAL DECISIONS =====
@@ -511,6 +540,12 @@ async function executeRetreat(unit, enemies) {
                 hexDistance({ q, r }, { q: a.q, r: a.r })
             ));
             score += (10 - closestAlly) * 5;
+        }
+
+        // Zone awareness - don't retreat outside the safe zone!
+        const targetInZone = isHexInZone(q, r);
+        if (!targetInZone) {
+            score -= 200;  // Heavy penalty for retreating outside zone
         }
 
         if (score > bestScore) {
@@ -705,6 +740,36 @@ function selectStrategicMoveTarget(unit, plan) {
         const terrainData = TERRAIN[hex.type];
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
+
+        // === ZONE AWARENESS ===
+        const unitInZone = isHexInZone(unit.q, unit.r);
+        const targetInZone = isHexInZone(q, r);
+
+        if (!unitInZone) {
+            // Unit is OUTSIDE zone - high priority to get back in!
+            if (targetInZone) {
+                score += 500;  // Massive bonus for getting into safe zone
+            } else {
+                // At least move toward center
+                const currentDistFromCenter = Math.max(Math.abs(unit.q), Math.abs(unit.r), Math.abs(-unit.q - unit.r));
+                const targetDistFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                if (targetDistFromCenter < currentDistFromCenter) {
+                    score += 100;  // Bonus for moving toward center
+                }
+            }
+        } else {
+            // Unit is inside zone - avoid moving outside
+            if (!targetInZone) {
+                score -= 300;  // Heavy penalty for leaving safe zone
+            } else {
+                // Stay away from zone edge if zone is shrinking
+                const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                const distFromEdge = state.zoneRadius - distFromCenter;
+                if (distFromEdge <= 2) {
+                    score -= 20;  // Small penalty for being near edge
+                }
+            }
+        }
 
         candidates.push({ q, r, score, cost: data.cost });
     });
@@ -981,7 +1046,8 @@ function scoreSearchPosition(unit, q, r, plan) {
 // ===== MOVEMENT EXECUTION =====
 
 /**
- * Execute AI movement with proper rendering
+ * Execute AI movement with step-by-step animation
+ * In single-player, animate visible movements so player can follow
  */
 async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
@@ -990,16 +1056,72 @@ async function executeAIMove(unit, target) {
     const isSinglePlayer = state.settings.singlePlayer;
     const wasVisible = isUnitVisibleToViewer(unit);
 
-    // Clear old position
-    const oldHex = getHex(unit.q, unit.r);
-    if (oldHex) oldHex.unit = null;
+    // Get the path from unit's current position to target
+    const pathResult = findPath(unit.q, unit.r, target.q, target.r, target.cost + 2);
 
-    // Move unit
-    unit.q = target.q;
-    unit.r = target.r;
-    targetHex.unit = unit;
+    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        // No valid path found - fall back to instant teleport
+        const oldHex = getHex(unit.q, unit.r);
+        if (oldHex) oldHex.unit = null;
 
-    // Spend from shared pool and track movement
+        unit.q = target.q;
+        unit.r = target.r;
+        targetHex.unit = unit;
+
+        spendSharedAP(target.cost);
+        updateVisibility();
+        if (isSinglePlayer) {
+            updateVisibilityForPlayer(0);
+        }
+        render();
+        updateUI();
+        return;
+    }
+
+    const path = pathResult.path;
+    const stepDelay = 120; // ms per step (faster than player animation)
+
+    // If unit starts visible, scroll to it first
+    if (isSinglePlayer && wasVisible) {
+        scrollToUnit(unit, 200);
+        await delay(250);
+    }
+
+    // Animate step by step
+    let unitBecameVisible = false;
+    for (let i = 1; i < path.length; i++) {
+        const nextPos = path[i];
+        const nextHex = getHex(nextPos.q, nextPos.r);
+
+        if (!nextHex) continue;
+
+        // Move unit one step
+        moveUnitInstant(unit, nextHex);
+
+        // Update visibility after each step
+        updateVisibility();
+        if (isSinglePlayer) {
+            updateVisibilityForPlayer(0);
+        }
+
+        const isNowVisible = isUnitVisibleToViewer(unit);
+
+        // Check if unit just became visible
+        if (isSinglePlayer && isNowVisible && !unitBecameVisible) {
+            unitBecameVisible = true;
+            // Scroll to show the newly visible enemy
+            scrollToUnit(unit, 300);
+            await delay(350);
+        }
+
+        // Only render if unit is visible (or in multiplayer)
+        if (!isSinglePlayer || isNowVisible) {
+            render();
+            await delay(stepDelay);
+        }
+    }
+
+    // Spend from shared pool after animation completes
     spendSharedAP(target.cost);
 
     // Mark this area as searched
@@ -1011,17 +1133,10 @@ async function executeAIMove(unit, target) {
         aiMemory.searchedAreas.delete(first);
     }
 
-    // Update visibility
-    updateVisibility();
-    if (isSinglePlayer) {
-        updateVisibilityForPlayer(0);
-    }
-
-    const isNowVisible = isUnitVisibleToViewer(unit);
-
-    if (!isSinglePlayer || wasVisible || isNowVisible) {
-        render();
+    // Final update
+    if (!isSinglePlayer || wasVisible || unitBecameVisible) {
         updateUI();
+        render();
     }
 }
 
