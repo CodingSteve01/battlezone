@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.5.0...shadow-squad-v3.6.0) (2025-12-26)
+
+
+### Features
+
+* **perf,tutorial:** optimize iPad rendering and add interactive tutorial ([#115](https://github.com/CodingSteve01/battlezone/issues/115)) ([5c3b4d5](https://github.com/CodingSteve01/battlezone/commit/5c3b4d5c165f3fda93ebdaa071c6a081e1f78d03))
+
 ## [3.5.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.4.1...shadow-squad-v3.5.0) (2025-12-26)
 
 
