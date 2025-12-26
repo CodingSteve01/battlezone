@@ -2560,6 +2560,9 @@ export function render() {
     // Collect cover positions to show only the best ones (max 4)
     const coverPositions = [];
 
+    // Collect powerup positions for drawing on top of foreground elements
+    const powerupPositions = [];
+
     // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
@@ -2651,11 +2654,11 @@ export function render() {
             foregroundElements.push(...elements);
         }
 
-        // Draw power-up if present
+        // Collect power-up positions for drawing on top of foreground elements
         if (fogLevel === 'visible') {
             const powerup = getPowerupAt(hex.q, hex.r);
             if (powerup) {
-                drawPowerup(sx, sy, powerup, state.hexSize);
+                powerupPositions.push({ sx, sy, powerup });
             }
         }
 
@@ -2742,29 +2745,6 @@ export function render() {
             }
         }
     });
-
-    // Draw cover icons only for the best positions (max 4, sorted by lowest movement cost)
-    if (coverPositions.length > 0) {
-        // Sort by cost (cheapest first) and take only the best 4
-        const bestCoverPositions = coverPositions
-            .sort((a, b) => a.cost - b.cost)
-            .slice(0, 4);
-
-        bestCoverPositions.forEach(({ sx, sy }) => {
-            ctx.globalAlpha = 1;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 6;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            ctx.font = `${Math.round(state.hexSize * 0.5)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🛡️', sx, sy - state.hexSize * 0.25);
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-        });
-    }
 
     // Draw hex grid overlay only when planning movement or attack
     if (showGrid) {
@@ -3065,6 +3045,33 @@ export function render() {
     unitDrawables.forEach(drawable => {
         drawUnitOverlay(drawable.unit, drawable.x, drawable.y);
     });
+
+    // Draw powerups on top of all terrain and foreground elements
+    powerupPositions.forEach(({ sx, sy, powerup }) => {
+        drawPowerup(sx, sy, powerup, state.hexSize);
+    });
+
+    // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
+    if (coverPositions.length > 0) {
+        const bestCoverPositions = coverPositions
+            .sort((a, b) => a.cost - b.cost)
+            .slice(0, 4);
+
+        bestCoverPositions.forEach(({ sx, sy }) => {
+            ctx.globalAlpha = 1;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 6;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            ctx.font = `${Math.round(state.hexSize * 0.5)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🛡️', sx, sy - state.hexSize * 0.25);
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        });
+    }
 
     // Update and draw particles only when active
     if (particles.getActiveCount() > 0) {
