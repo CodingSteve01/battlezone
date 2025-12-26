@@ -2457,3 +2457,182 @@ button:focus:not(:focus-visible),
         width: 100%;
     }
 }
+
+/* ===== TUTORIAL OVERLAY ===== */
+.tutorial-overlay {
+    position: fixed;
+    left: 0;
+    right: 0;
+    display: none;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 20px;
+    z-index: 2000;
+    pointer-events: none;
+    animation: tutorialFadeIn 0.3s ease-out;
+}
+
+.tutorial-overlay.tutorial-center {
+    top: 0;
+    bottom: 0;
+    align-items: center;
+}
+
+.tutorial-overlay.tutorial-top {
+    top: 0;
+    bottom: auto;
+    align-items: flex-start;
+    padding-top: 80px;
+}
+
+.tutorial-overlay.tutorial-bottom {
+    top: auto;
+    bottom: 0;
+    align-items: flex-end;
+    padding-bottom: 100px;
+}
+
+@keyframes tutorialFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tutorial-hint {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(26, 26, 62, 0.95));
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    border-radius: 16px;
+    padding: 16px 20px;
+    max-width: 400px;
+    width: 100%;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
+                0 0 20px rgba(16, 185, 129, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    pointer-events: all;
+}
+
+.tutorial-hint-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.tutorial-hint-icon {
+    font-size: 24px;
+    animation: tutorialPulse 2s ease-in-out infinite;
+}
+
+@keyframes tutorialPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.tutorial-hint-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--green-light);
+}
+
+.tutorial-close-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tutorial-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
+.tutorial-hint-message {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+}
+
+.tutorial-hint-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.tutorial-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.tutorial-btn-ok {
+    background: linear-gradient(135deg, var(--green), var(--green-light));
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.tutorial-btn-ok:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.tutorial-btn-dismiss {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+.tutorial-btn-dismiss:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+    .tutorial-overlay {
+        padding: 12px;
+    }
+
+    .tutorial-overlay.tutorial-bottom {
+        padding-bottom: 80px;
+    }
+
+    .tutorial-overlay.tutorial-top {
+        padding-top: 60px;
+    }
+
+    .tutorial-hint {
+        padding: 14px 16px;
+        border-radius: 12px;
+    }
+
+    .tutorial-hint-title {
+        font-size: 15px;
+    }
+
+    .tutorial-hint-message {
+        font-size: 13px;
+    }
+
+    .tutorial-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}

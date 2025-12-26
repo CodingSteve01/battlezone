@@ -13,6 +13,7 @@ import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
 import { isAIPlayer } from './ai.js';
+import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint } from './tutorial.js';
 
 let canvas;
 let pendingMoveAnimationId = null;
@@ -646,6 +647,8 @@ function handleTapOrClick(clientX, clientY) {
             updateUI();
             render();
             showToast(`${hex.unit.name} ausgewählt`, 'info');
+            // Check for tutorial hints after selection
+            checkTutorialHint();
             return;
         }
     }
@@ -689,6 +692,10 @@ function handleEnemyClick(unit, hex) {
 
             render();
             updateUI();
+
+            // Check for tutorial hints after attack
+            showActionHint('attacked');
+            checkTutorialHint();
         } else {
             // First tap - target this enemy
             state.targetedUnit = enemy;
@@ -853,6 +860,10 @@ function handleMoveClick(unit, hex) {
 
             render();
             updateUI();
+
+            // Check for tutorial hints after movement
+            showActionHint('moved');
+            checkTutorialHint();
         }, render);
     } else {
         // First tap - show path preview and set pending destination
@@ -1002,7 +1013,7 @@ function animateCameraTo(targetCameraX, targetCameraY, duration = 500) {
 
 /**
  * Play game intro flyover animation
- * Shows an overview of the map and player's units
+ * Shows an overview of the map, pans across visible terrain, then zooms to player's units
  */
 export async function playGameIntro() {
     if (state.introShown) return;
@@ -1029,46 +1040,77 @@ export async function playGameIntro() {
     }
 
     // Calculate center of units
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
+    const unitCenterX = (minX + maxX) / 2;
+    const unitCenterY = (minY + maxY) / 2;
 
-    // Calculate spread to determine zoom level
-    const spreadX = maxX - minX;
-    const spreadY = maxY - minY;
-    const spread = Math.max(spreadX, spreadY);
+    // Get map size for overview
+    const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
+    const mapExtent = mapRadius * CONFIG.BASE_HEX_SIZE * 1.5;
 
-    // Start zoomed out with overview
-    const overviewZoom = Math.max(0.5, Math.min(0.8, 400 / (spread + 200)));
-
-    // Step 1: Zoom out to show overview
-    state.cameraX = -centerX;
-    state.cameraY = -centerY;
+    // Step 1: Start with a wide overview of the entire map
+    const overviewZoom = 0.4;
+    state.cameraX = 0;
+    state.cameraY = 0;
     state.zoomLevel = overviewZoom;
     state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
     limitCameraBounds();
     updateCameraOffset();
     render();
 
-    await delay(800);
+    await delay(600);
 
-    // Step 2: Pan across the units (show each unit briefly)
-    for (const unit of playerUnits.slice(0, 3)) { // Show max 3 units
-        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
-        await animateCameraTo(-pos.x, -pos.y, 600);
-        await delay(400);
+    // Step 2: Pan diagonally across the visible map area
+    // This shows the terrain before focusing on units
+    const panPoints = [
+        { x: mapExtent * 0.3, y: -mapExtent * 0.3 },   // Upper right area
+        { x: -mapExtent * 0.3, y: mapExtent * 0.2 },   // Lower left area
+    ];
+
+    for (const point of panPoints) {
+        await animateCameraTo(-point.x, -point.y, 800);
+        await delay(300);
     }
 
-    // Step 3: Zoom in to first unit
+    // Step 3: Pan to player's units area (still zoomed out)
+    await animateCameraTo(-unitCenterX, -unitCenterY, 600);
+    await delay(400);
+
+    // Step 4: Zoom in while panning to each unit
+    const intermediateZoom = 0.7;
+    await animateZoom(intermediateZoom, 500);
+
+    // Step 5: Show each unit briefly
+    for (const unit of playerUnits.slice(0, 3)) {
+        const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+        await animateCameraTo(-pos.x, -pos.y, 500);
+        await delay(350);
+    }
+
+    // Step 6: Final zoom to first unit
     const firstUnit = playerUnits[0];
     const firstPos = hexToPixel(firstUnit.q, firstUnit.r, CONFIG.BASE_HEX_SIZE);
 
-    // Animate to first unit position while zooming in
     await Promise.all([
-        animateCameraTo(-firstPos.x, -firstPos.y, 800),
-        animateZoom(1.0, 800)
+        animateCameraTo(-firstPos.x, -firstPos.y, 700),
+        animateZoom(1.0, 700)
     ]);
 
     state.animating = false;
+
+    // Start tutorial if this is the first game
+    startTutorialIfNeeded();
+}
+
+/**
+ * Start the tutorial if this is the player's first game
+ */
+function startTutorialIfNeeded() {
+    if (shouldStartTutorial()) {
+        // Small delay to let the UI settle
+        setTimeout(() => {
+            startTutorial();
+        }, 500);
+    }
 }
 
 /**
