@@ -381,6 +381,65 @@ button:focus:not(:focus-visible),
     opacity: 0.5;
 }
 
+/* Settings Section (Notifications, Tutorial) */
+.settings-section {
+    padding: 12px 16px;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.setting-row:last-child {
+    margin-bottom: 0;
+}
+
+.setting-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.setting-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.setting-btn {
+    padding: 6px 12px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.setting-btn:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--border-light);
+}
+
+.setting-btn.active {
+    background: var(--green-dark);
+    border-color: var(--green);
+    color: var(--green-light);
+}
+
+.tutorial-reset-btn {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1));
+    border-color: var(--blue);
+    color: var(--blue);
+}
+
+.tutorial-reset-btn:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.2));
+}
+
 /* Effects Section (Gore Toggle) */
 .effects-section {
     padding: 12px 16px;

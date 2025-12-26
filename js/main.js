@@ -15,6 +15,7 @@ import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
+import { resetTutorial } from './tutorial.js';
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -492,6 +493,59 @@ async function init() {
                 muteBtn.textContent = '🔇';
                 muteBtn.classList.add('muted');
             }
+            playClick();
+        });
+    }
+
+    // Setup notification level buttons
+    const notificationBtns = document.querySelectorAll('#notification-level .setting-btn');
+    notificationBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            notificationBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update setting
+            state.settings.notificationLevel = btn.dataset.value;
+
+            // Save to localStorage
+            try {
+                localStorage.setItem('shadowSquad_notificationLevel', btn.dataset.value);
+            } catch { /* ignore */ }
+
+            playClick();
+        });
+    });
+
+    // Load saved notification level
+    try {
+        const savedLevel = localStorage.getItem('shadowSquad_notificationLevel');
+        if (savedLevel) {
+            state.settings.notificationLevel = savedLevel;
+            notificationBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === savedLevel);
+            });
+        }
+    } catch { /* ignore */ }
+
+    // Setup tutorial reset button
+    const resetTutorialBtn = document.getElementById('reset-tutorial-btn');
+    if (resetTutorialBtn) {
+        resetTutorialBtn.addEventListener('click', () => {
+            resetTutorial();
+            state.settings.showTutorial = true;
+
+            // Visual feedback
+            resetTutorialBtn.textContent = '✓ Zurückgesetzt!';
+            resetTutorialBtn.style.borderColor = 'var(--green)';
+            resetTutorialBtn.style.color = 'var(--green)';
+
+            setTimeout(() => {
+                resetTutorialBtn.textContent = '🔄 Zurücksetzen';
+                resetTutorialBtn.style.borderColor = '';
+                resetTutorialBtn.style.color = '';
+            }, 2000);
+
             playClick();
         });
     }
