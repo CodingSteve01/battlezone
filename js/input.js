@@ -8,7 +8,7 @@ import { executeAttack, useSpecialAbility } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, setMinimapActive, toggleMinimapVisibility, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
+import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, setMinimapActive, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
@@ -424,11 +424,11 @@ function applyZoom(zoomDelta, screenX, screenY) {
 }
 
 /**
- * Check if a click/touch is on the minimap toggle button (compact mode)
- * Returns true if click was on toggle (handled), false otherwise
+ * Check if a click/touch is on the minimap expand button (compact mode)
+ * Returns true if click was on expand button (handled), false otherwise
  */
-function handleMinimapToggleClick(clientX, clientY) {
-    // Toggle button only visible in compact mode
+function handleMinimapExpandClick(clientX, clientY) {
+    // Expand button only visible in compact mode
     if (isMinimapExpanded()) return false;
 
     const rect = canvas.getBoundingClientRect();
@@ -438,13 +438,13 @@ function handleMinimapToggleClick(clientX, clientY) {
     const toggleBounds = getToggleButtonBounds();
     if (!toggleBounds) return false;
 
-    // Check if click is on toggle button
+    // Check if click is on expand button
     if (canvasX >= toggleBounds.x &&
         canvasX <= toggleBounds.x + toggleBounds.size &&
         canvasY >= toggleBounds.y &&
         canvasY <= toggleBounds.y + toggleBounds.size) {
 
-        toggleMinimapVisibility();
+        setMinimapExpanded(true);
         playClick();
         render();
         return true;
@@ -485,15 +485,16 @@ function handleMinimapCloseClick(clientX, clientY) {
 
 /**
  * Check if a click/touch is on the minimap and handle interaction
- * - Compact mode: Touch to expand
- * - Expanded mode: Touch to navigate viewport, or close button to collapse
+ * - Both modes: Touch to navigate viewport
+ * - Compact mode: Expand button to enlarge
+ * - Expanded mode: Close button or click outside to collapse
  * Returns true if click was on minimap (handled), false otherwise
  */
 function handleMinimapClick(clientX, clientY) {
     const expanded = isMinimapExpanded();
 
-    // First check toggle button (compact mode only)
-    if (!expanded && handleMinimapToggleClick(clientX, clientY)) {
+    // First check expand button (compact mode only)
+    if (!expanded && handleMinimapExpandClick(clientX, clientY)) {
         return true;
     }
 
@@ -507,7 +508,7 @@ function handleMinimapClick(clientX, clientY) {
     const canvasY = clientY - rect.top;
 
     const bounds = getMinimapBounds();
-    if (!bounds || bounds.size === 0 || bounds.hidden) return false;
+    if (!bounds || bounds.size === 0) return false;
 
     // Check if click is within minimap bounds (with some padding)
     const padding = 5;
@@ -516,44 +517,33 @@ function handleMinimapClick(clientX, clientY) {
         canvasY >= bounds.y - padding &&
         canvasY <= bounds.y + bounds.size + padding;
 
-    if (expanded) {
-        // In expanded mode: click within minimap navigates, click outside closes
-        if (isWithinMinimap) {
-            // Set minimap as active for visual feedback
-            setMinimapActive(true);
-            setTimeout(() => setMinimapActive(false), 300);
+    if (isWithinMinimap) {
+        // Both modes: click within minimap navigates viewport
+        setMinimapActive(true);
+        setTimeout(() => setMinimapActive(false), 300);
 
-            // Convert minimap click to hex coordinates
-            const relX = canvasX - bounds.centerX;
-            const relY = canvasY - bounds.centerY;
+        // Convert minimap click to hex coordinates
+        const relX = canvasX - bounds.centerX;
+        const relY = canvasY - bounds.centerY;
 
-            // Reverse the hex-to-pixel conversion used in minimap drawing
-            const q = relX / (bounds.hexSize * 1.5);
-            const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
+        // Reverse the hex-to-pixel conversion used in minimap drawing
+        const q = relX / (bounds.hexSize * 1.5);
+        const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
 
-            // Convert to world pixel position
-            const worldX = q * state.hexSize * 1.5;
-            const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
+        // Convert to world pixel position
+        const worldX = q * state.hexSize * 1.5;
+        const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
 
-            // Smooth scroll to position
-            scrollToPosition(-worldX, -worldY);
+        // Smooth scroll to position
+        scrollToPosition(-worldX, -worldY);
 
-            return true;
-        } else {
-            // Click outside expanded minimap - close it
-            setMinimapExpanded(false);
-            playClick();
-            render();
-            return true;
-        }
-    } else {
-        // In compact mode: click on minimap expands it
-        if (isWithinMinimap) {
-            setMinimapExpanded(true);
-            playClick();
-            render();
-            return true;
-        }
+        return true;
+    } else if (expanded) {
+        // Click outside expanded minimap - close it
+        setMinimapExpanded(false);
+        playClick();
+        render();
+        return true;
     }
 
     return false;
