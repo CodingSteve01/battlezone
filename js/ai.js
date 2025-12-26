@@ -728,6 +728,16 @@ function assignTargets(aiUnits, enemies) {
  * Perform all AI actions for current turn
  */
 async function performAIActions() {
+    // SAFETY CHECK: Double-verify this is an AI player's turn
+    // This prevents any race conditions or bugs from allowing AI to control human units
+    if (!isAIPlayer()) {
+        console.warn('AI tried to execute actions for human player - aborting!');
+        hideAIThinking();
+        return;
+    }
+
+    const aiPlayerIndex = state.currentPlayer; // Store for validation during execution
+
     // Check if we're in spectator mode (human watching AI vs AI)
     const spectatorMode = isSpectatorMode();
 
@@ -753,6 +763,12 @@ async function performAIActions() {
 
     for (const unit of sortedUnits) {
         if (!unit.alive) continue;
+
+        // SAFETY: Verify turn hasn't changed and unit belongs to AI
+        if (state.currentPlayer !== aiPlayerIndex || unit.player !== aiPlayerIndex) {
+            console.warn('Turn changed or unit mismatch during AI execution - stopping!');
+            break;
+        }
 
         await performUnitAI(unit, plan);
         await delay(400);
@@ -813,6 +829,12 @@ function sortUnitsForExecution(plan) {
  * Perform AI for a single unit with strategic awareness
  */
 async function performUnitAI(unit, plan) {
+    // CRITICAL SAFETY: Never control units that don't belong to AI
+    if (!isAIPlayer(unit.player)) {
+        console.error(`AI attempted to control human player ${unit.player}'s unit! Blocking action.`);
+        return;
+    }
+
     // In spectator mode, always render as if human is watching
     const spectatorMode = isSpectatorMode();
     const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
