@@ -317,9 +317,10 @@ function assignTargets(aiUnits, enemies) {
  * Perform all AI actions for current turn
  */
 async function performAIActions() {
-    // In single-player, ensure human player's visibility is set for rendering
-    if (state.settings.singlePlayer) {
-        updateVisibilityForPlayer(0);
+    // When AI is playing, ensure human viewer's visibility is set for rendering
+    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
+    if (hasHumanViewer && state.viewingPlayer !== state.currentPlayer) {
+        updateVisibilityForPlayer(state.viewingPlayer);
         render();
     }
 
@@ -372,10 +373,10 @@ function sortUnitsForExecution(plan) {
  * Perform AI for a single unit with strategic awareness
  */
 async function performUnitAI(unit, plan) {
-    const isSinglePlayer = state.settings.singlePlayer;
+    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
 
     const renderIfVisible = () => {
-        if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+        if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
             render();
         }
     };
@@ -396,19 +397,19 @@ async function performUnitAI(unit, plan) {
     // 2. Attack assigned target if possible (focus fire)
     if (assignedTargetId && attackable.some(t => t.id === assignedTargetId)) {
         const target = attackable.find(t => t.id === assignedTargetId);
-        await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
+        await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
     } else if (attackable.length > 0 && state.sharedAP >= 1) {
         // 3. Attack best available target
         const target = selectBestTarget(unit, attackable);
         if (target) {
-            await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
         }
     }
 
     // 4. Use special ability if beneficial
     if (state.sharedAP >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
         useSpecialAbility(unit);
-        if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+        if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
             updateUI();
             render();
         }
@@ -428,22 +429,22 @@ async function performUnitAI(unit, plan) {
     if (attackableAfterMove.length > 0 && state.sharedAP >= 1) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
-            await executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
         }
     }
 }
 
 /**
  * Execute attack with proper rendering
- * In single-player, scroll to the attacked friendly unit so the player can see the action
+ * When a human is viewing, scroll to show the attack action
  */
-async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlayer) {
-    // In single-player, scroll to the target (friendly unit being attacked) before attack
-    if (isSinglePlayer && target.player === 0) {
+async function executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer) {
+    // When there's a human viewer, scroll to show attacks on their units
+    if (hasHumanViewer && target.player === state.viewingPlayer) {
         // Scroll to the friendly unit being attacked
         scrollToUnit(target, 400);
         await delay(450);
-    } else if (isSinglePlayer && isUnitVisibleToViewer(unit)) {
+    } else if (hasHumanViewer && isUnitVisibleToViewer(unit)) {
         // If attacking another enemy but AI is visible, scroll to the action
         scrollToUnit(unit, 300);
         await delay(350);
@@ -463,7 +464,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, isSinglePlay
         });
     }
 
-    if (!isSinglePlayer || isUnitVisibleToViewer(unit)) {
+    if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
         updateUI();
         render();
     }
@@ -1047,13 +1048,13 @@ function scoreSearchPosition(unit, q, r, plan) {
 
 /**
  * Execute AI movement with step-by-step animation
- * In single-player, animate visible movements so player can follow
+ * When a human is viewing, animate visible movements so they can follow
  */
 async function executeAIMove(unit, target) {
     const targetHex = getHex(target.q, target.r);
     if (!targetHex) return;
 
-    const isSinglePlayer = state.settings.singlePlayer;
+    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
     const wasVisible = isUnitVisibleToViewer(unit);
 
     // Get the path from unit's current position to target
@@ -1070,8 +1071,8 @@ async function executeAIMove(unit, target) {
 
         spendSharedAP(target.cost);
         updateVisibility();
-        if (isSinglePlayer) {
-            updateVisibilityForPlayer(0);
+        if (hasHumanViewer) {
+            updateVisibilityForPlayer(state.viewingPlayer);
         }
         render();
         updateUI();
@@ -1082,7 +1083,7 @@ async function executeAIMove(unit, target) {
     const stepDelay = 120; // ms per step (faster than player animation)
 
     // If unit starts visible, scroll to it first
-    if (isSinglePlayer && wasVisible) {
+    if (hasHumanViewer && wasVisible) {
         scrollToUnit(unit, 200);
         await delay(250);
     }
@@ -1100,22 +1101,22 @@ async function executeAIMove(unit, target) {
 
         // Update visibility after each step
         updateVisibility();
-        if (isSinglePlayer) {
-            updateVisibilityForPlayer(0);
+        if (hasHumanViewer) {
+            updateVisibilityForPlayer(state.viewingPlayer);
         }
 
         const isNowVisible = isUnitVisibleToViewer(unit);
 
         // Check if unit just became visible
-        if (isSinglePlayer && isNowVisible && !unitBecameVisible) {
+        if (hasHumanViewer && isNowVisible && !unitBecameVisible) {
             unitBecameVisible = true;
             // Scroll to show the newly visible enemy
             scrollToUnit(unit, 300);
             await delay(350);
         }
 
-        // Only render if unit is visible (or in multiplayer)
-        if (!isSinglePlayer || isNowVisible) {
+        // Only render if unit is visible (or if all players are AI)
+        if (!hasHumanViewer || isNowVisible) {
             render();
             await delay(stepDelay);
         }
@@ -1134,7 +1135,7 @@ async function executeAIMove(unit, target) {
     }
 
     // Final update
-    if (!isSinglePlayer || wasVisible || unitBecameVisible) {
+    if (!hasHumanViewer || wasVisible || unitBecameVisible) {
         updateUI();
         render();
     }

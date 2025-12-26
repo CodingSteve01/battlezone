@@ -11,6 +11,7 @@ import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
+import { isAIPlayer } from './ai.js';
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
@@ -2585,7 +2586,7 @@ export function render() {
     ctx.save();
     ctx.translate(shakeOffset.x, shakeOffset.y);
 
-    const isAiTurnHidden = state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer;
+    const isAiTurnHidden = isAIPlayer() && state.currentPlayer !== state.viewingPlayer;
     const currentUnit = isAiTurnHidden ? null : getCurrentUnit();
     // Always show reachable hexes when a unit is selected (point-and-click system)
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
@@ -2747,7 +2748,9 @@ export function render() {
         }
 
         // Highlight reachable hexes for movement - traffic light color system based on cumulative path cost
-        if (reachableHexes.size > 0 && fogLevel === 'visible') {
+        // Only show colored overlays when a path is being planned (currentPath exists)
+        const isPathPlanning = state.currentPath && state.currentPath.length > 0;
+        if (reachableHexes.size > 0 && fogLevel === 'visible' && isPathPlanning) {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && !hex.unit) {

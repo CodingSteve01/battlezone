@@ -12,6 +12,7 @@ import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getClose
 import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
+import { isAIPlayer } from './ai.js';
 
 let canvas;
 let pendingMoveAnimationId = null;
@@ -586,7 +587,7 @@ export function scrollToPosition(targetCameraX, targetCameraY, duration = 300) {
  * - Click empty hex: Move there
  */
 function handleTapOrClick(clientX, clientY) {
-    if (state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer) {
+    if (isAIPlayer() && state.currentPlayer !== state.viewingPlayer) {
         return;
     }
 
@@ -716,7 +717,7 @@ function handleEnemyClick(unit, hex) {
  */
 function handlePathPreview(clientX, clientY) {
     if (state.gameOver) return;
-    if (state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer) return;
+    if (isAIPlayer() && state.currentPlayer !== state.viewingPlayer) return;
     // Don't show path preview if targeting an enemy
     if (state.targetedUnit) return;
 
