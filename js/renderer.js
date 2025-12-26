@@ -2744,221 +2744,8 @@ export function render() {
         drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit);
     }
 
-    // Draw path preview - clean simple path line with destination marker (point-and-click system)
-    if (state.currentPath && state.currentPath.length >= 2 && currentUnit) {
-        // Use same budget as movement logic: shared AP pool
-        const maxCost = state.sharedAP;
-
-        // Calculate cumulative costs along path
-        let cumulativeCost = 0;
-        const pathWithCosts = state.currentPath.map((point, index) => {
-            if (index > 0) {
-                const hex = getHex(point.q, point.r);
-                if (hex && TERRAIN[hex.type]) {
-                    cumulativeCost += TERRAIN[hex.type].moveCost;
-                }
-            }
-            return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
-        });
-
-        // Find last reachable point this turn
-        let lastReachableIndex = 0;
-        for (let i = 1; i < pathWithCosts.length; i++) {
-            const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
-            if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
-            if (pathWithCosts[i].totalCost <= maxCost) {
-                lastReachableIndex = i;
-            }
-        }
-
-        // Check if this is a multi-turn path
-        const isMultiTurnPath = lastReachableIndex < pathWithCosts.length - 1;
-
-        // Draw the future path (orange, dashed) - for multi-turn movement
-        if (isMultiTurnPath && lastReachableIndex >= 1) {
-            ctx.save();
-            ctx.strokeStyle = 'rgba(251, 146, 60, 0.6)';
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.setLineDash([8, 6]);
-            ctx.beginPath();
-
-            // Start from where reachable path ends
-            const startPoint = pathWithCosts[lastReachableIndex];
-            const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
-            ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
-
-            // Draw to final destination
-            for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
-                const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
-                if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.restore();
-
-            // Draw final destination marker (orange)
-            const finalPoint = pathWithCosts[pathWithCosts.length - 1];
-            const finalPos = hexToPixel(finalPoint.q, finalPoint.r, state.hexSize);
-            const finalSx = state.offsetX + finalPos.x;
-            const finalSy = state.offsetY + finalPos.y;
-
-            ctx.save();
-            ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
-            ctx.beginPath();
-            ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = 'rgba(251, 146, 60, 0.8)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 3]);
-            ctx.beginPath();
-            ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Flag icon for future destination
-            ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🚩', finalSx, finalSy);
-            ctx.restore();
-        }
-
-        // Draw the reachable path line (green, solid)
-        if (lastReachableIndex >= 1) {
-            ctx.save();
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-            ctx.shadowBlur = 3;
-            ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
-            ctx.lineWidth = 5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-
-            for (let i = 0; i <= lastReachableIndex; i++) {
-                const point = pathWithCosts[i];
-                const pos = hexToPixel(point.q, point.r, state.hexSize);
-                const sx = state.offsetX + pos.x;
-                const sy = state.offsetY + pos.y;
-                if (i === 0) ctx.moveTo(sx, sy);
-                else ctx.lineTo(sx, sy);
-            }
-            ctx.stroke();
-            ctx.restore();
-
-            // Destination marker for this turn
-            const endPoint = pathWithCosts[lastReachableIndex];
-            const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
-            const endSx = state.offsetX + endPos.x;
-            const endSy = state.offsetY + endPos.y;
-
-            // Check if pending confirmation
-            const isPending = state.pendingMoveDestination &&
-                state.pendingMoveDestination.q === endPoint.q &&
-                state.pendingMoveDestination.r === endPoint.r;
-
-            if (isPending) {
-                // Pulsing confirmation marker
-                const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
-
-                ctx.fillStyle = `rgba(34, 197, 94, ${0.2 * pulse})`;
-                ctx.beginPath();
-                ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Confirm button
-                const btnSize = state.hexSize * 0.45;
-                ctx.fillStyle = `rgba(22, 163, 74, ${0.85 + 0.15 * pulse})`;
-                ctx.beginPath();
-                ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Checkmark
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 3;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                const s = btnSize * 0.4;
-                ctx.moveTo(endSx - s * 0.5, endSy);
-                ctx.lineTo(endSx - s * 0.1, endSy + s * 0.4);
-                ctx.lineTo(endSx + s * 0.5, endSy - s * 0.4);
-                ctx.stroke();
-
-                // Cost badge - larger and more visible
-                const cost = pathWithCosts[lastReachableIndex].totalCost;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-                ctx.beginPath();
-                ctx.roundRect(endSx - 26, endSy + btnSize + 6, 52, 24, 6);
-                ctx.fill();
-                // Border for visibility
-                ctx.strokeStyle = '#22c55e';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.fillStyle = '#4ade80';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 18);
-
-                // Show multi-turn indicator if applicable
-                if (isMultiTurnPath) {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                    ctx.beginPath();
-                    ctx.roundRect(endSx - 30, endSy - btnSize - 26, 60, 18, 4);
-                    ctx.fill();
-                    ctx.fillStyle = '#fb923c';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.fillText('📍 Mehr...', endSx, endSy - btnSize - 17);
-                }
-            } else {
-                // Simple destination dot
-                ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
-                ctx.beginPath();
-                ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-        }
-    }
-
-    // Draw queued path indicator for selected unit
-    if (currentUnit) {
-        const queuedPath = getQueuedPath(currentUnit.id);
-        if (queuedPath && queuedPath.path && !state.currentPath) {
-            // Draw indicator showing there's a queued destination
-            const targetPos = hexToPixel(queuedPath.targetQ, queuedPath.targetR, state.hexSize);
-            const targetSx = state.offsetX + targetPos.x;
-            const targetSy = state.offsetY + targetPos.y;
-
-            ctx.save();
-            const pulse = 0.6 + Math.sin(Date.now() / 300) * 0.4;
-            ctx.fillStyle = `rgba(251, 146, 60, ${0.2 * pulse})`;
-            ctx.beginPath();
-            ctx.arc(targetSx, targetSy, state.hexSize * 0.5 * pulse, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.strokeStyle = 'rgba(251, 146, 60, 0.7)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 4]);
-            ctx.beginPath();
-            ctx.arc(targetSx, targetSy, state.hexSize * 0.5, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            ctx.font = `${Math.round(state.hexSize * 0.4)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🚩', targetSx, targetSy);
-            ctx.restore();
-        }
-    }
+    // NOTE: Path preview and attack line are now drawn AFTER foreground elements
+    // See drawPathPreviewOnTop() call below for the path overlay rendering
 
     // Draw attack line when targeting an enemy
     if (currentUnit && state.targetedUnit) {
@@ -3119,6 +2906,9 @@ export function render() {
             ctx.fillText(`${cost}`, sx, sy + state.hexSize * 0.48);
         });
     }
+
+    // Draw path preview ON TOP of all foreground elements (trees, units, etc.)
+    drawPathPreviewOnTop(currentUnit);
 
     // Draw scroll hint if map is larger than viewport
     drawScrollHint(w, h);
@@ -3479,4 +3269,225 @@ function drawMinimap(w, h) {
     ctx.fillText('KARTE', x + size / 2, y - 8);
 
     ctx.restore();
+}
+
+// ===== PATH PREVIEW (drawn on top of foreground elements) =====
+
+/**
+ * Draw path preview on top of all foreground elements
+ * This ensures the path line and markers are always visible above trees, units, etc.
+ */
+function drawPathPreviewOnTop(currentUnit) {
+    if (!state.currentPath || state.currentPath.length < 2 || !currentUnit) return;
+
+    // Use same budget as movement logic: shared AP pool
+    const maxCost = state.sharedAP;
+
+    // Calculate cumulative costs along path
+    let cumulativeCost = 0;
+    const pathWithCosts = state.currentPath.map((point, index) => {
+        if (index > 0) {
+            const hex = getHex(point.q, point.r);
+            if (hex && TERRAIN[hex.type]) {
+                cumulativeCost += TERRAIN[hex.type].moveCost;
+            }
+        }
+        return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
+    });
+
+    // Find last reachable point this turn
+    let lastReachableIndex = 0;
+    for (let i = 1; i < pathWithCosts.length; i++) {
+        const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
+        if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
+        if (pathWithCosts[i].totalCost <= maxCost) {
+            lastReachableIndex = i;
+        }
+    }
+
+    // Check if this is a multi-turn path
+    const isMultiTurnPath = lastReachableIndex < pathWithCosts.length - 1;
+
+    // Draw the future path (orange, dashed) - for multi-turn movement
+    if (isMultiTurnPath && lastReachableIndex >= 1) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.6)';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+
+        // Start from where reachable path ends
+        const startPoint = pathWithCosts[lastReachableIndex];
+        const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
+        ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
+
+        // Draw to final destination
+        for (let i = lastReachableIndex + 1; i < pathWithCosts.length; i++) {
+            const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
+            if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
+            const point = pathWithCosts[i];
+            const pos = hexToPixel(point.q, point.r, state.hexSize);
+            ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Draw final destination marker (orange)
+        const finalPoint = pathWithCosts[pathWithCosts.length - 1];
+        const finalPos = hexToPixel(finalPoint.q, finalPoint.r, state.hexSize);
+        const finalSx = state.offsetX + finalPos.x;
+        const finalSy = state.offsetY + finalPos.y;
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
+        ctx.beginPath();
+        ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Flag icon for future destination
+        ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🚩', finalSx, finalSy);
+        ctx.restore();
+    }
+
+    // Draw the reachable path line (green, solid)
+    if (lastReachableIndex >= 1) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 3;
+        ctx.strokeStyle = 'rgba(34, 197, 94, 0.9)';
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+
+        for (let i = 0; i <= lastReachableIndex; i++) {
+            const point = pathWithCosts[i];
+            const pos = hexToPixel(point.q, point.r, state.hexSize);
+            const sx = state.offsetX + pos.x;
+            const sy = state.offsetY + pos.y;
+            if (i === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // Destination marker for this turn
+        const endPoint = pathWithCosts[lastReachableIndex];
+        const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
+        const endSx = state.offsetX + endPos.x;
+        const endSy = state.offsetY + endPos.y;
+
+        // Check if pending confirmation
+        const isPending = state.pendingMoveDestination &&
+            state.pendingMoveDestination.q === endPoint.q &&
+            state.pendingMoveDestination.r === endPoint.r;
+
+        if (isPending) {
+            // Pulsing confirmation marker
+            const pulse = 0.7 + Math.sin(Date.now() / 150) * 0.3;
+
+            ctx.fillStyle = `rgba(34, 197, 94, ${0.2 * pulse})`;
+            ctx.beginPath();
+            ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Confirm button
+            const btnSize = state.hexSize * 0.45;
+            ctx.fillStyle = `rgba(22, 163, 74, ${0.85 + 0.15 * pulse})`;
+            ctx.beginPath();
+            ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Checkmark
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            const s = btnSize * 0.4;
+            ctx.moveTo(endSx - s * 0.5, endSy);
+            ctx.lineTo(endSx - s * 0.1, endSy + s * 0.4);
+            ctx.lineTo(endSx + s * 0.5, endSy - s * 0.4);
+            ctx.stroke();
+
+            // Cost badge - larger and more visible
+            const cost = pathWithCosts[lastReachableIndex].totalCost;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(endSx - 26, endSy + btnSize + 6, 52, 24, 6);
+            ctx.fill();
+            // Border for visibility
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.fillStyle = '#4ade80';
+            ctx.font = 'bold 14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 18);
+
+            // Show multi-turn indicator if applicable
+            if (isMultiTurnPath) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.beginPath();
+                ctx.roundRect(endSx - 30, endSy - btnSize - 26, 60, 18, 4);
+                ctx.fill();
+                ctx.fillStyle = '#fb923c';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.fillText('📍 Mehr...', endSx, endSy - btnSize - 17);
+            }
+        } else {
+            // Simple destination dot
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.9)';
+            ctx.beginPath();
+            ctx.arc(endSx, endSy, 10, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    // Draw queued path indicator for selected unit
+    const queuedPath = getQueuedPath(currentUnit.id);
+    if (queuedPath && queuedPath.path && !state.currentPath) {
+        // Draw indicator showing there's a queued destination
+        const targetPos = hexToPixel(queuedPath.targetQ, queuedPath.targetR, state.hexSize);
+        const targetSx = state.offsetX + targetPos.x;
+        const targetSy = state.offsetY + targetPos.y;
+
+        ctx.save();
+        const pulse = 0.6 + Math.sin(Date.now() / 300) * 0.4;
+        ctx.fillStyle = `rgba(251, 146, 60, ${0.2 * pulse})`;
+        ctx.beginPath();
+        ctx.arc(targetSx, targetSy, state.hexSize * 0.5 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(targetSx, targetSy, state.hexSize * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.font = `${Math.round(state.hexSize * 0.4)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🚩', targetSx, targetSy);
+        ctx.restore();
+    }
 }

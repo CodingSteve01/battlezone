@@ -188,8 +188,8 @@ export const TERRAIN = {
         colorLight: '#6a8a60', // Sunlit reeds
         colorDark: '#4a6a40',  // Shadowed reeds
         walkable: true,
-        cover: true,
-        canHide: true,
+        cover: false,
+        canHide: false,
         moveCost: 2,
         name: 'Schilf',
         animated: true
@@ -231,8 +231,8 @@ export const TERRAIN = {
         colorLight: '#d8c070', // Sunlit wheat
         colorDark: '#b8a050',  // Shadowed wheat
         walkable: true,
-        cover: true,
-        canHide: true,
+        cover: false,
+        canHide: false,
         moveCost: 1,
         name: 'Weizenfeld',
         animated: true
@@ -262,8 +262,8 @@ export const TERRAIN = {
         colorLight: '#8a8580', // Lichen-covered stone
         colorDark: '#6a6560',  // Shadowed ruins
         walkable: true,
-        cover: true,
-        canHide: true,
+        cover: false,
+        canHide: false,
         moveCost: 2,
         name: 'Ruinen'
     },
@@ -283,8 +283,8 @@ export const TERRAIN = {
         colorLight: '#6a9a65', // Sun-touched grass
         colorDark: '#4a7a45',  // Shaded grass
         walkable: true,
-        cover: true,
-        canHide: true,
+        cover: false,
+        canHide: false,
         moveCost: 1,
         name: 'Hohes Gras',
         animated: true
