@@ -3,7 +3,7 @@ import { CONFIG, TERRAIN, UNIT_CLASSES } from '../js/config.js';
 
 describe('CONFIG', () => {
     it('should have valid player colors', () => {
-        expect(CONFIG.PLAYER_COLORS).toHaveLength(4);
+        expect(CONFIG.PLAYER_COLORS).toHaveLength(8);
         CONFIG.PLAYER_COLORS.forEach(color => {
             expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
         });
