@@ -2930,6 +2930,9 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 export function render() {
     if (!canvas || !ctx) return;
 
+    // Skip rendering if canvas has invalid dimensions (not yet sized)
+    if (canvas.width === 0 || canvas.height === 0) return;
+
     // Update animations
     animationTick(performance.now());
 

@@ -368,11 +368,16 @@ function startGameWithTeams() {
     // Show game area
     showScreen(null);
 
-    // Initialize canvas
-    resizeCanvas();
+    // Use requestAnimationFrame to ensure the browser has updated the layout
+    // before sizing the canvas. This is critical for AI vs AI games where
+    // everything happens synchronously without user interaction.
+    requestAnimationFrame(() => {
+        // Initialize canvas
+        resizeCanvas();
 
-    // Start first turn
-    startTurn();
+        // Start first turn
+        startTurn();
+    });
 }
 
 /**
