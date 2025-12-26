@@ -11,7 +11,7 @@ import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
-import { scrollToUnit } from './input.js';
+import { scrollToUnit, scrollToUnitWithZoom } from './input.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -741,6 +741,9 @@ async function performAIActions() {
     // Check if we're in spectator mode (human watching AI vs AI)
     const spectatorMode = isSpectatorMode();
 
+    // Spectator mode: slow down AI to human-like speed so viewer can follow
+    const unitDelay = spectatorMode ? 800 : 400;
+
     // When AI is playing, ensure correct visibility for rendering
     if (spectatorMode) {
         // In spectator mode, view from current AI's perspective
@@ -761,6 +764,12 @@ async function performAIActions() {
     // Sort units by role priority for this turn
     const sortedUnits = sortUnitsForExecution(plan);
 
+    // In spectator mode, hide the thinking overlay once AI starts executing
+    // so the viewer can watch the action without obstruction
+    if (spectatorMode) {
+        hideAIThinking();
+    }
+
     for (const unit of sortedUnits) {
         if (!unit.alive) continue;
 
@@ -770,15 +779,22 @@ async function performAIActions() {
             break;
         }
 
-        await performUnitAI(unit, plan);
-        await delay(400);
+        // In spectator mode, use cinematic zoom scroll to follow the action
+        if (spectatorMode) {
+            // Dynamic zoom: zoom in for a close-up view of the unit
+            await scrollToUnitWithZoom(unit, 500, 1.3);
+            await delay(300);
+        }
+
+        await performUnitAI(unit, plan, spectatorMode);
+        await delay(unitDelay);
     }
 
     hideAIThinking();
 
     setTimeout(() => {
         endTurn();
-    }, 500);
+    }, spectatorMode ? 800 : 500);
 }
 
 /**
@@ -827,8 +843,11 @@ function sortUnitsForExecution(plan) {
 
 /**
  * Perform AI for a single unit with strategic awareness
+ * @param {Object} unit - The unit to control
+ * @param {Object} plan - Strategic plan from analyzeAndPlan
+ * @param {boolean} spectatorMode - Whether in spectator mode (slower pacing)
  */
-async function performUnitAI(unit, plan) {
+async function performUnitAI(unit, plan, spectatorMode = false) {
     // CRITICAL SAFETY: Never control units that don't belong to AI
     if (!isAIPlayer(unit.player)) {
         console.error(`AI attempted to control human player ${unit.player}'s unit! Blocking action.`);
@@ -836,8 +855,11 @@ async function performUnitAI(unit, plan) {
     }
 
     // In spectator mode, always render as if human is watching
-    const spectatorMode = isSpectatorMode();
     const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
+
+    // Delay multiplier for spectator mode - makes AI human-speed watchable
+    const actionDelayBase = spectatorMode ? 600 : 300;
+    const shortDelay = spectatorMode ? 400 : 100;
 
     const renderIfVisible = () => {
         // In spectator mode, always render (human is watching)
@@ -853,12 +875,12 @@ async function performUnitAI(unit, plan) {
 
     // === DECOY STRATEGY EXECUTION ===
     if (plan.decoyActive && isDecoyUnit(unit)) {
-        await executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer);
+        await executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode);
         return;
     }
 
     if (plan.decoyActive && isAmbushUnit(unit)) {
-        await executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer);
+        await executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode);
         return;
     }
 
@@ -866,19 +888,19 @@ async function performUnitAI(unit, plan) {
 
     // 1. Should we retreat? (Low HP, enemies nearby)
     if (shouldRetreat(unit, enemies)) {
-        await executeRetreat(unit, enemies);
+        await executeRetreat(unit, enemies, spectatorMode);
         return;
     }
 
     // 2. Attack assigned target if possible (focus fire)
     if (assignedTargetId && attackable.some(t => t.id === assignedTargetId)) {
         const target = attackable.find(t => t.id === assignedTargetId);
-        await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+        await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
     } else if (attackable.length > 0 && state.sharedAP >= 1) {
         // 3. Attack best available target
         const target = selectBestTarget(unit, attackable);
         if (target) {
-            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
 
@@ -900,14 +922,14 @@ async function performUnitAI(unit, plan) {
             updateUI();
             render();
         }
-        await delay(isUnitVisibleToViewer(unit) ? 400 : 100);
+        await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
     }
 
     // 5. Move strategically
     if (state.sharedAP >= 1) {
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
-            await executeAIMove(unit, moveTarget);
+            await executeAIMove(unit, moveTarget, spectatorMode);
         }
     }
 
@@ -916,7 +938,7 @@ async function performUnitAI(unit, plan) {
     if (attackableAfterMove.length > 0 && state.sharedAP >= 1) {
         const target = selectBestTarget(unit, attackableAfterMove);
         if (target) {
-            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
 }
@@ -924,14 +946,15 @@ async function performUnitAI(unit, plan) {
 /**
  * Execute decoy unit behavior - lure enemies while staying alive
  */
-async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer) {
+async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const actionDelay = spectatorMode ? 500 : 300;
 
     // Decoy prioritizes survival - retreat if too damaged
     if (unit.currentHp < unit.maxHp * 0.4) {
         addAIThought(`${unitName} (Köder): Rückzug - zu viel Schaden!`, 'retreat');
-        await executeRetreat(unit, enemies);
+        await executeRetreat(unit, enemies, spectatorMode);
         return;
     }
 
@@ -940,7 +963,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer)
         addAIThought(`${unitName} lockt Feinde an...`, 'move');
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
-            await executeAIMove(unit, moveTarget);
+            await executeAIMove(unit, moveTarget, spectatorMode);
         }
     }
 
@@ -951,7 +974,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer)
         const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
         if (killableTarget) {
             addAIThought(`${unitName}: Gelegenheitsziel!`, 'attack');
-            await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer);
+            await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
 
@@ -968,7 +991,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer)
                 addAIThought(`${unitName}: Sprint vorbereitet für Flucht!`, 'special');
                 useSpecialAbility(unit);
                 renderIfVisible();
-                await delay(300);
+                await delay(actionDelay);
             }
         }
     }
@@ -977,10 +1000,11 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer)
 /**
  * Execute ambush unit behavior - wait in cover, strike hard when enemies engage
  */
-async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer) {
+async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const attackable = getAttackableUnits(unit);
+    const actionDelay = spectatorMode ? 500 : 300;
 
     // 1. Use stealth abilities if available (sniper cloak, commando stealth)
     if (state.sharedAP >= 2 && !unit.usedSpecial) {
@@ -988,7 +1012,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
             addAIThought(`${unitName}: Tarnung für Hinterhalt!`, 'special');
             useSpecialAbility(unit);
             renderIfVisible();
-            await delay(300);
+            await delay(actionDelay);
         }
     }
 
@@ -997,7 +1021,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         addAIThought(`${unitName} positioniert sich für Hinterhalt...`, 'move');
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
-            await executeAIMove(unit, moveTarget);
+            await executeAIMove(unit, moveTarget, spectatorMode);
         }
     }
 
@@ -1008,7 +1032,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         const target = selectBestTarget(unit, attackableNow);
         if (target) {
             addAIThought(`${unitName}: Hinterhalt! Angriff auf ${CLASS_NAMES_DE[target.class]}!`, 'attack');
-            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
 
@@ -1021,14 +1045,14 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
             addAIThought(`${unitName}: Powershot! 💥`, 'special');
             useSpecialAbility(unit);
             renderIfVisible();
-            await delay(300);
+            await delay(actionDelay);
 
             // Attack with powershot bonus
             const targetAfterPowershot = getAttackableUnits(unit);
             if (targetAfterPowershot.length > 0 && state.sharedAP >= 1) {
                 const target = selectBestTarget(unit, targetAfterPowershot);
                 if (target) {
-                    await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+                    await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 }
             }
         }
@@ -1039,7 +1063,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
     if (finalAttackable.length > 0 && state.sharedAP >= 1) {
         const target = selectBestTarget(unit, finalAttackable);
         if (target) {
-            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
 }
@@ -1057,11 +1081,17 @@ const CLASS_NAMES_DE = {
  * Execute attack with proper rendering
  * When a human is viewing, scroll to show the attack action
  */
-async function executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer) {
+async function executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     // Generate attack thought for spectator mode
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const targetName = CLASS_NAMES_DE[target.class] || target.class;
     const canKill = target.currentHp <= unit.damage;
+
+    // Delay multipliers for spectator mode
+    const scrollDelay = spectatorMode ? 600 : 400;
+    const targetingDelay = spectatorMode ? 500 : 300;
+    const afterAttackDelay = spectatorMode ? 700 : 500;
+    const shortDelay = spectatorMode ? 250 : 100;
 
     if (canKill) {
         addAIThought(`${unitName} führt Todesstoß gegen ${targetName} aus!`, 'attack');
@@ -1070,20 +1100,20 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         addAIThought(`${unitName} greift ${targetName} an (${hpPercent}% HP)`, 'attack');
     }
 
-    // When there's a human viewer, scroll to show attacks on their units
-    if (hasHumanViewer && target.player === state.viewingPlayer) {
-        // Scroll to the friendly unit being attacked
-        scrollToUnit(target, 400);
-        await delay(450);
-    } else if (hasHumanViewer && isUnitVisibleToViewer(unit)) {
-        // If attacking another enemy but AI is visible, scroll to the action
-        scrollToUnit(unit, 300);
-        await delay(350);
+    // In spectator mode, use cinematic zoom to show the attack action
+    if (spectatorMode) {
+        // Zoom in closer for combat (1.4x for dramatic effect)
+        await scrollToUnitWithZoom(target, scrollDelay, 1.4);
+        await delay(200);
+    } else if (hasHumanViewer) {
+        // Normal scroll for human player watching AI
+        scrollToUnit(target, scrollDelay);
+        await delay(scrollDelay + 100);
     }
 
     state.targetedUnit = target;
     renderIfVisible();
-    await delay(isUnitVisibleToViewer(unit) ? 300 : 100);
+    await delay(isUnitVisibleToViewer(unit) ? targetingDelay : shortDelay);
     executeAttack(unit, target);
     state.targetedUnit = null;
 
@@ -1100,7 +1130,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         updateUI();
         render();
     }
-    await delay(isUnitVisibleToViewer(unit) ? 500 : 100);
+    await delay(isUnitVisibleToViewer(unit) ? afterAttackDelay : shortDelay);
 }
 
 // ===== TACTICAL DECISIONS =====
@@ -1140,7 +1170,7 @@ function shouldRetreat(unit, enemies) {
 /**
  * Execute retreat - move away from enemies
  */
-async function executeRetreat(unit, enemies) {
+async function executeRetreat(unit, enemies, spectatorMode = false) {
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
     addAIThought(`${unitName} zieht sich zurück (${hpPercent}% HP)`, 'retreat');
@@ -1192,7 +1222,7 @@ async function executeRetreat(unit, enemies) {
     });
 
     if (bestHex) {
-        await executeAIMove(unit, bestHex);
+        await executeAIMove(unit, bestHex, spectatorMode);
     }
 }
 
@@ -1696,12 +1726,15 @@ function scoreSearchPosition(unit, q, r, plan) {
 /**
  * Execute AI movement with step-by-step animation
  * When a human is viewing, animate visible movements so they can follow
+ * @param {Object} unit - The unit to move
+ * @param {Object} target - Target hex with q, r, cost
+ * @param {boolean} spectatorMode - Whether in spectator mode (slower pacing)
  */
-async function executeAIMove(unit, target) {
+async function executeAIMove(unit, target, spectatorMode = false) {
     const targetHex = getHex(target.q, target.r);
     if (!targetHex) return;
 
-    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
+    const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
     const wasVisible = isUnitVisibleToViewer(unit);
 
     // Get the path from unit's current position to target
@@ -1727,12 +1760,17 @@ async function executeAIMove(unit, target) {
     }
 
     const path = pathResult.path;
-    const stepDelay = 120; // ms per step (faster than player animation)
+    // Spectator mode: slower step delay so viewer can follow the movement
+    const stepDelay = spectatorMode ? 200 : 120;
+    const scrollDuration = spectatorMode ? 400 : 200;
 
-    // If unit starts visible, scroll to it first
-    if (hasHumanViewer && wasVisible) {
-        scrollToUnit(unit, 200);
-        await delay(250);
+    // If unit starts visible or in spectator mode, scroll to it first
+    if (spectatorMode) {
+        // Use cinematic zoom scroll for spectator mode (zoom out slightly to see more of path)
+        await scrollToUnitWithZoom(unit, scrollDuration, 1.1);
+    } else if (hasHumanViewer && wasVisible) {
+        scrollToUnit(unit, scrollDuration);
+        await delay(scrollDuration + 100);
     }
 
     // Animate step by step
@@ -1758,12 +1796,16 @@ async function executeAIMove(unit, target) {
         if (hasHumanViewer && isNowVisible && !unitBecameVisible) {
             unitBecameVisible = true;
             // Scroll to show the newly visible enemy
-            scrollToUnit(unit, 300);
-            await delay(350);
+            if (spectatorMode) {
+                await scrollToUnitWithZoom(unit, 400, 1.2);
+            } else {
+                scrollToUnit(unit, 300);
+                await delay(350);
+            }
         }
 
-        // Only render if unit is visible (or if all players are AI)
-        if (!hasHumanViewer || isNowVisible) {
+        // In spectator mode or when unit is visible, render each step
+        if (spectatorMode || !hasHumanViewer || isNowVisible) {
             render();
             await delay(stepDelay);
         }
@@ -1782,7 +1824,7 @@ async function executeAIMove(unit, target) {
     }
 
     // Final update
-    if (!hasHumanViewer || wasVisible || unitBecameVisible) {
+    if (spectatorMode || !hasHumanViewer || wasVisible || unitBecameVisible) {
         updateUI();
         render();
     }

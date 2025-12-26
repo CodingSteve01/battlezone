@@ -3037,12 +3037,10 @@ export function render() {
                 fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
             }
 
-            // Only show grid lines when in movement/attack mode
-            const strokeColor = showGrid ?
-                (fogLevel === 'visible' ? 'rgba(255,255,255,0.12)' :
-                (fogLevel === 'explored' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.3)')) : null;
+            // No grid lines on base hex - grid overlay is drawn separately only for relevant hexes
+            // This matches cached tile behavior for seamless terrain
             const terrainData = fogLevel === 'visible' ? terrain : null;
-            drawHex(sx, sy, state.hexSize, fillColor, strokeColor, 1, texture, terrainData);
+            drawHex(sx, sy, state.hexSize, fillColor, null, 1, texture, terrainData);
 
             // Draw terrain details for visible hexes (same as cached tiles)
             if (fogLevel === 'visible' && shouldRenderDetails()) {
