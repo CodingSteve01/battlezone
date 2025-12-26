@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.6.0...shadow-squad-v3.7.0) (2025-12-26)
+
+
+### Features
+
+* **combat:** add skill-based attack minigames for each unit class ([#117](https://github.com/CodingSteve01/battlezone/issues/117)) ([7c5c32c](https://github.com/CodingSteve01/battlezone/commit/7c5c32cc07ba2bbd8ea03e137298d75adc2c46a8))
+
 ## [3.6.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.5.0...shadow-squad-v3.6.0) (2025-12-26)
 
 
