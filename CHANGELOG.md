@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.1.0...shadow-squad-v3.1.1) (2025-12-26)
+
+
+### Bug Fixes
+
+* **tests:** update player colors test to expect 8 colors ([#99](https://github.com/CodingSteve01/battlezone/issues/99)) ([3b00f82](https://github.com/CodingSteve01/battlezone/commit/3b00f8279eaa4a47b429668c90e72e05e18a5c99))
+
 ## [3.1.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.0.3...shadow-squad-v3.1.0) (2025-12-25)
 
 
