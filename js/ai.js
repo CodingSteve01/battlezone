@@ -13,6 +13,118 @@ import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
 import { scrollToUnit } from './input.js';
 
+// ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
+// Stores and displays AI decision explanations
+
+const aiThoughts = {
+    current: null,          // Current thought being displayed
+    queue: [],              // Queue of thoughts to display
+    enabled: false,         // Only enabled in spectator mode (all AI players)
+    displayTime: 2000,      // How long each thought is displayed (ms)
+};
+
+/**
+ * Check if spectator mode is active
+ * Active when:
+ * 1. All players were AI from the start, OR
+ * 2. All human players have been eliminated (no units left)
+ */
+export function isSpectatorMode() {
+    if (state.settings.players <= 0) return false;
+
+    // Check each player
+    for (let p = 0; p < state.settings.players; p++) {
+        if (!isAIPlayer(p)) {
+            // This is a human player - check if they still have units
+            const humanUnits = getPlayerUnits(p).filter(u => u.alive);
+            if (humanUnits.length > 0) {
+                // At least one human player still has units - not spectator mode
+                return false;
+            }
+        }
+    }
+
+    // Either all players are AI, or all human players have been eliminated
+    return true;
+}
+
+/**
+ * Add an AI thought to be displayed
+ */
+function addAIThought(thought, category = 'general') {
+    if (!isSpectatorMode()) return;
+
+    const thoughtObj = {
+        text: thought,
+        category: category,  // 'strategy', 'attack', 'move', 'special', 'retreat'
+        timestamp: Date.now()
+    };
+
+    aiThoughts.queue.push(thoughtObj);
+    showNextThought();
+}
+
+/**
+ * Show the next thought in queue
+ */
+function showNextThought() {
+    if (aiThoughts.current || aiThoughts.queue.length === 0) return;
+
+    aiThoughts.current = aiThoughts.queue.shift();
+    displayThought(aiThoughts.current);
+
+    setTimeout(() => {
+        aiThoughts.current = null;
+        showNextThought();
+    }, aiThoughts.displayTime);
+}
+
+/**
+ * Display a thought in the UI
+ */
+function displayThought(thought) {
+    const existing = document.querySelector('.ai-thought-bubble');
+    if (existing) existing.remove();
+
+    const categoryIcons = {
+        strategy: '🎯',
+        attack: '⚔️',
+        move: '🚶',
+        special: '✨',
+        retreat: '🛡️',
+        general: '💭'
+    };
+
+    const bubble = document.createElement('div');
+    bubble.className = 'ai-thought-bubble';
+    bubble.innerHTML = `
+        <span class="thought-icon">${categoryIcons[thought.category] || '💭'}</span>
+        <span class="thought-text">${thought.text}</span>
+    `;
+    document.body.appendChild(bubble);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        bubble.classList.add('visible');
+    });
+
+    // Animate out before removal
+    setTimeout(() => {
+        bubble.classList.remove('visible');
+        setTimeout(() => bubble.remove(), 300);
+    }, aiThoughts.displayTime - 300);
+}
+
+/**
+ * Clear all pending thoughts
+ */
+function clearAIThoughts() {
+    aiThoughts.queue = [];
+    aiThoughts.current = null;
+    const existing = document.querySelector('.ai-thought-bubble');
+    if (existing) existing.remove();
+}
+
 // ===== AI MEMORY SYSTEM =====
 // Stores information about enemy positions, even when not visible
 
@@ -85,9 +197,16 @@ function showAIThinking() {
     const existing = document.querySelector('.ai-thinking');
     if (existing) existing.remove();
 
+    const playerNum = state.currentPlayer + 1;
+    const spectator = isSpectatorMode();
+
     const overlay = document.createElement('div');
-    overlay.className = 'ai-thinking';
-    overlay.innerHTML = `
+    overlay.className = 'ai-thinking' + (spectator ? ' spectator-mode' : '');
+    overlay.innerHTML = spectator ? `
+        <div class="ai-icon">🎬</div>
+        <div class="ai-text">Spieler ${playerNum} (KI) analysiert...</div>
+        <div class="ai-subtext">Beobachter-Modus aktiv</div>
+    ` : `
         <div class="ai-icon">🤖</div>
         <div class="ai-text">KI plant Strategie...</div>
     `;
@@ -120,18 +239,33 @@ function analyzeAndPlan() {
     // Estimate player position if no enemies visible
     if (visibleEnemies.length === 0) {
         estimatePlayerPosition();
+        addAIThought('Keine Feinde in Sicht. Suche nach Zielen...', 'strategy');
     } else {
         aiMemory.lastContactRound = state.round;
         aiMemory.huntMode = false;
+        const threatLevel = visibleEnemies.length > 2 ? 'hohe' : 'moderate';
+        addAIThought(`${visibleEnemies.length} Feinde erkannt! Bewerte ${threatLevel} Bedrohung.`, 'strategy');
     }
 
     // Enter hunt mode if we haven't seen enemies for a while
     if (state.round - aiMemory.lastContactRound >= 2) {
         aiMemory.huntMode = true;
+        addAIThought('Aktiviere Jagdmodus - Feinde werden gesucht!', 'strategy');
     }
 
     // Decide search pattern based on situation
     decideSearchPattern(aiUnits, visibleEnemies);
+
+    // Generate thought based on search pattern
+    const patternNames = {
+        'engage': 'Angriff - Feinde im Visier',
+        'expand': 'Expansion - Gebiet erkunden',
+        'sweep': 'Durchkämmen - Koordinierter Vormarsch',
+        'pincer': 'Zangenbewegung - Einkreisung'
+    };
+    if (aiMemory.searchPattern && patternNames[aiMemory.searchPattern]) {
+        addAIThought(`Strategie: ${patternNames[aiMemory.searchPattern]}`, 'strategy');
+    }
 
     // Assign targets for focus fire
     assignTargets(aiUnits, visibleEnemies);
@@ -317,11 +451,21 @@ function assignTargets(aiUnits, enemies) {
  * Perform all AI actions for current turn
  */
 async function performAIActions() {
-    // When AI is playing, ensure human viewer's visibility is set for rendering
-    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
-    if (hasHumanViewer && state.viewingPlayer !== state.currentPlayer) {
-        updateVisibilityForPlayer(state.viewingPlayer);
+    // Check if we're in spectator mode (human watching AI vs AI)
+    const spectatorMode = isSpectatorMode();
+
+    // When AI is playing, ensure correct visibility for rendering
+    if (spectatorMode) {
+        // In spectator mode, view from current AI's perspective
+        updateVisibilityForPlayer(state.currentPlayer);
         render();
+    } else {
+        // Normal mode: human viewer's visibility
+        const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
+        if (hasHumanViewer && state.viewingPlayer !== state.currentPlayer) {
+            updateVisibilityForPlayer(state.viewingPlayer);
+            render();
+        }
     }
 
     // Strategic analysis and planning
@@ -373,10 +517,13 @@ function sortUnitsForExecution(plan) {
  * Perform AI for a single unit with strategic awareness
  */
 async function performUnitAI(unit, plan) {
-    const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
+    // In spectator mode, always render as if human is watching
+    const spectatorMode = isSpectatorMode();
+    const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
 
     const renderIfVisible = () => {
-        if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+        // In spectator mode, always render (human is watching)
+        if (spectatorMode || !hasHumanViewer || isUnitVisibleToViewer(unit)) {
             render();
         }
     };
@@ -408,6 +555,17 @@ async function performUnitAI(unit, plan) {
 
     // 4. Use special ability if beneficial
     if (state.sharedAP >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
+        // Generate special ability thought
+        const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+        const specialNames = {
+            scout: 'Sprint aktiviert! 🏃',
+            assault: 'Powershot vorbereitet! 💥',
+            medic: 'Heilung eingeleitet! 💚',
+            sniper: 'Tarnung aktiviert! 🫥',
+            commando: 'Stealth-Modus! 🥷'
+        };
+        addAIThought(`${unitName}: ${specialNames[unit.class] || 'Spezialfähigkeit!'}`, 'special');
+
         useSpecialAbility(unit);
         if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
             updateUI();
@@ -434,11 +592,32 @@ async function performUnitAI(unit, plan) {
     }
 }
 
+// German class names for display
+const CLASS_NAMES_DE = {
+    scout: 'Späher',
+    assault: 'Sturmsoldat',
+    medic: 'Sanitäter',
+    sniper: 'Scharfschütze',
+    commando: 'Kommando'
+};
+
 /**
  * Execute attack with proper rendering
  * When a human is viewing, scroll to show the attack action
  */
 async function executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer) {
+    // Generate attack thought for spectator mode
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const targetName = CLASS_NAMES_DE[target.class] || target.class;
+    const canKill = target.currentHp <= unit.damage;
+
+    if (canKill) {
+        addAIThought(`${unitName} führt Todesstoß gegen ${targetName} aus!`, 'attack');
+    } else {
+        const hpPercent = Math.round(target.currentHp / target.maxHp * 100);
+        addAIThought(`${unitName} greift ${targetName} an (${hpPercent}% HP)`, 'attack');
+    }
+
     // When there's a human viewer, scroll to show attacks on their units
     if (hasHumanViewer && target.player === state.viewingPlayer) {
         // Scroll to the friendly unit being attacked
@@ -458,6 +637,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
 
     // Update memory if enemy killed
     if (!target.alive) {
+        addAIThought(`${targetName} eliminiert! ✓`, 'attack');
         aiMemory.lastKnownPositions.delete(target.id);
         aiMemory.assignedTargets.forEach((tid, uid) => {
             if (tid === target.id) aiMemory.assignedTargets.delete(uid);
@@ -509,6 +689,10 @@ function shouldRetreat(unit, enemies) {
  * Execute retreat - move away from enemies
  */
 async function executeRetreat(unit, enemies) {
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
+    addAIThought(`${unitName} zieht sich zurück (${hpPercent}% HP)`, 'retreat');
+
     const reachable = getReachableHexes(unit);
     if (reachable.size === 0) return;
 
