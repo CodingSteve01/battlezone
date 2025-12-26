@@ -1,8 +1,8 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, markCombat } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, markCombat, triggerScreenShake } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
-import { hexDistance, hexToPixel, hexLine, getNeighbors } from './hexMath.js';
+import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
@@ -431,8 +431,15 @@ export function executeAttack(attacker, defender) {
     const dy = defenderPos.y - attackerPos.y;
     const attackDirection = Math.atan2(dy, dx);
 
-    // Muzzle flash at attacker position
-    particles.muzzleFlash(attackerPos.x, attackerPos.y - 10, attackDirection);
+    // Enhanced muzzle flash at attacker position
+    particles.enhancedMuzzleFlash(attackerPos.x, attackerPos.y - 10, attackDirection, attacker.class);
+
+    // Trigger projectile animation (visual tracer from attacker to defender)
+    particles.projectileAttack(
+        attackerPos.x, attackerPos.y - 10,
+        defenderPos.x, defenderPos.y - 10,
+        attacker.class, false, null
+    );
 
     // Check for event-based miss (storm)
     if (hit && checkEventMiss(dist)) {
@@ -551,14 +558,18 @@ export function executeAttack(attacker, defender) {
     if (crit.isCrit) {
         playCriticalHit();
         showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
+        // Strong screen shake for critical hits
+        triggerScreenShake(12, 300);
     } else {
         playHit();
         showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
+        // Normal screen shake for hits
+        triggerScreenShake(6, 150);
     }
 
-    // Hit particle effects at defender position
+    // Enhanced hit particle effects at defender position
     // Direction is from attacker to defender (impact direction)
-    particles.hitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection);
+    particles.enhancedHitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection, attacker.class);
 
     // Check for kill
     if (defender.currentHp <= 0) {

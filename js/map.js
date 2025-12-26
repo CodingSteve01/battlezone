@@ -871,7 +871,7 @@ function validateAndFixMap(radius) {
  * Eliminate isolated pools - areas that have no path to the map center
  * This prevents units from being trapped when the shrinking zone pushes inward
  */
-function eliminateIsolatedPools(_radius) {
+function eliminateIsolatedPools(radius) {
     // Flood fill from center to find all hexes reachable from center
     const reachableFromCenter = new Set();
     const centerHex = getHex(0, 0);

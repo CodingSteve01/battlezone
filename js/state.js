@@ -107,7 +107,17 @@ export const state = {
 
     // Canvas dimensions
     canvasWidth: 0,
-    canvasHeight: 0
+    canvasHeight: 0,
+
+    // Screen shake effect
+    screenShake: {
+        active: false,
+        intensity: 0,
+        duration: 0,
+        startTime: 0,
+        offsetX: 0,
+        offsetY: 0
+    }
 };
 
 /**
@@ -172,6 +182,16 @@ export function resetState() {
     state.lastCombatRound = 0;
     state.zonePhase = 0;
     state.revealCooldown = 0;
+
+    // Screen shake zurücksetzen
+    state.screenShake = {
+        active: false,
+        intensity: 0,
+        duration: 0,
+        startTime: 0,
+        offsetX: 0,
+        offsetY: 0
+    };
 
     // Initialize per-player explored hexes and visible hexes
     state.playerExploredHexes = [];
@@ -252,11 +272,12 @@ export function getPlayerUnits(player) {
 
 /**
  * Initialize the shared AP pool for a player's turn
- * Pool = sum of all living units' AP_PER_TURN
+ * Pool is constant (UNITS_PER_PLAYER × AP_PER_TURN) regardless of surviving units
+ * This prevents the losing player from being at a severe disadvantage
  */
-export function initSharedAPPool(player) {
-    const units = getPlayerUnits(player);
-    const poolSize = units.length * CONFIG.AP_PER_TURN;
+export function initSharedAPPool(_player) {
+    // Constant pool: always based on starting unit count, not current
+    const poolSize = CONFIG.UNITS_PER_PLAYER * CONFIG.AP_PER_TURN;
     state.sharedAP = poolSize;
     state.maxSharedAP = poolSize;
     state.unitAttacksThisTurn = {};  // Reset attack tracking
@@ -416,6 +437,56 @@ export function isHexInZone(q, r) {
  */
 export function markCombat() {
     state.lastCombatRound = state.round;
+}
+
+/**
+ * Trigger screen shake effect
+ * @param {number} intensity - Shake intensity in pixels (default 8)
+ * @param {number} duration - Duration in milliseconds (default 200)
+ */
+export function triggerScreenShake(intensity = 8, duration = 200) {
+    state.screenShake = {
+        active: true,
+        intensity,
+        duration,
+        startTime: performance.now(),
+        offsetX: 0,
+        offsetY: 0
+    };
+}
+
+/**
+ * Update screen shake effect (call each frame)
+ * Returns current shake offset
+ */
+export function updateScreenShake() {
+    if (!state.screenShake.active) {
+        return { x: 0, y: 0 };
+    }
+
+    const elapsed = performance.now() - state.screenShake.startTime;
+
+    if (elapsed >= state.screenShake.duration) {
+        // Shake finished
+        state.screenShake.active = false;
+        state.screenShake.offsetX = 0;
+        state.screenShake.offsetY = 0;
+        return { x: 0, y: 0 };
+    }
+
+    // Calculate decay (shake gets weaker over time)
+    const progress = elapsed / state.screenShake.duration;
+    const decay = 1 - progress;
+    const currentIntensity = state.screenShake.intensity * decay;
+
+    // Random shake offset with decay
+    state.screenShake.offsetX = (Math.random() - 0.5) * 2 * currentIntensity;
+    state.screenShake.offsetY = (Math.random() - 0.5) * 2 * currentIntensity;
+
+    return {
+        x: state.screenShake.offsetX,
+        y: state.screenShake.offsetY
+    };
 }
 
 /**

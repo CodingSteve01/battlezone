@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake } from './state.js';
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -2544,6 +2544,13 @@ export function render() {
         }
     }
 
+    // Update screen shake and get current offset
+    const shakeOffset = updateScreenShake();
+
+    // Apply screen shake via canvas transform (affects all rendering)
+    ctx.save();
+    ctx.translate(shakeOffset.x, shakeOffset.y);
+
     const isAiTurnHidden = state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer;
     const currentUnit = isAiTurnHidden ? null : getCurrentUnit();
     // Always show reachable hexes when a unit is selected (point-and-click system)
@@ -2941,6 +2948,9 @@ export function render() {
             }
         }
     }
+
+    // Restore canvas state (removes screen shake transform)
+    ctx.restore();
 
     if (shouldAnimate()) {
         ensureAnimationLoop();
