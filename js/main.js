@@ -26,14 +26,12 @@ let currentPlayerSelection = [];
 function startTeamSelection() {
     // Initialize team selections array
     state.teamSelections = [];
-    const numHumanPlayers = state.settings.singlePlayer ? 1 : state.settings.players;
 
     for (let i = 0; i < state.settings.players; i++) {
         state.teamSelections.push([]);
     }
 
-    // AI teams are now auto-generated in showTeamSelectForPlayer when skipping AI players
-
+    // AI teams are auto-generated in showTeamSelectForPlayer when skipping AI players
     currentTeamSelectPlayer = 0;
     showTeamSelectForPlayer(0);
 }
@@ -100,9 +98,7 @@ function showTeamSelectForPlayer(playerIndex) {
         playerNum.textContent = playerIndex + 1;
     }
     if (hint) {
-        hint.textContent = state.settings.singlePlayer
-            ? 'Wähle dein Team (3 Einheiten)'
-            : `Spieler ${playerIndex + 1}: Wähle dein Team`;
+        hint.textContent = `Spieler ${playerIndex + 1}: Wähle dein Team`;
     }
 
     // Generate unit cards
@@ -248,13 +244,13 @@ function confirmTeamSelection() {
     state.teamSelections[currentTeamSelectPlayer] = [...currentPlayerSelection];
 
     // Move to next player or start game
+    // showTeamSelectForPlayer automatically skips AI players
     const nextPlayer = currentTeamSelectPlayer + 1;
-    const isNextAI = state.settings.singlePlayer && nextPlayer > 0;
 
-    if (nextPlayer < state.settings.players && !isNextAI) {
+    if (nextPlayer < state.settings.players) {
         showTeamSelectForPlayer(nextPlayer);
     } else {
-        // All human players selected, start game
+        // All players selected, start game
         startGameWithTeams();
     }
 }
@@ -268,13 +264,13 @@ function startGameWithTeams() {
     resumeAudio();
     startAmbient();
 
-    // Reset state (but keep teamSelections and singlePlayer setting)
+    // Reset state (but keep teamSelections and aiPlayers setting)
     const savedSelections = [...state.teamSelections];
-    const singlePlayer = state.settings.singlePlayer;
+    const aiPlayers = [...state.settings.aiPlayers];
     resetState();
     resetAIMemory();  // Reset AI's strategic memory for new game
     state.teamSelections = savedSelections;
-    state.settings.singlePlayer = singlePlayer;
+    state.settings.aiPlayers = aiPlayers;
 
     // Clear cached hex tiles since map is regenerating
     clearRenderCaches();
@@ -352,48 +348,9 @@ async function init() {
         startBtn.onclick = startGame;
     }
 
-    // Setup game mode buttons
-    document.querySelectorAll('[data-mode]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-
-            const mode = btn.dataset.mode;
-            state.settings.singlePlayer = (mode === 'single');
-
-            // Hide/show players section and AI config
-            const playersSection = document.getElementById('players-section');
-            const aiConfigSection = document.getElementById('ai-config-section');
-
-            if (playersSection) {
-                if (mode === 'single') {
-                    playersSection.classList.add('hidden');
-                    state.settings.players = 2; // AI opponent
-                    state.settings.aiPlayers = [1]; // Player 2 is AI
-                } else {
-                    playersSection.classList.remove('hidden');
-                    state.settings.aiPlayers = []; // Reset AI players
-                }
-            }
-
-            // Show/hide AI config in multiplayer
-            if (aiConfigSection) {
-                aiConfigSection.style.display = (mode === 'multi') ? 'block' : 'none';
-                if (mode === 'multi') {
-                    updateAIConfigGrid();
-                }
-            }
-        });
-
-        // Also handle touch events for mobile
-        btn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            btn.click();
-        });
-    });
+    // Initialize AI config grid on startup (default: Player 2 is AI)
+    state.settings.aiPlayers = [1];
+    updateAIConfigGrid();
 
     // Setup player count buttons
     document.querySelectorAll('[data-players]').forEach(btn => {
@@ -407,9 +364,7 @@ async function init() {
             state.settings.players = parseInt(btn.dataset.players, 10);
 
             // Update AI config grid when player count changes
-            if (!state.settings.singlePlayer) {
-                updateAIConfigGrid();
-            }
+            updateAIConfigGrid();
         });
 
         btn.addEventListener('touchend', (e) => {
@@ -596,6 +551,9 @@ async function init() {
 function updateAIConfigGrid() {
     const grid = document.getElementById('ai-config-grid');
     if (!grid) return;
+
+    // Filter out AI players that are no longer valid (when player count reduced)
+    state.settings.aiPlayers = state.settings.aiPlayers.filter(p => p < state.settings.players);
 
     grid.innerHTML = '';
 

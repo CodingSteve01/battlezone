@@ -7,6 +7,7 @@ import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
+import { isAIPlayer } from './ai.js';
 
 // Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
 
@@ -57,7 +58,7 @@ function centerOnUnit(unit, duration = 400) {
  * Update all UI elements
  */
 export function updateUI() {
-    const isAiTurnHidden = state.settings.singlePlayer && state.currentPlayer !== state.viewingPlayer;
+    const isAiTurnHidden = isAIPlayer() && state.currentPlayer !== state.viewingPlayer;
     const units = isAiTurnHidden ? getPlayerUnits(state.viewingPlayer) : getPlayerUnits(state.currentPlayer);
     const unit = isAiTurnHidden ? null : getCurrentUnit();
 
@@ -532,7 +533,7 @@ function updateCompassIndicator() {
     if (existing) existing.remove();
 
     // Don't show compass for AI player or if game is over
-    if (state.gameOver || (state.settings.singlePlayer && state.currentPlayer > 0)) {
+    if (state.gameOver || isAIPlayer()) {
         return;
     }
 

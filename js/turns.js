@@ -105,8 +105,16 @@ export function startTurn() {
         turnNum.textContent = state.currentPlayer + 1;
     }
 
-    // In single player, skip the turn screen for player 1 after first turn
-    if (state.settings.singlePlayer && state.round > 1) {
+    // Skip the turn screen for the sole human player after first turn
+    // (no need to "pass device" if there's only one human)
+    const humanPlayers = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        if (!isAIPlayer(i)) humanPlayers.push(i);
+    }
+    const onlyOneHuman = humanPlayers.length === 1;
+    const isCurrentHuman = !isAIPlayer();
+
+    if (isCurrentHuman && onlyOneHuman && state.round > 1) {
         showScreen(null);
         updateUI();
         render();
@@ -220,13 +228,13 @@ export function endGame(winner) {
 
     // Play victory or defeat sound
     if (winner !== null) {
-        // In single player, check if human won
-        if (state.settings.singlePlayer) {
-            if (winner === 0) {
-                playVictory();
-            } else {
-                playDefeat();
-            }
+        // Check if winner is human or AI
+        const winnerIsAI = isAIPlayer(winner);
+        // If there are any human players and the winner is AI, play defeat
+        // Otherwise play victory
+        const hasHumans = state.settings.aiPlayers.length < state.settings.players;
+        if (hasHumans && winnerIsAI) {
+            playDefeat();
         } else {
             playVictory();
         }
@@ -511,7 +519,7 @@ export function getZoneInfo() {
 function autoEndTurn() {
     // Don't auto-end during AI turns or if game is over
     if (state.gameOver) return;
-    if (state.settings.singlePlayer && state.currentPlayer !== 0) return;
+    if (isAIPlayer()) return;
 
     // Double-check AP is actually 0
     if (state.sharedAP > 0) return;
