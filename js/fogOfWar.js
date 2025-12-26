@@ -78,6 +78,9 @@ export function updateVisibility() {
         state.playerVisibleHexes[state.currentPlayer] = new Set();
     }
 
+    // Clear visible hexes before recalculating (like updateVisibilityForPlayer does)
+    state.playerVisibleHexes[state.currentPlayer].clear();
+
     // Set current player's explored set as active
     state.exploredHexes = state.playerExploredHexes[state.currentPlayer];
 
