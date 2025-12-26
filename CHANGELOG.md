@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.3.0...shadow-squad-v3.3.1) (2025-12-26)
+
+
+### Bug Fixes
+
+* **ui:** improve terrain selection and minimap UX ([#105](https://github.com/CodingSteve01/battlezone/issues/105)) ([28348e0](https://github.com/CodingSteve01/battlezone/commit/28348e07a1ac0b327b189994fe1322367b6f378f))
+
 ## [3.3.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.2.0...shadow-squad-v3.3.0) (2025-12-26)
 
 
