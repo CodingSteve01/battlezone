@@ -943,6 +943,71 @@ export function scrollToUnit(unit, duration = 500) {
 }
 
 /**
+ * Smoothly scroll camera to unit with dynamic zoom for spectator mode
+ * Zooms in closer for a cinematic follow-cam experience
+ * @returns Promise that resolves when animation completes
+ */
+export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
+    return new Promise(resolve => {
+        if (!unit) {
+            resolve();
+            return;
+        }
+
+        // Calculate target zoom - closer zoom for better viewing in spectator mode
+        // Default: zoom in to 1.2 or current zoom if already closer
+        const idealZoom = targetZoom || Math.max(1.2, state.zoomLevel);
+        const clampedZoom = Math.min(Math.max(idealZoom, CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
+
+        // Calculate target position at the target zoom level
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * clampedZoom;
+        const targetPos = hexToPixel(unit.q, unit.r, targetHexSize);
+        const targetCameraX = -targetPos.x;
+        const targetCameraY = -targetPos.y;
+
+        const startCameraX = state.cameraX;
+        const startCameraY = state.cameraY;
+        const startZoom = state.zoomLevel;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic for smooth cinematic movement
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            // Animate zoom
+            state.zoomLevel = startZoom + (clampedZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+
+            // Recalculate target position at current zoom level for smooth tracking
+            const currentTargetPos = hexToPixel(unit.q, unit.r, state.hexSize);
+            const currentTargetCameraX = -currentTargetPos.x;
+            const currentTargetCameraY = -currentTargetPos.y;
+
+            // Animate camera position
+            state.cameraX = startCameraX + (currentTargetCameraX - startCameraX) * ease;
+            state.cameraY = startCameraY + (currentTargetCameraY - startCameraY) * ease;
+
+            limitCameraBounds();
+            updateCameraOffset();
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
  * Smoothly animate zoom level
  * @returns Promise that resolves when animation completes
  */

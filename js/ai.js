@@ -11,7 +11,7 @@ import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
-import { scrollToUnit } from './input.js';
+import { scrollToUnit, scrollToUnitWithZoom } from './input.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -764,6 +764,12 @@ async function performAIActions() {
     // Sort units by role priority for this turn
     const sortedUnits = sortUnitsForExecution(plan);
 
+    // In spectator mode, hide the thinking overlay once AI starts executing
+    // so the viewer can watch the action without obstruction
+    if (spectatorMode) {
+        hideAIThinking();
+    }
+
     for (const unit of sortedUnits) {
         if (!unit.alive) continue;
 
@@ -773,10 +779,11 @@ async function performAIActions() {
             break;
         }
 
-        // In spectator mode, always scroll to the unit before they act
+        // In spectator mode, use cinematic zoom scroll to follow the action
         if (spectatorMode) {
-            scrollToUnit(unit, 400);
-            await delay(500);
+            // Dynamic zoom: zoom in for a close-up view of the unit
+            await scrollToUnitWithZoom(unit, 500, 1.3);
+            await delay(300);
         }
 
         await performUnitAI(unit, plan, spectatorMode);
@@ -1093,9 +1100,13 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         addAIThought(`${unitName} greift ${targetName} an (${hpPercent}% HP)`, 'attack');
     }
 
-    // In spectator mode, always scroll to the action
-    if (spectatorMode || hasHumanViewer) {
-        // Scroll to the target being attacked so viewer can see the action
+    // In spectator mode, use cinematic zoom to show the attack action
+    if (spectatorMode) {
+        // Zoom in closer for combat (1.4x for dramatic effect)
+        await scrollToUnitWithZoom(target, scrollDelay, 1.4);
+        await delay(200);
+    } else if (hasHumanViewer) {
+        // Normal scroll for human player watching AI
         scrollToUnit(target, scrollDelay);
         await delay(scrollDelay + 100);
     }
@@ -1751,10 +1762,13 @@ async function executeAIMove(unit, target, spectatorMode = false) {
     const path = pathResult.path;
     // Spectator mode: slower step delay so viewer can follow the movement
     const stepDelay = spectatorMode ? 200 : 120;
-    const scrollDuration = spectatorMode ? 350 : 200;
+    const scrollDuration = spectatorMode ? 400 : 200;
 
     // If unit starts visible or in spectator mode, scroll to it first
-    if (hasHumanViewer && (wasVisible || spectatorMode)) {
+    if (spectatorMode) {
+        // Use cinematic zoom scroll for spectator mode (zoom out slightly to see more of path)
+        await scrollToUnitWithZoom(unit, scrollDuration, 1.1);
+    } else if (hasHumanViewer && wasVisible) {
         scrollToUnit(unit, scrollDuration);
         await delay(scrollDuration + 100);
     }
@@ -1782,8 +1796,12 @@ async function executeAIMove(unit, target, spectatorMode = false) {
         if (hasHumanViewer && isNowVisible && !unitBecameVisible) {
             unitBecameVisible = true;
             // Scroll to show the newly visible enemy
-            scrollToUnit(unit, spectatorMode ? 400 : 300);
-            await delay(spectatorMode ? 450 : 350);
+            if (spectatorMode) {
+                await scrollToUnitWithZoom(unit, 400, 1.2);
+            } else {
+                scrollToUnit(unit, 300);
+                await delay(350);
+            }
         }
 
         // In spectator mode or when unit is visible, render each step
