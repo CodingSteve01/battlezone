@@ -37,31 +37,99 @@ function startTeamSelection() {
     showTeamSelectForPlayer(0);
 }
 
+// AI personality types for team selection variety
+const AI_PERSONALITIES = {
+    aggressive: {
+        name: 'Aggressor',
+        compositions: [
+            ['assault', 'commando', 'medic'],    // Heavy offense with healing
+            ['assault', 'assault', 'medic'],     // Double tank
+            ['commando', 'commando', 'scout'],   // Assassin squad
+        ],
+        weight: 1
+    },
+    defensive: {
+        name: 'Defender',
+        compositions: [
+            ['medic', 'sniper', 'assault'],      // Long range with tank
+            ['medic', 'medic', 'assault'],       // Extreme sustain
+            ['sniper', 'sniper', 'scout'],       // Long range focus
+        ],
+        weight: 1
+    },
+    balanced: {
+        name: 'Taktiker',
+        compositions: [
+            ['scout', 'assault', 'medic'],       // Classic balanced
+            ['scout', 'sniper', 'medic'],        // Vision + range + heal
+            ['assault', 'sniper', 'medic'],      // All-rounder
+        ],
+        weight: 1.5  // Slightly prefer balanced teams
+    },
+    stealth: {
+        name: 'Schattenjäger',
+        compositions: [
+            ['scout', 'commando', 'sniper'],     // Stealth + assassination
+            ['commando', 'sniper', 'medic'],     // Ambush squad
+            ['scout', 'commando', 'commando'],   // Fast strike team
+        ],
+        weight: 0.8
+    },
+    specialist: {
+        name: 'Spezialist',
+        compositions: [
+            ['scout', 'scout', 'sniper'],        // Maximum vision
+            ['assault', 'assault', 'assault'],   // Brute force
+            ['medic', 'scout', 'commando'],      // Support + mobility
+        ],
+        weight: 0.6  // Rarer specialist teams
+    }
+};
+
+// Track last AI team to avoid repetition
+let lastAITeamKey = null;
+
 /**
  * Generate a balanced team for AI
- * Wählt ein ausgewogenes Team basierend auf taktischen Rollen
+ * Wählt ein intelligentes Team basierend auf KI-Persönlichkeit und vermeidet Wiederholungen
  */
 function generateAITeam() {
-    // Verschiedene taktische Kompositionen - alle ausgewogen
-    const teamCompositions = [
-        // Ausgewogen: Scout (Aufklärung), Assault (Frontlinie), Medic (Support)
-        ['scout', 'assault', 'medic'],
-        // Aggressiv: Assault (Tank), Commando (Flanke), Medic (Heilung)
-        ['assault', 'commando', 'medic'],
-        // Stealth: Scout (Aufklärung), Commando (Assassine), Sniper (Fernkampf)
-        ['scout', 'commando', 'sniper'],
-        // Klassisch: Scout (Aufklärung), Assault (Hauptkampf), Sniper (Support)
-        ['scout', 'assault', 'sniper'],
-        // Nahkampf-fokussiert: Assault, Commando, Medic
-        ['assault', 'commando', 'medic'],
-        // Defensiv: Medic, Sniper, Assault
-        ['medic', 'sniper', 'assault'],
-        // Aufklärer: Scout, Scout, Assault
-        ['scout', 'scout', 'assault'],
-    ];
+    // Select a personality based on weighted random
+    const personalities = Object.entries(AI_PERSONALITIES);
+    const totalWeight = personalities.reduce((sum, [, p]) => sum + p.weight, 0);
+    let random = Math.random() * totalWeight;
 
-    // Wähle zufällig eine Komposition
-    return teamCompositions[Math.floor(Math.random() * teamCompositions.length)];
+    let selectedPersonality = personalities[0][1]; // Default fallback
+    for (const [, personality] of personalities) {
+        random -= personality.weight;
+        if (random <= 0) {
+            selectedPersonality = personality;
+            break;
+        }
+    }
+
+    // Get compositions for this personality
+    const compositions = selectedPersonality.compositions;
+
+    // Try to pick a different composition than last time
+    let attempts = 0;
+    let selectedTeam;
+    do {
+        selectedTeam = compositions[Math.floor(Math.random() * compositions.length)];
+        const teamKey = selectedTeam.join(',');
+        if (teamKey !== lastAITeamKey || attempts >= 3) {
+            lastAITeamKey = teamKey;
+            break;
+        }
+        attempts++;
+    } while (attempts < 5);
+
+    // Small chance to shuffle order for visual variety
+    if (Math.random() < 0.3) {
+        selectedTeam = [...selectedTeam].sort(() => Math.random() - 0.5);
+    }
+
+    return selectedTeam;
 }
 
 /**

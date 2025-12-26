@@ -137,6 +137,10 @@ const aiMemory = {
     playerCenterEstimate: null,      // Estimated center of player forces
     searchPattern: 'expand',         // 'expand', 'sweep', 'pincer'
     assignedTargets: new Map(),      // unitId -> targetUnitId (for focus fire)
+    // Decoy/Bait strategy
+    decoyUnit: null,                 // Unit acting as bait
+    ambushUnits: [],                 // Units waiting to ambush
+    decoyActive: false,              // Is decoy strategy currently active
 };
 
 /**
@@ -151,6 +155,262 @@ export function resetAIMemory() {
     aiMemory.playerCenterEstimate = null;
     aiMemory.searchPattern = 'expand';
     aiMemory.assignedTargets.clear();
+    aiMemory.decoyUnit = null;
+    aiMemory.ambushUnits = [];
+    aiMemory.decoyActive = false;
+}
+
+// ===== DECOY/BAIT STRATEGY =====
+
+/**
+ * Check if decoy strategy should be used
+ * Conditions:
+ * - Have 3+ units alive
+ * - Have a tanky unit (Assault) or fast unit (Scout) to act as bait
+ * - Have units that can deal high damage from ambush (Sniper, Commando)
+ * - Enemies are visible but not too close
+ */
+function shouldUseDecoyStrategy(aiUnits, enemies) {
+    // Need at least 3 units for effective decoy
+    if (aiUnits.length < 3) return false;
+
+    // Need visible enemies
+    if (enemies.length === 0) return false;
+
+    // Check if enemies are at mid-range (not too close, not too far)
+    const avgEnemyDist = enemies.reduce((sum, e) => {
+        const closestUnit = aiUnits.reduce((minDist, u) => {
+            const dist = hexDistance({ q: u.q, r: u.r }, { q: e.q, r: e.r });
+            return dist < minDist ? dist : minDist;
+        }, Infinity);
+        return sum + closestUnit;
+    }, 0) / enemies.length;
+
+    // Decoy works best at 4-8 hex distance
+    if (avgEnemyDist < 4 || avgEnemyDist > 10) return false;
+
+    // Check for suitable decoy candidates
+    const decoyCandidate = findDecoyCandidate(aiUnits);
+    if (!decoyCandidate) return false;
+
+    // Check for ambush units
+    const ambushCandidates = aiUnits.filter(u =>
+        u.id !== decoyCandidate.id &&
+        (u.class === 'sniper' || u.class === 'commando' || u.class === 'assault')
+    );
+
+    return ambushCandidates.length >= 1;
+}
+
+/**
+ * Find the best unit to act as decoy/bait
+ * Prefer: Assault (tanky), Scout (fast escape)
+ */
+function findDecoyCandidate(aiUnits) {
+    // Priority order for decoy
+    const decoyPriority = ['assault', 'scout', 'medic'];
+
+    for (const className of decoyPriority) {
+        const candidate = aiUnits.find(u =>
+            u.class === className &&
+            u.currentHp > u.maxHp * 0.5 && // Needs decent HP
+            u.alive
+        );
+        if (candidate) return candidate;
+    }
+    return null;
+}
+
+/**
+ * Plan decoy strategy - set up units for ambush
+ */
+function planDecoyStrategy(aiUnits, _enemies) {
+    // Find decoy
+    const decoy = findDecoyCandidate(aiUnits);
+    if (!decoy) return false;
+
+    // Find ambush units (high damage dealers)
+    const ambushers = aiUnits.filter(u =>
+        u.id !== decoy.id &&
+        u.alive &&
+        (u.class === 'sniper' || u.class === 'commando' || u.class === 'assault')
+    );
+
+    if (ambushers.length === 0) return false;
+
+    // Activate decoy strategy
+    aiMemory.decoyUnit = decoy.id;
+    aiMemory.ambushUnits = ambushers.map(u => u.id);
+    aiMemory.decoyActive = true;
+
+    addAIThought(`🎯 Köder-Strategie: ${CLASS_NAMES_DE[decoy.class]} lockt Feinde an!`, 'strategy');
+
+    return true;
+}
+
+/**
+ * Check if a unit is the current decoy
+ */
+function isDecoyUnit(unit) {
+    return aiMemory.decoyActive && aiMemory.decoyUnit === unit.id;
+}
+
+/**
+ * Check if a unit is an ambush unit
+ */
+function isAmbushUnit(unit) {
+    return aiMemory.decoyActive && aiMemory.ambushUnits.includes(unit.id);
+}
+
+/**
+ * Score position for decoy unit - move toward enemies to lure them
+ * Decoy should be tempting target but have escape route
+ */
+function scoreDecoyPosition(unit, q, r, enemies) {
+    let score = 0;
+    const hex = getHex(q, r);
+
+    if (!hex) return -1000;
+
+    // Find closest enemy
+    let closestEnemy = null;
+    let closestDist = Infinity;
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+        if (dist < closestDist) {
+            closestDist = dist;
+            closestEnemy = enemy;
+        }
+    }
+
+    if (closestEnemy) {
+        // Decoy wants to be visible and in enemy attack range to lure them
+        // Ideal distance: just outside enemy range or just inside (to be attacked)
+        const enemyRange = closestEnemy.range || 3;
+
+        if (closestDist === enemyRange || closestDist === enemyRange + 1) {
+            // Perfect bait position - enemy can almost reach
+            score += 100;
+        } else if (closestDist < enemyRange) {
+            // In enemy range - dangerous but effective bait
+            score += 60;
+        } else if (closestDist <= enemyRange + 2) {
+            // Close enough to lure
+            score += 40;
+        } else {
+            // Too far to be effective bait
+            score -= closestDist * 5;
+        }
+    }
+
+    // Check retreat path to allies (ambush units)
+    const ambushUnits = getPlayerUnits(unit.player).filter(u => isAmbushUnit(u));
+    if (ambushUnits.length > 0) {
+        const avgAmbushDist = ambushUnits.reduce((sum, a) =>
+            sum + hexDistance({ q, r }, { q: a.q, r: a.r }), 0
+        ) / ambushUnits.length;
+
+        // Decoy should be between enemies and ambush units (but closer to enemies)
+        if (avgAmbushDist >= 3 && avgAmbushDist <= 6) {
+            score += 30; // Good retreat distance
+        } else if (avgAmbushDist > 6) {
+            score -= 20; // Too far from backup
+        }
+    }
+
+    // Decoy prefers light cover but stays visible
+    if (hex.cover) score += 15; // Some protection is good
+    if (hex.type === 'hills') score += 10; // Visible position
+
+    // Penalty for positions that block ambush units' line of fire
+    // (decoy shouldn't stand between ambush and enemy)
+
+    // Zone awareness
+    if (!isHexInZone(q, r)) {
+        score -= 200; // Don't lure outside safe zone
+    }
+
+    return score;
+}
+
+/**
+ * Score position for ambush unit - stay hidden, ready to strike
+ * Ambush units should be in cover, at flanking angles
+ */
+function scoreAmbushPosition(unit, q, r, enemies) {
+    let score = 0;
+    const hex = getHex(q, r);
+
+    if (!hex) return -1000;
+
+    // Find closest enemy
+    let closestEnemy = null;
+    let closestDist = Infinity;
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+        if (dist < closestDist) {
+            closestDist = dist;
+            closestEnemy = enemy;
+        }
+    }
+
+    // Ambush units want to be in attack range but from cover
+    if (closestEnemy) {
+        // Ideal distance: just at unit's attack range
+        if (closestDist <= unit.range) {
+            score += 80; // Can attack from here
+        } else if (closestDist <= unit.range + 2) {
+            score += 40; // Close to attack range
+        } else {
+            score -= (closestDist - unit.range) * 10;
+        }
+    }
+
+    // Cover is essential for ambush
+    if (hex.cover) {
+        score += 60; // Ambush from cover
+    } else {
+        score -= 30; // Exposed position is bad for ambush
+    }
+
+    // Hills provide attack bonus for snipers
+    if (hex.type === 'hills' && unit.class === 'sniper') {
+        score += 50;
+    }
+
+    // Flanking position bonus
+    // Check position relative to decoy unit
+    const decoyUnit = getPlayerUnits(unit.player).find(u => isDecoyUnit(u));
+    if (decoyUnit && closestEnemy) {
+        // Ambush should be at different angle from decoy
+        const decoyAngle = Math.atan2(decoyUnit.r - closestEnemy.r, decoyUnit.q - closestEnemy.q);
+        const myAngle = Math.atan2(r - closestEnemy.r, q - closestEnemy.q);
+        const angleDiff = Math.abs(myAngle - decoyAngle);
+
+        // Reward flanking position (90+ degrees from decoy)
+        if (angleDiff > Math.PI / 2) {
+            score += 40; // Good flank
+        } else if (angleDiff > Math.PI / 4) {
+            score += 20; // Acceptable angle
+        }
+    }
+
+    // Avoid clustering with other ambush units
+    const otherAmbush = getPlayerUnits(unit.player).filter(u =>
+        isAmbushUnit(u) && u.id !== unit.id
+    );
+    for (const other of otherAmbush) {
+        const dist = hexDistance({ q, r }, { q: other.q, r: other.r });
+        if (dist <= 1) score -= 25;
+        else if (dist <= 2) score -= 10;
+    }
+
+    // Zone awareness
+    if (!isHexInZone(q, r)) {
+        score -= 200;
+    }
+
+    return score;
 }
 
 /**
@@ -270,12 +530,29 @@ function analyzeAndPlan() {
     // Assign targets for focus fire
     assignTargets(aiUnits, visibleEnemies);
 
+    // Check if decoy strategy should be used
+    if (!aiMemory.decoyActive && shouldUseDecoyStrategy(aiUnits, visibleEnemies)) {
+        planDecoyStrategy(aiUnits, visibleEnemies);
+    }
+
+    // Deactivate decoy strategy if decoy unit is dead or too damaged
+    if (aiMemory.decoyActive) {
+        const decoy = aiUnits.find(u => u.id === aiMemory.decoyUnit);
+        if (!decoy || !decoy.alive || decoy.currentHp < decoy.maxHp * 0.3) {
+            aiMemory.decoyActive = false;
+            aiMemory.decoyUnit = null;
+            aiMemory.ambushUnits = [];
+            addAIThought('Köder-Strategie abgebrochen - neu bewerten...', 'strategy');
+        }
+    }
+
     return {
         aiUnits,
         visibleEnemies,
         knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
         inHuntMode: aiMemory.huntMode,
-        searchPattern: aiMemory.searchPattern
+        searchPattern: aiMemory.searchPattern,
+        decoyActive: aiMemory.decoyActive
     };
 }
 
@@ -495,6 +772,25 @@ function sortUnitsForExecution(plan) {
     const units = [...plan.aiUnits];
 
     return units.sort((a, b) => {
+        // === DECOY STRATEGY ORDER ===
+        // Decoy moves FIRST to set up the lure position
+        // Then ambush units position/attack
+        // Then other units support
+        if (plan.decoyActive) {
+            const aIsDecoy = isDecoyUnit(a);
+            const bIsDecoy = isDecoyUnit(b);
+            const aIsAmbush = isAmbushUnit(a);
+            const bIsAmbush = isAmbushUnit(b);
+
+            // Decoy goes first
+            if (aIsDecoy && !bIsDecoy) return -1;
+            if (bIsDecoy && !aIsDecoy) return 1;
+
+            // Ambush units go second
+            if (aIsAmbush && !bIsAmbush) return -1;
+            if (bIsAmbush && !aIsAmbush) return 1;
+        }
+
         // If enemies visible, prioritize attackers
         if (plan.visibleEnemies.length > 0) {
             // Units with assigned targets go first
@@ -533,7 +829,18 @@ async function performUnitAI(unit, plan) {
     const assignedTargetId = aiMemory.assignedTargets.get(unit.id);
     const enemies = plan.visibleEnemies;
 
-    // Tactical decision tree
+    // === DECOY STRATEGY EXECUTION ===
+    if (plan.decoyActive && isDecoyUnit(unit)) {
+        await executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer);
+        return;
+    }
+
+    if (plan.decoyActive && isAmbushUnit(unit)) {
+        await executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer);
+        return;
+    }
+
+    // === NORMAL TACTICAL DECISION TREE ===
 
     // 1. Should we retreat? (Low HP, enemies nearby)
     if (shouldRetreat(unit, enemies)) {
@@ -586,6 +893,129 @@ async function performUnitAI(unit, plan) {
     const attackableAfterMove = getAttackableUnits(unit);
     if (attackableAfterMove.length > 0 && state.sharedAP >= 1) {
         const target = selectBestTarget(unit, attackableAfterMove);
+        if (target) {
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+        }
+    }
+}
+
+/**
+ * Execute decoy unit behavior - lure enemies while staying alive
+ */
+async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer) {
+    const enemies = plan.visibleEnemies;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+
+    // Decoy prioritizes survival - retreat if too damaged
+    if (unit.currentHp < unit.maxHp * 0.4) {
+        addAIThought(`${unitName} (Köder): Rückzug - zu viel Schaden!`, 'retreat');
+        await executeRetreat(unit, enemies);
+        return;
+    }
+
+    // 1. Move to lure position FIRST (most important for decoy)
+    if (state.sharedAP >= 1) {
+        addAIThought(`${unitName} lockt Feinde an...`, 'move');
+        const moveTarget = selectStrategicMoveTarget(unit, plan);
+        if (moveTarget) {
+            await executeAIMove(unit, moveTarget);
+        }
+    }
+
+    // 2. Only attack if it's safe (kill shot or enemy is almost dead)
+    const attackable = getAttackableUnits(unit);
+    if (attackable.length > 0 && state.sharedAP >= 1) {
+        // Only attack if we can kill or target is nearly dead
+        const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
+        if (killableTarget) {
+            addAIThought(`${unitName}: Gelegenheitsziel!`, 'attack');
+            await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer);
+        }
+    }
+
+    // 3. Use special only defensively (sprint for escape, etc.)
+    if (state.sharedAP >= 2 && !unit.usedSpecial) {
+        // Scout: Sprint if enemies are close (escape option)
+        // Assault: Don't powershot (save HP as bait)
+        if (unit.class === 'scout') {
+            const closestEnemy = enemies.reduce((min, e) => {
+                const d = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+                return d < min ? d : min;
+            }, Infinity);
+            if (closestEnemy <= 3) {
+                addAIThought(`${unitName}: Sprint vorbereitet für Flucht!`, 'special');
+                useSpecialAbility(unit);
+                renderIfVisible();
+                await delay(300);
+            }
+        }
+    }
+}
+
+/**
+ * Execute ambush unit behavior - wait in cover, strike hard when enemies engage
+ */
+async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer) {
+    const enemies = plan.visibleEnemies;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const attackable = getAttackableUnits(unit);
+
+    // 1. Use stealth abilities if available (sniper cloak, commando stealth)
+    if (state.sharedAP >= 2 && !unit.usedSpecial) {
+        if ((unit.class === 'sniper' || unit.class === 'commando') && !unit.cloaked) {
+            addAIThought(`${unitName}: Tarnung für Hinterhalt!`, 'special');
+            useSpecialAbility(unit);
+            renderIfVisible();
+            await delay(300);
+        }
+    }
+
+    // 2. Position for ambush if not in attack range
+    if (attackable.length === 0 && state.sharedAP >= 1) {
+        addAIThought(`${unitName} positioniert sich für Hinterhalt...`, 'move');
+        const moveTarget = selectStrategicMoveTarget(unit, plan);
+        if (moveTarget) {
+            await executeAIMove(unit, moveTarget);
+        }
+    }
+
+    // 3. Attack aggressively when in range!
+    const attackableNow = getAttackableUnits(unit);
+    if (attackableNow.length > 0 && state.sharedAP >= 1) {
+        // Prioritize enemies that attacked/engaged the decoy
+        const target = selectBestTarget(unit, attackableNow);
+        if (target) {
+            addAIThought(`${unitName}: Hinterhalt! Angriff auf ${CLASS_NAMES_DE[target.class]}!`, 'attack');
+            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+        }
+    }
+
+    // 4. Use powershot if assault and in range
+    if (state.sharedAP >= 2 && !unit.usedSpecial && unit.class === 'assault') {
+        const inRange = enemies.filter(e =>
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
+        );
+        if (inRange.length > 0) {
+            addAIThought(`${unitName}: Powershot! 💥`, 'special');
+            useSpecialAbility(unit);
+            renderIfVisible();
+            await delay(300);
+
+            // Attack with powershot bonus
+            const targetAfterPowershot = getAttackableUnits(unit);
+            if (targetAfterPowershot.length > 0 && state.sharedAP >= 1) {
+                const target = selectBestTarget(unit, targetAfterPowershot);
+                if (target) {
+                    await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
+                }
+            }
+        }
+    }
+
+    // 5. Attack again if possible
+    const finalAttackable = getAttackableUnits(unit);
+    if (finalAttackable.length > 0 && state.sharedAP >= 1) {
+        const target = selectBestTarget(unit, finalAttackable);
         if (target) {
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer);
         }
@@ -969,9 +1399,20 @@ function selectStrategicMoveTarget(unit, plan) {
  * Score position for combat situations
  * VERBESSERTE KI: Klassenspezifische Positionierung
  */
-function scoreCombatPosition(unit, q, r, enemies, _plan) {
+function scoreCombatPosition(unit, q, r, enemies, plan) {
     let score = 0;
     const hex = getHex(q, r);
+
+    // === DECOY STRATEGY POSITIONING ===
+    if (plan.decoyActive) {
+        if (isDecoyUnit(unit)) {
+            // Decoy moves TOWARD enemies to lure them
+            return scoreDecoyPosition(unit, q, r, enemies);
+        } else if (isAmbushUnit(unit)) {
+            // Ambush units stay in cover, flank position
+            return scoreAmbushPosition(unit, q, r, enemies);
+        }
+    }
 
     // Get assigned target or closest enemy
     const assignedId = aiMemory.assignedTargets.get(unit.id);
