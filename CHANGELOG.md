@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.1.1...shadow-squad-v3.2.0) (2025-12-26)
+
+
+### Features
+
+* comprehensive combat rebalance and shrinking zone mechanic ([#101](https://github.com/CodingSteve01/battlezone/issues/101)) ([ce4b928](https://github.com/CodingSteve01/battlezone/commit/ce4b9280f73f13f14fd57fa818f27b4a8bf00729))
+
 ## [3.1.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.1.0...shadow-squad-v3.1.1) (2025-12-26)
 
 
