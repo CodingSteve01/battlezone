@@ -1006,6 +1006,185 @@ export function continueQueuedPath(unit) {
 }
 
 /**
+ * Execute all queued paths for the current player automatically at turn start
+ * Returns a Promise that resolves when all movements are complete
+ */
+export async function executeQueuedPathsForPlayer() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    const unitsWithPaths = playerUnits.filter(unit => {
+        const queuedPath = getQueuedPath(unit.id);
+        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
+    });
+
+    if (unitsWithPaths.length === 0) return;
+
+    showToast(`📍 ${unitsWithPaths.length} Wegpunkt${unitsWithPaths.length > 1 ? 'e werden' : ' wird'} ausgeführt...`, 'info');
+
+    for (const unit of unitsWithPaths) {
+        if (!unit.alive) continue;
+        if (state.sharedAP <= 0) break;
+
+        const success = await executeQueuedPathForUnit(unit);
+        if (!success) continue;
+
+        // Small delay between units
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    render();
+    updateUI();
+}
+
+/**
+ * Execute a single queued path for a unit
+ * Returns a Promise that resolves when movement is complete
+ */
+async function executeQueuedPathForUnit(unit) {
+    const queuedPath = getQueuedPath(unit.id);
+    if (!queuedPath || !queuedPath.path) return false;
+
+    // Recalculate path from current position to target
+    const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
+
+    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
+        // Path is blocked or invalid
+        clearQueuedPath(unit.id);
+        showToast(`❌ Pfad für ${unit.name} blockiert`, 'warning');
+        return false;
+    }
+
+    // Calculate reachable portion with current AP
+    const maxMoveCost = state.sharedAP;
+    let cumulativeCost = 0;
+    const reachablePath = [pathResult.path[0]];
+    let totalCost = 0;
+    let lastReachableIndex = 0;
+
+    for (let i = 1; i < pathResult.path.length; i++) {
+        const point = pathResult.path[i];
+        const pointHex = getHex(point.q, point.r);
+        if (!pointHex) break;
+
+        const terrain = TERRAIN[pointHex.type];
+        cumulativeCost += terrain.moveCost;
+
+        if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
+            reachablePath.push(point);
+            totalCost = cumulativeCost;
+            lastReachableIndex = i;
+        } else if (pointHex.unit && pointHex.unit.id !== unit.id) {
+            // Path blocked by another unit
+            break;
+        }
+    }
+
+    if (reachablePath.length < 2 || totalCost === 0) {
+        // Can't move this turn, keep the path for next turn
+        return false;
+    }
+
+    // Check if we reached the destination
+    const isComplete = lastReachableIndex >= pathResult.path.length - 1;
+
+    // Update or clear queued path
+    if (!isComplete) {
+        const remainingPath = pathResult.path.slice(lastReachableIndex);
+        setQueuedPath(unit.id, remainingPath, queuedPath.targetQ, queuedPath.targetR);
+    } else {
+        clearQueuedPath(unit.id);
+    }
+
+    // Scroll to unit before moving
+    scrollToUnit(unit, 300);
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    // Execute the movement
+    return new Promise(resolve => {
+        playMoveStart();
+
+        // Reveal from cover when moving
+        if (unit.hiding) {
+            unit.hiding = false;
+        }
+
+        animateUnitMovement(unit, reachablePath, totalCost, () => {
+            playMoveEnd();
+
+            // Check for power-up pickup
+            const pickup = checkPowerupPickup(unit);
+            if (pickup) {
+                showPowerupPickup(pickup.powerup, pickup.result);
+            }
+
+            updateVisibility();
+
+            // Auto-take cover if on valid terrain
+            if (canAutoTakeCover(unit)) {
+                autoTakeCover(unit);
+            }
+
+            render();
+            updateUI();
+            resolve(true);
+        }, render);
+    });
+}
+
+/**
+ * Cancel all queued paths for the current player
+ */
+export function cancelAllQueuedPaths() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    let cancelled = 0;
+
+    playerUnits.forEach(unit => {
+        if (getQueuedPath(unit.id)) {
+            clearQueuedPath(unit.id);
+            cancelled++;
+        }
+    });
+
+    if (cancelled > 0) {
+        showToast(`🚫 ${cancelled} Wegpunkt${cancelled > 1 ? 'e' : ''} abgebrochen`, 'info');
+        render();
+    }
+
+    return cancelled;
+}
+
+/**
+ * Get count of units with queued paths for current player
+ */
+export function getQueuedPathCount() {
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+    return playerUnits.filter(unit => {
+        const queuedPath = getQueuedPath(unit.id);
+        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
+    }).length;
+}
+
+/**
+ * Update the waypoint cancel button UI based on queued path count
+ */
+export function updateWaypointUI() {
+    const cancelBtn = document.getElementById('cancel-waypoints-btn');
+    const waypointCount = document.getElementById('waypoint-count');
+
+    if (!cancelBtn) return;
+
+    const count = getQueuedPathCount();
+
+    if (count > 0) {
+        cancelBtn.style.display = 'flex';
+        if (waypointCount) {
+            waypointCount.textContent = count;
+        }
+    } else {
+        cancelBtn.style.display = 'none';
+    }
+}
+
+/**
  * Start animation loop for pending move indicator
  */
 function startPendingMoveAnimation() {
@@ -1080,7 +1259,7 @@ function handleAttackClick(unit, hex) {
 function setupMenuButtons() {
     const readyBtn = document.getElementById('ready-btn');
     if (readyBtn) {
-        readyBtn.onclick = () => {
+        readyBtn.onclick = async () => {
             showScreen(null);
             updateVisibility();
             updateUI();
@@ -1089,6 +1268,11 @@ function setupMenuButtons() {
             requestAnimationFrame(() => {
                 centerOnCurrentUnit();
             });
+
+            // Execute any queued paths after a short delay
+            setTimeout(async () => {
+                await executeQueuedPathsForPlayer();
+            }, 500);
         };
     }
 
@@ -1117,6 +1301,15 @@ function setupMenuButtons() {
     const menuBtn = document.getElementById('menu-btn');
     if (menuBtn) {
         menuBtn.onclick = () => showScreen('menu');
+    }
+
+    // Cancel waypoints button
+    const cancelWaypointsBtn = document.getElementById('cancel-waypoints-btn');
+    if (cancelWaypointsBtn) {
+        cancelWaypointsBtn.onclick = () => {
+            cancelAllQueuedPaths();
+            updateWaypointUI();
+        };
     }
 
     // Round info dropdown toggle

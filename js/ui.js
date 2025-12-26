@@ -8,6 +8,8 @@ import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js
 import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 
+// Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
+
 /**
  * Center camera on a specific unit with smooth scrolling
  */
@@ -73,6 +75,11 @@ export function updateUI() {
     if (giveUpBtn) {
         giveUpBtn.disabled = state.gameOver;
     }
+
+    // Update waypoint cancel button (lazy import to avoid circular deps)
+    import('./input.js').then(({ updateWaypointUI }) => {
+        updateWaypointUI();
+    }).catch(() => {}); // Ignore if not yet loaded
 }
 
 /**

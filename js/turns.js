@@ -7,7 +7,7 @@ import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWa
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
-import { centerOnCurrentUnit } from './input.js';
+import { centerOnCurrentUnit, executeQueuedPathsForPlayer } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
@@ -59,17 +59,8 @@ export function startTurn() {
     const visibleEnemies = getVisibleEnemies();
     updatePreviouslyVisibleEnemies(visibleEnemies.map(e => e.id));
 
-    // Check if selected unit has a queued path
-    const currentUnit = units[0];
-    if (currentUnit) {
-        const queuedPath = getQueuedPath(currentUnit.id);
-        if (queuedPath && queuedPath.path) {
-            // Show notification about queued path
-            setTimeout(() => {
-                showToast('📍 Gespeicherter Wegpunkt vorhanden', 'info');
-            }, 500);
-        }
-    }
+    // Note: Queued paths are now automatically executed after turn screen is dismissed
+    // See executeQueuedPathsForPlayer() in input.js
 
     // Check if this is an AI player
     if (isAIPlayer()) {
@@ -108,6 +99,11 @@ export function startTurn() {
         requestAnimationFrame(() => {
             centerOnCurrentUnit();
         });
+
+        // Execute any queued paths after a short delay
+        setTimeout(async () => {
+            await executeQueuedPathsForPlayer();
+        }, 500);
         return;
     }
 

@@ -1327,6 +1327,27 @@ button:focus:not(:focus-visible),
     pointer-events: none;
 }
 
+/* Waypoint cancel button */
+.action-btn.waypoint-btn {
+    flex: 1;
+    gap: 4px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%);
+    border-color: var(--orange, #f97316);
+}
+
+.action-btn.waypoint-btn:hover {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.3) 0%, rgba(234, 88, 12, 0.2) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 0 20px rgba(251, 146, 60, 0.3);
+}
+
+.action-btn.waypoint-btn .label {
+    font-size: 10px;
+    font-weight: 600;
+    color: #fdba74;
+}
+
 /* Suggested action - pulsing animation to draw attention */
 .action-btn.suggested {
     animation: suggestPulse 1.5s ease-in-out infinite;
