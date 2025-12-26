@@ -335,59 +335,69 @@ export const UNIT_CLASSES = {
     scout: {
         name: 'Scout',
         icon: '🧭',
-        hp: 60,
-        damage: 18,
+        hp: 70,             // Erhöht von 60 - robuster Aufklärer
+        damage: 22,         // Erhöht von 18 - besserer Schaden
         range: 4,
         move: 5,
-        vision: 7,          // Increased from 6 - best at finding enemies
+        vision: 8,          // Beste Sicht im Spiel - Hauptrolle: Aufklärung
         special: 'Sprint',
-        specialDesc: '+3 Bewegung'
+        specialDesc: '+3 Bewegung',
+        // Scout-Bonus: Findet versteckte Einheiten leichter
+        stealthDetectionRange: 3
     },
     assault: {
         name: 'Assault',
         icon: '🪖',
-        hp: 100,
-        damage: 35,
+        hp: 120,            // Erhöht von 100 - der Tank des Teams
+        damage: 40,         // Erhöht von 35 - hoher Burst-Schaden
         range: 2,
         move: 3,
-        vision: 5,          // Increased from 4
+        vision: 5,
         special: 'Powershot',
-        specialDesc: '+20 Schaden'
+        specialDesc: '+25 Schaden',  // Erhöht von +20
+        // Assault-Bonus: Weniger Schadensreduktion durch Deckung
+        armorPiercing: 0.5  // 50% der Deckungsreduktion ignorieren
     },
     medic: {
         name: 'Medic',
         icon: '⛑️',
-        hp: 80,
-        damage: 12,
-        range: 2,
+        hp: 90,             // Erhöht von 80 - überlebensfähiger
+        damage: 15,         // Erhöht von 12
+        range: 3,           // Erhöht von 2 - kann aus sicherer Distanz helfen
         move: 4,
-        vision: 6,          // Increased from 5
+        vision: 6,
         special: 'Heilung',
-        specialDesc: 'Heilt Team +30 HP'
+        specialDesc: 'Heilt Team +40 HP', // Erhöht von +30
+        healAmount: 40,     // Stärker heilen
+        healRange: 4        // Erhöhte Heilreichweite
     },
     sniper: {
         name: 'Sniper',
         icon: '🎯',
-        hp: 50,
-        damage: 45,
+        hp: 40,             // REDUZIERT von 50 - sehr fragil
+        damage: 38,         // REDUZIERT von 45 - nicht mehr 1-shot
         range: 6,
         move: 2,
-        vision: 8,          // Increased from 7 - excellent spotter
+        vision: 7,          // Reduziert von 8 - Scout ist jetzt bester Spotter
         special: 'Tarnung',
         specialDesc: 'Unsichtbar für 1 Runde',
-        stealthDetectionRange: 2
+        stealthDetectionRange: 2,
+        // Sniper-Schwäche: Braucht Zeit zum Nachladen
+        reloadPenalty: true // Kann nicht 2x in Folge angreifen (braucht Bewegung dazwischen)
     },
     commando: {
         name: 'Commando',
         icon: '⚔️',
-        hp: 65,
-        damage: 40,
+        hp: 75,             // Erhöht von 65 - robuster im Nahkampf
+        damage: 50,         // Erhöht von 40 - SEHR gefährlich im Nahkampf
         range: 1,           // Nahkampf
-        move: 4,
-        vision: 5,          // Kept at 5 - relies on stealth, not vision
+        move: 5,            // Erhöht von 4 - schneller anschleichen
+        vision: 5,
         special: 'Schleichen',
         specialDesc: 'Tarnung + Bonus-Bewegung',
-        stealthDetectionRange: 1,  // Noch schwerer zu entdecken
-        meleeBonus: 15      // Extra Schaden im Nahkampf
+        stealthDetectionRange: 1,  // Schwer zu entdecken
+        meleeBonus: 20,     // Erhöht von 15 - brutaler Nahkampf
+        // Commando-Bonus: Erste Attacke nach Stealth macht Bonusschaden
+        ambushBonus: 15     // Extra Schaden aus dem Hinterhalt
     }
 };

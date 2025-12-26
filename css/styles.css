@@ -854,6 +854,47 @@ button:focus:not(:focus-visible),
     background: rgba(167, 139, 250, 0.15);
 }
 
+/* === SCHUSSCHWIERIGKEIT VISUELLES FEEDBACK === */
+.target-info .cover-info.guaranteed {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.25);
+    font-weight: 600;
+}
+
+.target-info .cover-info.hard-shot {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.2);
+    font-weight: 600;
+    animation: pulseWarning 1s infinite ease-in-out;
+}
+
+@keyframes pulseWarning {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+}
+
+/* Trefferchance Farbcodierung */
+#hit-chance.shot-easy {
+    color: #22c55e !important;
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+#hit-chance.shot-medium {
+    color: #fbbf24 !important;
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+#hit-chance.shot-hard {
+    color: #ef4444 !important;
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    animation: pulseWarning 1s infinite ease-in-out;
+}
+
+#hit-chance.shot-impossible {
+    color: #dc2626 !important;
+    text-shadow: 0 0 15px rgba(220, 38, 38, 0.7);
+}
+
 .target-info .attack-hint {
     color: var(--yellow);
     font-size: 11px;

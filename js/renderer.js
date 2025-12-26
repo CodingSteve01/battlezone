@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone } from './state.js';
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -2656,6 +2656,46 @@ export function render() {
             const powerup = getPowerupAt(hex.q, hex.r);
             if (powerup) {
                 drawPowerup(sx, sy, powerup, state.hexSize);
+            }
+        }
+
+        // === SHRINKING ZONE VISUAL INDICATOR ===
+        // Draw red overlay on hexes outside the safe zone
+        if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
+            if (!isHexInZone(hex.q, hex.r)) {
+                // Red danger zone overlay
+                ctx.save();
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize);
+                const zoneGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
+                zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
+                zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
+                zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
+                ctx.fillStyle = zoneGradient;
+                ctx.fill();
+
+                // Pulsing red border for danger zone edge
+                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
+                ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulse * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Zone warning indicator for hexes at the boundary
+        if (state.zoneShrinkWarning && state.zoneRadius > 0) {
+            const hexDist = Math.max(Math.abs(hex.q), Math.abs(hex.r), Math.abs(-hex.q - hex.r));
+            // Hexes that will be outside after next shrink
+            if (hexDist > state.zoneRadius - 2 && hexDist <= state.zoneRadius) {
+                ctx.save();
+                ctx.beginPath();
+                drawHexPath(sx, sy, state.hexSize);
+                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+                ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.4})`;
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                ctx.restore();
             }
         }
 

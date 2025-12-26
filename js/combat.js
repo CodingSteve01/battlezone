@@ -1,6 +1,6 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, markCombat } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine, getNeighbors } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -207,89 +207,103 @@ function calculateCoverEffectiveness(attacker, defender) {
 
 /**
  * Calculate hit chance for an attack
+ * NEUES SYSTEM: Nahkampf trifft IMMER, Nahschüsse fast immer,
+ * nur am Rand der Reichweite gibt es Fehlschuss-Chance
  */
 export function calculateHitChance(attacker, defender) {
-    let chance = 70; // Base hit chance
-
-    // Get terrain info for both units
-    const attHex = getHex(attacker.q, attacker.r);
-    const defHex = getHex(defender.q, defender.r);
-
-    // Calculate line of sight cover
-    const losInfo = calculateLineOfSightCover(attacker, defender);
-
-    // Penalty for shooting through obstacles
-    if (losInfo.hasObstruction) {
-        chance -= losInfo.coverCount * 10; // -10% per obstacle
-    }
-
-    // Defender in cover terrain (forest) - base cover bonus
-    if (defHex && defHex.cover) {
-        chance -= 15; // Reduced from 25 - this is passive terrain cover
-    }
-
-    // Defender is actively hiding - bonus depends on direction
-    if (defender.hiding) {
-        const coverEffectiveness = calculateCoverEffectiveness(attacker, defender);
-        if (coverEffectiveness > 0) {
-            // Cover is effective - apply full hiding bonus scaled by effectiveness
-            const hidingPenalty = Math.round(25 * coverEffectiveness);
-            chance -= hidingPenalty;
-        }
-        // If coverEffectiveness is 0, the attacker has a clear shot (flanked)
-    }
-
-    // Attacker on hills - better accuracy (high ground)
-    if (attHex && attHex.type === 'hills') {
-        chance += 15;
-    }
-
-    // Defender on hills - harder to hit (defensive position)
-    if (defHex && defHex.type === 'hills') {
-        chance -= 10;
-    }
-
-    // Scout accuracy bonus
-    if (attacker.class === 'scout') {
-        chance += 15;
-    }
-
     // Distance calculation
     const dist = hexDistance(
         { q: attacker.q, r: attacker.r },
         { q: defender.q, r: defender.r }
     );
 
-    // Close-range bonus: harder to miss when up close
+    const unitRange = attacker.range;
+
+    // === NAHKAMPF (Commando) TRIFFT IMMER ===
+    if (attacker.class === 'commando') {
+        return 100; // Nahkampf-Attacken verfehlen nie
+    }
+
+    // === NAHSCHÜSSE TREFFEN FAST IMMER ===
+    // Distanz 1: 100% Trefferchance (Punkt-blank)
+    // Distanz 2: 98% Trefferchance
     if (dist === 1) {
-        chance += 20;
-    } else if (dist === 2) {
-        chance += 10;
-    } else if (dist === 3) {
+        return 100; // Niemand verfehlt aus nächster Nähe
+    }
+    if (dist === 2) {
+        return 98; // Fast unmöglich zu verfehlen
+    }
+
+    // === DISTANZBASIERTE TREFFERCHANCE ===
+    // Basis: 95% bei mittlerer Reichweite
+    // Nur am absoluten Rand der Reichweite sinkt die Chance
+    let chance = 95;
+
+    // Berechne wie nah wir am Reichweiten-Limit sind (0 = perfekt, 1 = am Limit)
+    const rangeRatio = dist / unitRange;
+
+    // Nur bei mehr als 70% der maximalen Reichweite beginnt Abzug
+    if (rangeRatio > 0.7) {
+        // Am äußersten Rand (100% Reichweite): bis zu -20% Chance
+        const distancePenalty = Math.round((rangeRatio - 0.7) * 67); // Max ~20% bei voller Reichweite
+        chance -= distancePenalty;
+    }
+
+    // === SNIPER SPEZIAL ===
+    // Sniper haben höhere Reichweite, aber am absoluten Rand (5-6 Felder) wird es schwieriger
+    if (attacker.class === 'sniper') {
+        if (dist >= 5) {
+            // Schwieriger Schuss auf maximale Distanz
+            chance -= (dist - 4) * 8; // -8% pro Feld über 4
+        } else {
+            // Sniper sind in mittlerer Reichweite sehr präzise
+            chance += 5;
+        }
+    }
+
+    // === TERRAIN-MODIFIKATOREN ===
+    const attHex = getHex(attacker.q, attacker.r);
+    const defHex = getHex(defender.q, defender.r);
+
+    // Attacker auf Hügel: +5% (nicht mehr)
+    if (attHex && attHex.type === 'hills') {
         chance += 5;
     }
 
-    // Sniper: accuracy bonus, especially at range
-    if (attacker.class === 'sniper') {
-        chance += 20; // Base accuracy bonus
-        // Sniper gets BETTER at range, not worse
-        if (dist >= 4) {
-            chance += 10; // Optimal range bonus
+    // Verteidiger auf Hügel: -5% (leicht schwerer zu treffen)
+    if (defHex && defHex.type === 'hills') {
+        chance -= 5;
+    }
+
+    // === SICHTLINIEN-HINDERNISSE ===
+    // Nur bei weiter Entfernung relevant
+    if (dist >= 4) {
+        const losInfo = calculateLineOfSightCover(attacker, defender);
+        if (losInfo.hasObstruction) {
+            chance -= losInfo.coverCount * 5; // Reduziert von 10%
         }
-    } else {
-        // Normal units: distance penalty
-        chance -= (dist - 1) * 5;
     }
 
-    // Clamp to reasonable bounds
-    const clampedChance = Math.min(95, Math.max(25, chance));
-
-    // Commandos at melee range should not miss
-    if (attacker.class === 'commando' && dist === 1) {
-        return 100;
+    // === DECKUNG (WALD) ===
+    // Wald reduziert NICHT mehr stark die Trefferchance!
+    // Stattdessen reduziert Wald den Schaden (siehe executeAttack)
+    // Nur minimaler Malus für aktives Verstecken auf große Distanz
+    if (defender.hiding && dist >= 4) {
+        const coverEffectiveness = calculateCoverEffectiveness(attacker, defender);
+        if (coverEffectiveness > 0) {
+            // Max -10% statt -25%
+            chance -= Math.round(10 * coverEffectiveness);
+        }
     }
 
-    return clampedChance;
+    // Scout hat leichten Präzisionsbonus
+    if (attacker.class === 'scout') {
+        chance += 5;
+    }
+
+    // Minimum 75% Chance (außer für sehr schwierige Schüsse)
+    // Maximum 100%
+    return Math.min(100, Math.max(75, chance));
 }
 
 /**
@@ -311,6 +325,64 @@ export function getCoverInfo(attacker, defender) {
         distance,
         isFlanked: defender.hiding && coverEffectiveness === 0
     };
+}
+
+/**
+ * Calculate cover damage reduction (NEUES SYSTEM)
+ * Wald/Deckung reduziert den Schaden, nicht die Trefferchance
+ */
+function calculateCoverDamageReduction(attacker, defender) {
+    const defHex = getHex(defender.q, defender.r);
+    if (!defHex) return 0;
+
+    const dist = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
+
+    let reduction = 0;
+
+    // Wald/Deckung reduziert Schaden
+    if (defHex.cover) {
+        // Basis-Schadensreduktion durch Terrain: 15%
+        reduction += 0.15;
+
+        // Aktives Verstecken erhöht die Reduktion
+        if (defender.hiding) {
+            const coverEffectiveness = calculateCoverEffectiveness(attacker, defender);
+            // Bis zu +20% extra Reduktion bei guter Deckung
+            reduction += 0.20 * coverEffectiveness;
+        }
+    }
+
+    // Distanz-basierte Schadensreduktion für Fernkämpfer (nicht Sniper)
+    // Simuliert Energieverlust des Projektils
+    if (dist >= 4 && attacker.class !== 'sniper') {
+        reduction += (dist - 3) * 0.05; // 5% pro Feld über 3
+    }
+
+    // Hügel-Verteidigung
+    if (defHex.type === 'hills') {
+        reduction += 0.10; // 10% Schadensreduktion
+    }
+
+    // Sichtlinien-Hindernisse reduzieren auch Schaden
+    if (dist >= 3) {
+        const losInfo = calculateLineOfSightCover(attacker, defender);
+        if (losInfo.hasObstruction) {
+            reduction += losInfo.coverCount * 0.08; // 8% pro Hindernis
+        }
+    }
+
+    // === ASSAULT ARMOR PIERCING ===
+    // Assault ignoriert einen Teil der Deckungsreduktion
+    if (attacker.class === 'assault') {
+        const armorPiercing = UNIT_CLASSES.assault.armorPiercing || 0.5;
+        reduction *= (1 - armorPiercing); // 50% weniger effektive Deckung gegen Assault
+    }
+
+    // Maximum 50% Schadensreduktion
+    return Math.min(0.50, reduction);
 }
 
 /**
@@ -367,16 +439,36 @@ export function executeAttack(attacker, defender) {
         hit = false;
         playMiss();
         showToast('⛈️ Sturm! Schuss verfehlt!', 'miss');
-        spendSharedAP(1);  // Spend from shared pool
-        trackUnitAttack(attacker);  // Still counts as an attack
-        return { hit: false, damage: 0, killed: false, eventMiss: true };
+        // KEIN AP-Verbrauch bei Sturm-Fehlschuss - Spieler kann erneut versuchen
+        // Aber zählt als Angriff für diesen Zug
+        trackUnitAttack(attacker);
+        return { hit: false, damage: 0, killed: false, eventMiss: true, apRefunded: true };
     }
 
-    // Consume AP from shared pool
+    // === FEHLSCHUSS-BEHANDLUNG ===
+    if (!hit) {
+        playMiss();
+        // NEUES SYSTEM: Fehlschuss kostet KEINE AP!
+        // Spieler darf erneut versuchen (zählt aber als Angriff für diese Einheit)
+        trackUnitAttack(attacker);
+
+        // Zeige Info dass erneuter Versuch möglich ist (wenn noch AP vorhanden)
+        if (state.sharedAP >= 1) {
+            showToast('💨 Verfehlt! Erneuter Versuch möglich', 'miss');
+        } else {
+            showToast('💨 Verfehlt!', 'miss');
+        }
+        return { hit: false, damage: 0, killed: false, apRefunded: true };
+    }
+
+    // === TREFFER - AP wird verbraucht ===
     spendSharedAP(1);
 
     // Track this attack for the unit
     trackUnitAttack(attacker);
+
+    // Markiere dass Kampf stattgefunden hat (für Shrinking Zone)
+    markCombat();
 
     // Show remaining attacks if limited
     const remaining = getRemainingAttacks(attacker);
@@ -386,94 +478,112 @@ export function executeAttack(attacker, defender) {
         }, 500);
     }
 
-    if (hit) {
-        // Check for shield (from power-up)
-        if (defender.shield) {
-            defender.shield = false;
-            playShieldBlock();
-            showToast('🛡️ Schild blockiert Angriff!', 'special');
-            return { hit: true, damage: 0, killed: false, blocked: true };
-        }
+    // Check for shield (from power-up)
+    if (defender.shield) {
+        defender.shield = false;
+        playShieldBlock();
+        showToast('🛡️ Schild blockiert Angriff!', 'special');
+        return { hit: true, damage: 0, killed: false, blocked: true };
+    }
 
-        // Calculate base damage with all bonuses
-        let damage = getEffectiveDamage(attacker);
+    // Calculate base damage with all bonuses
+    let damage = getEffectiveDamage(attacker);
 
-        // Assault has damage variance
-        if (attacker.class === 'assault') {
-            damage += Math.floor(Math.random() * 15);
-        }
+    // Assault has damage variance
+    if (attacker.class === 'assault') {
+        damage += Math.floor(Math.random() * 15);
+    }
 
-        // Ninja melee bonus (at range 1)
-        if (attacker.class === 'commando') {
-            if (dist === 1) {
-                damage += UNIT_CLASSES.commando.meleeBonus || 15;
+    // Commando melee bonus (at range 1)
+    if (attacker.class === 'commando') {
+        if (dist === 1) {
+            damage += UNIT_CLASSES.commando.meleeBonus || 20;
+
+            // Ambush-Bonus: Extra Schaden wenn aus Tarnung/Versteck angreifend
+            if (wasStealthed) {
+                const ambushBonus = UNIT_CLASSES.commando.ambushBonus || 15;
+                damage += ambushBonus;
+                setTimeout(() => {
+                    showToast('🗡️ Hinterhalt! Bonus-Schaden!', 'special');
+                }, 200);
             }
         }
-
-        // Calculate critical hit
-        const crit = calculateCritical(attacker, defender);
-        if (crit.isCrit) {
-            damage = Math.floor(damage * crit.multiplier);
-        }
-
-        // Apply damage
-        defender.currentHp -= damage;
-
-        // Track damage for XP and assists
-        trackDamage(attacker, defender, damage);
-
-        // Calculate screen position for floating damage
-        const defenderPos = hexToPixel(defender.q, defender.r, state.hexSize);
-        const canvas = document.getElementById('game-canvas');
-        if (canvas) {
-            const rect = canvas.getBoundingClientRect();
-            const screenX = rect.left + state.offsetX + defenderPos.x;
-            const screenY = rect.top + state.offsetY + defenderPos.y - 20;
-            showFloatingDamage(screenX, screenY, damage, crit.isCrit);
-        }
-
-        // Play hit sound and show message
-        if (crit.isCrit) {
-            playCriticalHit();
-            showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
-        } else {
-            playHit();
-            showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
-        }
-
-        // Hit particle effects at defender position
-        // Direction is from attacker to defender (impact direction)
-        particles.hitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection);
-
-        // Check for kill
-        if (defender.currentHp <= 0) {
-            killUnit(defender);
-            playDeath();
-
-            // Award XP for kill and assists
-            const levelUps = awardKillXP(attacker, defender);
-
-            setTimeout(() => {
-                showToast(`☠️ ${UNIT_CLASSES[defender.class].name} eliminiert!`, 'hit');
-            }, 800);
-
-            // Show level up notifications
-            levelUps.forEach((levelUp, i) => {
-                setTimeout(() => {
-                    import('./audio.js').then(audio => audio.playLevelUp());
-                    showToast(`⭐ ${UNIT_CLASSES[levelUp.unit.class].name} → ${levelUp.rank}!`, 'levelup');
-                }, 1600 + i * 800);
-            });
-
-            return { hit: true, damage, killed: true, crit: crit.isCrit, levelUps };
-        }
-
-        return { hit: true, damage, killed: false, crit: crit.isCrit };
-    } else {
-        playMiss();
-        showToast('💨 Verfehlt!', 'miss');
-        return { hit: false, damage: 0, killed: false };
     }
+
+    // === NEUES SYSTEM: Deckung reduziert Schaden ===
+    const coverReduction = calculateCoverDamageReduction(attacker, defender);
+    if (coverReduction > 0) {
+        const reducedAmount = Math.floor(damage * coverReduction);
+        damage -= reducedAmount;
+        if (reducedAmount > 5) {
+            setTimeout(() => {
+                showToast(`🌲 Deckung absorbiert ${reducedAmount} Schaden`, 'info');
+            }, 300);
+        }
+    }
+
+    // Calculate critical hit
+    const crit = calculateCritical(attacker, defender);
+    if (crit.isCrit) {
+        damage = Math.floor(damage * crit.multiplier);
+    }
+
+    // Minimum damage is 5 (can't be completely negated by cover)
+    damage = Math.max(5, damage);
+
+    // Apply damage
+    defender.currentHp -= damage;
+
+    // Track damage for XP and assists
+    trackDamage(attacker, defender, damage);
+
+    // Calculate screen position for floating damage
+    const defenderPosScreen = hexToPixel(defender.q, defender.r, state.hexSize);
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const screenX = rect.left + state.offsetX + defenderPosScreen.x;
+        const screenY = rect.top + state.offsetY + defenderPosScreen.y - 20;
+        showFloatingDamage(screenX, screenY, damage, crit.isCrit);
+    }
+
+    // Play hit sound and show message
+    if (crit.isCrit) {
+        playCriticalHit();
+        showToast(`⚡ KRITISCH! ${damage} Schaden!`, 'crit');
+    } else {
+        playHit();
+        showToast(`💥 Treffer! ${damage} Schaden`, 'hit');
+    }
+
+    // Hit particle effects at defender position
+    // Direction is from attacker to defender (impact direction)
+    particles.hitEffect(defenderPos.x, defenderPos.y - 10, crit.isCrit, attackDirection);
+
+    // Check for kill
+    if (defender.currentHp <= 0) {
+        killUnit(defender);
+        playDeath();
+
+        // Award XP for kill and assists
+        const levelUps = awardKillXP(attacker, defender);
+
+        setTimeout(() => {
+            showToast(`☠️ ${UNIT_CLASSES[defender.class].name} eliminiert!`, 'hit');
+        }, 800);
+
+        // Show level up notifications
+        levelUps.forEach((levelUp, i) => {
+            setTimeout(() => {
+                import('./audio.js').then(audio => audio.playLevelUp());
+                showToast(`⭐ ${UNIT_CLASSES[levelUp.unit.class].name} → ${levelUp.rank}!`, 'levelup');
+            }, 1600 + i * 800);
+        });
+
+        return { hit: true, damage, killed: true, crit: crit.isCrit, levelUps };
+    }
+
+    return { hit: true, damage, killed: false, crit: crit.isCrit };
 }
 
 /**
@@ -502,7 +612,7 @@ export function useSpecialAbility(unit) {
 }
 
 /**
- * Medic healing ability
+ * Medic healing ability (VERBESSERT)
  */
 function useMedicSpecial(unit) {
     const allies = getPlayerUnits(unit.player);
@@ -514,17 +624,21 @@ function useMedicSpecial(unit) {
     const medicPos = hexToPixel(unit.q, unit.r, state.hexSize);
     particles.healEffect(medicPos.x, medicPos.y - 10);
 
+    // Verwende verbesserte Werte aus config
+    const healAmount = UNIT_CLASSES.medic.healAmount || 40;
+    const healRange = UNIT_CLASSES.medic.healRange || 4;
+
     allies.forEach(ally => {
         const dist = hexDistance(
             { q: unit.q, r: unit.r },
             { q: ally.q, r: ally.r }
         );
 
-        if (dist <= 3) {
-            const healAmount = Math.min(30, ally.maxHp - ally.currentHp);
-            if (healAmount > 0) {
-                ally.currentHp += healAmount;
-                totalHealed += healAmount;
+        if (dist <= healRange) {
+            const actualHeal = Math.min(healAmount, ally.maxHp - ally.currentHp);
+            if (actualHeal > 0) {
+                ally.currentHp += actualHeal;
+                totalHealed += actualHeal;
 
                 // Healing particles at ally position
                 const allyPos = hexToPixel(ally.q, ally.r, state.hexSize);
@@ -536,7 +650,7 @@ function useMedicSpecial(unit) {
                     const rect = canvas.getBoundingClientRect();
                     const screenX = rect.left + state.offsetX + allyPos.x;
                     const screenY = rect.top + state.offsetY + allyPos.y - 20;
-                    showFloatingDamage(screenX, screenY, healAmount, false, true);
+                    showFloatingDamage(screenX, screenY, actualHeal, false, true);
                 }
             }
         }
@@ -567,17 +681,17 @@ function useScoutSpecial(unit) {
 }
 
 /**
- * Assault powershot ability
+ * Assault powershot ability (VERBESSERT)
  */
 function useAssaultSpecial(unit) {
-    unit.damage += 20;
+    unit.damage += 25; // Erhöht von 20
     playPowershot();
 
     // Powershot charging effect
     const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
     particles.powershotEffect(unitPos.x, unitPos.y - 10, 0); // Direction 0 = right, will spread
 
-    showToast('💥 Powershot bereit!', 'special');
+    showToast('💥 Powershot bereit! (+25 Schaden)', 'special');
     return true;
 }
 

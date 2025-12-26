@@ -1,9 +1,9 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool } from './state.js';
+import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
-import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
+import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
@@ -12,6 +12,16 @@ import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn } from './ai.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
+
+// === SHRINKING ZONE CONSTANTS ===
+const ZONE_CONFIG = {
+    ROUNDS_BEFORE_SHRINK: 4,      // Runden ohne Kampf bevor Zone schrumpft
+    SHRINK_AMOUNT: 2,             // Wie viele Felder pro Schrumpfung
+    MIN_ZONE_RADIUS: 5,           // Minimaler Radius
+    ZONE_DAMAGE: 15,              // Schaden pro Runde außerhalb der Zone
+    REVEAL_INTERVAL: 5,           // Alle X Runden ohne Kampf: versteckte Einheiten aufdecken
+    WARNING_ROUNDS: 1             // Runden Vorwarnung bevor Zone schrumpft
+};
 
 /**
  * Start a player's turn
@@ -129,6 +139,9 @@ export function nextPlayer() {
         // Clear previous round's event
         clearRoundEvent();
 
+        // === SHRINKING ZONE MECHANIK ===
+        processZoneMechanic();
+
         // Roll for new round event
         const event = rollRoundEvent();
         if (event) {
@@ -236,4 +249,152 @@ export function checkWinCondition() {
         return true;
     }
     return false;
+}
+
+// === SHRINKING ZONE MECHANIK ===
+
+/**
+ * Process the shrinking zone mechanic at the start of each new round
+ */
+function processZoneMechanic() {
+    // Nur aktiv wenn Zone initialisiert wurde
+    if (state.maxZoneRadius === 0) return;
+
+    const roundsWithoutCombat = state.round - state.lastCombatRound;
+
+    // === 1. VERSTECKTE EINHEITEN AUFDECKEN ===
+    // Alle X Runden ohne Kampf werden getarnte Einheiten kurz aufgedeckt
+    if (roundsWithoutCombat > 0 && roundsWithoutCombat % ZONE_CONFIG.REVEAL_INTERVAL === 0) {
+        revealAllStealthedUnits();
+    }
+
+    // === 2. WARNUNG VOR ZONE-SCHRUMPFUNG ===
+    const roundsUntilShrink = ZONE_CONFIG.ROUNDS_BEFORE_SHRINK - roundsWithoutCombat;
+
+    if (roundsUntilShrink === ZONE_CONFIG.WARNING_ROUNDS && state.zoneRadius > ZONE_CONFIG.MIN_ZONE_RADIUS) {
+        state.zoneShrinkWarning = true;
+        showToast('⚠️ WARNUNG: Spielfeld schrumpft nächste Runde!', 'special');
+        setTimeout(() => {
+            showToast('💡 Sucht den Feind oder die Zone wird kleiner!', 'info');
+        }, 2000);
+    }
+
+    // === 3. ZONE SCHRUMPFEN ===
+    if (roundsWithoutCombat >= ZONE_CONFIG.ROUNDS_BEFORE_SHRINK) {
+        shrinkZone();
+    }
+
+    // === 4. SCHADEN AN EINHEITEN AUSSERHALB DER ZONE ===
+    applyZoneDamage();
+}
+
+/**
+ * Reveal all stealthed/cloaked units temporarily
+ */
+function revealAllStealthedUnits() {
+    let revealed = 0;
+
+    state.units.forEach(unit => {
+        if (!unit.alive) return;
+
+        if (unit.cloaked || unit.hiding) {
+            unit.cloaked = false;
+            unit.hiding = false;
+            unit.revealedByZone = true; // Marker für temporäre Enthüllung
+            revealed++;
+        }
+    });
+
+    if (revealed > 0) {
+        showToast(`👁️ AUFKLÄRUNG! ${revealed} versteckte Einheit${revealed > 1 ? 'en' : ''} aufgedeckt!`, 'special');
+
+        // Visibility aktualisieren
+        setTimeout(() => {
+            updateVisibility();
+            render();
+        }, 500);
+    }
+}
+
+/**
+ * Shrink the playable zone
+ */
+function shrinkZone() {
+    if (state.zoneRadius <= ZONE_CONFIG.MIN_ZONE_RADIUS) {
+        // Zone ist bereits minimal - stattdessen öfter Einheiten aufdecken
+        revealAllStealthedUnits();
+        return;
+    }
+
+    const oldRadius = state.zoneRadius;
+    state.zoneRadius = Math.max(
+        ZONE_CONFIG.MIN_ZONE_RADIUS,
+        state.zoneRadius - ZONE_CONFIG.SHRINK_AMOUNT
+    );
+
+    state.zonePhase++;
+    state.zoneShrinkWarning = false;
+
+    // Reset Kampf-Timer nach Schrumpfung (gibt Spielern Zeit zu reagieren)
+    state.lastCombatRound = state.round;
+
+    showToast(`🔴 ZONE SCHRUMPFT! Radius: ${oldRadius} → ${state.zoneRadius}`, 'miss');
+
+    setTimeout(() => {
+        showToast('⚠️ Einheiten außerhalb der Zone erleiden Schaden!', 'info');
+    }, 1500);
+}
+
+/**
+ * Apply damage to units outside the safe zone
+ */
+function applyZoneDamage() {
+    if (state.zoneRadius >= state.maxZoneRadius) return; // Zone noch nicht geschrumpft
+
+    let unitsHit = 0;
+
+    state.units.forEach(unit => {
+        if (!unit.alive) return;
+
+        if (!isHexInZone(unit.q, unit.r)) {
+            const damage = ZONE_CONFIG.ZONE_DAMAGE;
+            unit.currentHp -= damage;
+            unitsHit++;
+
+            if (unit.currentHp <= 0) {
+                unit.currentHp = 0;
+                unit.alive = false;
+                showToast(`☠️ ${unit.class} wurde von der Zone eliminiert!`, 'miss');
+            }
+        }
+    });
+
+    if (unitsHit > 0) {
+        showToast(`☢️ ${unitsHit} Einheit${unitsHit > 1 ? 'en' : ''} erleidet Zonenschaden!`, 'miss');
+    }
+
+    // Prüfe Spielende nach Zonenschaden
+    const result = checkGameOver();
+    if (result.gameOver) {
+        setTimeout(() => endGame(result.winner), 1000);
+    }
+}
+
+/**
+ * Get current zone info for UI display
+ */
+export function getZoneInfo() {
+    if (state.maxZoneRadius === 0) return null;
+
+    const roundsWithoutCombat = state.round - state.lastCombatRound;
+    const roundsUntilShrink = Math.max(0, ZONE_CONFIG.ROUNDS_BEFORE_SHRINK - roundsWithoutCombat);
+
+    return {
+        currentRadius: state.zoneRadius,
+        maxRadius: state.maxZoneRadius,
+        phase: state.zonePhase,
+        roundsUntilShrink,
+        isWarning: state.zoneShrinkWarning,
+        roundsWithoutCombat
+    };
 }

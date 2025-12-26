@@ -576,66 +576,93 @@ function selectBestTarget(attacker, targets) {
 
 /**
  * Decide if special ability should be used
+ * VERBESSERTE KI: Intelligentere Entscheidungen basierend auf Situation
  */
 function shouldUseSpecial(unit, enemies, plan) {
     switch (unit.class) {
         case 'medic': {
             const allies = getPlayerUnits(unit.player);
+            // Verbesserte Heilreichweite aus config
+            const healRange = 4;
             const woundedNearby = allies.filter(a =>
                 a.currentHp < a.maxHp * 0.7 &&
-                hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= 3
+                hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= healRange
             );
-            // Heal if multiple wounded or anyone critically wounded
+            // Heal if multiple wounded or anyone critically wounded or if self wounded
+            const selfWounded = unit.currentHp < unit.maxHp * 0.6;
             return woundedNearby.length >= 2 ||
-                   woundedNearby.some(a => a.currentHp < a.maxHp * 0.4);
+                   woundedNearby.some(a => a.currentHp < a.maxHp * 0.4) ||
+                   (selfWounded && woundedNearby.length >= 1);
         }
 
         case 'scout':
-            // Sprint to close distance or escape
+            // Sprint to close distance, escape, or explore faster
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                return closestEnemy > unit.range && closestEnemy <= unit.range + unit.move + 3;
+                // Sprint zum Angriff wenn Feind in erreichbarer Nähe
+                if (closestEnemy > unit.range && closestEnemy <= unit.range + unit.move + 3) {
+                    return true;
+                }
+                // Sprint zur Flucht wenn schwer verletzt
+                if (unit.currentHp < unit.maxHp * 0.4 && closestEnemy <= 4) {
+                    return true;
+                }
             }
-            // Sprint during hunt mode for faster search
+            // Sprint während Hunt-Modus für schnellere Aufklärung
             return plan.inHuntMode;
 
         case 'assault':
-            // Powershot on high-value targets
+            // Powershot auf wichtige Ziele oder wenn Feind in Reichweite
             if (enemies.length > 0) {
                 const inRange = enemies.filter(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
                 );
-                return inRange.some(e => e.class === 'medic' || e.class === 'sniper');
+                // Powershot auf hochwertige Ziele (Medic, Sniper)
+                if (inRange.some(e => e.class === 'medic' || e.class === 'sniper')) {
+                    return true;
+                }
+                // Powershot wenn Feind schwach und in Reichweite
+                if (inRange.some(e => e.currentHp <= unit.damage + 25)) {
+                    return true; // Kann mit Powershot töten
+                }
             }
             return false;
 
         case 'sniper':
-            // Cloak only when tactically beneficial (not always)
+            // Cloak nur wenn taktisch sinnvoll
             if (unit.cloaked) return false;
             if (enemies.length > 0) {
-                // Only cloak if in danger - enemies within 3 hexes
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                return closestEnemy <= 3 && unit.currentHp < unit.maxHp * 0.7;
+                // Tarnung wenn in Gefahr
+                if (closestEnemy <= 3) {
+                    return true;
+                }
+                // Tarnung wenn verletzt und Feinde in der Nähe
+                if (unit.currentHp < unit.maxHp * 0.5 && closestEnemy <= 5) {
+                    return true;
+                }
             }
-            // In hunt mode, only cloak 30% of the time (not always)
-            return plan.inHuntMode && Math.random() < 0.3;
+            // Seltener tarnen im Hunt-Modus
+            return plan.inHuntMode && Math.random() < 0.2;
 
         case 'commando':
-            // Stealth for ambush - but not constantly
+            // Stealth für Hinterhalt
             if (unit.cloaked) return false;
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                // Only stealth if close enough to ambush (within 3 hexes)
-                return closestEnemy <= 3 && closestEnemy > 1;
+                // Stealth wenn Feind in Angriffsreichweite (kann danach anschleichen)
+                if (closestEnemy <= unit.move + 2 && closestEnemy > 1) {
+                    return true;
+                }
             }
-            // In hunt mode, only cloak 20% of the time
-            return plan.inHuntMode && Math.random() < 0.2;
+            // Im Hunt-Modus öfter Stealth für Überraschungsangriffe
+            return plan.inHuntMode && Math.random() < 0.4;
 
         default:
             return false;
@@ -690,9 +717,11 @@ function selectStrategicMoveTarget(unit, plan) {
 
 /**
  * Score position for combat situations
+ * VERBESSERTE KI: Klassenspezifische Positionierung
  */
 function scoreCombatPosition(unit, q, r, enemies, _plan) {
     let score = 0;
+    const hex = getHex(q, r);
 
     // Get assigned target or closest enemy
     const assignedId = aiMemory.assignedTargets.get(unit.id);
@@ -703,15 +732,57 @@ function scoreCombatPosition(unit, q, r, enemies, _plan) {
     if (primaryTarget) {
         const distToTarget = hexDistance({ q, r }, { q: primaryTarget.q, r: primaryTarget.r });
 
-        // Ideal distance based on unit type
+        // === KLASSENSPEZIFISCHE IDEALE DISTANZ ===
         let idealDist = unit.range;
-        if (unit.class === 'sniper') idealDist = Math.max(4, unit.range - 1);
-        if (unit.class === 'commando') idealDist = 1;
-        if (unit.class === 'assault') idealDist = Math.min(2, unit.range);
+        let minDist = 1;
+        let maxDist = unit.range;
+
+        switch (unit.class) {
+            case 'sniper':
+                // Sniper will auf maximaler Distanz bleiben
+                idealDist = unit.range;
+                minDist = 4; // Nicht zu nah
+                maxDist = unit.range;
+                break;
+            case 'commando':
+                // Commando will in Nahkampfreichweite
+                idealDist = 1;
+                minDist = 1;
+                maxDist = 2;
+                break;
+            case 'assault':
+                // Assault als Tank in mittlerer Distanz
+                idealDist = 2;
+                minDist = 1;
+                maxDist = unit.range;
+                break;
+            case 'scout':
+                // Scout flexibel, bevorzugt aber etwas Abstand
+                idealDist = 3;
+                minDist = 2;
+                maxDist = unit.range;
+                break;
+            case 'medic':
+                // Medic hält sich zurück, aber in Heilreichweite zu Verbündeten
+                idealDist = 4;
+                minDist = 3;
+                maxDist = 5;
+                break;
+        }
 
         // Score based on distance to ideal range
         const distDiff = Math.abs(distToTarget - idealDist);
         score -= distDiff * 15;
+
+        // Penalty für zu nah (außer Commando)
+        if (distToTarget < minDist) {
+            score -= (minDist - distToTarget) * 30;
+        }
+
+        // Penalty für zu weit
+        if (distToTarget > maxDist) {
+            score -= (distToTarget - maxDist) * 20;
+        }
 
         // Bonus for being in attack range
         if (distToTarget <= unit.range) {
@@ -719,6 +790,35 @@ function scoreCombatPosition(unit, q, r, enemies, _plan) {
 
             // Extra bonus for optimal range
             if (distToTarget === idealDist) score += 30;
+        }
+    }
+
+    // === KLASSENSPEZIFISCHE TERRAIN-PRÄFERENZEN ===
+    if (hex) {
+        switch (unit.class) {
+            case 'sniper':
+                // Sniper bevorzugt Hügel (Sichtbonus) und Deckung
+                if (hex.type === 'hills') score += 50;
+                if (hex.cover) score += 30;
+                break;
+            case 'commando':
+                // Commando bevorzugt Deckung für Hinterhalte
+                if (hex.cover) score += 40;
+                // Aber auch freie Sicht zum Ziel
+                break;
+            case 'assault':
+                // Assault ist robust, bevorzugt aber leichte Deckung
+                if (hex.cover) score += 15;
+                break;
+            case 'scout':
+                // Scout bevorzugt Hügel für Aufklärung
+                if (hex.type === 'hills') score += 30;
+                break;
+            case 'medic':
+                // Medic bevorzugt sichere Positionen
+                if (hex.cover) score += 40;
+                if (hex.type === 'hills') score += 20;
+                break;
         }
     }
 
@@ -732,11 +832,27 @@ function scoreCombatPosition(unit, q, r, enemies, _plan) {
         const myAngle = Math.atan2(r - primaryTarget.r, q - primaryTarget.q);
         const angleDiff = Math.abs(myAngle - avgAllyAngle);
 
-        // Bonus for flanking (attacking from different side)
-        if (angleDiff > Math.PI / 3) score += 25;
+        // Commando bekommt größeren Flanking-Bonus
+        const flankBonus = unit.class === 'commando' ? 40 : 25;
+        if (angleDiff > Math.PI / 3) score += flankBonus;
     }
 
-    // Avoid clustering with allies (spread out to avoid AoE)
+    // === MEDIC-SPEZIAL: Nähe zu Verbündeten ===
+    if (unit.class === 'medic') {
+        for (const ally of allies) {
+            const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+            // Medic will in Heilreichweite sein
+            if (distToAlly <= 4) {
+                score += 15;
+                // Bonus wenn Verbündeter verletzt
+                if (ally.currentHp < ally.maxHp * 0.7) {
+                    score += 20;
+                }
+            }
+        }
+    }
+
+    // Avoid clustering with allies (spread out)
     for (const ally of allies) {
         const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
         if (distToAlly <= 1) score -= 20;
