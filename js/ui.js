@@ -9,25 +9,46 @@ import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 
 /**
- * Center camera on a specific unit
+ * Center camera on a specific unit with smooth scrolling
  */
-function centerOnUnit(unit) {
+function centerOnUnit(unit, duration = 400) {
     if (!unit) return;
 
     // Calculate unit position in pixels
     const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const targetCameraX = -pos.x;
+    const targetCameraY = -pos.y;
 
-    // Set camera to center on unit with smooth animation feel
-    state.cameraX = -pos.x;
-    state.cameraY = -pos.y;
+    const startCameraX = state.cameraX;
+    const startCameraY = state.cameraY;
+    const startTime = Date.now();
 
-    // Update offset (replicated from input.js to avoid circular dependency)
     const canvas = document.getElementById('game-canvas');
-    if (canvas) {
+    if (!canvas) return;
+
+    function animateScroll() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / duration);
+
+        // Ease out cubic for smooth deceleration
+        const ease = 1 - Math.pow(1 - progress, 3);
+
+        state.cameraX = startCameraX + (targetCameraX - startCameraX) * ease;
+        state.cameraY = startCameraY + (targetCameraY - startCameraY) * ease;
+
+        // Update offset
         const rect = canvas.getBoundingClientRect();
         state.offsetX = rect.width / 2 + state.cameraX;
         state.offsetY = rect.height / 2 + state.cameraY;
+
+        render();
+
+        if (progress < 1) {
+            requestAnimationFrame(animateScroll);
+        }
     }
+
+    requestAnimationFrame(animateScroll);
 }
 
 /**
