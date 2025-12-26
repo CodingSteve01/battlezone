@@ -1,6 +1,6 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone } from './state.js';
+import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone, setOnAPDepletedCallback } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
@@ -482,3 +482,26 @@ export function getZoneInfo() {
         roundsWithoutCombat
     };
 }
+
+// ===== AUTO END TURN =====
+
+/**
+ * Auto-end turn when all AP is depleted
+ * Shows a brief notification before ending
+ */
+function autoEndTurn() {
+    // Don't auto-end during AI turns or if game is over
+    if (state.gameOver) return;
+    if (state.settings.singlePlayer && state.currentPlayer !== 0) return;
+
+    // Double-check AP is actually 0
+    if (state.sharedAP > 0) return;
+
+    showToast('⚡ Alle AP verbraucht - Zug wird beendet', 'info');
+    setTimeout(() => {
+        endTurn();
+    }, 1000);
+}
+
+// Set up the callback for auto-end turn
+setOnAPDepletedCallback(autoEndTurn);

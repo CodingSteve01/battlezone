@@ -283,13 +283,32 @@ export function initSharedAPPool(_player) {
     state.unitAttacksThisTurn = {};  // Reset attack tracking
 }
 
+// Callback for when AP is depleted (set by turns.js to avoid circular deps)
+let onAPDepleted = null;
+export function setOnAPDepletedCallback(callback) {
+    onAPDepleted = callback;
+}
+
 /**
  * Spend AP from the shared pool
  * Returns true if successful, false if not enough AP
+ * Triggers auto-end turn callback when AP reaches 0
  */
 export function spendSharedAP(amount) {
     if (state.sharedAP >= amount) {
         state.sharedAP -= amount;
+
+        // Check for auto-end turn when AP depleted (only for human players)
+        if (state.sharedAP <= 0 && onAPDepleted &&
+            (!state.settings.singlePlayer || state.currentPlayer === 0)) {
+            // Delay to let current action complete
+            setTimeout(() => {
+                if (state.sharedAP <= 0 && onAPDepleted) {
+                    onAPDepleted();
+                }
+            }, 800);
+        }
+
         return true;
     }
     return false;
