@@ -42,10 +42,26 @@ export function resetAIMemory() {
 }
 
 /**
- * Check if current player is AI controlled
+ * Check if a player is AI controlled
+ * Supports both legacy singlePlayer mode and new aiPlayers array
  */
 export function isAIPlayer(playerIndex = state.currentPlayer) {
+    // New mode: check aiPlayers array
+    if (state.settings.aiPlayers && state.settings.aiPlayers.length > 0) {
+        return state.settings.aiPlayers.includes(playerIndex);
+    }
+    // Legacy mode: singlePlayer means all non-0 players are AI
     return state.settings.singlePlayer && playerIndex > 0;
+}
+
+/**
+ * Check if there are any human players in the game
+ */
+export function hasHumanPlayer() {
+    for (let p = 0; p < state.settings.players; p++) {
+        if (!isAIPlayer(p)) return true;
+    }
+    return false;
 }
 
 /**

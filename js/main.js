@@ -32,12 +32,7 @@ function startTeamSelection() {
         state.teamSelections.push([]);
     }
 
-    // In single player, auto-select AI teams
-    if (state.settings.singlePlayer) {
-        for (let i = 1; i < state.settings.players; i++) {
-            state.teamSelections[i] = generateAITeam();
-        }
-    }
+    // AI teams are now auto-generated in showTeamSelectForPlayer when skipping AI players
 
     currentTeamSelectPlayer = 0;
     showTeamSelectForPlayer(0);
@@ -74,9 +69,18 @@ function generateAITeam() {
  * Show team selection screen for a specific player
  */
 function showTeamSelectForPlayer(playerIndex) {
-    // Skip AI players in single player mode
-    if (state.settings.singlePlayer && playerIndex > 0) {
-        startGameWithTeams();
+    // Skip AI players (both in single player mode and mixed multiplayer)
+    if (isAIPlayer(playerIndex)) {
+        // Auto-generate team for AI
+        state.teamSelections[playerIndex] = generateAITeam();
+
+        // Move to next player
+        const nextPlayer = playerIndex + 1;
+        if (nextPlayer >= state.settings.players) {
+            startGameWithTeams();
+        } else {
+            showTeamSelectForPlayer(nextPlayer);
+        }
         return;
     }
 
@@ -360,14 +364,26 @@ async function init() {
             const mode = btn.dataset.mode;
             state.settings.singlePlayer = (mode === 'single');
 
-            // Hide/show players section
+            // Hide/show players section and AI config
             const playersSection = document.getElementById('players-section');
+            const aiConfigSection = document.getElementById('ai-config-section');
+
             if (playersSection) {
                 if (mode === 'single') {
                     playersSection.classList.add('hidden');
                     state.settings.players = 2; // AI opponent
+                    state.settings.aiPlayers = [1]; // Player 2 is AI
                 } else {
                     playersSection.classList.remove('hidden');
+                    state.settings.aiPlayers = []; // Reset AI players
+                }
+            }
+
+            // Show/hide AI config in multiplayer
+            if (aiConfigSection) {
+                aiConfigSection.style.display = (mode === 'multi') ? 'block' : 'none';
+                if (mode === 'multi') {
+                    updateAIConfigGrid();
                 }
             }
         });
@@ -389,6 +405,11 @@ async function init() {
             btn.classList.add('selected');
 
             state.settings.players = parseInt(btn.dataset.players, 10);
+
+            // Update AI config grid when player count changes
+            if (!state.settings.singlePlayer) {
+                updateAIConfigGrid();
+            }
         });
 
         btn.addEventListener('touchend', (e) => {
@@ -567,6 +588,53 @@ async function init() {
     // showScreen() now automatically handles pointer-events on game-area
 
     console.log('Shadow Squad initialized');
+}
+
+/**
+ * Update the AI config grid based on current player count
+ */
+function updateAIConfigGrid() {
+    const grid = document.getElementById('ai-config-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    for (let i = 0; i < state.settings.players; i++) {
+        const item = document.createElement('div');
+        item.className = 'ai-config-item';
+
+        const badge = document.createElement('div');
+        badge.className = 'player-badge';
+        badge.style.backgroundColor = CONFIG.PLAYER_COLORS[i];
+        badge.textContent = i + 1;
+
+        const isAI = state.settings.aiPlayers.includes(i);
+        const toggle = document.createElement('button');
+        toggle.className = `type-toggle ${isAI ? 'ai' : 'human'}`;
+        toggle.textContent = isAI ? '🤖 KI' : '👤 Mensch';
+        toggle.dataset.player = i;
+
+        toggle.addEventListener('click', () => {
+            const playerIndex = parseInt(toggle.dataset.player, 10);
+            const isCurrentlyAI = state.settings.aiPlayers.includes(playerIndex);
+
+            if (isCurrentlyAI) {
+                // Remove from AI players
+                state.settings.aiPlayers = state.settings.aiPlayers.filter(p => p !== playerIndex);
+                toggle.className = 'type-toggle human';
+                toggle.textContent = '👤 Mensch';
+            } else {
+                // Add to AI players
+                state.settings.aiPlayers.push(playerIndex);
+                toggle.className = 'type-toggle ai';
+                toggle.textContent = '🤖 KI';
+            }
+        });
+
+        item.appendChild(badge);
+        item.appendChild(toggle);
+        grid.appendChild(item);
+    }
 }
 
 // Start when DOM is ready

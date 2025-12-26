@@ -9,7 +9,8 @@ export const state = {
         players: 2,
         size: 'medium',
         landscape: 'random',    // 'random', 'temperate', 'desert', 'tundra', 'tropical', 'highland', 'wetland'
-        singlePlayer: false,
+        singlePlayer: false,    // Legacy: true = all non-0 players are AI
+        aiPlayers: [],          // Array of player indices controlled by AI (e.g., [1, 3] for players 2 and 4)
         renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
         particleQuality: 'high' // 'low', 'medium', 'high' - Partikelanzahl
@@ -300,8 +301,12 @@ export function spendSharedAP(amount) {
         state.sharedAP -= amount;
 
         // Check for auto-end turn when AP depleted (only for human players)
-        if (state.sharedAP <= 0 && onAPDepleted &&
-            (!state.settings.singlePlayer || state.currentPlayer === 0)) {
+        // Check both legacy singlePlayer mode and new aiPlayers array
+        const isHumanPlayer = state.settings.aiPlayers && state.settings.aiPlayers.length > 0
+            ? !state.settings.aiPlayers.includes(state.currentPlayer)
+            : (!state.settings.singlePlayer || state.currentPlayer === 0);
+
+        if (state.sharedAP <= 0 && onAPDepleted && isHumanPlayer) {
             // Delay to let current action complete
             setTimeout(() => {
                 if (state.sharedAP <= 0 && onAPDepleted) {

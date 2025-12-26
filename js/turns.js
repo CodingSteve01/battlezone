@@ -48,9 +48,23 @@ export function startTurn() {
     state.currentPath = null;
     state.pendingMoveDestination = null;
 
-    // In single-player, always render from human player's perspective (player 0)
-    // In multiplayer, render from current player's perspective
-    state.viewingPlayer = state.settings.singlePlayer ? 0 : state.currentPlayer;
+    // Determine viewing player perspective:
+    // - If current player is human, view from their perspective
+    // - If current player is AI, keep the previous human player's perspective
+    if (isAIPlayer()) {
+        // AI is playing - find the first human player for viewing
+        let firstHuman = 0;
+        for (let p = 0; p < state.settings.players; p++) {
+            if (!isAIPlayer(p)) {
+                firstHuman = p;
+                break;
+            }
+        }
+        state.viewingPlayer = firstHuman;
+    } else {
+        // Human is playing - view from their perspective
+        state.viewingPlayer = state.currentPlayer;
+    }
 
     // Update fog of war
     updateVisibility();
