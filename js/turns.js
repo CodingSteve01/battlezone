@@ -347,10 +347,15 @@ function shrinkZone() {
 
 /**
  * Apply damage to units outside the safe zone
+ * First tries to displace units inward, then applies damage if they can't move
  */
 function applyZoneDamage() {
     if (state.zoneRadius >= state.maxZoneRadius) return; // Zone noch nicht geschrumpft
 
+    // First, try to displace units in the danger zone inward
+    displaceUnitsFromDangerZone();
+
+    // Now apply damage to any remaining units outside the zone
     let unitsHit = 0;
 
     state.units.forEach(unit => {
@@ -378,6 +383,89 @@ function applyZoneDamage() {
     if (result.gameOver) {
         setTimeout(() => endGame(result.winner), 1000);
     }
+}
+
+/**
+ * Displace units from the danger zone inward
+ * Units are moved to the nearest valid hex inside the safe zone
+ * Never places units on top of each other
+ */
+function displaceUnitsFromDangerZone() {
+    // Get all units outside the safe zone
+    const unitsInDanger = state.units.filter(unit =>
+        unit.alive && !isHexInZone(unit.q, unit.r)
+    );
+
+    if (unitsInDanger.length === 0) return;
+
+    let unitsMoved = 0;
+
+    // Sort units by distance from center (furthest first to prevent blocking)
+    unitsInDanger.sort((a, b) => {
+        const distA = Math.max(Math.abs(a.q), Math.abs(a.r), Math.abs(-a.q - a.r));
+        const distB = Math.max(Math.abs(b.q), Math.abs(b.r), Math.abs(-b.q - b.r));
+        return distB - distA;
+    });
+
+    for (const unit of unitsInDanger) {
+        const newPos = findSafeHexForUnit(unit);
+        if (newPos) {
+            // Move unit to new position
+            const oldHex = state.hexMap.get(`${unit.q},${unit.r}`);
+            if (oldHex) {
+                oldHex.unit = null;
+            }
+
+            unit.q = newPos.q;
+            unit.r = newPos.r;
+
+            const newHex = state.hexMap.get(`${unit.q},${unit.r}`);
+            if (newHex) {
+                newHex.unit = unit;
+            }
+
+            unitsMoved++;
+        }
+    }
+
+    if (unitsMoved > 0) {
+        showToast(`⚡ ${unitsMoved} Einheit${unitsMoved > 1 ? 'en' : ''} wurde${unitsMoved > 1 ? 'n' : ''} in sichere Zone versetzt!`, 'special');
+    }
+}
+
+/**
+ * Find the nearest safe hex for a unit to be displaced to
+ * Returns null if no valid hex is found
+ */
+function findSafeHexForUnit(unit) {
+    // Get all hexes inside the safe zone
+    const safeHexes = [];
+    state.hexes.forEach(hex => {
+        if (isHexInZone(hex.q, hex.r) && hex.walkable && !hex.unit) {
+            // Calculate distance from unit's current position
+            const distFromUnit = Math.abs(hex.q - unit.q) + Math.abs(hex.r - unit.r) +
+                Math.abs((-hex.q - hex.r) - (-unit.q - unit.r));
+            safeHexes.push({
+                q: hex.q,
+                r: hex.r,
+                dist: distFromUnit / 2 // Proper hex distance
+            });
+        }
+    });
+
+    // Sort by distance (nearest first)
+    safeHexes.sort((a, b) => a.dist - b.dist);
+
+    // Return the nearest unoccupied safe hex
+    for (const hex of safeHexes) {
+        // Double-check it's not occupied (in case another unit was just moved there)
+        const hexData = state.hexMap.get(`${hex.q},${hex.r}`);
+        if (hexData && hexData.walkable && !hexData.unit) {
+            return { q: hex.q, r: hex.r };
+        }
+    }
+
+    return null; // No valid position found
 }
 
 /**

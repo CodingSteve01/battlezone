@@ -495,18 +495,6 @@ async function init() {
         });
     }
 
-    // Setup gore toggle (blood effects - off by default for children)
-    const goreToggle = document.getElementById('gore-toggle');
-    if (goreToggle) {
-        // Initialize from state (default is false)
-        goreToggle.checked = state.settings.gore;
-
-        goreToggle.addEventListener('change', () => {
-            state.settings.gore = goreToggle.checked;
-            playClick();
-        });
-    }
-
     // Setup team confirm button
     const teamConfirmBtn = document.getElementById('team-confirm-btn');
     if (teamConfirmBtn) {

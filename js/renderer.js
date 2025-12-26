@@ -2563,6 +2563,9 @@ export function render() {
     // Collect powerup positions for drawing on top of foreground elements
     const powerupPositions = [];
 
+    // Collect AP cost overlay positions for drawing on top of everything
+    const apCostOverlays = [];
+
     // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
@@ -2728,19 +2731,9 @@ export function render() {
                     coverPositions.push({ sx, sy, cost: pathData.cost });
                 }
 
-                // Show movement cost on each hex - larger and clearer
+                // Collect AP cost overlays for drawing on top of everything
                 if (pathData.cost > 0) {
-                    // Background pill for cost
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                    ctx.beginPath();
-                    ctx.roundRect(sx - state.hexSize * 0.18, sy + state.hexSize * 0.38, state.hexSize * 0.36, state.hexSize * 0.22, 4);
-                    ctx.fill();
-
-                    ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
-                    ctx.font = `bold ${Math.round(state.hexSize * 0.2)}px sans-serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(`${pathData.cost}`, sx, sy + state.hexSize * 0.49);
+                    apCostOverlays.push({ sx, sy, cost: pathData.cost, offersCover });
                 }
             }
         }
@@ -3109,6 +3102,24 @@ export function render() {
         ctx.stroke();
     }
 
+    // Draw AP cost overlays - ALWAYS ON TOP of everything
+    if (apCostOverlays.length > 0) {
+        apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
+            // Background pill for cost
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+            ctx.beginPath();
+            ctx.roundRect(sx - state.hexSize * 0.2, sy + state.hexSize * 0.35, state.hexSize * 0.4, state.hexSize * 0.26, 5);
+            ctx.fill();
+
+            // Cost number
+            ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
+            ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${cost}`, sx, sy + state.hexSize * 0.48);
+        });
+    }
+
     // Draw scroll hint if map is larger than viewport
     drawScrollHint(w, h);
 
@@ -3117,6 +3128,9 @@ export function render() {
 
     // Draw zoom indicator
     drawZoomIndicator(w, h);
+
+    // Draw minimap for strategic overview
+    drawMinimap(w, h);
 
     // Apply post-processing effects (color grading, vignette, etc.)
     // Only on medium/high quality for performance
@@ -3273,6 +3287,196 @@ function drawZoomIndicator(w, h) {
     ctx.textBaseline = 'middle';
     const zoomPercent = Math.round(state.zoomLevel * 100);
     ctx.fillText(`🔍 ${zoomPercent}%`, x + 35, y + 15);
+
+    ctx.restore();
+}
+
+// ===== MINIMAP =====
+
+/**
+ * Minimap configuration
+ */
+const MINIMAP_CONFIG = {
+    SIZE: 140,           // Minimap size in pixels
+    PADDING: 12,         // Padding from screen edge
+    HEX_SIZE: 3,         // Size of each hex on minimap
+    OPACITY: 0.85        // Overall opacity
+};
+
+/**
+ * Draw strategic minimap showing terrain, units, and zone
+ * - Shows all terrain
+ * - Shows own units (including eliminated ones marked with X)
+ * - Shows enemies only when visible
+ * - Shows shrinking zone boundary
+ */
+function drawMinimap(w, h) {
+    if (state.hexes.length === 0) return;
+
+    const config = MINIMAP_CONFIG;
+    const size = config.SIZE;
+    const padding = config.PADDING;
+
+    // Position in bottom-right corner (above action buttons on mobile)
+    const x = w - size - padding;
+    const y = h - size - padding - 80; // Extra offset for mobile UI
+
+    ctx.save();
+    ctx.globalAlpha = config.OPACITY;
+
+    // Background with rounded corners
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.beginPath();
+    ctx.roundRect(x - 5, y - 5, size + 10, size + 10, 8);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Calculate scale to fit map in minimap
+    const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
+    const hexSize = Math.min(config.HEX_SIZE, (size / 2) / (mapRadius * 1.8));
+
+    // Center of minimap
+    const centerX = x + size / 2;
+    const centerY = y + size / 2;
+
+    // Clip to minimap area
+    ctx.beginPath();
+    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, 6);
+    ctx.clip();
+
+    // Draw all hexes
+    state.hexes.forEach(hex => {
+        const terrain = TERRAIN[hex.type];
+        if (!terrain) return;
+
+        // Convert hex coords to minimap pixel position
+        const px = centerX + hex.q * hexSize * 1.5;
+        const py = centerY + (hex.r + hex.q * 0.5) * hexSize * Math.sqrt(3);
+
+        // Check fog level for coloring
+        const fogLevel = getFogLevel(hex.q, hex.r);
+
+        // Draw hex as small circle/diamond
+        ctx.beginPath();
+        ctx.arc(px, py, hexSize * 0.8, 0, Math.PI * 2);
+
+        if (fogLevel === 'hidden') {
+            ctx.fillStyle = '#1a1a2e';
+        } else if (fogLevel === 'explored') {
+            ctx.fillStyle = desaturateAndDarken(terrain.color, 0.4, 0.6);
+        } else {
+            ctx.fillStyle = terrain.color;
+        }
+        ctx.fill();
+    });
+
+    // Draw shrinking zone boundary (if active)
+    if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
+        // Draw zone circle
+        const zoneRadiusPx = state.zoneRadius * hexSize * 1.8;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, zoneRadiusPx, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Draw units
+    const currentPlayer = state.viewingPlayer;
+
+    // First, draw eliminated friendly units (grayed out with X)
+    state.units.forEach(unit => {
+        if (unit.player !== currentPlayer) return;
+        if (unit.alive) return; // Skip alive units for now
+
+        const px = centerX + unit.q * hexSize * 1.5;
+        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
+
+        // Draw eliminated unit marker
+        ctx.fillStyle = 'rgba(100, 100, 100, 0.7)';
+        ctx.beginPath();
+        ctx.arc(px, py, hexSize * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw X over eliminated unit
+        ctx.strokeStyle = '#ff4444';
+        ctx.lineWidth = 1.5;
+        const xSize = hexSize * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(px - xSize, py - xSize);
+        ctx.lineTo(px + xSize, py + xSize);
+        ctx.moveTo(px + xSize, py - xSize);
+        ctx.lineTo(px - xSize, py + xSize);
+        ctx.stroke();
+    });
+
+    // Draw alive friendly units
+    state.units.forEach(unit => {
+        if (unit.player !== currentPlayer || !unit.alive) return;
+
+        const px = centerX + unit.q * hexSize * 1.5;
+        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
+
+        // Draw unit dot with player color
+        ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
+        ctx.beginPath();
+        ctx.arc(px, py, hexSize * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White outline
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    });
+
+    // Draw visible enemy units
+    state.units.forEach(unit => {
+        if (unit.player === currentPlayer || !unit.alive) return;
+
+        // Check if enemy is visible
+        if (!isUnitVisibleToViewer(unit)) return;
+
+        const px = centerX + unit.q * hexSize * 1.5;
+        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
+
+        // Draw enemy unit dot
+        ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
+        ctx.beginPath();
+        ctx.arc(px, py, hexSize * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Red hostile outline
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    });
+
+    // Draw current viewport indicator
+    const viewportW = state.canvasWidth / state.hexSize / 2.5;
+    const viewportH = state.canvasHeight / state.hexSize / 2.5;
+    const viewX = centerX - state.cameraX / state.hexSize * hexSize * 1.5;
+    const viewY = centerY - state.cameraY / state.hexSize * hexSize * Math.sqrt(3);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+        viewX - viewportW * hexSize,
+        viewY - viewportH * hexSize,
+        viewportW * hexSize * 2,
+        viewportH * hexSize * 2
+    );
+
+    // Label
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('KARTE', x + size / 2, y - 8);
 
     ctx.restore();
 }
