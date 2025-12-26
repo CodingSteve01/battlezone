@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.2.0...shadow-squad-v3.3.0) (2025-12-26)
+
+
+### Features
+
+* add strategic minimap and improve zone mechanics ([#103](https://github.com/CodingSteve01/battlezone/issues/103)) ([5883ab9](https://github.com/CodingSteve01/battlezone/commit/5883ab9dfcc6cea70f9991589f8a0369dd866842))
+
 ## [3.2.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.1.1...shadow-squad-v3.2.0) (2025-12-26)
 
 
