@@ -2,7 +2,7 @@
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
-import { calculateHitChance, getCoverInfo } from './combat.js';
+import { calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
@@ -266,6 +266,49 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
             if (state.sharedAP < 2 || unit.usedSpecial) {
                 specialBtn.classList.add('disabled');
                 if (tipEl) tipEl.textContent = unit.usedSpecial ? 'Bereits benutzt' : 'Nicht genug AP';
+            }
+        }
+    }
+
+    // === HINTERHALT-BUTTON ===
+    const ambushBtn = document.getElementById('ambush-btn');
+    if (ambushBtn) {
+        if (!unit || isAiTurnHidden) {
+            ambushBtn.style.display = 'none';
+        } else if (canPrepareAmbush(unit)) {
+            // Zeige Button wenn Hinterhalt möglich
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.remove('disabled');
+            ambushBtn.classList.add('suggested'); // Hervorheben
+        } else if (unit.ambushReady) {
+            // Zeige dass Hinterhalt vorbereitet ist
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.add('disabled');
+            ambushBtn.querySelector('.label').textContent = 'Bereit!';
+        } else if (unit.cloaked || unit.hiding) {
+            // Versteckt aber nicht genug AP
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.add('disabled');
+            ambushBtn.querySelector('.label').textContent = 'Hinterhalt';
+        } else {
+            ambushBtn.style.display = 'none';
+        }
+    }
+
+    // === KOORDINATIONS-BUTTON ===
+    const coordBtn = document.getElementById('coordinate-btn');
+    if (coordBtn) {
+        // Zeige Button wenn ein Ziel anvisiert ist und mehrere Einheiten angreifen können
+        if (!unit || isAiTurnHidden || !state.targetedUnit) {
+            coordBtn.style.display = 'none';
+        } else {
+            const eligible = getEligibleCoordinators(state.targetedUnit);
+            if (eligible.length >= 2) {
+                coordBtn.style.display = 'flex';
+                coordBtn.classList.remove('disabled');
+                coordBtn.querySelector('.label').textContent = `Koordinieren (${eligible.length})`;
+            } else {
+                coordBtn.style.display = 'none';
             }
         }
     }

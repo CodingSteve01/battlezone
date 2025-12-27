@@ -1,6 +1,6 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, markCombat, triggerScreenShake } from './state.js';
+import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, canUnitAttack, markCombat, triggerScreenShake } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -387,6 +387,59 @@ function calculateCoverDamageReduction(attacker, defender) {
 }
 
 /**
+ * Baue den Kontext für das adaptive Minigame
+ * Sammelt alle relevanten Kampf-Informationen
+ */
+function buildMinigameContext(attacker, defender) {
+    const attackerHex = getHex(attacker.q, attacker.r);
+    const defenderHex = getHex(defender.q, defender.r);
+
+    // Berechne Distanz
+    const distance = hexDistance(
+        { q: attacker.q, r: attacker.r },
+        { q: defender.q, r: defender.r }
+    );
+
+    // Zähle Verbündete und Feinde in der Nähe (2 Hex Radius)
+    const allUnits = state.units.filter(u => u.alive);
+    let alliesInRange = 0;
+    let enemiesInRange = 0;
+
+    for (const unit of allUnits) {
+        if (unit.id === attacker.id) continue;
+
+        const dist = hexDistance(
+            { q: attacker.q, r: attacker.r },
+            { q: unit.q, r: unit.r }
+        );
+
+        if (dist <= 2) {
+            if (unit.player === attacker.player) {
+                alliesInRange++;
+            } else {
+                enemiesInRange++;
+            }
+        }
+    }
+
+    // Prüfe ob aus Tarnung/Hinterhalt
+    const isAmbush = attacker.cloaked || attacker.hiding || attacker.ambushReady;
+
+    return {
+        distance,
+        maxRange: attacker.range || UNIT_CLASSES[attacker.class]?.range || 4,
+        attackerTerrain: attackerHex?.type || 'grass',
+        targetTerrain: defenderHex?.type || 'grass',
+        alliesInRange,
+        enemiesInRange,
+        isAmbush,
+        targetHiding: defender.hiding || false,
+        attackerHP: attacker.currentHp / attacker.maxHp,
+        targetHP: defender.currentHp / defender.maxHp
+    };
+}
+
+/**
  * Execute an attack with optional minigame
  * This is the main entry point for attacks - starts minigame first if enabled
  * Returns a Promise with the attack result
@@ -394,8 +447,11 @@ function calculateCoverDamageReduction(attacker, defender) {
 export async function executeAttackWithMinigame(attacker, defender) {
     // Check if minigames are enabled
     if (areMinigamesEnabled()) {
-        // Start the minigame for this unit class
-        const minigameResult = await startMinigame(attacker.class);
+        // Baue Kontext für adaptives Minigame
+        const context = buildMinigameContext(attacker, defender);
+
+        // Start the minigame for this unit class with context
+        const minigameResult = await startMinigame(attacker.class, context);
         // Execute the attack with the minigame result
         return executeAttack(attacker, defender, minigameResult);
     } else {
@@ -816,4 +872,212 @@ export function checkGameOver() {
     }
 
     return { gameOver: false, winner: null };
+}
+
+// ===== HINTERHALT-SYSTEM =====
+
+/**
+ * Prüfe ob eine Einheit einen Hinterhalt vorbereiten kann
+ */
+export function canPrepareAmbush(unit) {
+    if (!unit || !unit.alive) return false;
+    if (unit.ambushReady) return false;  // Bereits vorbereitet
+    if (state.sharedAP < 1) return false; // Kostet 1 AP
+
+    // Nur aus Tarnung oder Deckung möglich
+    return unit.cloaked || unit.hiding;
+}
+
+/**
+ * Bereite einen Hinterhalt vor
+ * Einheit wird automatisch angreifen wenn Feind in Reichweite kommt
+ */
+export function prepareAmbush(unit) {
+    if (!canPrepareAmbush(unit)) return false;
+
+    unit.ambushReady = true;
+    unit.ambushTriggerRange = unit.range;
+    spendSharedAP(1);
+
+    showToast('🎯 Hinterhalt vorbereitet!', 'special');
+
+    // Visueller Effekt
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.burst('warning', unitPos.x, unitPos.y - 10, 5);
+
+    return true;
+}
+
+/**
+ * Prüfe ob Hinterhalte durch Bewegung ausgelöst werden
+ * Wird nach jedem Bewegungsschritt aufgerufen
+ * @returns {Array} Liste von Hinterhalt-Events
+ */
+export function checkAmbushTriggers(movedUnit) {
+    if (!movedUnit || !movedUnit.alive) return [];
+
+    const triggers = [];
+
+    // Finde alle feindlichen Einheiten mit vorbereitetem Hinterhalt
+    const ambushers = state.units.filter(u =>
+        u.alive &&
+        u.player !== movedUnit.player &&
+        u.ambushReady &&
+        !u.ambushUsedThisTurn
+    );
+
+    for (const ambusher of ambushers) {
+        const distance = hexDistance(
+            { q: ambusher.q, r: ambusher.r },
+            { q: movedUnit.q, r: movedUnit.r }
+        );
+
+        // Ist das Ziel in Reichweite?
+        if (distance <= ambusher.ambushTriggerRange) {
+            // Prüfe Sichtlinie
+            const los = hasLineOfSight(ambusher.q, ambusher.r, movedUnit.q, movedUnit.r);
+            if (los.clear) {
+                triggers.push({
+                    ambusher,
+                    target: movedUnit
+                });
+            }
+        }
+    }
+
+    return triggers;
+}
+
+/**
+ * Führe einen Hinterhalt-Angriff aus
+ * Automatischer Angriff mit Bonus, aber ohne Minigame
+ */
+export async function executeAmbushAttack(ambusher, target) {
+    // Markiere Hinterhalt als verwendet
+    ambusher.ambushUsedThisTurn = true;
+    ambusher.ambushReady = false;
+
+    // Hinterhalt bricht Tarnung
+    const wasHidden = ambusher.cloaked || ambusher.hiding;
+    if (ambusher.cloaked) {
+        ambusher.cloaked = false;
+    }
+    if (ambusher.hiding) {
+        ambusher.hiding = false;
+    }
+
+    // Ghost-Indikator für Hinterhalt-Position
+    if (wasHidden) {
+        addGhostIndicator(ambusher);
+    }
+
+    // Berechne Hinterhalt-Bonus
+    const ambushBonus = UNIT_CLASSES[ambusher.class]?.ambushBonus || 20;
+
+    // Temporär Schaden erhöhen
+    const originalDamage = ambusher.damage;
+    ambusher.damage += ambushBonus;
+
+    // Führe Angriff aus mit automatisch gutem Ergebnis (kein Minigame)
+    const result = executeAttack(ambusher, target, {
+        level: RESULT_LEVELS.GOOD,
+        multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD]
+    });
+
+    // Schaden zurücksetzen
+    ambusher.damage = originalDamage;
+
+    return result;
+}
+
+/**
+ * Setze Hinterhalt-Status für alle Einheiten eines Spielers zurück
+ * Wird am Anfang jedes Zuges aufgerufen
+ */
+export function resetAmbushStatus(player) {
+    const units = getPlayerUnits(player);
+    for (const unit of units) {
+        unit.ambushUsedThisTurn = false;
+        // ambushReady bleibt aktiv bis ausgelöst
+    }
+}
+
+// ===== KOORDINIERTE ANGRIFFE =====
+
+/**
+ * Prüfe welche Einheiten ein Ziel koordiniert angreifen können
+ */
+export function getEligibleCoordinators(targetUnit) {
+    const eligible = [];
+    const playerUnits = getPlayerUnits(state.currentPlayer);
+
+    for (const unit of playerUnits) {
+        if (!unit.alive) continue;
+        if (!canUnitAttack(unit)) continue;
+
+        // Prüfe ob Einheit das Ziel angreifen kann
+        const distance = hexDistance(
+            { q: unit.q, r: unit.r },
+            { q: targetUnit.q, r: targetUnit.r }
+        );
+
+        if (distance <= unit.range) {
+            // Prüfe Sichtlinie
+            const los = hasLineOfSight(unit.q, unit.r, targetUnit.q, targetUnit.r);
+            if (los.clear) {
+                eligible.push(unit);
+            }
+        }
+    }
+
+    return eligible;
+}
+
+/**
+ * Führe einen koordinierten Angriff aus
+ * Alle markierten Einheiten greifen gleichzeitig an
+ */
+export async function executeCoordinatedAttack(attackers, target) {
+    if (attackers.length === 0) return [];
+
+    const results = [];
+    const bonus = (attackers.length - 1) * state.coordinatedAttack.bonusPerAttacker;
+
+    showToast(`🎯 Koordinierter Angriff! +${Math.round(bonus * 100)}% Bonus`, 'special');
+
+    // Sequentiell für jede Einheit Minigame + Angriff
+    for (const attacker of attackers) {
+        // Baue Kontext mit Koordinations-Info
+        const context = buildMinigameContext(attacker, target);
+        context.coordinatedBonus = bonus;
+
+        // Für koordinierte Angriffe: Kürzeres Minigame (Sequenz wäre zu lang)
+        // Verwende vereinfachte Variante oder skip für 2.+ Angreifer
+        let minigameResult;
+        if (attackers.indexOf(attacker) === 0) {
+            // Erster Angreifer macht normales Minigame
+            minigameResult = await startMinigame(attacker.class, context);
+        } else {
+            // Weitere Angreifer: Automatisch GOOD (Minigame wäre zu ermüdend)
+            minigameResult = { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] };
+        }
+
+        // Temporär Bonus-Schaden
+        const originalDamage = attacker.damage;
+        attacker.damage = Math.round(attacker.damage * (1 + bonus));
+
+        const result = executeAttack(attacker, target, minigameResult);
+        results.push(result);
+
+        // Schaden zurücksetzen
+        attacker.damage = originalDamage;
+
+        // Prüfe ob Ziel noch lebt
+        if (!target.alive) break;
+
+        // Kurze Pause zwischen Angriffen
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    return results;
 }

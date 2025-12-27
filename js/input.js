@@ -4,7 +4,7 @@ import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueued
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
-import { executeAttack, executeAttackWithMinigame, useSpecialAbility } from './combat.js';
+import { executeAttack, executeAttackWithMinigame, useSpecialAbility, prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -1681,6 +1681,55 @@ function setupActionButtons() {
             } else if (unit && state.sharedAP < 2) {
                 showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
             }
+        };
+    }
+
+    // === HINTERHALT-BUTTON ===
+    const ambushBtn = document.getElementById('ambush-btn');
+    if (ambushBtn) {
+        ambushBtn.onclick = () => {
+            const unit = getCurrentUnit();
+            if (unit && canPrepareAmbush(unit)) {
+                prepareAmbush(unit);
+                render();
+                updateUI();
+            } else if (unit && unit.ambushReady) {
+                showToast('🎯 Hinterhalt bereits vorbereitet!', 'info');
+            } else if (unit && state.sharedAP < 1) {
+                showToast('❌ Nicht genug AP (braucht 1)!', 'warning');
+            } else if (unit && !unit.cloaked && !unit.hiding) {
+                showToast('❌ Nur aus Tarnung oder Deckung möglich!', 'warning');
+            }
+        };
+    }
+
+    // === KOORDINATIONS-BUTTON ===
+    const coordBtn = document.getElementById('coordinate-btn');
+    if (coordBtn) {
+        coordBtn.onclick = async () => {
+            const unit = getCurrentUnit();
+            const target = state.targetedUnit;
+
+            if (!unit || !target) {
+                showToast('❌ Ziel wählen, dann koordinieren!', 'warning');
+                return;
+            }
+
+            const eligible = getEligibleCoordinators(target);
+            if (eligible.length < 2) {
+                showToast('❌ Mindestens 2 Einheiten zum Koordinieren nötig!', 'warning');
+                return;
+            }
+
+            // Alle geeigneten Einheiten greifen an
+            state.animating = true;
+            await executeCoordinatedAttack(eligible, target);
+            state.animating = false;
+
+            state.targetedUnit = null;
+            render();
+            updateUI();
+            checkWinCondition();
         };
     }
 }
