@@ -527,6 +527,16 @@ function confirmTeamSelection() {
  * Start a new game with selected teams
  */
 function startGameWithTeams() {
+    // === VALIDIERE TEAM-KONFIGURATION ===
+    // Verhindere, dass alle Spieler im gleichen Team sind
+    if (state.settings.alliances && state.settings.alliances.length > 0) {
+        const uniqueTeams = new Set(state.settings.alliances);
+        if (uniqueTeams.size < 2) {
+            showToast('⚠️ Es müssen mindestens 2 verschiedene Teams existieren!', 'warning');
+            return;
+        }
+    }
+
     // Hide team selection tutorial
     hideTeamSelectTutorial();
 
