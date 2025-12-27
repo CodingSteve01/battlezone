@@ -9,6 +9,7 @@ export const CONFIG = {
     TEAM_BUDGET: 350,         // Total points available for team composition
     MIN_UNITS: 2,             // Minimum units required
     MAX_UNITS: 5,             // Maximum units allowed
+    UNITS_PER_PLAYER: 3,      // Default/base units per player (for AP pool calculations)
 
     AP_PER_TURN: 4,
     MAX_ROUNDS: 30,

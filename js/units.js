@@ -15,12 +15,18 @@ export function createUnits() {
     const spawns = getSpawnPositions();
 
     for (let p = 0; p < state.settings.players; p++) {
-        // Use team selection if available, otherwise default
-        const playerClasses = (state.teamSelections && state.teamSelections[p] && state.teamSelections[p].length === CONFIG.UNITS_PER_PLAYER)
+        // Use team selection if available and valid, otherwise default
+        const hasValidSelection = state.teamSelections &&
+            state.teamSelections[p] &&
+            state.teamSelections[p].length >= CONFIG.MIN_UNITS &&
+            state.teamSelections[p].length <= CONFIG.MAX_UNITS;
+
+        const playerClasses = hasValidSelection
             ? state.teamSelections[p]
             : defaultClasses;
 
-        for (let u = 0; u < CONFIG.UNITS_PER_PLAYER; u++) {
+        // Iterate over actual team size (variable 2-5 units)
+        for (let u = 0; u < playerClasses.length; u++) {
             const classType = playerClasses[u];
             const classData = UNIT_CLASSES[classType];
             const spawn = spawns[p][u];
