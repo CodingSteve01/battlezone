@@ -585,10 +585,14 @@ const UNIT_FALLBACKS = {
     commando: 'scout',       // Commando uses scout as fallback if missing
 };
 
+// Cache for colorized player sprites (players 4-7)
+const colorizedSpriteCache = new Map();
+
 /**
  * Get a unit sprite with optional facing direction
+ * For players 4-7 (without dedicated sprites), colorizes player 0-3 sprites
  * @param {string} unitClass - The unit class (scout, assault, etc.)
- * @param {number} playerIndex - Player index (0-3)
+ * @param {number} playerIndex - Player index (0-7)
  * @param {string} state - Unit state (normal, cover, attack, dead)
  * @param {string} facing - Facing direction ('left' or 'right'), defaults to base direction
  * @returns {ImageBitmap|HTMLCanvasElement|null} The sprite image or null if not found
@@ -604,6 +608,37 @@ export function getUnitSprite(unitClass, playerIndex, state = 'normal', facing =
         sprite = spriteRegistry.units.get(fallbackKey) || null;
         if (sprite) {
             console.log(`[SpriteSheetLoader] Using fallback sprite: ${fallbackClass} for ${unitClass}`);
+        }
+    }
+
+    // === FALLBACK FOR PLAYERS 4-7: Use colorized version of player 0-3 sprites ===
+    if (!sprite && playerIndex >= 4) {
+        // Map player 4-7 to base player 0-3
+        const basePlayer = playerIndex % 4;
+        const baseKey = `${unitClass}_${state}_${basePlayer}`;
+        const baseSprite = spriteRegistry.units.get(baseKey);
+
+        // Try fallback class if needed
+        let sourceSpriteKey = baseKey;
+        let sourceSprite = baseSprite;
+        if (!sourceSprite && UNIT_FALLBACKS[unitClass]) {
+            const fallbackClass = UNIT_FALLBACKS[unitClass];
+            sourceSpriteKey = `${fallbackClass}_${state}_${basePlayer}`;
+            sourceSprite = spriteRegistry.units.get(sourceSpriteKey);
+        }
+
+        if (sourceSprite) {
+            // Check cache first
+            const colorizedKey = `${key}_colorized`;
+            if (colorizedSpriteCache.has(colorizedKey)) {
+                sprite = colorizedSpriteCache.get(colorizedKey);
+            } else {
+                // Create colorized version for this player
+                const playerColor = CONFIG.PLAYER_COLORS[playerIndex];
+                sprite = colorizeSprite(sourceSprite, playerColor);
+                colorizedSpriteCache.set(colorizedKey, sprite);
+                console.log(`[SpriteSheetLoader] Colorized sprite for player ${playerIndex}: ${unitClass}_${state}`);
+            }
         }
     }
 
@@ -624,6 +659,31 @@ export function getUnitSprite(unitClass, playerIndex, state = 'normal', facing =
     const mirrored = createMirroredSprite(sprite);
     mirroredSpriteCache.set(mirrorKey, mirrored);
     return mirrored;
+}
+
+/**
+ * Colorize a sprite with a player color
+ * Used for players 4-7 who don't have dedicated sprites
+ * @param {ImageBitmap|HTMLCanvasElement} sourceSprite - Source sprite to colorize
+ * @param {string} targetColor - Target player color (hex)
+ * @returns {HTMLCanvasElement} Colorized sprite
+ */
+function colorizeSprite(sourceSprite, targetColor) {
+    const canvas = document.createElement('canvas');
+    canvas.width = sourceSprite.width;
+    canvas.height = sourceSprite.height;
+    const ctx = canvas.getContext('2d');
+
+    // Draw original sprite
+    ctx.drawImage(sourceSprite, 0, 0);
+
+    // Apply color overlay with multiply blend
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = targetColor;
+    ctx.globalAlpha = 0.4; // Stronger tint for visibility
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    return canvas;
 }
 
 /**
