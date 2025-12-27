@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.9.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.8.1...shadow-squad-v3.9.0) (2025-12-27)
+
+
+### Features
+
+* **team-selection:** add unit cost budget system and elite Kommando-Soldat unit ([#133](https://github.com/CodingSteve01/battlezone/issues/133)) ([f08f6c2](https://github.com/CodingSteve01/battlezone/commit/f08f6c249ef2d1e82c3b67d99b3f1a9f2b513dae))
+* **tutorial:** add team selection tutorial hints ([#131](https://github.com/CodingSteve01/battlezone/issues/131)) ([e81e6a4](https://github.com/CodingSteve01/battlezone/commit/e81e6a489a98dd76f9e6fe5371d8b2f7718c2a52))
+
 ## [3.8.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.8.0...shadow-squad-v3.8.1) (2025-12-27)
 
 
