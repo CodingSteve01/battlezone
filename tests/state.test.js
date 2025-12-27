@@ -224,6 +224,7 @@ describe('state', () => {
 
         it('getVisibleGhosts should filter by player and age', () => {
             state.currentPlayer = 0;
+            state.viewingPlayer = 0;  // getVisibleGhosts uses viewingPlayer for rendering
             addGhostIndicator({ id: 'enemy', q: 1, r: 1, player: 1, class: 'scout' });
             addGhostIndicator({ id: 'ally', q: 2, r: 2, player: 0, class: 'medic' });
 
