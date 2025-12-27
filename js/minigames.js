@@ -1024,9 +1024,9 @@ function startMedicMinigame(resolve, mods = {}) {
     // Basis-Intervall wird durch Stress verkürzt
     const beatInterval = Math.round(800 / speedMult * timeMult); // Adaptiver Puls
     const beats = [0, beatInterval, beatInterval * 2, beatInterval * 3];
-    let currentBeat = 0;
-    let startTime = Date.now();
-    let taps = [];
+    const currentBeat = 0;
+    const startTime = Date.now();
+    const taps = [];
     let gameActive = true;
     let ecgPosition = 0;
 
@@ -1168,7 +1168,7 @@ function startCommandoMinigame(resolve) {
 
     let currentIndex = 0;
     let gameActive = true;
-    let startTime = Date.now();
+    const startTime = Date.now();
     const maxTime = 3000; // 3 seconds total
 
     let touchStartX = 0;
@@ -1352,7 +1352,7 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
 
     // Duel State
     let currentRound = 0;
-    let roundResults = [];       // Array von 'win', 'lose', 'draw'
+    const roundResults = [];       // Array von 'win', 'lose', 'draw'
     let phase = 'ready';         // 'ready', 'tell', 'react', 'result'
     let phaseStartTime = 0;
     let enemyMove = null;
@@ -1748,9 +1748,9 @@ function startHealingMinigameInternal(resolve, mods = {}) {
 
     const beatInterval = Math.round(800 / speedMult * timeMult);
     const beats = [0, beatInterval, beatInterval * 2, beatInterval * 3];
-    let currentBeat = 0;
-    let startTime = Date.now();
-    let taps = [];
+    const currentBeat = 0;
+    const startTime = Date.now();
+    const taps = [];
     let gameActive = true;
     let ecgPosition = 0;
 

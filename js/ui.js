@@ -476,7 +476,7 @@ function updateTargetInfo(unit) {
             } else if (chance >= 85) {
                 // Gute Chance
                 if (coverInfo.hasLineOfSightCover) {
-                    coverEl.textContent = `🌲 Leichte Hindernisse`;
+                    coverEl.textContent = '🌲 Leichte Hindernisse';
                     coverEl.className = 'cover-info obstacles';
                 } else {
                     coverEl.textContent = '✓ Guter Schuss';
@@ -489,7 +489,7 @@ function updateTargetInfo(unit) {
                         coverEl.textContent = '⚠️ Ziel in Deckung (flankiert)';
                         coverEl.className = 'cover-info flanked';
                     } else {
-                        coverEl.textContent = `🌲 Ziel in Deckung (-Schaden)`;
+                        coverEl.textContent = '🌲 Ziel in Deckung (-Schaden)';
                         coverEl.className = 'cover-info effective';
                     }
                 } else {
@@ -498,7 +498,7 @@ function updateTargetInfo(unit) {
                 }
             } else {
                 // Schwieriger Schuss (nur bei maximaler Reichweite)
-                coverEl.textContent = `⚠️ Maximale Reichweite - schwieriger Schuss!`;
+                coverEl.textContent = '⚠️ Maximale Reichweite - schwieriger Schuss!';
                 coverEl.className = 'cover-info hard-shot';
             }
         }
@@ -980,7 +980,7 @@ const AWARDS = [
         title: 'Pazifist',
         stat: 'damageDealt',
         condition: (stats) => stats.kills === 0 && stats.damageDealt < 30 && stats.hexesMoved > 10,
-        getValue: (stats) => `Kampf vermieden`
+        getValue: (stats) => 'Kampf vermieden'
     },
     {
         id: 'accurate',

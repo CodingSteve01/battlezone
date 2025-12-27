@@ -7,7 +7,7 @@ import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
 // Use the legacy canvas renderer for stability/performance
 import { initRenderer, resizeCanvas, render, clearRenderCaches } from './renderer.js';
-import { updateUI, showScreen } from './ui.js';
+import { updateUI, showScreen, showToast } from './ui.js';
 import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';

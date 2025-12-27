@@ -98,7 +98,7 @@ test.describe('AI vs AI Spectator Mode', () => {
         ];
 
         let blackPixels = 0;
-        let totalSamples = samplePoints.length;
+        const totalSamples = samplePoints.length;
 
         for (const point of samplePoints) {
           const imageData = ctx.getImageData(point.x, point.y, 1, 1);
@@ -166,7 +166,7 @@ test.describe('AI vs AI Spectator Mode', () => {
       if (gameState.gameOverVisible) {
         console.log('Game ended normally - game over screen visible');
         gameEnded = true;
-        await page.screenshot({ path: `test-results/ai-vs-ai-gameover.png` });
+        await page.screenshot({ path: 'test-results/ai-vs-ai-gameover.png' });
         break;
       }
 
@@ -397,7 +397,7 @@ test.describe('AI vs AI Spectator Mode', () => {
     const errors = [];
     let aiActionsDetected = 0;
     let unitsMovedCount = 0;
-    let attacksExecutedCount = 0;
+    const attacksExecutedCount = 0;
 
     page.on('pageerror', error => {
       errors.push(error.message);
@@ -436,8 +436,8 @@ test.describe('AI vs AI Spectator Mode', () => {
     await page.locator('#start-btn').click();
 
     // Wait for game to progress and track unit HP changes
-    let initialUnitStates = null;
-    let hpChangesDetected = 0;
+    const initialUnitStates = null;
+    const hpChangesDetected = 0;
 
     for (let i = 0; i < 20; i++) { // 40 seconds
       await page.waitForTimeout(2000);
@@ -480,7 +480,7 @@ test.describe('AI vs AI Spectator Mode', () => {
     }
 
     // Verify AI actually did something
-    console.log(`\n=== AI Activity Summary ===`);
+    console.log('\n=== AI Activity Summary ===');
     console.log(`AI turn cycles completed: ${aiActionsDetected}`);
     console.log(`Total units processed: ${unitsMovedCount}`);
 
