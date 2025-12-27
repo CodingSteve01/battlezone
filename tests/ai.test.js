@@ -248,3 +248,60 @@ describe('AI Turn Execution Safety', () => {
     expect(() => ai.executeAITurn()).not.toThrow();
   });
 });
+
+describe('AI Turn Timeout Protection', () => {
+  let ai, state;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    ai = await import('../js/ai.js');
+    state = await import('../js/state.js');
+    state.resetState();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('AI turn should handle AI vs AI scenario without freezing', () => {
+    // Setup AI vs AI game
+    state.state.settings.players = 2;
+    state.state.settings.aiPlayers = [0, 1];
+    state.state.currentPlayer = 0;
+    state.state.units = [
+      { id: 1, player: 0, alive: true, q: 0, r: 0, class: 'scout', currentHp: 60, maxHp: 60, damage: 18, range: 4, move: 5, vision: 6 },
+      { id: 2, player: 1, alive: true, q: 5, r: 5, class: 'assault', currentHp: 100, maxHp: 100, damage: 35, range: 2, move: 3, vision: 5 }
+    ];
+
+    // Execute AI turn - should not throw
+    expect(() => ai.executeAITurn()).not.toThrow();
+
+    // The turn should eventually complete (timeout mechanism should prevent infinite loops)
+    // Advance timers to trigger any timeouts
+    vi.advanceTimersByTime(35000); // Past the 30 second timeout
+  });
+
+  it('AI vs AI spectator mode should be correctly detected', () => {
+    state.state.settings.players = 2;
+    state.state.settings.aiPlayers = [0, 1];
+    state.state.units = [
+      { id: 1, player: 0, alive: true },
+      { id: 2, player: 1, alive: true }
+    ];
+
+    expect(ai.isSpectatorMode()).toBe(true);
+  });
+
+  it('should recognize all-AI game configuration', () => {
+    state.state.settings.players = 3;
+    state.state.settings.aiPlayers = [0, 1, 2];
+    state.state.currentPlayer = 0;
+
+    expect(ai.isAIPlayer()).toBe(true);
+    expect(ai.isAIPlayer(0)).toBe(true);
+    expect(ai.isAIPlayer(1)).toBe(true);
+    expect(ai.isAIPlayer(2)).toBe(true);
+    expect(ai.hasHumanPlayer()).toBe(false);
+  });
+});

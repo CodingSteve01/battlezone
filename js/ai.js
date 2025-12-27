@@ -763,6 +763,11 @@ function assignTargets(aiUnits, enemies) {
 
 // ===== MAIN AI EXECUTION =====
 
+// Track AI turn progress to detect freezes
+let aiTurnStartTime = 0;
+let aiTurnTimeoutId = null;
+const AI_TURN_MAX_DURATION = 30000; // 30 seconds max per turn
+
 /**
  * Perform all AI actions for current turn
  */
@@ -777,11 +782,24 @@ async function performAIActions() {
 
     const aiPlayerIndex = state.currentPlayer; // Store for validation during execution
 
+    // Track turn start time for timeout detection
+    aiTurnStartTime = Date.now();
+
     // Check if we're in spectator mode (human watching AI vs AI)
     const spectatorMode = isSpectatorMode();
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
     const unitDelay = spectatorMode ? 800 : 400;
+
+    // Set up global turn timeout - CRITICAL for preventing infinite loops
+    // This ensures the turn ALWAYS ends, even if AI logic gets stuck
+    if (aiTurnTimeoutId) clearTimeout(aiTurnTimeoutId);
+    aiTurnTimeoutId = setTimeout(() => {
+        console.warn(`AI turn timeout after ${AI_TURN_MAX_DURATION}ms - forcing end turn`);
+        hideAIThinking();
+        clearAIThoughts();
+        endTurn();
+    }, AI_TURN_MAX_DURATION);
 
     // Wrap entire AI execution in try/catch to ensure endTurn is ALWAYS called
     // This prevents the game from hanging if any async operation fails
@@ -812,7 +830,16 @@ async function performAIActions() {
             hideAIThinking();
         }
 
+        // Track units processed for debugging
+        let unitsProcessed = 0;
+
         for (const unit of sortedUnits) {
+            // Check global timeout hasn't triggered
+            if (Date.now() - aiTurnStartTime > AI_TURN_MAX_DURATION - 2000) {
+                console.warn('AI turn approaching timeout - stopping early');
+                break;
+            }
+
             if (!unit.alive) continue;
 
             // SAFETY: Verify turn hasn't changed and unit belongs to AI
@@ -830,12 +857,23 @@ async function performAIActions() {
             }
 
             await safeAwait(performUnitAI(unit, plan, spectatorMode), 10000);
+            unitsProcessed++;
             await delay(unitDelay);
         }
+
+        // Log turn completion stats for debugging
+        const turnDuration = Date.now() - aiTurnStartTime;
+        console.log(`AI turn completed: ${unitsProcessed} units processed in ${turnDuration}ms`);
     } catch (error) {
         console.error('AI execution error:', error);
         // Continue to endTurn despite errors
     } finally {
+        // Clear the timeout since we're ending normally
+        if (aiTurnTimeoutId) {
+            clearTimeout(aiTurnTimeoutId);
+            aiTurnTimeoutId = null;
+        }
+
         // ALWAYS clean up and end turn, even if errors occurred
         hideAIThinking();
         clearAIThoughts();
