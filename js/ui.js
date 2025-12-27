@@ -71,6 +71,7 @@ export function updateUI() {
     updateActionButtons(unit, isAiTurnHidden);
     updateTargetInfo(unit);
     updateCompassIndicator();
+    updatePlayersAlive();
 
     const endTurnBtn = document.getElementById('end-turn-btn');
     if (endTurnBtn) {
@@ -85,6 +86,44 @@ export function updateUI() {
     import('./input.js').then(({ updateWaypointUI }) => {
         updateWaypointUI();
     }).catch(() => {}); // Ignore if not yet loaded
+}
+
+/**
+ * Update players alive display (Turn Screen and Dropdown)
+ * Shows which players are still in the game with colored indicators
+ */
+export function updatePlayersAlive() {
+    const turnContainer = document.getElementById('turn-players-alive');
+    const dropdownContainer = document.getElementById('dropdown-players-alive');
+
+    // Generate the HTML for player status indicators
+    let html = '';
+    for (let p = 0; p < state.settings.players; p++) {
+        const units = getPlayerUnits(p);
+        const isAlive = units.length > 0;
+        const isCurrent = p === state.currentPlayer;
+        const color = CONFIG.PLAYER_COLORS[p];
+
+        let statusClass = isAlive ? 'alive' : 'eliminated';
+        if (isCurrent && isAlive) statusClass = 'current';
+
+        const unitCount = isAlive ? ` (${units.length})` : '';
+
+        html += `
+            <div class="player-status ${statusClass}">
+                <span class="player-dot" style="background-color: ${color}"></span>
+                <span>S${p + 1}${unitCount}</span>
+            </div>
+        `;
+    }
+
+    // Update both containers
+    if (turnContainer) {
+        turnContainer.innerHTML = html;
+    }
+    if (dropdownContainer) {
+        dropdownContainer.innerHTML = html;
+    }
 }
 
 /**

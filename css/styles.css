@@ -927,8 +927,60 @@ button:focus:not(:focus-visible),
 
 .turn-hint {
     color: var(--dim);
-    margin-bottom: 40px;
+    margin-bottom: 20px;
     font-size: 16px;
+}
+
+/* Players alive container (Turn Screen) */
+.players-alive-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 30px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    max-width: 320px;
+}
+
+.players-alive-container .player-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.players-alive-container .player-status.alive {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: var(--green);
+}
+
+.players-alive-container .player-status.eliminated {
+    background: rgba(244, 63, 94, 0.15);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    color: var(--red);
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.players-alive-container .player-status.current {
+    background: rgba(59, 130, 246, 0.3);
+    border: 1px solid rgba(59, 130, 246, 0.7);
+    color: #93c5fd;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.players-alive-container .player-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
 .ready-btn {
@@ -1047,6 +1099,55 @@ button:focus:not(:focus-visible),
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
+}
+
+/* Players alive in dropdown */
+.dropdown-players-alive {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    max-width: 280px;
+}
+
+.dropdown-players-alive .player-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.dropdown-players-alive .player-status.alive {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: var(--green);
+}
+
+.dropdown-players-alive .player-status.eliminated {
+    background: rgba(244, 63, 94, 0.1);
+    border: 1px solid rgba(244, 63, 94, 0.2);
+    color: var(--red);
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.dropdown-players-alive .player-status.current {
+    background: rgba(59, 130, 246, 0.25);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    color: #93c5fd;
+}
+
+.dropdown-players-alive .player-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
 .dropdown-give-up-btn {

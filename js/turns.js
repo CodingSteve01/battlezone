@@ -9,7 +9,7 @@ import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
-import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
+import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
@@ -131,6 +131,9 @@ export function startTurn() {
         updateUI();
         render();
 
+        // Reset transition flag - AI turn is starting
+        state.turnTransitionInProgress = false;
+
         // Start watchdog timer - ensures AI turn ALWAYS completes
         // This is a backup safety in case executeAITurn() fails or never starts
         startAIWatchdog();
@@ -167,6 +170,9 @@ export function startTurn() {
     const isCurrentHuman = !isAIPlayer();
 
     if (isCurrentHuman && onlyOneHuman && state.round > 1) {
+        // Reset transition flag - human turn is starting
+        state.turnTransitionInProgress = false;
+
         showScreen(null);
         updateUI();
         render();
@@ -181,6 +187,12 @@ export function startTurn() {
         return;
     }
 
+    // Reset transition flag - human turn is starting (turn screen will be shown)
+    state.turnTransitionInProgress = false;
+
+    // Update players alive display before showing turn screen
+    updatePlayersAlive();
+
     showScreen('turn-screen');
 }
 
@@ -188,6 +200,13 @@ export function startTurn() {
  * End current turn
  */
 export function endTurn() {
+    // Prevent race conditions: don't allow multiple turn transitions
+    if (state.turnTransitionInProgress) {
+        console.warn('endTurn() called while turn transition already in progress - ignoring');
+        return;
+    }
+    state.turnTransitionInProgress = true;
+
     // Clear AI watchdog since turn is ending normally
     clearAIWatchdog();
     playTurnEnd();
@@ -200,6 +219,12 @@ export function endTurn() {
 export function nextPlayer() {
     // Clear AI watchdog since we're moving to next player
     clearAIWatchdog();
+
+    // Prevent race conditions: if called directly (not via endTurn), set the flag
+    // This handles the AI watchdog case and recursive calls for eliminated players
+    if (!state.turnTransitionInProgress) {
+        state.turnTransitionInProgress = true;
+    }
 
     // Update power-up buffs for ending player
     updatePowerupBuffs(state.currentPlayer);

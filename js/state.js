@@ -61,6 +61,7 @@ export const state = {
     gameOver: false,
     animating: false,
     introShown: false,  // Whether the game intro flyover has been shown
+    turnTransitionInProgress: false,  // Prevents race conditions during turn changes
 
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }
@@ -192,6 +193,7 @@ export function resetState() {
     state.round = 1;
     state.gameOver = false;
     state.animating = false;
+    state.turnTransitionInProgress = false;
     state.visibleHexes.clear();
     state.exploredHexes.clear();
     state.ghostIndicators = [];
