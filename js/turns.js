@@ -47,6 +47,12 @@ export function startTurn() {
     state.targetedUnit = null;
     state.currentPath = null;
     state.pendingMoveDestination = null;
+    state.hoveredHex = null;
+
+    // Safety: Reset animation state to prevent stuck animations from previous turn
+    // This can happen if an animation callback fails or times out
+    state.animating = false;
+    state.movementAnimation = null;
 
     // Determine viewing player perspective:
     // - If spectator mode (all AI or humans eliminated), follow current AI's perspective
