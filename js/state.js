@@ -121,7 +121,19 @@ export const state = {
         startTime: 0,
         offsetX: 0,
         offsetY: 0
-    }
+    },
+
+    // === KOORDINIERTE ANGRIFFE ===
+    coordinatedAttack: {
+        active: false,              // Koordinations-Modus aktiv
+        targetUnit: null,           // Ziel-Einheit
+        attackers: [],              // Array von Unit-IDs die angreifen
+        bonusPerAttacker: 0.15      // 15% Schadensbonus pro zusätzlichem Angreifer
+    },
+
+    // === HINTERHALT-SYSTEM ===
+    ambushQueue: [],                // Warteschlange für ausstehende Hinterhalte
+    ambushProcessing: false         // Wird gerade ein Hinterhalt verarbeitet?
 };
 
 /**
@@ -214,6 +226,18 @@ export function resetState() {
 
     // Reset debug flags
     state._visibilityWarningLogged = false;
+
+    // Koordinierte Angriffe zurücksetzen
+    state.coordinatedAttack = {
+        active: false,
+        targetUnit: null,
+        attackers: [],
+        bonusPerAttacker: 0.15
+    };
+
+    // Hinterhalt-System zurücksetzen
+    state.ambushQueue = [];
+    state.ambushProcessing = false;
 }
 
 /**
@@ -623,4 +647,83 @@ export function getEnemyDirection() {
         distance: Math.round(nearestDist),
         roundsSearching: playerRoundsWithoutContact
     };
+}
+
+// === KOORDINIERTE ANGRIFFE HELPER ===
+
+/**
+ * Starte den Koordinations-Modus für einen Angriff
+ */
+export function startCoordinatedAttack(targetUnit) {
+    state.coordinatedAttack.active = true;
+    state.coordinatedAttack.targetUnit = targetUnit;
+    state.coordinatedAttack.attackers = [];
+}
+
+/**
+ * Füge einen Angreifer zur koordinierten Attacke hinzu
+ */
+export function addCoordinatedAttacker(unit) {
+    if (!state.coordinatedAttack.attackers.includes(unit.id)) {
+        state.coordinatedAttack.attackers.push(unit.id);
+    }
+}
+
+/**
+ * Entferne einen Angreifer aus der koordinierten Attacke
+ */
+export function removeCoordinatedAttacker(unitId) {
+    state.coordinatedAttack.attackers = state.coordinatedAttack.attackers.filter(id => id !== unitId);
+}
+
+/**
+ * Beende den Koordinations-Modus
+ */
+export function cancelCoordinatedAttack() {
+    state.coordinatedAttack.active = false;
+    state.coordinatedAttack.targetUnit = null;
+    state.coordinatedAttack.attackers = [];
+}
+
+/**
+ * Berechne den Schadensbonus für koordinierte Angriffe
+ */
+export function getCoordinatedAttackBonus() {
+    const attackerCount = state.coordinatedAttack.attackers.length;
+    if (attackerCount <= 1) return 0;
+    return (attackerCount - 1) * state.coordinatedAttack.bonusPerAttacker;
+}
+
+// === HINTERHALT HELPER ===
+
+/**
+ * Füge einen Hinterhalt zur Warteschlange hinzu
+ */
+export function queueAmbush(ambusher, target) {
+    state.ambushQueue.push({
+        ambusherId: ambusher.id,
+        targetId: target.id,
+        timestamp: Date.now()
+    });
+}
+
+/**
+ * Hole den nächsten Hinterhalt aus der Warteschlange
+ */
+export function getNextAmbush() {
+    return state.ambushQueue.shift() || null;
+}
+
+/**
+ * Prüfe ob Hinterhalte ausstehen
+ */
+export function hasQueuedAmbushes() {
+    return state.ambushQueue.length > 0;
+}
+
+/**
+ * Leere die Hinterhalt-Warteschlange
+ */
+export function clearAmbushQueue() {
+    state.ambushQueue = [];
 }

@@ -375,7 +375,7 @@ export const UNIT_CLASSES = {
         name: 'Sniper',
         icon: '🎯',
         hp: 45,             // Leicht erhöht von 40 - etwas robuster
-        damage: 45,         // Erhöht von 38 - signifikanter Schaden pro Treffer
+        damage: 65,         // STARK ERHÖHT von 45 - Sniper soll mit einem Schuss töten können!
         range: 6,
         move: 2,
         vision: 7,          // Reduziert von 8 - Scout ist jetzt bester Spotter

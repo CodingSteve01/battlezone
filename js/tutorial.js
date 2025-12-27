@@ -81,6 +81,34 @@ const TUTORIAL_HINTS = {
         message: 'Verschiedene Geländetypen kosten unterschiedlich viele Bewegungspunkte. Wälder und Hügel kosten 2 AP.',
         position: 'bottom',
         showOnce: true
+    },
+    ambush: {
+        id: 'ambush',
+        title: 'Hinterhalt legen',
+        message: 'Versteckte Einheiten (🛡️) können einen Hinterhalt vorbereiten. Feinde die in Reichweite kommen werden automatisch angegriffen! Kostet 1 AP.',
+        position: 'bottom',
+        showOnce: true
+    },
+    coordinated: {
+        id: 'coordinated',
+        title: 'Koordinierter Angriff',
+        message: 'Wenn mehrere Einheiten ein Ziel angreifen können, erscheint der 👥-Button. Koordinierte Angriffe geben +15% Schaden pro zusätzlichem Angreifer!',
+        position: 'top',
+        showOnce: true
+    },
+    minigame: {
+        id: 'minigame',
+        title: 'Kampf-Minigames',
+        message: 'Jeder Angriff startet ein Minigame! Je besser du abschneidest, desto mehr Schaden richtest du an. Die Schwierigkeit passt sich der Situation an.',
+        position: 'center',
+        showOnce: true
+    },
+    duel: {
+        id: 'duel',
+        title: 'Nahkampf-Duell',
+        message: 'Commando-Angriffe sind echte Duelle: ⚔️ schlägt 💨, 🛡️ schlägt ⚔️, 💨 schlägt 🛡️. Gewinne 2 von 3 Runden!',
+        position: 'center',
+        showOnce: true
     }
 };
 

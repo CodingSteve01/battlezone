@@ -2,7 +2,7 @@
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
-import { calculateHitChance, getCoverInfo } from './combat.js';
+import { calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
@@ -213,17 +213,18 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
             if (labelEl) labelEl.textContent = 'Spezial';
             if (tipEl) tipEl.textContent = '';
         } else {
-            // Update label with unit's special ability name
+            // Update label with unit's special ability name and cost
             const unitClass = UNIT_CLASSES[unit.class];
+            const apCost = getSpecialAbilityCost(unit.class);
             if (labelEl && unitClass) {
-                labelEl.textContent = unitClass.special || 'Spezial';
+                labelEl.textContent = `${unitClass.special || 'Spezial'} (${apCost} AP)`;
             }
 
             // Generate contextual tip based on unit class
             let tip = '';
             let shouldSuggest = false;
 
-            if (!unit.usedSpecial && state.sharedAP >= 2) {
+            if (canUseSpecialAbility(unit)) {
                 switch (unit.class) {
                     case 'medic':
                         // Check if allies need healing
@@ -244,17 +245,13 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
                         break;
                     case 'scout':
                         // Suggest sprint if there's AP in pool
-                        if (state.sharedAP >= 3) {
-                            tip = '🏃 Sprint für +3 Bewegung!';
-                            shouldSuggest = true;
-                        }
+                        tip = '🏃 Sprint für +3 Bewegung!';
+                        shouldSuggest = state.sharedAP >= 2; // Show as suggested if enough AP for sprint + 1 move
                         break;
                     case 'assault':
                         // Suggest powershot before attacking
-                        if (state.sharedAP >= 3) {
-                            tip = '💥 Powershot für +20 Schaden!';
-                            shouldSuggest = true;
-                        }
+                        tip = '💥 Powershot für +25 Schaden!';
+                        shouldSuggest = state.sharedAP >= 2; // Show as suggested if enough AP for powershot + attack
                         break;
                 }
             }
@@ -262,10 +259,65 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
             if (tipEl) tipEl.textContent = tip;
             if (shouldSuggest) specialBtn.classList.add('suggested');
 
-            // Disable if not enough AP in pool or already used
-            if (state.sharedAP < 2 || unit.usedSpecial) {
+            // Disable if ability cannot be used
+            if (!canUseSpecialAbility(unit)) {
                 specialBtn.classList.add('disabled');
-                if (tipEl) tipEl.textContent = unit.usedSpecial ? 'Bereits benutzt' : 'Nicht genug AP';
+                if (tipEl) {
+                    if (unit.usedSpecial) {
+                        tipEl.textContent = 'Bereits benutzt';
+                    } else if (state.sharedAP < apCost) {
+                        tipEl.textContent = `Nicht genug AP (${apCost} benötigt)`;
+                    } else if (unit.class === 'assault') {
+                        tipEl.textContent = 'Kein Angriff mehr möglich';
+                    } else if ((unit.class === 'sniper' || unit.class === 'commando') && unit.cloaked) {
+                        tipEl.textContent = 'Bereits getarnt';
+                    } else {
+                        tipEl.textContent = 'Nicht verfügbar';
+                    }
+                }
+            }
+        }
+    }
+
+    // === HINTERHALT-BUTTON ===
+    const ambushBtn = document.getElementById('ambush-btn');
+    if (ambushBtn) {
+        if (!unit || isAiTurnHidden) {
+            ambushBtn.style.display = 'none';
+        } else if (canPrepareAmbush(unit)) {
+            // Zeige Button wenn Hinterhalt möglich
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.remove('disabled');
+            ambushBtn.classList.add('suggested'); // Hervorheben
+        } else if (unit.ambushReady) {
+            // Zeige dass Hinterhalt vorbereitet ist
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.add('disabled');
+            ambushBtn.querySelector('.label').textContent = 'Bereit!';
+        } else if (unit.cloaked || unit.hiding) {
+            // Versteckt aber nicht genug AP
+            ambushBtn.style.display = 'flex';
+            ambushBtn.classList.add('disabled');
+            ambushBtn.querySelector('.label').textContent = 'Hinterhalt';
+        } else {
+            ambushBtn.style.display = 'none';
+        }
+    }
+
+    // === KOORDINATIONS-BUTTON ===
+    const coordBtn = document.getElementById('coordinate-btn');
+    if (coordBtn) {
+        // Zeige Button wenn ein Ziel anvisiert ist und mehrere Einheiten angreifen können
+        if (!unit || isAiTurnHidden || !state.targetedUnit) {
+            coordBtn.style.display = 'none';
+        } else {
+            const eligible = getEligibleCoordinators(state.targetedUnit);
+            if (eligible.length >= 2) {
+                coordBtn.style.display = 'flex';
+                coordBtn.classList.remove('disabled');
+                coordBtn.querySelector('.label').textContent = `Koordinieren (${eligible.length})`;
+            } else {
+                coordBtn.style.display = 'none';
             }
         }
     }

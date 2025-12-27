@@ -5,7 +5,7 @@ import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGh
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
-import { executeAttack, useSpecialAbility } from './combat.js';
+import { executeAttack, useSpecialAbility, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
 import { render } from './renderer.js';
@@ -485,6 +485,166 @@ function hideAIThinking() {
 // ===== STRATEGIC PLANNING =====
 
 /**
+ * Calculate AP budget per unit to ensure all units can act
+ * This prevents one unit from consuming all AP
+ */
+function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
+    const apBudgets = new Map();
+    const aliveUnits = aiUnits.filter(u => u.alive);
+    const unitCount = aliveUnits.length;
+
+    if (unitCount === 0) return apBudgets;
+
+    // Base AP per unit (ensure everyone gets something)
+    const baseAPPerUnit = Math.floor(totalAP / unitCount);
+    let remainingAP = totalAP;
+
+    // Priority scoring for AP allocation
+    const priorities = [];
+
+    for (const unit of aliveUnits) {
+        let priority = 1.0;
+
+        // Check if unit can attack any visible enemy
+        const canAttack = visibleEnemies.some(e =>
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
+        );
+
+        // Check if unit can reach attack range with movement
+        const canReachAndAttack = visibleEnemies.some(e => {
+            const dist = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+            return dist <= unit.range + unit.move;
+        });
+
+        // Higher priority for units that can attack now
+        if (canAttack) {
+            priority += 1.5;
+            // Even higher for kill shots
+            const killable = visibleEnemies.find(e =>
+                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range &&
+                e.currentHp <= unit.damage
+            );
+            if (killable) priority += 1.0;
+        } else if (canReachAndAttack) {
+            priority += 0.8;
+        }
+
+        // Medics get priority if allies are wounded
+        if (unit.class === 'medic') {
+            const woundedAllies = aliveUnits.filter(a =>
+                a.currentHp < a.maxHp * 0.6
+            );
+            if (woundedAllies.length > 0) priority += 0.5;
+        }
+
+        // Lower priority for units that should retreat
+        if (shouldRetreat(unit, visibleEnemies)) {
+            priority -= 0.3;
+        }
+
+        // Assigned target bonus
+        if (aiMemory.assignedTargets.has(unit.id)) {
+            priority += 0.4;
+        }
+
+        priorities.push({ unit, priority, canAttack, canReachAndAttack });
+    }
+
+    // Sort by priority
+    priorities.sort((a, b) => b.priority - a.priority);
+
+    // Allocate AP based on priority
+    for (const { unit, priority, canAttack, canReachAndAttack } of priorities) {
+        // Calculate unit's AP budget
+        let unitBudget;
+
+        if (canAttack) {
+            // Unit can attack - give enough AP for attack + possible second action
+            unitBudget = Math.min(remainingAP, Math.max(2, baseAPPerUnit + 1));
+        } else if (canReachAndAttack) {
+            // Unit can reach and attack - give enough for move + attack
+            unitBudget = Math.min(remainingAP, Math.max(3, baseAPPerUnit + 1));
+        } else {
+            // Unit needs to explore/position - give base allocation
+            unitBudget = Math.min(remainingAP, Math.max(1, baseAPPerUnit));
+        }
+
+        // Ensure minimum 1 AP for each unit (for at least moving)
+        unitBudget = Math.max(1, unitBudget);
+
+        // Don't exceed remaining AP
+        unitBudget = Math.min(unitBudget, remainingAP);
+
+        apBudgets.set(unit.id, unitBudget);
+        remainingAP -= unitBudget;
+
+        // If we're out of AP, remaining units get 0
+        if (remainingAP <= 0) break;
+    }
+
+    // Give remaining units at least 0 budget
+    for (const unit of aliveUnits) {
+        if (!apBudgets.has(unit.id)) {
+            apBudgets.set(unit.id, 0);
+        }
+    }
+
+    return apBudgets;
+}
+
+/**
+ * Check if a position is exposed to enemy attacks
+ * Returns exposure score (higher = more dangerous)
+ */
+function calculatePositionExposure(q, r, enemies, unit) {
+    let exposure = 0;
+
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+        const enemyRange = enemy.range || 3;
+
+        // Position is in enemy attack range - very exposed
+        if (dist <= enemyRange) {
+            // Weight by enemy damage
+            exposure += enemy.damage * 1.5;
+
+            // Extra exposure if enemy is close (melee threat)
+            if (dist <= 2) {
+                exposure += enemy.damage * 0.5;
+            }
+
+            // High-damage enemies are more threatening
+            if (enemy.class === 'sniper' || enemy.class === 'assault') {
+                exposure += 20;
+            }
+        } else if (dist <= enemyRange + enemy.move) {
+            // Enemy could reach and attack next turn
+            exposure += enemy.damage * 0.4;
+        }
+    }
+
+    // Check terrain for cover reduction
+    const hex = getHex(q, r);
+    if (hex && hex.cover) {
+        exposure *= 0.6; // Cover reduces exposure by 40%
+    }
+    if (hex && hex.type === 'hills') {
+        exposure *= 0.85; // Hills provide some defense
+    }
+
+    // Adjust for unit class - some units can handle exposure better
+    if (unit) {
+        if (unit.class === 'assault') {
+            exposure *= 0.7; // Assault is tanky
+        } else if (unit.class === 'sniper' || unit.class === 'medic') {
+            exposure *= 1.3; // These are fragile
+        }
+    }
+
+    return exposure;
+}
+
+/**
  * Analyze the battlefield and create a strategic plan
  */
 function analyzeAndPlan() {
@@ -550,13 +710,23 @@ function analyzeAndPlan() {
         }
     }
 
+    // Calculate AP budgets for each unit
+    const apBudgets = calculateAPBudgets(aiUnits, state.sharedAP, visibleEnemies);
+
+    // Log AP allocation
+    const budgetInfo = aiUnits.filter(u => u.alive).map(u =>
+        `${CLASS_NAMES_DE[u.class] || u.class}: ${apBudgets.get(u.id) || 0} AP`
+    ).join(', ');
+    addAIThought(`AP-Verteilung: ${budgetInfo}`, 'strategy');
+
     return {
         aiUnits,
         visibleEnemies,
         knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
         inHuntMode: aiMemory.huntMode,
         searchPattern: aiMemory.searchPattern,
-        decoyActive: aiMemory.decoyActive
+        decoyActive: aiMemory.decoyActive,
+        apBudgets
     };
 }
 
@@ -947,7 +1117,7 @@ function sortUnitsForExecution(plan) {
 }
 
 /**
- * Perform AI for a single unit with strategic awareness
+ * Perform AI for a single unit with strategic awareness and AP budget
  * @param {Object} unit - The unit to control
  * @param {Object} plan - Strategic plan from analyzeAndPlan
  * @param {boolean} spectatorMode - Whether in spectator mode (slower pacing)
@@ -958,6 +1128,20 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         console.error(`AI attempted to control human player ${unit.player}'s unit! Blocking action.`);
         return;
     }
+
+    // Get this unit's AP budget
+    const unitBudget = plan.apBudgets ? (plan.apBudgets.get(unit.id) || 0) : state.sharedAP;
+    let apSpentByUnit = 0;
+
+    // Helper to check if unit can spend more AP
+    const canSpendAP = (cost) => {
+        return (apSpentByUnit + cost <= unitBudget) && (state.sharedAP >= cost);
+    };
+
+    // Helper to track AP spent by this unit
+    const trackAPSpent = (cost) => {
+        apSpentByUnit += cost;
+    };
 
     try {
         // In spectator mode, always render as if human is watching
@@ -993,25 +1177,28 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         // === NORMAL TACTICAL DECISION TREE ===
 
         // 1. Should we retreat? (Low HP, enemies nearby)
-        if (shouldRetreat(unit, enemies)) {
-            await executeRetreat(unit, enemies, spectatorMode);
+        if (shouldRetreat(unit, enemies) && canSpendAP(1)) {
+            await executeRetreatWithBudget(unit, enemies, spectatorMode, unitBudget - apSpentByUnit);
             return;
         }
 
         // 2. Attack assigned target if possible (focus fire)
-        if (assignedTargetId && attackable.some(t => t.id === assignedTargetId)) {
+        if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1)) {
             const target = attackable.find(t => t.id === assignedTargetId);
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
-        } else if (attackable.length > 0 && state.sharedAP >= 1) {
+            trackAPSpent(1);
+        } else if (attackable.length > 0 && canSpendAP(1)) {
             // 3. Attack best available target
             const target = selectBestTarget(unit, attackable);
             if (target) {
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
+                trackAPSpent(1);
             }
         }
 
-        // 4. Use special ability if beneficial
-        if (state.sharedAP >= 2 && !unit.usedSpecial && shouldUseSpecial(unit, enemies, plan)) {
+        // 4. Use special ability if beneficial AND within budget
+        const specialCost = getSpecialAbilityCost(unit.class);
+        if (canSpendAP(specialCost) && canUseSpecialAbility(unit) && shouldUseSpecial(unit, enemies, plan)) {
             // Generate special ability thought
             const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
             const specialNames = {
@@ -1024,6 +1211,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             addAIThought(`${unitName}: ${specialNames[unit.class] || 'Spezialfähigkeit!'}`, 'special');
 
             useSpecialAbility(unit);
+            trackAPSpent(specialCost);
             if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
                 updateUI();
                 render();
@@ -1031,26 +1219,322 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
         }
 
-        // 5. Move strategically
-        if (state.sharedAP >= 1) {
-            const moveTarget = selectStrategicMoveTarget(unit, plan);
+        // 5. Move strategically (within budget)
+        if (canSpendAP(1)) {
+            const remainingBudget = unitBudget - apSpentByUnit;
+            const moveTarget = selectStrategicMoveTargetWithBudget(unit, plan, remainingBudget);
             if (moveTarget) {
                 await executeAIMove(unit, moveTarget, spectatorMode);
+                trackAPSpent(moveTarget.cost);
             }
         }
 
-        // 6. Attack again after moving
+        // 6. Attack again after moving (if budget allows)
         const attackableAfterMove = getAttackableUnits(unit);
-        if (attackableAfterMove.length > 0 && state.sharedAP >= 1) {
+        if (attackableAfterMove.length > 0 && canSpendAP(1)) {
             const target = selectBestTarget(unit, attackableAfterMove);
             if (target) {
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
+                trackAPSpent(1);
             }
         }
     } catch (error) {
         console.error(`AI error for unit ${unit.id} (${unit.class}):`, error);
         // Continue to next unit - don't let one unit's error stop the entire turn
     }
+}
+
+/**
+ * Execute retreat with AP budget constraint
+ */
+async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
+    addAIThought(`${unitName} zieht sich zurück (${hpPercent}% HP)`, 'retreat');
+
+    const reachable = getReachableHexes(unit);
+    if (reachable.size === 0) return;
+
+    // Limit movement by budget
+    const maxCost = Math.min(maxAP, state.sharedAP);
+    let bestHex = null;
+    let bestScore = -Infinity;
+
+    reachable.forEach((data, key) => {
+        if (data.cost > maxCost) return;
+
+        const [q, r] = key.split(',').map(Number);
+        const hex = getHex(q, r);
+        if (!hex || hex.unit) return;
+
+        let score = 0;
+
+        // Maximize distance from enemies
+        for (const enemy of enemies) {
+            score += hexDistance({ q, r }, { q: enemy.q, r: enemy.r }) * 10;
+        }
+
+        // === EXPOSURE PENALTY - Don't retreat into enemy range ===
+        const exposure = calculatePositionExposure(q, r, enemies, unit);
+        score -= exposure * 2;
+
+        // Prefer cover
+        if (hex.cover) score += 30;
+
+        // Move towards allies (for protection/healing)
+        const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+        if (allies.length > 0) {
+            const closestAlly = Math.min(...allies.map(a =>
+                hexDistance({ q, r }, { q: a.q, r: a.r })
+            ));
+            score += (10 - closestAlly) * 5;
+        }
+
+        // Zone awareness
+        const targetInZone = isHexInZone(q, r);
+        if (!targetInZone) {
+            score -= 200;
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestHex = { q, r, cost: data.cost };
+        }
+    });
+
+    if (bestHex) {
+        await executeAIMove(unit, bestHex, spectatorMode);
+    }
+}
+
+/**
+ * Select strategic move target with AP budget constraint
+ */
+function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
+    const reachable = getReachableHexes(unit);
+    if (reachable.size === 0) return null;
+
+    // Limit by budget AND remaining shared AP
+    const maxCost = Math.min(maxAP, state.sharedAP);
+    const candidates = [];
+    const enemies = plan.visibleEnemies;
+
+    reachable.forEach((data, key) => {
+        if (data.cost > maxCost) return;
+
+        const [q, r] = key.split(',').map(Number);
+        const hex = getHex(q, r);
+        if (!hex || hex.unit) return;
+
+        let score = 0;
+
+        if (enemies.length > 0) {
+            // Combat mode - position for attack
+            score = scoreCombatPositionSafe(unit, q, r, enemies, plan);
+        } else if (plan.knownEnemyPositions.length > 0) {
+            // Hunt mode - move towards last known positions
+            score = scoreHuntPosition(unit, q, r, plan);
+        } else {
+            // Search mode - systematic exploration
+            score = scoreSearchPosition(unit, q, r, plan);
+        }
+
+        // Universal terrain preferences
+        const terrainData = TERRAIN[hex.type];
+        if (hex.cover) score += 15;
+        score -= terrainData.moveCost * 3;
+
+        // === ZONE AWARENESS ===
+        const unitInZone = isHexInZone(unit.q, unit.r);
+        const targetInZone = isHexInZone(q, r);
+
+        if (!unitInZone) {
+            if (targetInZone) {
+                score += 500;
+            } else {
+                const currentDistFromCenter = Math.max(Math.abs(unit.q), Math.abs(unit.r), Math.abs(-unit.q - unit.r));
+                const targetDistFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                if (targetDistFromCenter < currentDistFromCenter) {
+                    score += 100;
+                }
+            }
+        } else {
+            if (!targetInZone) {
+                score -= 300;
+            } else {
+                const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+                const distFromEdge = state.zoneRadius - distFromCenter;
+                if (distFromEdge <= 2) {
+                    score -= 20;
+                }
+            }
+        }
+
+        candidates.push({ q, r, score, cost: data.cost });
+    });
+
+    if (candidates.length === 0) return null;
+
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0];
+}
+
+/**
+ * Score combat position with STRONG exposure penalty
+ * This prevents AI from walking directly in front of enemies
+ */
+function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
+    let score = 0;
+    const hex = getHex(q, r);
+
+    // === DECOY STRATEGY POSITIONING ===
+    if (plan.decoyActive) {
+        if (isDecoyUnit(unit)) {
+            return scoreDecoyPosition(unit, q, r, enemies);
+        } else if (isAmbushUnit(unit)) {
+            return scoreAmbushPosition(unit, q, r, enemies);
+        }
+    }
+
+    // Get assigned target or closest enemy
+    const assignedId = aiMemory.assignedTargets.get(unit.id);
+    const primaryTarget = assignedId
+        ? enemies.find(e => e.id === assignedId)
+        : enemies[0];
+
+    if (primaryTarget) {
+        const distToTarget = hexDistance({ q, r }, { q: primaryTarget.q, r: primaryTarget.r });
+
+        // === KLASSENSPEZIFISCHE IDEALE DISTANZ ===
+        let idealDist = unit.range;
+        let minSafeDist = 1;
+
+        switch (unit.class) {
+            case 'sniper':
+                idealDist = unit.range;
+                minSafeDist = 4;
+                break;
+            case 'commando':
+                idealDist = 1;
+                minSafeDist = 1;
+                break;
+            case 'assault':
+                idealDist = 2;
+                minSafeDist = 1;
+                break;
+            case 'scout':
+                idealDist = 3;
+                minSafeDist = 2;
+                break;
+            case 'medic':
+                idealDist = 4;
+                minSafeDist = 3;
+                break;
+        }
+
+        // Score based on distance to ideal range
+        const distDiff = Math.abs(distToTarget - idealDist);
+        score -= distDiff * 15;
+
+        // Bonus for being in attack range
+        if (distToTarget <= unit.range) {
+            score += 60;
+            if (distToTarget === idealDist) score += 30;
+        }
+
+        // Penalty for being too close (except commando)
+        if (distToTarget < minSafeDist) {
+            score -= (minSafeDist - distToTarget) * 30;
+        }
+    }
+
+    // === CRITICAL: EXPOSURE PENALTY ===
+    // This is the key fix - heavily penalize exposed positions
+    const exposure = calculatePositionExposure(q, r, enemies, unit);
+
+    // Scale penalty based on unit's HP - wounded units are more careful
+    const hpRatio = unit.currentHp / unit.maxHp;
+    const exposurePenalty = exposure * (hpRatio < 0.5 ? 2.5 : 1.5);
+
+    // Only penalize exposure if we're not in a strong position
+    // Assault units can tolerate more exposure
+    if (unit.class !== 'assault' && unit.class !== 'commando') {
+        score -= exposurePenalty;
+    } else {
+        score -= exposurePenalty * 0.5;
+    }
+
+    // === PREFER POSITIONS WITH COVER ===
+    if (hex) {
+        if (hex.cover) {
+            score += 50; // Increased cover bonus
+        }
+        if (hex.type === 'hills') {
+            score += 30;
+        }
+    }
+
+    // === PREFER ATTACK POSITIONS WITH ESCAPE ROUTES ===
+    // Check if there are safe hexes nearby to retreat to
+    const neighbors = getNeighborCoords(q, r);
+    let escapeRoutes = 0;
+    for (const [nq, nr] of neighbors) {
+        const neighborHex = getHex(nq, nr);
+        if (neighborHex && !neighborHex.unit && neighborHex.walkable) {
+            const neighborExposure = calculatePositionExposure(nq, nr, enemies, unit);
+            if (neighborExposure < exposure * 0.7) {
+                escapeRoutes++;
+            }
+        }
+    }
+    score += escapeRoutes * 10;
+
+    // === MEDIC-SPEZIAL: Nähe zu Verbündeten ===
+    const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+    if (unit.class === 'medic') {
+        for (const ally of allies) {
+            const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+            if (distToAlly <= 4) {
+                score += 15;
+                if (ally.currentHp < ally.maxHp * 0.7) {
+                    score += 20;
+                }
+            }
+        }
+    }
+
+    // Avoid clustering with allies (spread out)
+    for (const ally of allies) {
+        const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+        if (distToAlly <= 1) score -= 20;
+        else if (distToAlly <= 2) score -= 10;
+    }
+
+    // Flanking bonus
+    if (primaryTarget && allies.length > 0) {
+        const avgAllyAngle = allies.reduce((sum, a) => {
+            return sum + Math.atan2(a.r - primaryTarget.r, a.q - primaryTarget.q);
+        }, 0) / allies.length;
+
+        const myAngle = Math.atan2(r - primaryTarget.r, q - primaryTarget.q);
+        const angleDiff = Math.abs(myAngle - avgAllyAngle);
+
+        const flankBonus = unit.class === 'commando' ? 40 : 25;
+        if (angleDiff > Math.PI / 3) score += flankBonus;
+    }
+
+    return score;
+}
+
+/**
+ * Get neighbor coordinates for a hex
+ */
+function getNeighborCoords(q, r) {
+    const directions = [
+        [1, 0], [1, -1], [0, -1],
+        [-1, 0], [-1, 1], [0, 1]
+    ];
+    return directions.map(([dq, dr]) => [q + dq, r + dr]);
 }
 
 /**
@@ -1089,7 +1573,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer,
     }
 
     // 3. Use special only defensively (sprint for escape, etc.)
-    if (state.sharedAP >= 2 && !unit.usedSpecial) {
+    if (canUseSpecialAbility(unit)) {
         // Scout: Sprint if enemies are close (escape option)
         // Assault: Don't powershot (save HP as bait)
         if (unit.class === 'scout') {
@@ -1117,7 +1601,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
     const actionDelay = spectatorMode ? 500 : 300;
 
     // 1. Use stealth abilities if available (sniper cloak, commando stealth)
-    if (state.sharedAP >= 2 && !unit.usedSpecial) {
+    if (canUseSpecialAbility(unit)) {
         if ((unit.class === 'sniper' || unit.class === 'commando') && !unit.cloaked) {
             addAIThought(`${unitName}: Tarnung für Hinterhalt!`, 'special');
             useSpecialAbility(unit);
@@ -1146,8 +1630,8 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         }
     }
 
-    // 4. Use powershot if assault and in range
-    if (state.sharedAP >= 2 && !unit.usedSpecial && unit.class === 'assault') {
+    // 4. Use powershot if assault and in range (uses canUseSpecialAbility which checks for attacks)
+    if (canUseSpecialAbility(unit) && unit.class === 'assault') {
         const inRange = enemies.filter(e =>
             hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
         );
