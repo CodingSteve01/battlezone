@@ -5,7 +5,8 @@ import {
     trackUnitAttack, getRemainingAttacks, canUnitAttack, markCombat, triggerScreenShake,
     addSuppressedHex, isHexSuppressed, getSuppressionInfo,
     setOverwatch, removeOverwatch, isUnitOnOverwatch, queueOverwatchTrigger,
-    getHoldPositionBonus, clearHoldPosition, updateHoldPosition
+    getHoldPositionBonus, clearHoldPosition, updateHoldPosition,
+    areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances
 } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
@@ -19,6 +20,25 @@ import {
 } from './audio.js';
 import { particles } from './particles.js';
 import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames, startHealingMinigame, HEALING_RESULT_MULTIPLIERS } from './minigames.js';
+
+/**
+ * Prüfe ob ein Angriff auf ein Ziel erlaubt ist
+ * Verbündete können sich NICHT gegenseitig angreifen!
+ * @param {Object} attacker - Die angreifende Einheit
+ * @param {Object} target - Das Ziel
+ * @returns {boolean} True wenn Angriff erlaubt ist
+ */
+export function canAttackTarget(attacker, target) {
+    if (!attacker || !target) return false;
+    if (!attacker.alive || !target.alive) return false;
+
+    // WICHTIG: Verbündete können sich NICHT angreifen!
+    if (areUnitsAllied(attacker, target)) {
+        return false;
+    }
+
+    return true;
+}
 
 /**
  * Check if a unit can take cover on their current hex
@@ -464,6 +484,12 @@ function buildMinigameContext(attacker, defender) {
  * Returns a Promise with the attack result
  */
 export async function executeAttackWithMinigame(attacker, defender) {
+    // === ALLIANZ-PRÜFUNG: Verbündete können sich NICHT angreifen! ===
+    if (!canAttackTarget(attacker, defender)) {
+        showToast('❌ Verbündete können nicht angegriffen werden!', 'error');
+        return { hit: false, damage: 0, killed: false, blocked: true, allyProtected: true };
+    }
+
     // Check if minigames are enabled
     if (areMinigamesEnabled()) {
         // Baue Kontext für adaptives Minigame
@@ -486,6 +512,12 @@ export async function executeAttackWithMinigame(attacker, defender) {
  * @param {Object} minigameResult - Result from the attack minigame (optional)
  */
 export function executeAttack(attacker, defender, minigameResult = null) {
+    // === ALLIANZ-PRÜFUNG: Verbündete können sich NICHT angreifen! ===
+    if (!canAttackTarget(attacker, defender)) {
+        showToast('❌ Verbündete können nicht angegriffen werden!', 'error');
+        return { hit: false, damage: 0, killed: false, blocked: true, allyProtected: true };
+    }
+
     // Default to GOOD result if no minigame result provided (for AI attacks, etc.)
     if (!minigameResult) {
         minigameResult = { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] };
@@ -1028,6 +1060,7 @@ function useEliteSpecial(unit) {
 
 /**
  * Check if the game is over
+ * Mit Allianz-Support: Spiel endet wenn nur noch ein Team übrig ist
  */
 export function checkGameOver() {
     const alivePlayers = [];
@@ -1038,14 +1071,44 @@ export function checkGameOver() {
         }
     }
 
-    if (alivePlayers.length <= 1) {
+    // Ohne Allianzen: Standard-Logik
+    if (!hasAlliances()) {
+        if (alivePlayers.length <= 1) {
+            return {
+                gameOver: true,
+                winner: alivePlayers[0] ?? null,
+                winningTeam: null
+            };
+        }
+        return { gameOver: false, winner: null, winningTeam: null };
+    }
+
+    // MIT Allianzen: Prüfe welche TEAMS noch Einheiten haben
+    const aliveTeams = new Set();
+    for (const player of alivePlayers) {
+        const team = state.settings.alliances[player];
+        if (team !== undefined) {
+            aliveTeams.add(team);
+        }
+    }
+
+    // Nur noch ein Team übrig = dieses Team gewinnt!
+    if (aliveTeams.size <= 1) {
+        const winningTeam = aliveTeams.size === 1 ? [...aliveTeams][0] : null;
+        // Finde den ersten lebenden Spieler des Sieger-Teams
+        const winner = winningTeam !== null
+            ? alivePlayers.find(p => state.settings.alliances[p] === winningTeam) ?? null
+            : null;
+
         return {
             gameOver: true,
-            winner: alivePlayers[0] ?? null
+            winner: winner,
+            winningTeam: winningTeam,
+            isTeamVictory: true
         };
     }
 
-    return { gameOver: false, winner: null };
+    return { gameOver: false, winner: null, winningTeam: null };
 }
 
 // ===== HINTERHALT-SYSTEM =====

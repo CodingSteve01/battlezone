@@ -662,6 +662,9 @@ async function init() {
     state.settings.aiPlayers = [1];
     updateAIConfigGrid();
 
+    // Setup alliance mode buttons
+    setupAllianceButtons();
+
     // Setup player count buttons
     document.querySelectorAll('[data-players]').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -846,6 +849,35 @@ async function init() {
         }
     } catch { /* ignore */ }
 
+    // Setup tutorial toggle buttons
+    const tutorialBtns = document.querySelectorAll('#tutorial-toggle .setting-btn');
+    tutorialBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tutorialBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            state.settings.showTutorial = btn.dataset.value === 'on';
+
+            // Save to localStorage
+            try {
+                localStorage.setItem('shadowSquad_showTutorial', btn.dataset.value);
+            } catch { /* ignore */ }
+
+            playClick();
+        });
+    });
+
+    // Load saved tutorial setting
+    try {
+        const savedTutorial = localStorage.getItem('shadowSquad_showTutorial');
+        if (savedTutorial) {
+            state.settings.showTutorial = savedTutorial === 'on';
+            tutorialBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === savedTutorial);
+            });
+        }
+    } catch { /* ignore */ }
+
     // Setup tutorial reset button
     const resetTutorialBtn = document.getElementById('reset-tutorial-btn');
     if (resetTutorialBtn) {
@@ -853,16 +885,24 @@ async function init() {
             resetTutorial();
             state.settings.showTutorial = true;
 
+            // Also update the toggle to "on"
+            tutorialBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.value === 'on');
+            });
+            try {
+                localStorage.setItem('shadowSquad_showTutorial', 'on');
+            } catch { /* ignore */ }
+
             // Visual feedback
-            resetTutorialBtn.textContent = '✓ Zurückgesetzt!';
+            resetTutorialBtn.textContent = '✓';
             resetTutorialBtn.style.borderColor = 'var(--green)';
             resetTutorialBtn.style.color = 'var(--green)';
 
             setTimeout(() => {
-                resetTutorialBtn.textContent = '🔄 Zurücksetzen';
+                resetTutorialBtn.textContent = '🔄';
                 resetTutorialBtn.style.borderColor = '';
                 resetTutorialBtn.style.color = '';
-            }, 2000);
+            }, 1500);
 
             playClick();
         });
@@ -918,6 +958,126 @@ async function init() {
 }
 
 /**
+ * Update alliance section visibility and config
+ */
+function updateAllianceSection() {
+    const section = document.getElementById('alliance-section');
+    const ffaBtn = document.getElementById('alliance-ffa-btn');
+    const teamsBtn = document.getElementById('alliance-teams-btn');
+    const configGrid = document.getElementById('alliance-config-grid');
+
+    if (!section) return;
+
+    // Only show alliance section for 3+ players
+    if (state.settings.players >= 3) {
+        section.style.display = 'block';
+    } else {
+        section.style.display = 'none';
+        // Reset alliances for 2 players
+        state.settings.alliances = [];
+        return;
+    }
+
+    // Update config grid when in teams mode
+    if (teamsBtn && teamsBtn.classList.contains('selected')) {
+        updateAllianceConfigGrid();
+    }
+}
+
+/**
+ * Update the alliance config grid (team assignment dropdowns)
+ */
+function updateAllianceConfigGrid() {
+    const grid = document.getElementById('alliance-config-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+
+    // Initialize alliances array if needed
+    if (!state.settings.alliances || state.settings.alliances.length !== state.settings.players) {
+        // Default: alternate teams (0,1,0,1,0,1...)
+        state.settings.alliances = [];
+        for (let i = 0; i < state.settings.players; i++) {
+            state.settings.alliances.push(i % 2);
+        }
+    }
+
+    // Determine max teams based on player count
+    const maxTeams = Math.min(4, Math.ceil(state.settings.players / 2));
+
+    for (let i = 0; i < state.settings.players; i++) {
+        const item = document.createElement('div');
+        item.className = 'alliance-player-item';
+
+        const badge = document.createElement('div');
+        badge.className = 'player-badge';
+        badge.style.backgroundColor = CONFIG.PLAYER_COLORS[i];
+        badge.textContent = i + 1;
+
+        const select = document.createElement('select');
+        select.className = 'team-select';
+        select.dataset.player = i;
+
+        // Add team options
+        for (let t = 0; t < maxTeams; t++) {
+            const option = document.createElement('option');
+            option.value = t;
+            option.textContent = `Team ${t + 1}`;
+            if (state.settings.alliances[i] === t) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        }
+
+        select.addEventListener('change', () => {
+            const playerIndex = parseInt(select.dataset.player, 10);
+            const newTeam = parseInt(select.value, 10);
+            state.settings.alliances[playerIndex] = newTeam;
+            // Update visual indicators
+            updateAllianceConfigGrid();
+        });
+
+        // Team color indicator
+        const indicator = document.createElement('div');
+        indicator.className = `team-indicator team-${state.settings.alliances[i]}`;
+
+        item.appendChild(badge);
+        item.appendChild(select);
+        item.appendChild(indicator);
+        grid.appendChild(item);
+    }
+}
+
+/**
+ * Setup alliance mode buttons
+ */
+function setupAllianceButtons() {
+    const ffaBtn = document.getElementById('alliance-ffa-btn');
+    const teamsBtn = document.getElementById('alliance-teams-btn');
+    const configGrid = document.getElementById('alliance-config-grid');
+
+    if (ffaBtn) {
+        ffaBtn.addEventListener('click', () => {
+            ffaBtn.classList.add('selected');
+            if (teamsBtn) teamsBtn.classList.remove('selected');
+            if (configGrid) configGrid.style.display = 'none';
+            // Clear alliances (free for all)
+            state.settings.alliances = [];
+        });
+    }
+
+    if (teamsBtn) {
+        teamsBtn.addEventListener('click', () => {
+            teamsBtn.classList.add('selected');
+            if (ffaBtn) ffaBtn.classList.remove('selected');
+            if (configGrid) configGrid.style.display = 'flex';
+            // Initialize default team assignments
+            updateAllianceConfigGrid();
+        });
+    }
+}
+
+/**
  * Update the AI config grid based on current player count
  */
 function updateAIConfigGrid() {
@@ -928,6 +1088,9 @@ function updateAIConfigGrid() {
     state.settings.aiPlayers = state.settings.aiPlayers.filter(p => p < state.settings.players);
 
     grid.innerHTML = '';
+
+    // Also update alliance section
+    updateAllianceSection();
 
     for (let i = 0; i < state.settings.players; i++) {
         const item = document.createElement('div');

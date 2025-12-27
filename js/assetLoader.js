@@ -102,8 +102,9 @@ export function isUsingSpriteSheets() {
 /**
  * Get a unit sprite image
  * Returns sprite or null (renderer will use placeholder)
+ * For players 4-7, automatically colorizes base sprites (0-3) with player colors
  * @param {string} classType - Unit class (scout, assault, etc.)
- * @param {number} playerIndex - Player index (0-3)
+ * @param {number} playerIndex - Player index (0-7)
  * @param {string} status - Unit state (normal, cover, attack, dead)
  * @param {string} facing - Facing direction ('left' or 'right')
  */

@@ -1,7 +1,7 @@
 // ===== UNIT SYSTEM =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks, areUnitsAllied } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -112,7 +112,8 @@ export function getAttackableUnits(unit) {
     const effectiveRange = getEffectiveRange(unit);
 
     return state.units.filter(target => {
-        if (!target.alive || target.player === unit.player) return false;
+        // Schließe tote Einheiten, eigene Einheiten UND VERBÜNDETE aus!
+        if (!target.alive || areUnitsAllied(unit, target)) return false;
 
         const dx = Math.abs(target.q - unit.q);
         const dy = Math.abs(target.r - unit.r);
