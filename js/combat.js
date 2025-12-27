@@ -712,12 +712,65 @@ export function executeAttack(attacker, defender, minigameResult = null) {
 }
 
 /**
+ * Get the AP cost for a special ability
+ * Different abilities have different costs
+ */
+export function getSpecialAbilityCost(unitClass) {
+    switch (unitClass) {
+        case 'scout':
+            return 1; // Sprint kostet nur 1 AP - ermöglicht sofortige Bewegung
+        case 'assault':
+            return 1; // PowerShot kostet nur 1 AP - muss aber mit Angriff kombiniert werden
+        case 'medic':
+            return 2; // Heilung kostet 2 AP (starker Effekt)
+        case 'sniper':
+            return 2; // Tarnung kostet 2 AP (strategischer Vorteil)
+        case 'commando':
+            return 2; // Stealth + Bewegung kostet 2 AP
+        default:
+            return 2;
+    }
+}
+
+/**
+ * Check if a unit can use its special ability
+ */
+export function canUseSpecialAbility(unit) {
+    if (!unit || !unit.alive) return false;
+    if (unit.usedSpecial) return false;
+
+    const cost = getSpecialAbilityCost(unit.class);
+    if (state.sharedAP < cost) return false;
+
+    // Spezielle Prüfungen pro Klasse
+    switch (unit.class) {
+        case 'assault':
+            // PowerShot nur sinnvoll wenn Angriff möglich ist
+            if (!canUnitAttack(unit)) {
+                return false;
+            }
+            break;
+        case 'sniper':
+            // Tarnung nur wenn nicht bereits getarnt
+            if (unit.cloaked) return false;
+            break;
+        case 'commando':
+            // Stealth nur wenn nicht bereits getarnt
+            if (unit.cloaked) return false;
+            break;
+    }
+
+    return true;
+}
+
+/**
  * Use special ability
  */
 export function useSpecialAbility(unit) {
-    if (state.sharedAP < 2 || unit.usedSpecial) return false;
+    if (!canUseSpecialAbility(unit)) return false;
 
-    spendSharedAP(2);  // Spend from shared pool
+    const cost = getSpecialAbilityCost(unit.class);
+    spendSharedAP(cost);
     unit.usedSpecial = true;
 
     switch (unit.class) {
