@@ -806,11 +806,12 @@ function updateThreatAssessment(enemies) {
 
         // Base threat by class
         const classThreat = {
-            sniper: 90,   // High damage at range
+            sniper: 90,      // High damage at range
+            elitesoldat: 88, // Versatile elite - high priority target
             commando: 85,    // High damage, stealth
-            assault: 70,  // High damage, tanky
-            medic: 80,    // Force multiplier - healing
-            scout: 50     // Lower threat but mobile
+            medic: 80,       // Force multiplier - healing
+            assault: 70,     // High damage, tanky
+            scout: 50        // Lower threat but mobile
         };
         threat += classThreat[enemy.class] || 50;
 
@@ -1209,7 +1210,8 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
                 assault: 'Powershot vorbereitet! 💥',
                 medic: 'Heilung eingeleitet! 💚',
                 sniper: 'Tarnung aktiviert! 🫥',
-                commando: 'Stealth-Modus! 🥷'
+                commando: 'Stealth-Modus! 🥷',
+                elitesoldat: 'Taktischer Modus! 🎖️'
             };
             addAIThought(`${unitName}: ${specialNames[unit.class] || 'Spezialfähigkeit!'}`, 'special');
 
@@ -1682,7 +1684,8 @@ const CLASS_NAMES_DE = {
     assault: 'Sturmsoldat',
     medic: 'Sanitäter',
     sniper: 'Scharfschütze',
-    commando: 'Kommando'
+    commando: 'Kommando',
+    elitesoldat: 'Kommando-Soldat'
 };
 
 /**
@@ -1973,6 +1976,28 @@ function shouldUseSpecial(unit, enemies, plan) {
             }
             // Im Hunt-Modus öfter Stealth für Überraschungsangriffe
             return plan.inHuntMode && Math.random() < 0.4;
+
+        case 'elitesoldat':
+            // Taktischer Modus wenn Feind in erreichbarer Nähe für Angriff
+            if (unit.tacticalMode) return false; // Already activated
+            if (enemies.length > 0) {
+                const closestEnemy = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                // Aktiviere wenn Feind in Reichweite nach Bewegung
+                if (closestEnemy <= unit.range + unit.move + 2) {
+                    return true;
+                }
+                // Aktiviere wenn hochwertige Ziele in Nähe (Medic, Sniper)
+                const valuableTargets = enemies.filter(e =>
+                    (e.class === 'medic' || e.class === 'sniper') &&
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range + unit.move + 2
+                );
+                if (valuableTargets.length > 0) {
+                    return true;
+                }
+            }
+            return false;
 
         default:
             return false;
