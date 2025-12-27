@@ -61,6 +61,7 @@ export const state = {
     gameOver: false,
     animating: false,
     introShown: false,  // Whether the game intro flyover has been shown
+    turnTransitionInProgress: false,  // Prevents race conditions during turn changes
 
     // Movement animation
     movementAnimation: null,  // { unit, path, currentStep, startTime }
@@ -148,7 +149,10 @@ export const state = {
     overwatchQueue: [],             // Warteschlange für Overwatch-Trigger
 
     // === STELLUNG HALTEN (HOLD POSITION) ===
-    holdingPosition: {}             // unitId -> {rounds: number, q, r} - Wie lange auf Position gehalten
+    holdingPosition: {},            // unitId -> {rounds: number, q, r} - Wie lange auf Position gehalten
+
+    // === SPIELER-STATISTIKEN (für Siegerehrung) ===
+    playerStats: []                 // Array von Statistik-Objekten pro Spieler
 };
 
 /**
@@ -192,6 +196,7 @@ export function resetState() {
     state.round = 1;
     state.gameOver = false;
     state.animating = false;
+    state.turnTransitionInProgress = false;
     state.visibleHexes.clear();
     state.exploredHexes.clear();
     state.ghostIndicators = [];
@@ -259,6 +264,34 @@ export function resetState() {
     state.overwatchUnits = [];
     state.overwatchQueue = [];
     state.holdingPosition = {};
+
+    // Spieler-Statistiken initialisieren
+    state.playerStats = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        state.playerStats.push(createEmptyPlayerStats(i));
+    }
+}
+
+/**
+ * Create empty player statistics object
+ */
+function createEmptyPlayerStats(playerIndex) {
+    return {
+        player: playerIndex,
+        kills: 0,
+        deaths: 0,
+        damageDealt: 0,
+        damageTaken: 0,
+        healing: 0,
+        hexesMoved: 0,
+        shotsHit: 0,
+        shotsMissed: 0,
+        criticalHits: 0,
+        specialsUsed: 0,
+        longestKillDistance: 0,
+        unitsLost: 0,
+        survivalRounds: 0
+    };
 }
 
 /**
@@ -1028,4 +1061,118 @@ export function getPlayersInTeam(teamId) {
         }
     }
     return players;
+}
+
+// === SPIELER-STATISTIKEN HELPER ===
+
+/**
+ * Get stats for a specific player
+ */
+export function getPlayerStats(player) {
+    if (!state.playerStats[player]) {
+        state.playerStats[player] = {
+            player,
+            kills: 0,
+            deaths: 0,
+            damageDealt: 0,
+            damageTaken: 0,
+            healing: 0,
+            hexesMoved: 0,
+            shotsHit: 0,
+            shotsMissed: 0,
+            criticalHits: 0,
+            specialsUsed: 0,
+            longestKillDistance: 0,
+            unitsLost: 0,
+            survivalRounds: 0
+        };
+    }
+    return state.playerStats[player];
+}
+
+/**
+ * Record a kill for a player
+ */
+export function recordKill(player, distance = 0) {
+    const stats = getPlayerStats(player);
+    stats.kills++;
+    if (distance > stats.longestKillDistance) {
+        stats.longestKillDistance = distance;
+    }
+}
+
+/**
+ * Record damage dealt by a player
+ */
+export function recordDamageDealt(player, amount) {
+    const stats = getPlayerStats(player);
+    stats.damageDealt += amount;
+}
+
+/**
+ * Record damage taken by a player
+ */
+export function recordDamageTaken(player, amount) {
+    const stats = getPlayerStats(player);
+    stats.damageTaken += amount;
+}
+
+/**
+ * Record a shot hit or miss
+ */
+export function recordShot(player, hit, isCritical = false) {
+    const stats = getPlayerStats(player);
+    if (hit) {
+        stats.shotsHit++;
+        if (isCritical) {
+            stats.criticalHits++;
+        }
+    } else {
+        stats.shotsMissed++;
+    }
+}
+
+/**
+ * Record healing done by a player
+ */
+export function recordHealing(player, amount) {
+    const stats = getPlayerStats(player);
+    stats.healing += amount;
+}
+
+/**
+ * Record movement (hexes moved)
+ */
+export function recordMovement(player, hexes) {
+    const stats = getPlayerStats(player);
+    stats.hexesMoved += hexes;
+}
+
+/**
+ * Record special ability used
+ */
+export function recordSpecialUsed(player) {
+    const stats = getPlayerStats(player);
+    stats.specialsUsed++;
+}
+
+/**
+ * Record a unit death for a player
+ */
+export function recordUnitLost(player) {
+    const stats = getPlayerStats(player);
+    stats.unitsLost++;
+}
+
+/**
+ * Update survival rounds for all alive players
+ */
+export function updateSurvivalRounds() {
+    for (let p = 0; p < state.settings.players; p++) {
+        const units = state.units.filter(u => u.player === p && u.alive);
+        if (units.length > 0) {
+            const stats = getPlayerStats(p);
+            stats.survivalRounds = state.round;
+        }
+    }
 }

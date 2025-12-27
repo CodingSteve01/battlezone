@@ -9,7 +9,7 @@ import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
-import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
+import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
@@ -62,6 +62,9 @@ function clearAIWatchdog() {
  * Start a player's turn
  */
 export function startTurn() {
+    // Clear any pending auto-end timer from previous turn
+    clearAutoEndTurnTimer();
+
     const units = getPlayerUnits(state.currentPlayer);
 
     // Skip players with no units
@@ -131,6 +134,9 @@ export function startTurn() {
         updateUI();
         render();
 
+        // Reset transition flag - AI turn is starting
+        state.turnTransitionInProgress = false;
+
         // Start watchdog timer - ensures AI turn ALWAYS completes
         // This is a backup safety in case executeAITurn() fails or never starts
         startAIWatchdog();
@@ -167,6 +173,9 @@ export function startTurn() {
     const isCurrentHuman = !isAIPlayer();
 
     if (isCurrentHuman && onlyOneHuman && state.round > 1) {
+        // Reset transition flag - human turn is starting
+        state.turnTransitionInProgress = false;
+
         showScreen(null);
         updateUI();
         render();
@@ -181,6 +190,12 @@ export function startTurn() {
         return;
     }
 
+    // Reset transition flag - human turn is starting (turn screen will be shown)
+    state.turnTransitionInProgress = false;
+
+    // Update players alive display before showing turn screen
+    updatePlayersAlive();
+
     showScreen('turn-screen');
 }
 
@@ -188,6 +203,16 @@ export function startTurn() {
  * End current turn
  */
 export function endTurn() {
+    // Clear auto-end timer to prevent double-ending
+    clearAutoEndTurnTimer();
+
+    // Prevent race conditions: don't allow multiple turn transitions
+    if (state.turnTransitionInProgress) {
+        console.warn('endTurn() called while turn transition already in progress - ignoring');
+        return;
+    }
+    state.turnTransitionInProgress = true;
+
     // Clear AI watchdog since turn is ending normally
     clearAIWatchdog();
     playTurnEnd();
@@ -200,6 +225,12 @@ export function endTurn() {
 export function nextPlayer() {
     // Clear AI watchdog since we're moving to next player
     clearAIWatchdog();
+
+    // Prevent race conditions: if called directly (not via endTurn), set the flag
+    // This handles the AI watchdog case and recursive calls for eliminated players
+    if (!state.turnTransitionInProgress) {
+        state.turnTransitionInProgress = true;
+    }
 
     // Update power-up buffs for ending player
     updatePowerupBuffs(state.currentPlayer);
@@ -338,6 +369,9 @@ export function endGame(winner, result = null) {
             winnerText.style.color = '#e2e8f0';
         }
     }
+
+    // Display awards/Siegerehrung
+    displayAwards(winner);
 
     showScreen('gameover');
 }
@@ -620,6 +654,19 @@ export function getZoneInfo() {
 
 // ===== AUTO END TURN =====
 
+// Timer ID for auto-end turn (to prevent double-ending)
+let autoEndTurnTimerId = null;
+
+/**
+ * Clear the auto-end turn timer
+ */
+function clearAutoEndTurnTimer() {
+    if (autoEndTurnTimerId !== null) {
+        clearTimeout(autoEndTurnTimerId);
+        autoEndTurnTimerId = null;
+    }
+}
+
 /**
  * Auto-end turn when all AP is depleted
  * Shows a brief notification before ending
@@ -632,8 +679,12 @@ function autoEndTurn() {
     // Double-check AP is actually 0
     if (state.sharedAP > 0) return;
 
+    // Clear any existing timer first
+    clearAutoEndTurnTimer();
+
     showToast('⚡ Alle AP verbraucht - Zug wird beendet', 'info');
-    setTimeout(() => {
+    autoEndTurnTimerId = setTimeout(() => {
+        autoEndTurnTimerId = null;
         endTurn();
     }, 1000);
 }

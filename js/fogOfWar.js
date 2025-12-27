@@ -1,7 +1,7 @@
 // ===== FOG OF WAR SYSTEM =====
 
 import { hexDistance, getHexesInRange } from './hexMath.js';
-import { state, getHex, getPlayerUnits, isHexVisible, isHexVisibleToPlayer, markEnemyContact } from './state.js';
+import { state, getHex, getPlayerUnits, isHexVisible, isHexVisibleToPlayer, markEnemyContact, getAlliedPlayers, arePlayersAllied } from './state.js';
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 import { hasLineOfSight } from './combat.js';
@@ -38,7 +38,7 @@ function getUnitVisibleHexes(unit) {
 
 /**
  * Update visible hexes for a specific player
- * Used for per-player visibility tracking
+ * Includes visibility from allied players (team members share vision)
  */
 export function updateVisibilityForPlayer(player) {
     // Ensure arrays exist
@@ -52,20 +52,27 @@ export function updateVisibilityForPlayer(player) {
     // Clear and recalculate visible hexes for this player
     state.playerVisibleHexes[player].clear();
 
-    const playerUnits = getPlayerUnits(player);
+    // Get all allied players (including self) for shared vision
+    const alliedPlayers = getAlliedPlayers(player);
 
-    for (const unit of playerUnits) {
-        const unitVisible = getUnitVisibleHexes(unit);
-        unitVisible.forEach(key => {
-            state.playerVisibleHexes[player].add(key);
-            state.playerExploredHexes[player].add(key);
-        });
+    // Collect visibility from all allied players' units
+    for (const allyPlayer of alliedPlayers) {
+        const allyUnits = getPlayerUnits(allyPlayer);
+
+        for (const unit of allyUnits) {
+            const unitVisible = getUnitVisibleHexes(unit);
+            unitVisible.forEach(key => {
+                state.playerVisibleHexes[player].add(key);
+                state.playerExploredHexes[player].add(key);
+            });
+        }
     }
 }
 
 /**
  * Update visible hexes for current player
  * Should be called at start of turn and after movement
+ * Includes shared vision from allied players (team members)
  */
 export function updateVisibility() {
     state.visibleHexes.clear();
@@ -84,15 +91,21 @@ export function updateVisibility() {
     // Set current player's explored set as active
     state.exploredHexes = state.playerExploredHexes[state.currentPlayer];
 
-    const playerUnits = getPlayerUnits(state.currentPlayer);
+    // Get all allied players (including self) for shared vision
+    const alliedPlayers = getAlliedPlayers(state.currentPlayer);
 
-    for (const unit of playerUnits) {
-        const unitVisible = getUnitVisibleHexes(unit);
-        unitVisible.forEach(key => {
-            state.visibleHexes.add(key);
-            state.exploredHexes.add(key); // Mark as explored for THIS player only
-            state.playerVisibleHexes[state.currentPlayer].add(key); // Also store in per-player array
-        });
+    // Collect visibility from all allied players' units
+    for (const allyPlayer of alliedPlayers) {
+        const allyUnits = getPlayerUnits(allyPlayer);
+
+        for (const unit of allyUnits) {
+            const unitVisible = getUnitVisibleHexes(unit);
+            unitVisible.forEach(key => {
+                state.visibleHexes.add(key);
+                state.exploredHexes.add(key); // Mark as explored for THIS player only
+                state.playerVisibleHexes[state.currentPlayer].add(key); // Also store in per-player array
+            });
+        }
     }
 
     // Update spotted status for current player's units
@@ -100,12 +113,18 @@ export function updateVisibility() {
 }
 
 /**
- * Check if an enemy unit is visible to a specific player
+ * Check if a unit is visible to a specific player
  * Used for rendering from a specific player's perspective
+ * Allied units are always visible (team members share vision)
  */
 export function isUnitVisibleToPlayer(unit, viewerPlayer) {
     // Own units are always visible to their owner
     if (unit.player === viewerPlayer) {
+        return true;
+    }
+
+    // Allied units are always visible (team members share vision)
+    if (arePlayersAllied(unit.player, viewerPlayer)) {
         return true;
     }
 

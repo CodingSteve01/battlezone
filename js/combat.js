@@ -6,7 +6,9 @@ import {
     addSuppressedHex, isHexSuppressed, getSuppressionInfo,
     setOverwatch, removeOverwatch, isUnitOnOverwatch, queueOverwatchTrigger,
     getHoldPositionBonus, clearHoldPosition, updateHoldPosition,
-    areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances
+    areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances,
+    recordKill, recordDamageDealt, recordDamageTaken, recordShot, recordHealing,
+    recordSpecialUsed, recordUnitLost
 } from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
@@ -604,6 +606,9 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     // === FEHLSCHUSS-BEHANDLUNG ===
     if (!hit) {
         playMiss();
+        // Statistik: Fehlschuss tracken
+        recordShot(attacker.player, false);
+
         // NEUES SYSTEM: Fehlschuss kostet KEINE AP!
         // Spieler darf erneut versuchen - zählt NICHT als Angriff
         // (trackUnitAttack wird NICHT aufgerufen bei Fehlschuss)
@@ -732,6 +737,11 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     // Apply damage
     defender.currentHp -= damage;
 
+    // === STATISTIK TRACKING ===
+    recordShot(attacker.player, true, hasCrit);
+    recordDamageDealt(attacker.player, damage);
+    recordDamageTaken(defender.player, damage);
+
     // Track damage for XP and assists
     trackDamage(attacker, defender, damage);
 
@@ -766,6 +776,10 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     if (defender.currentHp <= 0) {
         killUnit(defender);
         playDeath();
+
+        // === STATISTIK: Kill tracken ===
+        recordKill(attacker.player, dist);
+        recordUnitLost(defender.player);
 
         // Award XP for kill and assists
         const levelUps = awardKillXP(attacker, defender);
@@ -852,6 +866,9 @@ export function useSpecialAbility(unit) {
     spendSharedAP(cost);
     unit.usedSpecial = true;
 
+    // Statistik: Spezialfähigkeit tracken
+    recordSpecialUsed(unit.player);
+
     switch (unit.class) {
         case 'medic':
             return useMedicSpecial(unit);
@@ -876,7 +893,13 @@ export function useSpecialAbility(unit) {
  * @param {number} healMultiplier - Multiplier from minigame (default 1.0)
  */
 function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
-    const allies = getPlayerUnits(unit.player);
+    // Heile eigene UND verbündete Einheiten
+    const alliedPlayers = getAlliedPlayers(unit.player);
+    const allies = [];
+    for (const player of alliedPlayers) {
+        allies.push(...getPlayerUnits(player));
+    }
+
     let totalHealed = 0;
 
     playHeal();
@@ -921,6 +944,8 @@ function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
     // Award XP for healing
     if (totalHealed > 0) {
         awardXP(unit, XP_REWARDS.HEAL, 'heal');
+        // Statistik: Heilung tracken
+        recordHealing(unit.player, totalHealed);
     }
 
     // Show result based on multiplier

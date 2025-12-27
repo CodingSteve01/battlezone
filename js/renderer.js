@@ -247,13 +247,13 @@ function drawRockFormation2D5(x, y, size, seed) {
     ctx.fill();
 
     // Highlight
-    ctx.fillStyle = `rgba(255, 255, 255, 0.15)`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
     ctx.beginPath();
     ctx.ellipse(-rockSize * 0.2, -rockSize * 0.4, rockSize * 0.25, rockSize * 0.15, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
     // Shadow
-    ctx.fillStyle = `rgba(0, 0, 0, 0.2)`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.beginPath();
     ctx.ellipse(rockSize * 0.1, rockSize * 0.1, rockSize * 0.4, rockSize * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();

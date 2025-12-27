@@ -1,7 +1,7 @@
 // ===== UNIT SYSTEM =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks, areUnitsAllied } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks, areUnitsAllied, recordMovement } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
 import { updateVisibility } from './fogOfWar.js';
@@ -219,6 +219,8 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
                 state.movementAnimation = null;
                 // Deduct cost from shared pool
                 spendSharedAP(totalCost);
+                // Statistik: Bewegung tracken (path.length - 1 = Anzahl der Schritte)
+                recordMovement(unit.player, path.length - 1);
                 if (onComplete) onComplete();
                 return;
             }

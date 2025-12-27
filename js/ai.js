@@ -1698,6 +1698,15 @@ const CLASS_NAMES_DE = {
  * When a human is viewing, scroll to show the attack action
  */
 async function executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode = false) {
+    // === SICHERHEITSPRÜFUNG: Niemals Verbündete angreifen! ===
+    if (arePlayersAllied(unit.player, target.player)) {
+        console.error('[AI] BLOCKED: Attempted to attack allied unit!', {
+            attacker: unit.id, attackerPlayer: unit.player,
+            target: target.id, targetPlayer: target.player
+        });
+        return; // Angriff abbrechen
+    }
+
     // Generate attack thought for spectator mode
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const targetName = CLASS_NAMES_DE[target.class] || target.class;
