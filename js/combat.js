@@ -893,7 +893,13 @@ export function useSpecialAbility(unit) {
  * @param {number} healMultiplier - Multiplier from minigame (default 1.0)
  */
 function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
-    const allies = getPlayerUnits(unit.player);
+    // Heile eigene UND verbündete Einheiten
+    const alliedPlayers = getAlliedPlayers(unit.player);
+    const allies = [];
+    for (const player of alliedPlayers) {
+        allies.push(...getPlayerUnits(player));
+    }
+
     let totalHealed = 0;
 
     playHeal();
