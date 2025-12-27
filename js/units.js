@@ -26,10 +26,25 @@ export function createUnits() {
             : defaultClasses;
 
         // Iterate over actual team size (variable 2-5 units)
+        const playerSpawns = spawns[p] || [];
+        console.log(`[Units] Player ${p}: Creating ${playerClasses.length} units, ${playerSpawns.length} spawn positions available`);
+
         for (let u = 0; u < playerClasses.length; u++) {
             const classType = playerClasses[u];
             const classData = UNIT_CLASSES[classType];
-            const spawn = spawns[p][u];
+
+            // Safety check: ensure spawn position exists
+            if (!playerSpawns[u]) {
+                console.error(`[Units] No spawn position for player ${p}, unit ${u}! Skipping unit.`);
+                continue;
+            }
+            const spawn = playerSpawns[u];
+
+            // Safety check: ensure class data exists
+            if (!classData) {
+                console.error(`[Units] Unknown unit class "${classType}" for player ${p}! Skipping unit.`);
+                continue;
+            }
 
             const unit = {
                 id: `${p}-${u}`,
@@ -59,6 +74,13 @@ export function createUnits() {
             state.units.push(unit);
         }
     }
+
+    // Summary log for debugging
+    const unitCounts = {};
+    for (let p = 0; p < state.settings.players; p++) {
+        unitCounts[`Player ${p + 1}`] = state.units.filter(u => u.player === p).length;
+    }
+    console.log(`[Units] Total units created: ${state.units.length}`, unitCounts);
 }
 
 /**
