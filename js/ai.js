@@ -772,27 +772,11 @@ const AI_TURN_MAX_DURATION = 30000; // 30 seconds max per turn
  * Perform all AI actions for current turn
  */
 async function performAIActions() {
-    // SAFETY CHECK: Double-verify this is an AI player's turn
-    // This prevents any race conditions or bugs from allowing AI to control human units
-    if (!isAIPlayer()) {
-        console.warn('AI tried to execute actions for human player - aborting!');
-        hideAIThinking();
-        return;
-    }
-
-    const aiPlayerIndex = state.currentPlayer; // Store for validation during execution
-
     // Track turn start time for timeout detection
     aiTurnStartTime = Date.now();
 
-    // Check if we're in spectator mode (human watching AI vs AI)
-    const spectatorMode = isSpectatorMode();
-
-    // Spectator mode: slow down AI to human-like speed so viewer can follow
-    const unitDelay = spectatorMode ? 800 : 400;
-
-    // Set up global turn timeout - CRITICAL for preventing infinite loops
-    // This ensures the turn ALWAYS ends, even if AI logic gets stuck
+    // Set up global turn timeout FIRST - CRITICAL for preventing infinite loops
+    // This ensures the turn ALWAYS ends, even if AI logic gets stuck or safety checks bail out
     if (aiTurnTimeoutId) clearTimeout(aiTurnTimeoutId);
     aiTurnTimeoutId = setTimeout(() => {
         console.warn(`AI turn timeout after ${AI_TURN_MAX_DURATION}ms - forcing end turn`);
@@ -800,6 +784,29 @@ async function performAIActions() {
         clearAIThoughts();
         endTurn();
     }, AI_TURN_MAX_DURATION);
+
+    // SAFETY CHECK: Double-verify this is an AI player's turn
+    // This prevents any race conditions or bugs from allowing AI to control human units
+    if (!isAIPlayer()) {
+        console.warn('AI tried to execute actions for human player - forcing end turn!');
+        hideAIThinking();
+        // Clear timeout since we're ending turn now
+        if (aiTurnTimeoutId) {
+            clearTimeout(aiTurnTimeoutId);
+            aiTurnTimeoutId = null;
+        }
+        // CRITICAL: Must call endTurn() to not leave game hanging
+        endTurn();
+        return;
+    }
+
+    const aiPlayerIndex = state.currentPlayer; // Store for validation during execution
+
+    // Check if we're in spectator mode (human watching AI vs AI)
+    const spectatorMode = isSpectatorMode();
+
+    // Spectator mode: slow down AI to human-like speed so viewer can follow
+    const unitDelay = spectatorMode ? 800 : 400;
 
     // Wrap entire AI execution in try/catch to ensure endTurn is ALWAYS called
     // This prevents the game from hanging if any async operation fails

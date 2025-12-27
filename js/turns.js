@@ -23,6 +23,36 @@ const ZONE_CONFIG = {
     WARNING_ROUNDS: 1             // Runden Vorwarnung bevor Zone schrumpft
 };
 
+// === AI TURN WATCHDOG ===
+// Ensures AI turns always complete, even if executeAITurn() fails to start
+let aiTurnWatchdogId = null;
+const AI_TURN_WATCHDOG_TIMEOUT = 45000; // 45 seconds - longer than AI's internal 30s timeout
+
+/**
+ * Start AI turn watchdog timer
+ * This is a backup safety mechanism in case executeAITurn() is never called
+ * or fails to set up its own timeout
+ */
+function startAIWatchdog() {
+    clearAIWatchdog();
+    aiTurnWatchdogId = setTimeout(() => {
+        console.error('AI WATCHDOG TRIGGERED - AI turn never completed! Forcing next player...');
+        // Force end the turn - this is a last resort
+        nextPlayer();
+    }, AI_TURN_WATCHDOG_TIMEOUT);
+}
+
+/**
+ * Clear AI turn watchdog timer
+ * Called when turn ends normally
+ */
+function clearAIWatchdog() {
+    if (aiTurnWatchdogId) {
+        clearTimeout(aiTurnWatchdogId);
+        aiTurnWatchdogId = null;
+    }
+}
+
 /**
  * Start a player's turn
  */
@@ -93,6 +123,10 @@ export function startTurn() {
         updateUI();
         render();
 
+        // Start watchdog timer - ensures AI turn ALWAYS completes
+        // This is a backup safety in case executeAITurn() fails or never starts
+        startAIWatchdog();
+
         // Execute AI turn after short delay
         setTimeout(() => {
             executeAITurn();
@@ -146,6 +180,8 @@ export function startTurn() {
  * End current turn
  */
 export function endTurn() {
+    // Clear AI watchdog since turn is ending normally
+    clearAIWatchdog();
     playTurnEnd();
     nextPlayer();
 }
@@ -154,6 +190,9 @@ export function endTurn() {
  * Move to next player
  */
 export function nextPlayer() {
+    // Clear AI watchdog since we're moving to next player
+    clearAIWatchdog();
+
     // Update power-up buffs for ending player
     updatePowerupBuffs(state.currentPlayer);
 
