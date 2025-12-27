@@ -197,6 +197,36 @@ button:focus:not(:focus-visible),
     gap: 10px;
 }
 
+/* Map Section - Combined Size & Landscape */
+.map-section {
+    padding: 16px;
+}
+
+.map-options-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.map-option-group {
+    flex: 1;
+    min-width: 120px;
+}
+
+.map-option-group .section-label {
+    margin-bottom: 10px;
+}
+
+.size-grid {
+    display: flex;
+    gap: 8px;
+}
+
+.size-grid .option-btn {
+    flex: 1;
+    min-width: 40px;
+}
+
 /* Landscape Selection */
 .landscape-section {
     padding: 12px 16px;
@@ -438,6 +468,90 @@ button:focus:not(:focus-visible),
 
 .tutorial-reset-btn:hover {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.2));
+}
+
+/* Advanced Settings - Collapsible */
+.advanced-section {
+    padding: 0;
+    overflow: hidden;
+}
+
+.advanced-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.advanced-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-glass-hover);
+}
+
+.toggle-icon {
+    font-size: 16px;
+}
+
+.toggle-label {
+    flex: 1;
+    text-align: left;
+    font-weight: 500;
+}
+
+.toggle-arrow {
+    font-size: 10px;
+    transition: transform 0.3s ease;
+}
+
+.advanced-section:not(.collapsed) .toggle-arrow {
+    transform: rotate(180deg);
+}
+
+.advanced-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+    padding: 0 16px;
+}
+
+.advanced-section:not(.collapsed) .advanced-content {
+    max-height: 300px;
+    padding: 0 16px 16px;
+}
+
+.advanced-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.advanced-row:last-child {
+    border-bottom: none;
+}
+
+.advanced-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.advanced-row .audio-controls {
+    flex: 1;
+    max-width: 200px;
+}
+
+.advanced-row .setting-buttons {
+    flex-shrink: 0;
 }
 
 /* Effects Section (Gore Toggle) */

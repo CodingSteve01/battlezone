@@ -754,6 +754,15 @@ async function init() {
         };
     }
 
+    // Setup advanced settings toggle
+    const advancedToggle = document.getElementById('advanced-toggle');
+    const advancedSection = document.getElementById('advanced-section');
+    if (advancedToggle && advancedSection) {
+        advancedToggle.onclick = () => {
+            advancedSection.classList.toggle('collapsed');
+        };
+    }
+
     // Setup audio controls
     const volumeSlider = document.getElementById('volume-slider');
     const muteBtn = document.getElementById('mute-btn');

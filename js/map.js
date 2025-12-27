@@ -339,54 +339,71 @@ export function getSpawnPositions() {
     const offset = Math.min(baseOffset, radius - 2);
 
     // Define all possible spawn locations (8 directions for up to 8 players)
+    // Each player can have up to 5 units (CONFIG.MAX_UNITS)
     const allSpawnLocations = [
         // West
         [
             { q: -offset, r: 0 },
             { q: -offset, r: 1 },
-            { q: -offset + 1, r: 0 }
+            { q: -offset + 1, r: 0 },
+            { q: -offset, r: -1 },
+            { q: -offset + 1, r: 1 }
         ],
         // East
         [
             { q: offset, r: 0 },
             { q: offset, r: -1 },
-            { q: offset - 1, r: 0 }
+            { q: offset - 1, r: 0 },
+            { q: offset, r: 1 },
+            { q: offset - 1, r: -1 }
         ],
         // North-West
         [
             { q: -Math.floor(offset * 0.6), r: -Math.floor(offset * 0.6) },
             { q: -Math.floor(offset * 0.6) + 1, r: -Math.floor(offset * 0.6) },
-            { q: -Math.floor(offset * 0.6), r: -Math.floor(offset * 0.6) + 1 }
+            { q: -Math.floor(offset * 0.6), r: -Math.floor(offset * 0.6) + 1 },
+            { q: -Math.floor(offset * 0.6) - 1, r: -Math.floor(offset * 0.6) + 1 },
+            { q: -Math.floor(offset * 0.6) + 1, r: -Math.floor(offset * 0.6) - 1 }
         ],
         // North-East
         [
             { q: Math.floor(offset * 0.6), r: -Math.floor(offset * 0.8) },
             { q: Math.floor(offset * 0.6) - 1, r: -Math.floor(offset * 0.8) + 1 },
-            { q: Math.floor(offset * 0.6), r: -Math.floor(offset * 0.8) + 1 }
+            { q: Math.floor(offset * 0.6), r: -Math.floor(offset * 0.8) + 1 },
+            { q: Math.floor(offset * 0.6) + 1, r: -Math.floor(offset * 0.8) },
+            { q: Math.floor(offset * 0.6) - 1, r: -Math.floor(offset * 0.8) }
         ],
         // South-West
         [
             { q: -Math.floor(offset * 0.6), r: Math.floor(offset * 0.8) },
             { q: -Math.floor(offset * 0.6), r: Math.floor(offset * 0.8) - 1 },
-            { q: -Math.floor(offset * 0.6) + 1, r: Math.floor(offset * 0.8) - 1 }
+            { q: -Math.floor(offset * 0.6) + 1, r: Math.floor(offset * 0.8) - 1 },
+            { q: -Math.floor(offset * 0.6) - 1, r: Math.floor(offset * 0.8) },
+            { q: -Math.floor(offset * 0.6) + 1, r: Math.floor(offset * 0.8) }
         ],
         // South-East
         [
             { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) },
             { q: Math.floor(offset * 0.6) - 1, r: Math.floor(offset * 0.6) },
-            { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) - 1 }
+            { q: Math.floor(offset * 0.6), r: Math.floor(offset * 0.6) - 1 },
+            { q: Math.floor(offset * 0.6) + 1, r: Math.floor(offset * 0.6) - 1 },
+            { q: Math.floor(offset * 0.6) - 1, r: Math.floor(offset * 0.6) + 1 }
         ],
         // North (for 7+ players)
         [
             { q: 0, r: -offset },
             { q: 1, r: -offset },
-            { q: -1, r: -offset + 1 }
+            { q: -1, r: -offset + 1 },
+            { q: 0, r: -offset + 1 },
+            { q: 2, r: -offset }
         ],
         // South (for 8 players)
         [
             { q: 0, r: offset },
             { q: -1, r: offset },
-            { q: 1, r: offset - 1 }
+            { q: 1, r: offset - 1 },
+            { q: 0, r: offset - 1 },
+            { q: -2, r: offset }
         ]
     ];
 

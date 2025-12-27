@@ -15,15 +15,36 @@ export function createUnits() {
     const spawns = getSpawnPositions();
 
     for (let p = 0; p < state.settings.players; p++) {
-        // Use team selection if available, otherwise default
-        const playerClasses = (state.teamSelections && state.teamSelections[p] && state.teamSelections[p].length === CONFIG.UNITS_PER_PLAYER)
+        // Use team selection if available and valid, otherwise default
+        const hasValidSelection = state.teamSelections &&
+            state.teamSelections[p] &&
+            state.teamSelections[p].length >= CONFIG.MIN_UNITS &&
+            state.teamSelections[p].length <= CONFIG.MAX_UNITS;
+
+        const playerClasses = hasValidSelection
             ? state.teamSelections[p]
             : defaultClasses;
 
-        for (let u = 0; u < CONFIG.UNITS_PER_PLAYER; u++) {
+        // Iterate over actual team size (variable 2-5 units)
+        const playerSpawns = spawns[p] || [];
+        console.log(`[Units] Player ${p}: Creating ${playerClasses.length} units, ${playerSpawns.length} spawn positions available`);
+
+        for (let u = 0; u < playerClasses.length; u++) {
             const classType = playerClasses[u];
             const classData = UNIT_CLASSES[classType];
-            const spawn = spawns[p][u];
+
+            // Safety check: ensure spawn position exists
+            if (!playerSpawns[u]) {
+                console.error(`[Units] No spawn position for player ${p}, unit ${u}! Skipping unit.`);
+                continue;
+            }
+            const spawn = playerSpawns[u];
+
+            // Safety check: ensure class data exists
+            if (!classData) {
+                console.error(`[Units] Unknown unit class "${classType}" for player ${p}! Skipping unit.`);
+                continue;
+            }
 
             const unit = {
                 id: `${p}-${u}`,
@@ -53,6 +74,13 @@ export function createUnits() {
             state.units.push(unit);
         }
     }
+
+    // Summary log for debugging
+    const unitCounts = {};
+    for (let p = 0; p < state.settings.players; p++) {
+        unitCounts[`Player ${p + 1}`] = state.units.filter(u => u.player === p).length;
+    }
+    console.log(`[Units] Total units created: ${state.units.length}`, unitCounts);
 }
 
 /**
