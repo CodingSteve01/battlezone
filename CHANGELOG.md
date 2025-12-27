@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.8.0...shadow-squad-v3.8.1) (2025-12-27)
+
+
+### Bug Fixes
+
+* **balance:** increase sniper base damage to 65 ([#129](https://github.com/CodingSteve01/battlezone/issues/129)) ([6e660fc](https://github.com/CodingSteve01/battlezone/commit/6e660fc70c7912e188b4dad0907935d7eae6519c))
+
 ## [3.8.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.7.0...shadow-squad-v3.8.0) (2025-12-27)
 
 
