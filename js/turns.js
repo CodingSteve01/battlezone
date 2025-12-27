@@ -62,6 +62,9 @@ function clearAIWatchdog() {
  * Start a player's turn
  */
 export function startTurn() {
+    // Clear any pending auto-end timer from previous turn
+    clearAutoEndTurnTimer();
+
     const units = getPlayerUnits(state.currentPlayer);
 
     // Skip players with no units
@@ -200,6 +203,9 @@ export function startTurn() {
  * End current turn
  */
 export function endTurn() {
+    // Clear auto-end timer to prevent double-ending
+    clearAutoEndTurnTimer();
+
     // Prevent race conditions: don't allow multiple turn transitions
     if (state.turnTransitionInProgress) {
         console.warn('endTurn() called while turn transition already in progress - ignoring');
@@ -648,6 +654,19 @@ export function getZoneInfo() {
 
 // ===== AUTO END TURN =====
 
+// Timer ID for auto-end turn (to prevent double-ending)
+let autoEndTurnTimerId = null;
+
+/**
+ * Clear the auto-end turn timer
+ */
+function clearAutoEndTurnTimer() {
+    if (autoEndTurnTimerId !== null) {
+        clearTimeout(autoEndTurnTimerId);
+        autoEndTurnTimerId = null;
+    }
+}
+
 /**
  * Auto-end turn when all AP is depleted
  * Shows a brief notification before ending
@@ -660,8 +679,12 @@ function autoEndTurn() {
     // Double-check AP is actually 0
     if (state.sharedAP > 0) return;
 
+    // Clear any existing timer first
+    clearAutoEndTurnTimer();
+
     showToast('⚡ Alle AP verbraucht - Zug wird beendet', 'info');
-    setTimeout(() => {
+    autoEndTurnTimerId = setTimeout(() => {
+        autoEndTurnTimerId = null;
         endTurn();
     }, 1000);
 }
