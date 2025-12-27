@@ -173,7 +173,7 @@ async function generateCharacters() {
     preview.innerHTML = '';
     generatedAssets.characters = [];
 
-    const classes = ['scout', 'assault', 'medic', 'sniper', 'commando'];
+    const classes = ['scout', 'assault', 'medic', 'sniper', 'commando', 'elitesoldat'];
     const poses = ['normal', 'cover', 'attack', 'dead'];
     const players = 4;
 

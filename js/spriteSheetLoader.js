@@ -578,6 +578,13 @@ export function getAvailableTerrainTypes() {
     return Object.keys(variantRegistry.terrain);
 }
 
+// Fallback mappings for unit classes without dedicated sprites
+// Maps missing classes to similar-looking alternatives
+const UNIT_FALLBACKS = {
+    elitesoldat: 'assault',  // Elite soldier uses assault sprite as fallback
+    commando: 'scout',       // Commando uses scout as fallback if missing
+};
+
 /**
  * Get a unit sprite with optional facing direction
  * @param {string} unitClass - The unit class (scout, assault, etc.)
@@ -588,7 +595,17 @@ export function getAvailableTerrainTypes() {
  */
 export function getUnitSprite(unitClass, playerIndex, state = 'normal', facing = null) {
     const key = `${unitClass}_${state}_${playerIndex}`;
-    const sprite = spriteRegistry.units.get(key) || null;
+    let sprite = spriteRegistry.units.get(key) || null;
+
+    // If sprite not found, try fallback unit class
+    if (!sprite && UNIT_FALLBACKS[unitClass]) {
+        const fallbackClass = UNIT_FALLBACKS[unitClass];
+        const fallbackKey = `${fallbackClass}_${state}_${playerIndex}`;
+        sprite = spriteRegistry.units.get(fallbackKey) || null;
+        if (sprite) {
+            console.log(`[SpriteSheetLoader] Using fallback sprite: ${fallbackClass} for ${unitClass}`);
+        }
+    }
 
     if (!sprite) return null;
 

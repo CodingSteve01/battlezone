@@ -1467,8 +1467,10 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
         } else if (phase === 'result' && elapsed >= resultDuration) {
             if (!checkGameEnd()) {
                 phase = 'ready';
+                phaseStartTime = Date.now();
+            } else {
+                return; // Spiel ist vorbei, Animation beenden
             }
-            return;
         }
 
         // Draw
