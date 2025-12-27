@@ -168,15 +168,20 @@ export function nextPlayer() {
         clearRoundEvent();
 
         // === SHRINKING ZONE MECHANIK ===
+        // Process zone first - may show warnings/shrink notifications
+        const zoneHadAction = state.zoneShrinkWarning ||
+            (state.round - state.lastCombatRound >= ZONE_CONFIG.ROUNDS_BEFORE_SHRINK);
         processZoneMechanic();
 
-        // Roll for new round event
+        // Roll for new round event - delay if zone had action to avoid overlap
         const event = rollRoundEvent();
         if (event) {
+            // If zone had action, wait longer before showing event
+            const eventDelay = zoneHadAction ? 2500 : 500;
             setTimeout(() => {
                 playEvent();
                 showEventBanner(event);
-            }, 500);
+            }, eventDelay);
         }
 
         // Spawn new power-ups periodically
@@ -306,10 +311,13 @@ function processZoneMechanic() {
 
     if (roundsUntilShrink === ZONE_CONFIG.WARNING_ROUNDS && state.zoneRadius > ZONE_CONFIG.MIN_ZONE_RADIUS) {
         state.zoneShrinkWarning = true;
-        showToast('⚠️ WARNUNG: Spielfeld schrumpft nächste Runde!', 'special');
-        setTimeout(() => {
-            showToast('💡 Sucht den Feind oder die Zone wird kleiner!', 'info');
-        }, 2000);
+        // Use event banner for important zone warnings (less intrusive than toast)
+        showEventBanner({
+            name: 'Zone schrumpft!',
+            icon: '⚠️',
+            description: 'Sucht den Feind oder das Spielfeld wird kleiner!',
+            color: '#f59e0b'
+        });
     }
 
     // === 3. ZONE SCHRUMPFEN ===
@@ -371,11 +379,13 @@ function shrinkZone() {
     // Reset Kampf-Timer nach Schrumpfung (gibt Spielern Zeit zu reagieren)
     state.lastCombatRound = state.round;
 
-    showToast(`🔴 ZONE SCHRUMPFT! Radius: ${oldRadius} → ${state.zoneRadius}`, 'miss');
-
-    setTimeout(() => {
-        showToast('⚠️ Einheiten außerhalb der Zone erleiden Schaden!', 'info');
-    }, 1500);
+    // Use compact event banner instead of multiple toasts
+    showEventBanner({
+        name: 'Zone geschrumpft!',
+        icon: '🔴',
+        description: `Neuer Radius: ${state.zoneRadius} Felder`,
+        color: '#ef4444'
+    });
 }
 
 /**
@@ -390,6 +400,7 @@ function applyZoneDamage() {
 
     // Now apply damage to any remaining units outside the zone
     let unitsHit = 0;
+    let unitsKilled = 0;
 
     state.units.forEach(unit => {
         if (!unit.alive) return;
@@ -402,13 +413,18 @@ function applyZoneDamage() {
             if (unit.currentHp <= 0) {
                 unit.currentHp = 0;
                 unit.alive = false;
-                showToast(`☠️ ${unit.class} wurde von der Zone eliminiert!`, 'miss');
+                unitsKilled++;
             }
         }
     });
 
+    // Single consolidated toast for zone damage
     if (unitsHit > 0) {
-        showToast(`☢️ ${unitsHit} Einheit${unitsHit > 1 ? 'en' : ''} erleidet Zonenschaden!`, 'miss');
+        if (unitsKilled > 0) {
+            showToast(`☢️ Zonenschaden! ${unitsKilled} eliminiert!`, 'miss');
+        } else {
+            showToast(`☢️ ${unitsHit} Einheit${unitsHit > 1 ? 'en' : ''}: Zonenschaden!`, 'miss');
+        }
     }
 
     // Prüfe Spielende nach Zonenschaden

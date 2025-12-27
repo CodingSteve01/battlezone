@@ -2852,17 +2852,18 @@ function drawAnimatedTerrainOverlay(cx, cy, hexSize, terrainType, q, r) {
 
 /**
  * Check if hex grid should be visible
- * Only show when planning movement or attacking
+ * Only show when actively planning a path or targeting an attack
  */
 function shouldShowHexGrid() {
     const currentUnit = getCurrentUnit();
     if (!currentUnit) return false;
 
-    // Show grid when we have reachable hexes (movement mode) or targeting (attack mode)
-    return state.selectedAction === 'move' ||
-           state.selectedAction === 'attack' ||
-           state.currentPath !== null ||
-           state.pendingMoveDestination !== null;
+    // Only show grid when actively planning (path exists or pending destination)
+    // or when targeting an enemy for attack
+    return state.currentPath !== null ||
+           state.pendingMoveDestination !== null ||
+           state.targetedUnit !== null ||
+           state.hoveredHex !== null;
 }
 
 /**
@@ -2939,9 +2940,19 @@ export function render() {
     // or when animation callbacks fire at unexpected times.
     if (isSpectatorMode()) {
         const viewPlayer = state.viewingPlayer;
+
+        // Ensure visibility arrays exist for this player
+        if (!state.playerVisibleHexes[viewPlayer]) {
+            state.playerVisibleHexes[viewPlayer] = new Set();
+        }
+        if (!state.playerExploredHexes[viewPlayer]) {
+            state.playerExploredHexes[viewPlayer] = new Set();
+        }
+
         const visibleHexes = state.playerVisibleHexes[viewPlayer];
-        // Only refresh if visibility seems stale (empty or undefined)
+        // Refresh if visibility seems stale (empty or undefined)
         if (!visibleHexes || visibleHexes.size === 0) {
+            console.log('[Render] Spectator mode: refreshing visibility for player', viewPlayer);
             updateVisibilityForPlayer(viewPlayer);
         }
     }

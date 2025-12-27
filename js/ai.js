@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -494,6 +494,9 @@ function analyzeAndPlan() {
     // Update AI memory with visible enemies
     updateMemoryWithVisibleEnemies(visibleEnemies);
 
+    // Learn from ghost indicators (where cloaked enemies attacked from)
+    learnFromGhostIndicators();
+
     // Calculate threat assessment
     updateThreatAssessment(visibleEnemies);
 
@@ -582,6 +585,41 @@ function updateMemoryWithVisibleEnemies(enemies) {
             }
         }
     });
+}
+
+/**
+ * Learn from ghost indicators - positions where cloaked enemies attacked from
+ * This allows AI to deduce enemy positions even when they can't directly see them
+ */
+function learnFromGhostIndicators() {
+    // Get ghost indicators that are visible to the AI player (enemy attacks)
+    const ghosts = state.ghostIndicators.filter(ghost => {
+        // Only learn from ghosts of enemy units
+        return ghost.player !== state.currentPlayer;
+    });
+
+    for (const ghost of ghosts) {
+        // Check if this ghost position gives us new/better information
+        const existingInfo = aiMemory.lastKnownPositions.get(ghost.unitId);
+
+        // Ghost indicators have medium confidence (0.6) - they show where the enemy WAS
+        const ghostConfidence = 0.6;
+
+        if (!existingInfo || existingInfo.confidence < ghostConfidence) {
+            // Store or update the last known position from ghost
+            aiMemory.lastKnownPositions.set(ghost.unitId, {
+                q: ghost.q,
+                r: ghost.r,
+                round: state.round,
+                confidence: ghostConfidence,
+                unitClass: ghost.class,
+                fromGhost: true  // Mark this as ghost-derived information
+            });
+
+            // Log AI thought about detection
+            addAIThought(`Feindliche Position erkannt! ${ghost.class} griff von Position an.`, 'strategy');
+        }
+    }
 }
 
 /**

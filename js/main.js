@@ -12,7 +12,7 @@ import { initInput, centerOnCurrentUnit } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
-import { isAIPlayer, executeAITurn, resetAIMemory } from './ai.js';
+import { isAIPlayer, executeAITurn, resetAIMemory, isSpectatorMode } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
 import { resetTutorial } from './tutorial.js';
@@ -362,7 +362,14 @@ function startGameWithTeams() {
     const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || CONFIG.MAP_SIZES.medium;
     initZone(mapRadius);
 
-    // Initialize visibility
+    // Check if this is spectator mode (all AI players) BEFORE initializing visibility
+    // This ensures viewingPlayer is set correctly for the first render
+    if (isSpectatorMode()) {
+        state.viewingPlayer = state.currentPlayer;
+        console.log('[Main] Spectator mode detected - viewingPlayer set to', state.viewingPlayer);
+    }
+
+    // Initialize visibility for the viewing player
     updateVisibility();
 
     // Show game area
