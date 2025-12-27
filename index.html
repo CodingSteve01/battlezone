@@ -43,24 +43,28 @@
                 </div>
             </div>
 
-            <div class="menu-section">
-                <div class="option-grid">
-                    <button class="option-btn" data-size="small">S</button>
-                    <button class="option-btn selected" data-size="medium">M</button>
-                    <button class="option-btn" data-size="large">L</button>
-                </div>
-            </div>
-
-            <div class="menu-section landscape-section">
-                <div class="section-label">🗺️ Landschaft</div>
-                <div class="option-grid landscape-grid">
-                    <button class="option-btn selected" data-landscape="random" title="Zufällig">🎲</button>
-                    <button class="option-btn" data-landscape="temperate" title="Gemäßigt">🌳</button>
-                    <button class="option-btn" data-landscape="desert" title="Wüste">🏜️</button>
-                    <button class="option-btn" data-landscape="tundra" title="Tundra">❄️</button>
-                    <button class="option-btn" data-landscape="tropical" title="Tropisch">🌴</button>
-                    <button class="option-btn" data-landscape="highland" title="Hochland">⛰️</button>
-                    <button class="option-btn" data-landscape="wetland" title="Feuchtgebiet">🌿</button>
+            <div class="menu-section map-section">
+                <div class="map-options-row">
+                    <div class="map-option-group">
+                        <div class="section-label">📐 Größe</div>
+                        <div class="option-grid size-grid">
+                            <button class="option-btn" data-size="small" title="Klein">S</button>
+                            <button class="option-btn selected" data-size="medium" title="Mittel">M</button>
+                            <button class="option-btn" data-size="large" title="Groß">L</button>
+                        </div>
+                    </div>
+                    <div class="map-option-group">
+                        <div class="section-label">🗺️ Landschaft</div>
+                        <div class="option-grid landscape-grid">
+                            <button class="option-btn selected" data-landscape="random" title="Zufällig">🎲</button>
+                            <button class="option-btn" data-landscape="temperate" title="Gemäßigt">🌳</button>
+                            <button class="option-btn" data-landscape="desert" title="Wüste">🏜️</button>
+                            <button class="option-btn" data-landscape="tundra" title="Tundra">❄️</button>
+                            <button class="option-btn" data-landscape="tropical" title="Tropisch">🌴</button>
+                            <button class="option-btn" data-landscape="highland" title="Hochland">⛰️</button>
+                            <button class="option-btn" data-landscape="wetland" title="Feuchtgebiet">🌿</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="landscape-preview" id="landscape-preview">
                     <span class="landscape-preview-icon">🎲</span>
@@ -68,27 +72,32 @@
                 </div>
             </div>
 
-            <div class="menu-section audio-section">
-                <div class="audio-controls">
-                    <span class="audio-label">🔊 Lautstärke</span>
-                    <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="70">
-                    <button class="mute-btn" id="mute-btn" title="Ton an/aus">🔊</button>
-                </div>
-            </div>
-
-            <div class="menu-section settings-section">
-                <span class="section-label">⚙️ Einstellungen</span>
-                <div class="setting-row">
-                    <span class="setting-label">Hinweise</span>
-                    <div class="setting-buttons" id="notification-level">
-                        <button class="setting-btn" data-value="minimal">Minimal</button>
-                        <button class="setting-btn active" data-value="normal">Normal</button>
-                        <button class="setting-btn" data-value="verbose">Alle</button>
+            <div class="menu-section advanced-section collapsed" id="advanced-section">
+                <button class="advanced-toggle" id="advanced-toggle">
+                    <span class="toggle-icon">⚙️</span>
+                    <span class="toggle-label">Erweiterte Einstellungen</span>
+                    <span class="toggle-arrow">▼</span>
+                </button>
+                <div class="advanced-content" id="advanced-content">
+                    <div class="advanced-row audio-row">
+                        <span class="advanced-label">🔊 Lautstärke</span>
+                        <div class="audio-controls">
+                            <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="70">
+                            <button class="mute-btn" id="mute-btn" title="Ton an/aus">🔊</button>
+                        </div>
                     </div>
-                </div>
-                <div class="setting-row">
-                    <span class="setting-label">Tutorial</span>
-                    <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn">🔄 Zurücksetzen</button>
+                    <div class="advanced-row">
+                        <span class="advanced-label">💬 Hinweise</span>
+                        <div class="setting-buttons" id="notification-level">
+                            <button class="setting-btn" data-value="minimal">Minimal</button>
+                            <button class="setting-btn active" data-value="normal">Normal</button>
+                            <button class="setting-btn" data-value="verbose">Alle</button>
+                        </div>
+                    </div>
+                    <div class="advanced-row">
+                        <span class="advanced-label">📖 Tutorial</span>
+                        <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn">🔄 Zurücksetzen</button>
+                    </div>
                 </div>
             </div>
 
