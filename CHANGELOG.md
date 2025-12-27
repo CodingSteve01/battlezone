@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.11.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.11.0...shadow-squad-v3.11.1) (2025-12-27)
+
+
+### Bug Fixes
+
+* **game:** prevent player skip bug and add player status display ([#144](https://github.com/CodingSteve01/battlezone/issues/144)) ([c2f0e98](https://github.com/CodingSteve01/battlezone/commit/c2f0e98ec8cfdc8bd57a4c6d32485104cd3d2c1a))
+
 ## [3.11.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.10.0...shadow-squad-v3.11.0) (2025-12-27)
 
 
