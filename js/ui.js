@@ -641,13 +641,14 @@ export function showFloatingDamage(x, y, damage, isCrit = false, isHeal = false)
 
 /**
  * Show event banner for round events
+ * Compact, non-intrusive notification that doesn't interrupt gameplay
  */
 export function showEventBanner(event) {
     // Remove existing banner
     const existing = document.querySelector('.event-banner');
     if (existing) existing.remove();
 
-    // Create event banner
+    // Create compact event banner
     const banner = document.createElement('div');
     banner.className = 'event-banner';
     banner.innerHTML = `
@@ -660,16 +661,16 @@ export function showEventBanner(event) {
     banner.style.setProperty('--event-color', event.color);
     document.body.appendChild(banner);
 
-    // Animate in
+    // Animate in after a brief delay
     requestAnimationFrame(() => {
         banner.classList.add('show');
     });
 
-    // Auto remove after delay
+    // Auto remove after shorter delay (less intrusive)
     setTimeout(() => {
         banner.classList.remove('show');
-        setTimeout(() => banner.remove(), 500);
-    }, 3000);
+        setTimeout(() => banner.remove(), 400);
+    }, 2000);
 }
 
 /**

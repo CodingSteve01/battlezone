@@ -441,7 +441,23 @@ export function executeAttack(attacker, defender, minigameResult = null) {
         { q: attacker.q, r: attacker.r },
         { q: defender.q, r: defender.r }
     );
-    const hitChance = calculateHitChance(attacker, defender);
+
+    // Calculate hit chance with minigame bonus
+    let hitChance = calculateHitChance(attacker, defender);
+
+    // Apply minigame hit bonus
+    const hitBonus = minigameResult.multiplier.hitBonus || 0;
+    if (hitBonus === 1.0) {
+        // PERFECT result = guaranteed hit (hitBonus of 1.0 means 100% guaranteed)
+        hitChance = 100;
+    } else if (hitBonus > 0) {
+        // Good result = bonus to hit chance
+        hitChance = Math.min(100, hitChance + hitBonus * 100);
+    } else if (hitBonus < 0) {
+        // Poor minigame result = penalty to hit chance
+        hitChance = Math.max(50, hitChance + hitBonus * 100);
+    }
+
     const roll = Math.random() * 100;
     let hit = roll < hitChance;
 

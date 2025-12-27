@@ -1785,54 +1785,76 @@ button:focus:not(:focus-visible),
 }
 
 /* ===== EVENT BANNER ===== */
+/* Compact, non-intrusive event notification - appears at bottom-right */
 .event-banner {
     position: fixed;
-    top: 100px;
-    left: 50%;
-    transform: translateX(-50%) translateY(-20px);
-    background: linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(20,20,40,0.95) 100%);
-    border: 2px solid var(--event-color, var(--purple));
-    padding: 16px 32px;
-    border-radius: 16px;
+    bottom: 100px;
+    right: 16px;
+    transform: translateX(120%);
+    background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(20,20,40,0.9) 100%);
+    border-left: 4px solid var(--event-color, var(--purple));
+    border-radius: 8px;
+    padding: 12px 16px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     z-index: 150;
     opacity: 0;
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(15px);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5), 0 0 30px var(--event-color, rgba(168, 85, 247, 0.3));
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    max-width: 280px;
+    pointer-events: none;
 }
 
 .event-banner.show {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(0);
 }
 
 .event-banner .event-icon {
-    font-size: 40px;
-    animation: eventPulse 1.5s infinite;
+    font-size: 28px;
+    flex-shrink: 0;
+    animation: eventPulse 2s ease-in-out infinite;
 }
 
 @keyframes eventPulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.15); }
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.1); opacity: 1; }
 }
 
 .event-banner .event-content {
     text-align: left;
+    min-width: 0;
 }
 
 .event-banner .event-title {
-    font-size: 18px;
-    font-weight: 800;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--light);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .event-banner .event-desc {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--dim);
+    line-height: 1.3;
+}
+
+/* Mobile: bottom-center for better visibility */
+@media (max-width: 600px) {
+    .event-banner {
+        bottom: 80px;
+        right: 50%;
+        transform: translateX(50%) translateY(100%);
+        max-width: 90%;
+    }
+    .event-banner.show {
+        transform: translateX(50%) translateY(0);
+    }
 }
 
 /* ===== NEW TOAST TYPES ===== */

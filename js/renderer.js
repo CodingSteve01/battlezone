@@ -2852,17 +2852,18 @@ function drawAnimatedTerrainOverlay(cx, cy, hexSize, terrainType, q, r) {
 
 /**
  * Check if hex grid should be visible
- * Only show when planning movement or attacking
+ * Only show when actively planning a path or targeting an attack
  */
 function shouldShowHexGrid() {
     const currentUnit = getCurrentUnit();
     if (!currentUnit) return false;
 
-    // Show grid when we have reachable hexes (movement mode) or targeting (attack mode)
-    return state.selectedAction === 'move' ||
-           state.selectedAction === 'attack' ||
-           state.currentPath !== null ||
-           state.pendingMoveDestination !== null;
+    // Only show grid when actively planning (path exists or pending destination)
+    // or when targeting an enemy for attack
+    return state.currentPath !== null ||
+           state.pendingMoveDestination !== null ||
+           state.targetedUnit !== null ||
+           state.hoveredHex !== null;
 }
 
 /**

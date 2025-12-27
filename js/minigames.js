@@ -6,18 +6,18 @@ import { playClick, playTarget, playError } from './audio.js';
 
 // Minigame result levels
 export const RESULT_LEVELS = {
-    PERFECT: 'perfect',   // 100% damage + crit chance bonus
-    GOOD: 'good',         // 100% damage
+    PERFECT: 'perfect',   // 100% damage + crit chance bonus + guaranteed hit
+    GOOD: 'good',         // 100% damage + high hit chance
     OKAY: 'okay',         // 70% damage
     MISS: 'miss'          // 30% damage
 };
 
-// Result multipliers for damage
+// Result multipliers for damage and hit chance
 export const RESULT_MULTIPLIERS = {
-    [RESULT_LEVELS.PERFECT]: { damage: 1.0, critBonus: 0.25, label: 'PERFEKT!', color: '#ffd700' },
-    [RESULT_LEVELS.GOOD]: { damage: 1.0, critBonus: 0, label: 'GUT!', color: '#22c55e' },
-    [RESULT_LEVELS.OKAY]: { damage: 0.7, critBonus: 0, label: 'OK', color: '#f59e0b' },
-    [RESULT_LEVELS.MISS]: { damage: 0.3, critBonus: 0, label: 'DANEBEN', color: '#ef4444' }
+    [RESULT_LEVELS.PERFECT]: { damage: 1.0, critBonus: 0.25, hitBonus: 1.0, label: 'PERFEKT!', color: '#ffd700' },
+    [RESULT_LEVELS.GOOD]: { damage: 1.0, critBonus: 0, hitBonus: 0.15, label: 'GUT!', color: '#22c55e' },
+    [RESULT_LEVELS.OKAY]: { damage: 0.7, critBonus: 0, hitBonus: 0, label: 'OK', color: '#f59e0b' },
+    [RESULT_LEVELS.MISS]: { damage: 0.3, critBonus: 0, hitBonus: -0.2, label: 'DANEBEN', color: '#ef4444' }
 };
 
 // Current active minigame state
@@ -40,6 +40,35 @@ export function initMinigames() {
     minigameCtx = minigameCanvas?.getContext('2d');
 }
 
+// Unit-specific minigame descriptions
+const MINIGAME_DESCRIPTIONS = {
+    scout: {
+        title: 'Schnellfeuer',
+        instruction: 'Tippe das bewegliche Ziel!',
+        hint: 'Je näher am Zentrum, desto besser!'
+    },
+    assault: {
+        title: 'Powerschuss',
+        instruction: 'Stoppe im grünen Bereich!',
+        hint: 'Gold = Perfekt, Grün = Gut'
+    },
+    sniper: {
+        title: 'Präzisionsschuss',
+        instruction: 'Schieße wenn das Fadenkreuz still steht!',
+        hint: 'Warte auf den grünen Moment!'
+    },
+    medic: {
+        title: 'Heilungsrhythmus',
+        instruction: 'Tippe im Rhythmus des Herzschlags!',
+        hint: '4 Schläge im richtigen Timing'
+    },
+    commando: {
+        title: 'Komboangriff',
+        instruction: 'Wische in der richtigen Reihenfolge!',
+        hint: 'Folge den Pfeilen schnell!'
+    }
+};
+
 /**
  * Create the minigame overlay DOM elements
  */
@@ -54,6 +83,8 @@ function createMinigameOverlay() {
                 <span class="minigame-title" id="minigame-title">Angriff!</span>
             </div>
             <div class="minigame-instruction" id="minigame-instruction"></div>
+            <div class="minigame-hint" id="minigame-hint"></div>
+            <div class="minigame-countdown" id="minigame-countdown"></div>
             <canvas id="minigame-canvas" width="300" height="200"></canvas>
             <div class="minigame-result" id="minigame-result"></div>
         </div>
@@ -137,10 +168,46 @@ function addMinigameStyles() {
         }
 
         .minigame-instruction {
-            color: #a0aec0;
-            font-size: 14px;
-            margin-bottom: 15px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
             min-height: 20px;
+        }
+
+        .minigame-hint {
+            color: #a0aec0;
+            font-size: 13px;
+            margin-bottom: 12px;
+            min-height: 16px;
+            font-style: italic;
+        }
+
+        .minigame-countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fbbf24;
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: countdown-pulse 0.5s ease-in-out;
+        }
+
+        .minigame-countdown.hidden {
+            display: none;
+        }
+
+        .minigame-countdown.go {
+            color: #22c55e;
+            text-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+        }
+
+        @keyframes countdown-pulse {
+            0% { transform: scale(1.5); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
         }
 
         #minigame-canvas {
@@ -200,27 +267,82 @@ function addMinigameStyles() {
 }
 
 /**
+ * Show countdown before minigame starts
+ * Returns a Promise that resolves when countdown is complete
+ */
+function showCountdown() {
+    return new Promise((resolve) => {
+        const countdownEl = document.getElementById('minigame-countdown');
+        const canvasEl = document.getElementById('minigame-canvas');
+
+        // Hide canvas during countdown
+        canvasEl.style.display = 'none';
+        countdownEl.classList.remove('hidden', 'go');
+
+        const steps = ['3', '2', '1', 'LOS!'];
+        let step = 0;
+
+        function showStep() {
+            if (step >= steps.length) {
+                // Countdown complete
+                countdownEl.classList.add('hidden');
+                canvasEl.style.display = 'block';
+                resolve();
+                return;
+            }
+
+            countdownEl.textContent = steps[step];
+            if (steps[step] === 'LOS!') {
+                countdownEl.classList.add('go');
+            }
+
+            // Reset animation
+            countdownEl.style.animation = 'none';
+            countdownEl.offsetHeight; // Trigger reflow
+            countdownEl.style.animation = 'countdown-pulse 0.5s ease-in-out';
+
+            playClick();
+            step++;
+            setTimeout(showStep, step === steps.length ? 400 : 600);
+        }
+
+        showStep();
+    });
+}
+
+/**
  * Start a minigame for the given unit class
  * Returns a Promise that resolves with the result
  */
-export function startMinigame(unitClass) {
+export async function startMinigame(unitClass) {
+    initMinigames();
+
+    const classInfo = UNIT_CLASSES[unitClass];
+    if (!classInfo) {
+        return { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] };
+    }
+
+    // Get minigame description
+    const desc = MINIGAME_DESCRIPTIONS[unitClass] || {
+        title: 'Angriff',
+        instruction: 'Reagiere schnell!',
+        hint: ''
+    };
+
+    // Show overlay with instructions
+    minigameOverlay.classList.add('active');
+    document.getElementById('minigame-icon').textContent = classInfo.icon;
+    document.getElementById('minigame-title').textContent = desc.title;
+    document.getElementById('minigame-instruction').textContent = desc.instruction;
+    document.getElementById('minigame-hint').textContent = desc.hint;
+    document.getElementById('minigame-result').classList.remove('show');
+    document.getElementById('minigame-result').textContent = '';
+
+    // Show countdown
+    await showCountdown();
+
+    // Start the appropriate minigame and return a Promise
     return new Promise((resolve) => {
-        initMinigames();
-
-        const classInfo = UNIT_CLASSES[unitClass];
-        if (!classInfo) {
-            resolve({ level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] });
-            return;
-        }
-
-        // Show overlay
-        minigameOverlay.classList.add('active');
-        document.getElementById('minigame-icon').textContent = classInfo.icon;
-        document.getElementById('minigame-title').textContent = classInfo.name;
-        document.getElementById('minigame-result').classList.remove('show');
-        document.getElementById('minigame-result').textContent = '';
-
-        // Start the appropriate minigame
         switch (unitClass) {
             case 'scout':
                 startScoutMinigame(resolve);
@@ -513,8 +635,6 @@ function startAssaultMinigame(resolve) {
 // A crosshair wobbles - tap when it's centered on the target
 
 function startSniperMinigame(resolve) {
-    document.getElementById('minigame-instruction').textContent = 'Schieße wenn das Fadenkreuz still steht!';
-
     const canvas = minigameCanvas;
     const ctx = minigameCtx;
     const width = canvas.width;
@@ -528,51 +648,77 @@ function startSniperMinigame(resolve) {
     let wobbleTime = 0;
     let gameActive = true;
     let stillMoment = false;
-    let stillTimer = 0;
-    const stillDuration = 400; // ms the crosshair stays still
+    let nearStill = false; // New: approaching still moment
+    const stillDuration = 600; // Extended: ms the crosshair stays still
+    const nearStillDuration = 300; // New: pre-still warning phase
 
     function update() {
         if (!gameActive) return;
 
         wobbleTime += 16;
 
-        // Create wobble pattern with occasional still moments
-        const wobbleCycle = wobbleTime % 3000;
+        // Create wobble pattern with occasional still moments (faster cycle for more opportunities)
+        const wobbleCycle = wobbleTime % 2500;
 
-        if (wobbleCycle > 2000 && wobbleCycle < 2000 + stillDuration) {
-            // Still moment
+        // Pre-still warning phase (crosshair slowing down)
+        if (wobbleCycle > 1600 - nearStillDuration && wobbleCycle < 1600) {
+            nearStill = true;
+            stillMoment = false;
+            // Slower wobble during approach
+            const wobbleAmount = 15 * (1 - (wobbleCycle - (1600 - nearStillDuration)) / nearStillDuration);
+            crosshairX = centerX + Math.sin(wobbleTime * 0.006) * wobbleAmount;
+            crosshairY = centerY + Math.cos(wobbleTime * 0.004) * wobbleAmount;
+        } else if (wobbleCycle >= 1600 && wobbleCycle < 1600 + stillDuration) {
+            // Still moment - perfect shot opportunity
             stillMoment = true;
+            nearStill = false;
             crosshairX = centerX;
             crosshairY = centerY;
         } else {
             stillMoment = false;
-            // Wobble using multiple sine waves
-            const wobbleAmount = 30 + Math.sin(wobbleTime * 0.002) * 10;
-            crosshairX = centerX + Math.sin(wobbleTime * 0.008) * wobbleAmount + Math.sin(wobbleTime * 0.013) * (wobbleAmount * 0.5);
-            crosshairY = centerY + Math.cos(wobbleTime * 0.006) * wobbleAmount + Math.cos(wobbleTime * 0.011) * (wobbleAmount * 0.5);
+            nearStill = false;
+            // Normal wobble using multiple sine waves
+            const wobbleAmount = 25 + Math.sin(wobbleTime * 0.002) * 8;
+            crosshairX = centerX + Math.sin(wobbleTime * 0.008) * wobbleAmount + Math.sin(wobbleTime * 0.013) * (wobbleAmount * 0.4);
+            crosshairY = centerY + Math.cos(wobbleTime * 0.006) * wobbleAmount + Math.cos(wobbleTime * 0.011) * (wobbleAmount * 0.4);
         }
 
         // Draw
         ctx.clearRect(0, 0, width, height);
 
-        // Draw target
+        // Draw target rings with better visibility
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 40, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 45, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(55, 65, 81, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 30, 0, Math.PI * 2);
         ctx.strokeStyle = '#374151';
         ctx.lineWidth = 2;
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 25, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+        ctx.strokeStyle = '#4b5563';
+        ctx.lineWidth = 2;
         ctx.stroke();
 
+        // Bullseye
         ctx.beginPath();
-        ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
         ctx.fillStyle = '#ef4444';
         ctx.fill();
 
-        // Draw crosshair
-        const crosshairColor = stillMoment ? '#22c55e' : '#fff';
+        // Draw crosshair with color coding
+        let crosshairColor = '#fff';
+        if (stillMoment) {
+            crosshairColor = '#22c55e'; // Green = SHOOT NOW!
+        } else if (nearStill) {
+            crosshairColor = '#fbbf24'; // Yellow = get ready
+        }
+
         ctx.strokeStyle = crosshairColor;
         ctx.lineWidth = 2;
 
@@ -594,16 +740,22 @@ function startSniperMinigame(resolve) {
 
         // Center dot
         ctx.beginPath();
-        ctx.arc(crosshairX, crosshairY, 2, 0, Math.PI * 2);
+        ctx.arc(crosshairX, crosshairY, 3, 0, Math.PI * 2);
         ctx.fillStyle = crosshairColor;
         ctx.fill();
 
-        // Hint text
+        // Status hint at bottom
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
         if (stillMoment) {
             ctx.fillStyle = '#22c55e';
-            ctx.font = 'bold 14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('JETZT!', centerX, height - 20);
+            ctx.fillText('JETZT SCHIESSEN!', centerX, height - 15);
+        } else if (nearStill) {
+            ctx.fillStyle = '#fbbf24';
+            ctx.fillText('Bereit machen...', centerX, height - 15);
+        } else {
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText('Warte auf ruhige Hand...', centerX, height - 15);
         }
 
         animationFrameId = requestAnimationFrame(update);
@@ -616,13 +768,21 @@ function startSniperMinigame(resolve) {
         // Calculate distance from center
         const dist = Math.sqrt((crosshairX - centerX) ** 2 + (crosshairY - centerY) ** 2);
 
-        if (stillMoment && dist < 5) {
+        // More forgiving thresholds - Sniper is a precision class, good performance should be rewarded
+        if (stillMoment && dist < 8) {
+            // Perfect: Shot during still moment with good aim
             finishMinigame(RESULT_LEVELS.PERFECT, resolve);
-        } else if (dist < 15) {
+        } else if (stillMoment || dist < 12) {
+            // Good: Either during still moment OR very close to center
             finishMinigame(RESULT_LEVELS.GOOD, resolve);
-        } else if (dist < 35) {
+        } else if (nearStill || dist < 25) {
+            // Okay: Near-still moment OR reasonably close
+            finishMinigame(RESULT_LEVELS.OKAY, resolve);
+        } else if (dist < 40) {
+            // At least on target - still OKAY for sniper
             finishMinigame(RESULT_LEVELS.OKAY, resolve);
         } else {
+            // Really missed
             finishMinigame(RESULT_LEVELS.MISS, resolve);
         }
     }

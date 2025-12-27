@@ -1,7 +1,7 @@
 // ===== A* PATHFINDING =====
 
 import { hexDistance, getNeighbors } from './hexMath.js';
-import { getHex, state } from './state.js';
+import { getHex, state, isHexInZone } from './state.js';
 import { TERRAIN } from './config.js';
 
 /**
@@ -40,6 +40,13 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
         return null;
     }
 
+    // Block movement into the restricted zone (outside shrinking zone)
+    if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
+        if (!isHexInZone(goalQ, goalR)) {
+            return null; // Can't path into restricted zone
+        }
+    }
+
     const frontier = new PriorityQueue();
     frontier.enqueue({ q: startQ, r: startR }, 0);
 
@@ -68,6 +75,11 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
             // Can't move through other units (except start position)
             const nextKey = `${next.q},${next.r}`;
             if (nextHex.unit && nextKey !== startKey && nextKey !== goalKey) continue;
+
+            // Block movement into restricted zone
+            if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
+                if (!isHexInZone(next.q, next.r)) continue;
+            }
 
             const terrain = TERRAIN[nextHex.type];
             const moveCost = terrain.moveCost || 1;
@@ -117,6 +129,9 @@ export function getReachableHexes(unit) {
     const maxCost = state.sharedAP;
     const startKey = `${unit.q},${unit.r}`;
 
+    // Check if zone is active (shrinking has started)
+    const zoneActive = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius;
+
     const frontier = new PriorityQueue();
     frontier.enqueue({ q: unit.q, r: unit.r }, 0);
 
@@ -141,6 +156,9 @@ export function getReachableHexes(unit) {
 
             // Can't move through other units
             if (nextHex.unit && nextKey !== startKey) continue;
+
+            // Block movement into restricted zone
+            if (zoneActive && !isHexInZone(next.q, next.r)) continue;
 
             const terrain = TERRAIN[nextHex.type];
             const moveCost = terrain.moveCost || 1;
