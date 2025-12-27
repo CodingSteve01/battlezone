@@ -9,7 +9,7 @@ import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
-import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive } from './ui.js';
+import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
@@ -363,6 +363,9 @@ export function endGame(winner, result = null) {
             winnerText.style.color = '#e2e8f0';
         }
     }
+
+    // Display awards/Siegerehrung
+    displayAwards(winner);
 
     showScreen('gameover');
 }

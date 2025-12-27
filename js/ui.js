@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats } from './state.js';
 import {
     calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
     canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
@@ -885,4 +885,200 @@ export function selectAction(action) {
     state.pendingMoveDestination = null;
     updateUI();
     render();
+}
+
+// === SIEGEREHRUNG / AWARDS ===
+
+/**
+ * Award definitions with fun titles
+ */
+const AWARDS = [
+    {
+        id: 'terminator',
+        icon: '💀',
+        title: 'Terminator',
+        stat: 'kills',
+        condition: (stats) => stats.kills > 0,
+        getValue: (stats) => `${stats.kills} Kills`
+    },
+    {
+        id: 'marathon',
+        icon: '🏃',
+        title: 'Marathon-Läufer',
+        stat: 'hexesMoved',
+        condition: (stats) => stats.hexesMoved > 5,
+        getValue: (stats) => `${stats.hexesMoved} Felder`
+    },
+    {
+        id: 'tank',
+        icon: '🛡️',
+        title: 'Panzer',
+        stat: 'damageTaken',
+        condition: (stats) => stats.damageTaken > 50,
+        getValue: (stats) => `${stats.damageTaken} Schaden überlebt`
+    },
+    {
+        id: 'destroyer',
+        icon: '💥',
+        title: 'Zerstörer',
+        stat: 'damageDealt',
+        condition: (stats) => stats.damageDealt > 50,
+        getValue: (stats) => `${stats.damageDealt} Schaden`
+    },
+    {
+        id: 'sniper',
+        icon: '🎯',
+        title: 'Scharfschütze',
+        stat: 'longestKillDistance',
+        condition: (stats) => stats.longestKillDistance >= 4,
+        getValue: (stats) => `Kill aus ${stats.longestKillDistance} Feldern`
+    },
+    {
+        id: 'medic',
+        icon: '💚',
+        title: 'Sanitäter des Jahres',
+        stat: 'healing',
+        condition: (stats) => stats.healing > 0,
+        getValue: (stats) => `${stats.healing} HP geheilt`
+    },
+    {
+        id: 'lucky',
+        icon: '🍀',
+        title: 'Glückspilz',
+        stat: 'criticalHits',
+        condition: (stats) => stats.criticalHits >= 2,
+        getValue: (stats) => `${stats.criticalHits} kritische Treffer`
+    },
+    {
+        id: 'unlucky',
+        icon: '😅',
+        title: 'Pechvogel',
+        stat: 'shotsMissed',
+        condition: (stats) => stats.shotsMissed >= 3 && stats.shotsMissed > stats.shotsHit,
+        getValue: (stats) => `${stats.shotsMissed} Fehlschüsse`
+    },
+    {
+        id: 'tactician',
+        icon: '🧠',
+        title: 'Taktiker',
+        stat: 'specialsUsed',
+        condition: (stats) => stats.specialsUsed >= 3,
+        getValue: (stats) => `${stats.specialsUsed} Spezialfähigkeiten`
+    },
+    {
+        id: 'survivor',
+        icon: '⏱️',
+        title: 'Überlebenskünstler',
+        stat: 'survivalRounds',
+        condition: (stats, allStats, playerIndex, winner) =>
+            playerIndex !== winner && stats.survivalRounds >= state.round - 2,
+        getValue: (stats) => `Überlebt bis Runde ${stats.survivalRounds}`
+    },
+    {
+        id: 'pacifist',
+        icon: '☮️',
+        title: 'Pazifist',
+        stat: 'damageDealt',
+        condition: (stats) => stats.kills === 0 && stats.damageDealt < 30 && stats.hexesMoved > 10,
+        getValue: (stats) => `Kampf vermieden`
+    },
+    {
+        id: 'accurate',
+        icon: '🎯',
+        title: 'Präzisionsschütze',
+        stat: 'accuracy',
+        condition: (stats) => {
+            const total = stats.shotsHit + stats.shotsMissed;
+            return total >= 3 && (stats.shotsHit / total) >= 0.8;
+        },
+        getValue: (stats) => {
+            const total = stats.shotsHit + stats.shotsMissed;
+            const accuracy = Math.round((stats.shotsHit / total) * 100);
+            return `${accuracy}% Trefferquote`;
+        }
+    }
+];
+
+/**
+ * Generate awards based on player statistics
+ * Returns array of {icon, title, player, value, color}
+ */
+export function generateAwards(winner) {
+    const awards = [];
+    const allStats = [];
+
+    // Collect all player stats
+    for (let p = 0; p < state.settings.players; p++) {
+        allStats.push(getPlayerStats(p));
+    }
+
+    // Find best player for each award category
+    for (const award of AWARDS) {
+        let bestPlayer = -1;
+        let bestValue = -Infinity;
+
+        for (let p = 0; p < state.settings.players; p++) {
+            const stats = allStats[p];
+
+            // Check if player qualifies for this award
+            if (!award.condition(stats, allStats, p, winner)) continue;
+
+            // Get the stat value
+            let value;
+            if (award.stat === 'accuracy') {
+                const total = stats.shotsHit + stats.shotsMissed;
+                value = total > 0 ? stats.shotsHit / total : 0;
+            } else {
+                value = stats[award.stat] || 0;
+            }
+
+            if (value > bestValue) {
+                bestValue = value;
+                bestPlayer = p;
+            }
+        }
+
+        // Award to best player if found
+        if (bestPlayer >= 0) {
+            const stats = allStats[bestPlayer];
+            awards.push({
+                icon: award.icon,
+                title: award.title,
+                player: bestPlayer,
+                value: award.getValue(stats),
+                color: CONFIG.PLAYER_COLORS[bestPlayer]
+            });
+        }
+    }
+
+    return awards;
+}
+
+/**
+ * Display awards in the game over screen
+ */
+export function displayAwards(winner) {
+    const container = document.getElementById('awards-container');
+    if (!container) return;
+
+    const awards = generateAwards(winner);
+
+    if (awards.length === 0) {
+        container.innerHTML = '<div class="no-awards">Keine besonderen Leistungen</div>';
+        return;
+    }
+
+    container.innerHTML = awards.map(award => `
+        <div class="award-card">
+            <span class="award-icon">${award.icon}</span>
+            <div class="award-content">
+                <div class="award-title">${award.title}</div>
+                <div class="award-player">
+                    <span class="player-dot" style="background-color: ${award.color}"></span>
+                    Spieler ${award.player + 1}
+                </div>
+                <div class="award-value">${award.value}</div>
+            </div>
+        </div>
+    `).join('');
 }
