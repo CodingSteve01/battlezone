@@ -837,6 +837,33 @@ button:focus:not(:focus-visible),
     font-size: 16px;
 }
 
+.dropdown-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    border-radius: 8px;
+    color: #93c5fd;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    margin-top: 8px;
+}
+
+.dropdown-menu-btn:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%);
+    border-color: var(--blue);
+    color: #bfdbfe;
+}
+
+.dropdown-menu-btn .menu-icon {
+    font-size: 16px;
+}
+
 .round-badge {
     background: var(--bg-glass);
     border: 1px solid var(--border-subtle);

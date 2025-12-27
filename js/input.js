@@ -1616,6 +1616,27 @@ function setupMenuButtons() {
             endGame(winner);
         };
     }
+
+    // Back to menu button
+    const backToMenuBtn = document.getElementById('back-to-menu-btn');
+    if (backToMenuBtn) {
+        backToMenuBtn.onclick = () => {
+            // Close dropdown
+            const roundDropdown = document.getElementById('round-dropdown');
+            if (roundDropdown) roundDropdown.classList.remove('visible');
+
+            // Stop ambient audio
+            import('./audio.js').then(({ stopAmbient }) => {
+                stopAmbient();
+            });
+
+            // Mark game as over to prevent any further processing
+            state.gameOver = true;
+
+            // Return to menu
+            showScreen('menu');
+        };
+    }
 }
 
 /**

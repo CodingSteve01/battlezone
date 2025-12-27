@@ -2940,9 +2940,19 @@ export function render() {
     // or when animation callbacks fire at unexpected times.
     if (isSpectatorMode()) {
         const viewPlayer = state.viewingPlayer;
+
+        // Ensure visibility arrays exist for this player
+        if (!state.playerVisibleHexes[viewPlayer]) {
+            state.playerVisibleHexes[viewPlayer] = new Set();
+        }
+        if (!state.playerExploredHexes[viewPlayer]) {
+            state.playerExploredHexes[viewPlayer] = new Set();
+        }
+
         const visibleHexes = state.playerVisibleHexes[viewPlayer];
-        // Only refresh if visibility seems stale (empty or undefined)
+        // Refresh if visibility seems stale (empty or undefined)
         if (!visibleHexes || visibleHexes.size === 0) {
+            console.log('[Render] Spectator mode: refreshing visibility for player', viewPlayer);
             updateVisibilityForPlayer(viewPlayer);
         }
     }
