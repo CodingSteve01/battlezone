@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.11.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.10.0...shadow-squad-v3.11.0) (2025-12-27)
+
+
+### Features
+
+* **game:** add team alliances and aggressive shrinking zone ([#142](https://github.com/CodingSteve01/battlezone/issues/142)) ([554cae5](https://github.com/CodingSteve01/battlezone/commit/554cae59793fa74d25616d8efd6281e02b6d90bb))
+
 ## [3.10.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.9.2...shadow-squad-v3.10.0) (2025-12-27)
 
 
