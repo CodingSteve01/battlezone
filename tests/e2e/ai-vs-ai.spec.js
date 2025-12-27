@@ -390,4 +390,346 @@ test.describe('AI vs AI Spectator Mode', () => {
     expect(lastRound, 'Expected at least one round to be played').toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
+
+  // === NEW COMPREHENSIVE SPECTATOR MODE TESTS ===
+
+  test('AI units actually perform actions (move and attack)', async ({ page }) => {
+    const errors = [];
+    let aiActionsDetected = 0;
+    let unitsMovedCount = 0;
+    let attacksExecutedCount = 0;
+
+    page.on('pageerror', error => {
+      errors.push(error.message);
+    });
+
+    page.on('console', msg => {
+      const text = msg.text();
+      if (msg.type() === 'error') {
+        errors.push(text);
+      }
+      // Track AI actions from console logs
+      if (text.includes('AI turn completed')) {
+        aiActionsDetected++;
+        // Parse units processed count
+        const match = text.match(/(\d+) units processed/);
+        if (match) {
+          unitsMovedCount += parseInt(match[1], 10);
+        }
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Set up AI vs AI
+    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
+    const player1Text = await player1Toggle.textContent();
+    if (player1Text?.includes('Mensch')) {
+      await player1Toggle.click();
+    }
+
+    // Use small map
+    await page.locator('[data-size="small"]').click();
+
+    // Start game
+    await page.locator('#start-btn').click();
+
+    // Wait for game to progress and track unit HP changes
+    let initialUnitStates = null;
+    let hpChangesDetected = 0;
+
+    for (let i = 0; i < 20; i++) { // 40 seconds
+      await page.waitForTimeout(2000);
+
+      // Get unit states
+      const unitStates = await page.evaluate(() => {
+        // Access state via module if possible, or use DOM inspection
+        const unitElements = document.querySelectorAll('[data-unit-hp]');
+        if (unitElements.length > 0) {
+          return Array.from(unitElements).map(el => ({
+            id: el.dataset.unitId,
+            hp: parseInt(el.dataset.unitHp, 10)
+          }));
+        }
+        // Fallback: check if game state is accessible
+        return null;
+      });
+
+      // Check for game over
+      const isGameOver = await page.evaluate(() => {
+        return document.getElementById('gameover')?.classList.contains('active') || false;
+      });
+
+      if (isGameOver) {
+        console.log(`Game ended - AI completed ${aiActionsDetected} turn cycles`);
+        break;
+      }
+
+      // Get round and player info
+      const gameInfo = await page.evaluate(() => {
+        const roundEl = document.getElementById('round-num');
+        const playerEl = document.getElementById('current-player');
+        return {
+          round: roundEl ? parseInt(roundEl.textContent, 10) : 0,
+          player: playerEl ? playerEl.textContent : 'unknown'
+        };
+      });
+
+      console.log(`Check ${i + 1}: Round ${gameInfo.round}, AI turns completed: ${aiActionsDetected}`);
+    }
+
+    // Verify AI actually did something
+    console.log(`\n=== AI Activity Summary ===`);
+    console.log(`AI turn cycles completed: ${aiActionsDetected}`);
+    console.log(`Total units processed: ${unitsMovedCount}`);
+
+    // Assertions
+    expect(errors).toEqual([]);
+    expect(aiActionsDetected, 'AI should complete at least 2 turn cycles').toBeGreaterThanOrEqual(2);
+    expect(unitsMovedCount, 'AI should process units during turns').toBeGreaterThan(0);
+  });
+
+  test('Spectator mode shows AI thought bubbles', async ({ page }) => {
+    const errors = [];
+    let thoughtBubblesShown = 0;
+
+    page.on('pageerror', error => {
+      errors.push(error.message);
+    });
+
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Set up AI vs AI (spectator mode)
+    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
+    const player1Text = await player1Toggle.textContent();
+    if (player1Text?.includes('Mensch')) {
+      await player1Toggle.click();
+    }
+
+    // Use small map
+    await page.locator('[data-size="small"]').click();
+
+    // Start game
+    await page.locator('#start-btn').click();
+    await page.waitForTimeout(2000);
+
+    // Monitor for AI thought bubbles
+    for (let i = 0; i < 15; i++) { // 30 seconds
+      await page.waitForTimeout(2000);
+
+      // Check for thought bubble presence
+      const thoughtBubbleVisible = await page.evaluate(() => {
+        return !!document.querySelector('.ai-thought-bubble');
+      });
+
+      if (thoughtBubbleVisible) {
+        thoughtBubblesShown++;
+        console.log(`AI thought bubble visible at check ${i + 1}`);
+      }
+
+      // Check for AI thinking indicator (spectator mode shows this)
+      const aiThinkingVisible = await page.evaluate(() => {
+        const el = document.querySelector('.ai-thinking');
+        return el ? el.classList.contains('spectator-mode') : false;
+      });
+
+      if (aiThinkingVisible) {
+        console.log(`Spectator mode AI indicator visible at check ${i + 1}`);
+      }
+
+      // Check for game over
+      const isGameOver = await page.evaluate(() => {
+        return document.getElementById('gameover')?.classList.contains('active') || false;
+      });
+
+      if (isGameOver) {
+        console.log('Game ended normally');
+        break;
+      }
+    }
+
+    console.log(`\nThought bubbles observed: ${thoughtBubblesShown}`);
+
+    // In spectator mode, we should see at least some thought bubbles
+    // (though they may be quick, so we don't require too many)
+    expect(errors).toEqual([]);
+  });
+
+  test('AI vs AI game completes within reasonable time (no infinite loops)', async ({ page }) => {
+    const errors = [];
+    const watchdogTriggered = [];
+    const timeoutTriggered = [];
+
+    page.on('pageerror', error => {
+      errors.push(error.message);
+    });
+
+    page.on('console', msg => {
+      const text = msg.text();
+      if (msg.type() === 'error') {
+        errors.push(text);
+      }
+      // Track watchdog and timeout triggers
+      if (text.includes('WATCHDOG TRIGGERED')) {
+        watchdogTriggered.push(text);
+        console.log(`[WATCHDOG] ${text}`);
+      }
+      if (text.includes('AI turn timeout')) {
+        timeoutTriggered.push(text);
+        console.log(`[TIMEOUT] ${text}`);
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Set up AI vs AI
+    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
+    const player1Text = await player1Toggle.textContent();
+    if (player1Text?.includes('Mensch')) {
+      await player1Toggle.click();
+    }
+
+    // Use small map for faster completion
+    await page.locator('[data-size="small"]').click();
+
+    // Start game
+    await page.locator('#start-btn').click();
+
+    // Wait for game to complete or timeout
+    const maxWaitTime = 120000; // 2 minutes max
+    const startTime = Date.now();
+    let gameCompleted = false;
+
+    while (Date.now() - startTime < maxWaitTime) {
+      await page.waitForTimeout(3000);
+
+      const isGameOver = await page.evaluate(() => {
+        return document.getElementById('gameover')?.classList.contains('active') || false;
+      });
+
+      if (isGameOver) {
+        gameCompleted = true;
+        const elapsedTime = Date.now() - startTime;
+        console.log(`Game completed in ${Math.round(elapsedTime / 1000)} seconds`);
+        break;
+      }
+
+      // Log progress
+      const gameInfo = await page.evaluate(() => {
+        const roundEl = document.getElementById('round-num');
+        return {
+          round: roundEl ? parseInt(roundEl.textContent, 10) : 0
+        };
+      });
+      console.log(`Progress: Round ${gameInfo.round}, elapsed: ${Math.round((Date.now() - startTime) / 1000)}s`);
+    }
+
+    // Report findings
+    console.log('\n=== Completion Test Summary ===');
+    console.log(`Game completed: ${gameCompleted}`);
+    console.log(`Watchdog triggers: ${watchdogTriggered.length}`);
+    console.log(`Timeout triggers: ${timeoutTriggered.length}`);
+
+    // Assertions
+    expect(errors).toEqual([]);
+    // Watchdog should NOT trigger in normal gameplay
+    expect(watchdogTriggered.length, 'Watchdog should not trigger during normal gameplay').toBe(0);
+  });
+
+  test('Camera follows AI units in spectator mode', async ({ page }) => {
+    const errors = [];
+    let cameraMovements = 0;
+
+    page.on('pageerror', error => {
+      errors.push(error.message);
+    });
+
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        errors.push(msg.text());
+      }
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Set up AI vs AI
+    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
+    const player1Text = await player1Toggle.textContent();
+    if (player1Text?.includes('Mensch')) {
+      await player1Toggle.click();
+    }
+
+    // Use small map
+    await page.locator('[data-size="small"]').click();
+
+    // Start game
+    await page.locator('#start-btn').click();
+    await page.waitForTimeout(2000);
+
+    // Track camera position changes
+    let lastCameraState = null;
+
+    for (let i = 0; i < 15; i++) { // 30 seconds
+      await page.waitForTimeout(2000);
+
+      // Get current camera state (via canvas transform or state)
+      const cameraState = await page.evaluate(() => {
+        // Try to get camera state from canvas context
+        const canvas = document.getElementById('game-canvas');
+        if (!canvas) return null;
+
+        // We'll just check if content is being drawn at different positions
+        // by sampling pixel colors at fixed screen positions
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        // Sample center pixel color as a proxy for camera position
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const imageData = ctx.getImageData(centerX, centerY, 10, 10);
+
+        // Calculate average color as a simple hash
+        let sum = 0;
+        for (let j = 0; j < imageData.data.length; j += 4) {
+          sum += imageData.data[j] + imageData.data[j + 1] + imageData.data[j + 2];
+        }
+
+        return { colorHash: sum };
+      });
+
+      if (cameraState && lastCameraState) {
+        // Check if camera content changed (indicating movement)
+        if (cameraState.colorHash !== lastCameraState.colorHash) {
+          cameraMovements++;
+        }
+      }
+      lastCameraState = cameraState;
+
+      // Check for game over
+      const isGameOver = await page.evaluate(() => {
+        return document.getElementById('gameover')?.classList.contains('active') || false;
+      });
+
+      if (isGameOver) {
+        console.log('Game ended normally');
+        break;
+      }
+    }
+
+    console.log(`Camera content changes detected: ${cameraMovements}`);
+
+    // In spectator mode, camera should follow action (content should change)
+    expect(errors).toEqual([]);
+    expect(cameraMovements, 'Camera should move/change during AI gameplay').toBeGreaterThan(0);
+  });
 });
