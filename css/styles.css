@@ -2050,8 +2050,6 @@ button:focus:not(:focus-visible),
     padding: 16px;
     padding-top: max(16px, env(safe-area-inset-top));
     padding-bottom: max(20px, env(safe-area-inset-bottom));
-    display: flex;
-    flex-direction: column;
     overflow: hidden;
     -webkit-overflow-scrolling: touch;
     background:
@@ -2059,6 +2057,12 @@ button:focus:not(:focus-visible),
         radial-gradient(ellipse at 70% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
         linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
     position: relative;
+}
+
+/* Flex layout only when active (don't override display:none from .screen) */
+#team-select.active {
+    display: flex;
+    flex-direction: column;
 }
 
 /* Back Button - Tactical Military Style */
