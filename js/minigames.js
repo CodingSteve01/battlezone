@@ -214,15 +214,22 @@ const MINIGAME_DESCRIPTIONS = {
         hint: 'Warte auf den grünen Moment!'
     },
     medic: {
-        title: 'Heilungsrhythmus',
-        instruction: 'Tippe im Rhythmus des Herzschlags!',
-        hint: '4 Schläge im richtigen Timing'
+        title: 'Zielschuss',
+        instruction: 'Stoppe im grünen Bereich!',
+        hint: 'Medic greift mit Pistole an'
     },
     commando: {
         title: 'Nahkampf-Duell',
         instruction: 'Reagiere auf den Feind!',
         hint: '⚔️>💨 • 🛡️>⚔️ • 💨>🛡️'
     }
+};
+
+// Healing minigame description (separate from attack)
+const HEALING_MINIGAME_DESC = {
+    title: 'Heilungsrhythmus',
+    instruction: 'Tippe im Rhythmus des Herzschlags!',
+    hint: '4 Schläge im richtigen Timing'
 };
 
 /**
@@ -532,7 +539,8 @@ export async function startMinigame(unitClass, context = null) {
                 startSniperMinigame(resolve, currentModifiers);
                 break;
             case 'medic':
-                startMedicMinigame(resolve, currentModifiers);
+                // Medic greift wie normaler Soldat an - verwendet Assault-Minigame
+                startAssaultMinigame(resolve, currentModifiers);
                 break;
             case 'commando':
                 startCommandoDuelMinigame(resolve, currentModifiers);
@@ -1662,4 +1670,233 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
 export function areMinigamesEnabled() {
     // Could check a settings flag here
     return true;
+}
+
+// ===== HEALING MINIGAME =====
+// Exported function for Medic's healing ability
+// Uses the heartbeat rhythm minigame
+
+/**
+ * Healing result multipliers for heal amount
+ */
+export const HEALING_RESULT_MULTIPLIERS = {
+    [RESULT_LEVELS.PERFECT]: { healMultiplier: 1.5, label: 'PERFEKT!', color: '#ffd700' },  // 150% Heilung
+    [RESULT_LEVELS.GOOD]: { healMultiplier: 1.0, label: 'GUT!', color: '#22c55e' },         // 100% Heilung
+    [RESULT_LEVELS.OKAY]: { healMultiplier: 0.7, label: 'OK', color: '#f59e0b' },           // 70% Heilung
+    [RESULT_LEVELS.MISS]: { healMultiplier: 0.4, label: 'DANEBEN', color: '#ef4444' }       // 40% Heilung
+};
+
+/**
+ * Start the healing minigame for Medic's special ability
+ * Returns a Promise that resolves with the result including healMultiplier
+ * @param {Object} context - Optional context (wounded allies nearby, etc.)
+ */
+export async function startHealingMinigame(context = null) {
+    initMinigames();
+
+    // Calculate modifiers based on context (stress, allies, etc.)
+    const mods = context ? calculateDifficultyModifiers('medic', context) : {
+        speedMultiplier: 1.0,
+        timeMultiplier: 1.0,
+        description: null
+    };
+
+    // Show overlay with healing-specific instructions
+    minigameOverlay.classList.add('active');
+    document.getElementById('minigame-icon').textContent = '💚';
+    document.getElementById('minigame-title').textContent = HEALING_MINIGAME_DESC.title;
+    document.getElementById('minigame-instruction').textContent = HEALING_MINIGAME_DESC.instruction;
+
+    // Show context hint if available
+    const hintText = mods.description || HEALING_MINIGAME_DESC.hint;
+    document.getElementById('minigame-hint').textContent = hintText;
+    if (mods.description) {
+        document.getElementById('minigame-hint').style.color =
+            mods.speedMultiplier < 1 ? '#22c55e' : mods.speedMultiplier > 1.2 ? '#ef4444' : '#fbbf24';
+    } else {
+        document.getElementById('minigame-hint').style.color = '#a0aec0';
+    }
+
+    document.getElementById('minigame-result').classList.remove('show');
+    document.getElementById('minigame-result').textContent = '';
+
+    // Show countdown
+    await showCountdown();
+
+    // Start healing minigame
+    return new Promise((resolve) => {
+        startHealingMinigameInternal(resolve, mods);
+    });
+}
+
+/**
+ * Internal healing minigame - heartbeat rhythm
+ */
+function startHealingMinigameInternal(resolve, mods = {}) {
+    document.getElementById('minigame-instruction').textContent = 'Tippe im Rhythmus des Herzschlags!';
+
+    const canvas = minigameCanvas;
+    const ctx = minigameCtx;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Adaptive parameters
+    const speedMult = mods.speedMultiplier || 1.0;
+    const timeMult = mods.timeMultiplier || 1.0;
+
+    const beatInterval = Math.round(800 / speedMult * timeMult);
+    const beats = [0, beatInterval, beatInterval * 2, beatInterval * 3];
+    let currentBeat = 0;
+    let startTime = Date.now();
+    let taps = [];
+    let gameActive = true;
+    let ecgPosition = 0;
+
+    // ECG wave pattern
+    const ecgPattern = [0, 0, 0, 0.1, 0.2, 0.1, -0.3, 1, -0.5, 0.1, 0.2, 0.15, 0.1, 0, 0, 0, 0, 0];
+
+    function finishHealingMinigame(level) {
+        gameActive = false;
+
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+        }
+
+        const result = HEALING_RESULT_MULTIPLIERS[level];
+        const resultEl = document.getElementById('minigame-result');
+        resultEl.textContent = result.label;
+        resultEl.style.color = result.color;
+        resultEl.classList.add('show');
+
+        setTimeout(() => {
+            minigameOverlay.classList.remove('active');
+            canvas.onclick = null;
+            canvas.ontouchstart = null;
+            resolve({ level, multiplier: result });
+        }, 800);
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        const elapsed = Date.now() - startTime;
+        ecgPosition = (ecgPosition + 3) % width;
+
+        // Draw
+        ctx.clearRect(0, 0, width, height);
+
+        // Background with healing green tint
+        ctx.fillStyle = '#0a1a0a';
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw ECG line
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+
+        for (let x = 0; x < width; x++) {
+            const patternIndex = Math.floor(((x + ecgPosition) / width) * ecgPattern.length * 3) % ecgPattern.length;
+            const y = height / 2 - ecgPattern[patternIndex] * 60;
+            if (x === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Draw beat indicators
+        const beatY = height - 50;
+        beats.forEach((beat, i) => {
+            const beatX = 60 + i * 65;
+            const isCurrent = elapsed >= beat && elapsed < beat + 250;
+            const wasHit = taps[i] !== undefined;
+
+            ctx.beginPath();
+            ctx.arc(beatX, beatY, 22, 0, Math.PI * 2);
+
+            if (wasHit) {
+                ctx.fillStyle = taps[i] ? '#22c55e' : '#ef4444';
+            } else if (isCurrent) {
+                ctx.fillStyle = '#fbbf24';
+                // Pulse effect
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(beatX, beatY, 30, 0, Math.PI * 2);
+                ctx.fillStyle = '#fbbf24';
+                ctx.fill();
+                ctx.restore();
+            } else if (elapsed > beat + 250) {
+                ctx.fillStyle = '#ef4444';
+                if (taps[i] === undefined) taps[i] = false;
+            } else {
+                ctx.fillStyle = '#1f3a1f';
+            }
+
+            ctx.fill();
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Heart icon
+            ctx.fillStyle = '#fff';
+            ctx.font = '18px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('♥', beatX, beatY + 6);
+        });
+
+        // Title
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#22c55e';
+        ctx.textAlign = 'center';
+        ctx.fillText('💚 HEILUNG 💚', width / 2, 25);
+
+        // Check if game is complete
+        if (elapsed > beats[beats.length - 1] + 500) {
+            const hits = taps.filter(t => t === true).length;
+            if (hits === 4) {
+                finishHealingMinigame(RESULT_LEVELS.PERFECT);
+            } else if (hits >= 3) {
+                finishHealingMinigame(RESULT_LEVELS.GOOD);
+            } else if (hits >= 2) {
+                finishHealingMinigame(RESULT_LEVELS.OKAY);
+            } else {
+                finishHealingMinigame(RESULT_LEVELS.MISS);
+            }
+            return;
+        }
+
+        animationFrameId = requestAnimationFrame(update);
+    }
+
+    function handleTap() {
+        if (!gameActive) return;
+
+        const elapsed = Date.now() - startTime;
+        playClick();
+
+        // Find nearest beat
+        for (let i = 0; i < beats.length; i++) {
+            if (taps[i] !== undefined) continue;
+
+            const diff = Math.abs(elapsed - beats[i]);
+            if (diff < 250) {  // 250ms tolerance window
+                taps[i] = true;
+                playTarget();  // Success sound
+                return;
+            }
+        }
+    }
+
+    canvas.onclick = handleTap;
+    canvas.ontouchstart = (e) => {
+        e.preventDefault();
+        handleTap();
+    };
+
+    update();
 }

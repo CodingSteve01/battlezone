@@ -12,7 +12,7 @@ import {
     playHeal, playSprint, playPowershot, playCloak, playCover
 } from './audio.js';
 import { particles } from './particles.js';
-import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames } from './minigames.js';
+import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames, startHealingMinigame, HEALING_RESULT_MULTIPLIERS } from './minigames.js';
 
 /**
  * Check if a unit can take cover on their current hex
@@ -790,9 +790,11 @@ export function useSpecialAbility(unit) {
 }
 
 /**
- * Medic healing ability (VERBESSERT)
+ * Medic healing ability with optional minigame
+ * @param {Object} unit - The medic unit
+ * @param {number} healMultiplier - Multiplier from minigame (default 1.0)
  */
-function useMedicSpecial(unit) {
+function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
     const allies = getPlayerUnits(unit.player);
     let totalHealed = 0;
 
@@ -802,8 +804,9 @@ function useMedicSpecial(unit) {
     const medicPos = hexToPixel(unit.q, unit.r, state.hexSize);
     particles.healEffect(medicPos.x, medicPos.y - 10);
 
-    // Verwende verbesserte Werte aus config
-    const healAmount = UNIT_CLASSES.medic.healAmount || 40;
+    // Verwende verbesserte Werte aus config, skaliert mit Minigame-Ergebnis
+    const baseHealAmount = UNIT_CLASSES.medic.healAmount || 40;
+    const healAmount = Math.round(baseHealAmount * healMultiplier);
     const healRange = UNIT_CLASSES.medic.healRange || 4;
 
     allies.forEach(ally => {
@@ -839,8 +842,57 @@ function useMedicSpecial(unit) {
         awardXP(unit, XP_REWARDS.HEAL, 'heal');
     }
 
-    showToast(`💚 ${totalHealed} HP geheilt!`, 'special');
+    // Show result based on multiplier
+    if (healMultiplier >= 1.5) {
+        showToast(`💚 PERFEKT! ${totalHealed} HP geheilt!`, 'special');
+    } else if (healMultiplier >= 1.0) {
+        showToast(`💚 ${totalHealed} HP geheilt!`, 'special');
+    } else {
+        showToast(`💚 ${totalHealed} HP geheilt (${Math.round(healMultiplier * 100)}%)`, 'info');
+    }
+
+    return totalHealed;
+}
+
+/**
+ * Medic healing ability - starts minigame if enabled
+ * For synchronous calls (e.g., from AI)
+ */
+function useMedicSpecial(unit) {
+    useMedicSpecialInternal(unit, 1.0);
     return true;
+}
+
+/**
+ * Medic healing with minigame - async version for player use
+ * @param {Object} unit - The medic unit
+ */
+export async function useMedicHealingWithMinigame(unit) {
+    if (!areMinigamesEnabled()) {
+        return useMedicSpecialInternal(unit, 1.0);
+    }
+
+    // Build context for adaptive difficulty
+    const allies = getPlayerUnits(unit.player);
+    const woundedAllies = allies.filter(a => a.currentHp < a.maxHp * 0.6);
+    const enemiesNearby = state.units.filter(u =>
+        u.alive &&
+        u.player !== unit.player &&
+        hexDistance({ q: unit.q, r: unit.r }, { q: u.q, r: u.r }) <= 3
+    );
+
+    const context = {
+        attackerHP: unit.currentHp / unit.maxHp,
+        alliesInRange: woundedAllies.length,
+        enemiesInRange: enemiesNearby.length
+    };
+
+    // Start healing minigame
+    const result = await startHealingMinigame(context);
+
+    // Apply healing with minigame result
+    const healMultiplier = result.multiplier.healMultiplier;
+    return useMedicSpecialInternal(unit, healMultiplier);
 }
 
 /**

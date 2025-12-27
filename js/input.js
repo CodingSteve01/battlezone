@@ -1,10 +1,10 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP } from './state.js';
 import { pixelToHex, hexToPixel } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
-import { executeAttack, executeAttackWithMinigame, useSpecialAbility, prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack } from './combat.js';
+import { executeAttack, executeAttackWithMinigame, useSpecialAbility, useMedicHealingWithMinigame, prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -617,15 +617,22 @@ function handleTapOrClick(clientX, clientY) {
             // Check if current unit is a Medic and clicking on injured ally (context action: heal)
             if (unit && unit.class === 'medic' && hex.unit.id !== unit.id) {
                 const allyHex = hex.unit;
-                if (allyHex.currentHp < allyHex.maxHp && state.sharedAP >= 2 && !unit.usedSpecial) {
+                const healCost = getSpecialAbilityCost('medic');
+                if (allyHex.currentHp < allyHex.maxHp && state.sharedAP >= healCost && !unit.usedSpecial) {
                     // Show healing option
                     showToast(`💚 ${unit.name} kann ${allyHex.name} heilen! Tippe nochmal zum Heilen.`, 'info');
                     if (state.pendingHealTarget && state.pendingHealTarget.id === allyHex.id) {
-                        // Second tap - use special ability
-                        useSpecialAbility(unit);
+                        // Second tap - use special ability with minigame
                         state.pendingHealTarget = null;
-                        render();
-                        updateUI();
+                        // Spend AP and mark as used before starting minigame
+                        spendSharedAP(healCost);
+                        unit.usedSpecial = true;
+                        // Use async healing minigame
+                        (async () => {
+                            await useMedicHealingWithMinigame(unit);
+                            render();
+                            updateUI();
+                        })();
                         return;
                     }
                     state.pendingHealTarget = allyHex;
@@ -1667,19 +1674,38 @@ function setupMenuButtons() {
  * Setup action buttons
  */
 function setupActionButtons() {
-    // Special ability button - simplified UI
+    // Special ability button - uses correct AP costs and healing minigame for medic
     const specialBtn = document.querySelector('.action-btn[data-action="special"]');
     if (specialBtn) {
         specialBtn.onclick = () => {
             const unit = getCurrentUnit();
-            if (unit && state.sharedAP >= 2 && !unit.usedSpecial) {
-                useSpecialAbility(unit);
-                render();
-                updateUI();
-            } else if (unit && unit.usedSpecial) {
+            if (!unit) return;
+
+            const cost = getSpecialAbilityCost(unit.class);
+
+            if (canUseSpecialAbility(unit)) {
+                // Medic uses healing minigame
+                if (unit.class === 'medic') {
+                    // Spend AP and mark as used before starting minigame
+                    spendSharedAP(cost);
+                    unit.usedSpecial = true;
+                    (async () => {
+                        await useMedicHealingWithMinigame(unit);
+                        render();
+                        updateUI();
+                    })();
+                } else {
+                    // Other classes use normal special ability
+                    useSpecialAbility(unit);
+                    render();
+                    updateUI();
+                }
+            } else if (unit.usedSpecial) {
                 showToast('❌ Spezialfähigkeit bereits benutzt!', 'warning');
-            } else if (unit && state.sharedAP < 2) {
-                showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
+            } else if (state.sharedAP < cost) {
+                showToast(`❌ Nicht genug AP (braucht ${cost})!`, 'warning');
+            } else {
+                showToast('❌ Spezialfähigkeit nicht verfügbar!', 'warning');
             }
         };
     }
