@@ -296,6 +296,118 @@ button:focus:not(:focus-visible),
     color: var(--green);
 }
 
+/* ===== ALLIANCE CONFIG ===== */
+#alliance-section {
+    transition: all 0.3s ease;
+}
+
+.alliance-info {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.alliance-toggle-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.alliance-mode-btn {
+    flex: 1;
+    max-width: 150px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 2px solid var(--border-light);
+    background: var(--bg-glass);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.alliance-mode-btn:hover {
+    background: var(--bg-glass-hover);
+    border-color: var(--text-secondary);
+}
+
+.alliance-mode-btn.selected {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.05) 100%);
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 15px var(--green-glow);
+}
+
+.alliance-config-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    padding: 12px;
+    background: var(--bg-glass);
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+}
+
+.alliance-player-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-subtle);
+    transition: all 0.2s ease;
+}
+
+.alliance-player-item .player-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    box-shadow: var(--shadow-sm);
+}
+
+.alliance-player-item .team-select {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+    min-width: 70px;
+    text-align: center;
+}
+
+.alliance-player-item .team-select:focus {
+    outline: none;
+    border-color: var(--green);
+}
+
+/* Team color indicators */
+.team-indicator {
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 4px;
+}
+
+.team-indicator.team-0 { background: var(--green); }
+.team-indicator.team-1 { background: var(--red); }
+.team-indicator.team-2 { background: var(--blue); }
+.team-indicator.team-3 { background: var(--yellow); }
+
 .landscape-grid {
     display: flex;
     flex-wrap: wrap;
@@ -460,10 +572,22 @@ button:focus:not(:focus-visible),
     color: var(--green-light);
 }
 
+.tutorial-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.tutorial-controls .setting-buttons {
+    flex: 1;
+}
+
 .tutorial-reset-btn {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1));
     border-color: var(--blue);
     color: var(--blue);
+    padding: 6px 10px !important;
+    min-width: auto !important;
 }
 
 .tutorial-reset-btn:hover {

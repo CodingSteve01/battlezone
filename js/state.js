@@ -15,7 +15,12 @@ export const state = {
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
         particleQuality: 'high', // 'low', 'medium', 'high' - Partikelanzahl
         notificationLevel: 'normal', // 'minimal', 'normal', 'verbose' - Hinweis-Ausführlichkeit
-        showTutorial: true      // Tutorial-Hinweise anzeigen
+        showTutorial: true,     // Tutorial-Hinweise anzeigen
+        // === TEAM-ALLIANZEN ===
+        // Spieler im gleichen Team können sich nicht angreifen
+        // Format: Array von Team-IDs, Index = Spieler-Index
+        // z.B. [0, 0, 1, 1] = Spieler 0+1 sind Team 0, Spieler 2+3 sind Team 1
+        alliances: []           // Leer = keine Allianzen (jeder gegen jeden)
     },
 
     // Current active biome (resolved from 'random' or selected)
@@ -889,4 +894,138 @@ export function getHoldPositionBonus(unitId) {
  */
 export function clearHoldPosition(unitId) {
     delete state.holdingPosition[unitId];
+}
+
+// === TEAM-ALLIANZEN HELPER ===
+
+/**
+ * Prüfe ob zwei Spieler verbündet sind (im gleichen Team)
+ * @param {number} player1 - Erster Spieler-Index
+ * @param {number} player2 - Zweiter Spieler-Index
+ * @returns {boolean} True wenn verbündet
+ */
+export function arePlayersAllied(player1, player2) {
+    // Gleicher Spieler = immer "verbündet" (kann sich nicht selbst angreifen)
+    if (player1 === player2) return true;
+
+    // Keine Allianzen konfiguriert = jeder gegen jeden
+    const alliances = state.settings.alliances;
+    if (!alliances || alliances.length === 0) return false;
+
+    // Prüfe ob beide Spieler im gleichen Team sind
+    const team1 = alliances[player1];
+    const team2 = alliances[player2];
+
+    // Wenn einer keinem Team zugeordnet ist, sind sie nicht verbündet
+    if (team1 === undefined || team2 === undefined) return false;
+
+    return team1 === team2;
+}
+
+/**
+ * Prüfe ob zwei Einheiten verbündet sind
+ * @param {Object} unit1 - Erste Einheit
+ * @param {Object} unit2 - Zweite Einheit
+ * @returns {boolean} True wenn verbündet
+ */
+export function areUnitsAllied(unit1, unit2) {
+    if (!unit1 || !unit2) return false;
+    return arePlayersAllied(unit1.player, unit2.player);
+}
+
+/**
+ * Hole alle verbündeten Spieler eines Spielers
+ * @param {number} player - Spieler-Index
+ * @returns {number[]} Array von verbündeten Spieler-Indizes (inkl. sich selbst)
+ */
+export function getAlliedPlayers(player) {
+    const alliances = state.settings.alliances;
+    if (!alliances || alliances.length === 0) return [player];
+
+    const myTeam = alliances[player];
+    if (myTeam === undefined) return [player];
+
+    const allies = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        if (alliances[i] === myTeam) {
+            allies.push(i);
+        }
+    }
+    return allies;
+}
+
+/**
+ * Hole alle feindlichen Spieler eines Spielers
+ * @param {number} player - Spieler-Index
+ * @returns {number[]} Array von feindlichen Spieler-Indizes
+ */
+export function getEnemyPlayers(player) {
+    const enemies = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        if (!arePlayersAllied(player, i)) {
+            enemies.push(i);
+        }
+    }
+    return enemies;
+}
+
+/**
+ * Hole alle feindlichen Einheiten für einen Spieler
+ * @param {number} player - Spieler-Index
+ * @returns {Object[]} Array von feindlichen Einheiten
+ */
+export function getEnemyUnits(player) {
+    return state.units.filter(u =>
+        u.alive && !arePlayersAllied(u.player, player)
+    );
+}
+
+/**
+ * Hole alle verbündeten Einheiten für einen Spieler (inkl. eigene)
+ * @param {number} player - Spieler-Index
+ * @returns {Object[]} Array von verbündeten Einheiten
+ */
+export function getAlliedUnits(player) {
+    return state.units.filter(u =>
+        u.alive && arePlayersAllied(u.player, player)
+    );
+}
+
+/**
+ * Prüfe ob Allianzen aktiv sind
+ * @returns {boolean} True wenn Allianzen konfiguriert
+ */
+export function hasAlliances() {
+    const alliances = state.settings.alliances;
+    return alliances && alliances.length > 0;
+}
+
+/**
+ * Hole die Anzahl der verschiedenen Teams
+ * @returns {number} Anzahl der Teams
+ */
+export function getTeamCount() {
+    const alliances = state.settings.alliances;
+    if (!alliances || alliances.length === 0) {
+        return state.settings.players; // Jeder Spieler ist ein eigenes "Team"
+    }
+    return new Set(alliances).size;
+}
+
+/**
+ * Hole alle Spieler in einem bestimmten Team
+ * @param {number} teamId - Team-ID
+ * @returns {number[]} Array von Spieler-Indizes
+ */
+export function getPlayersInTeam(teamId) {
+    const alliances = state.settings.alliances;
+    if (!alliances || alliances.length === 0) return [];
+
+    const players = [];
+    for (let i = 0; i < alliances.length; i++) {
+        if (alliances[i] === teamId) {
+            players.push(i);
+        }
+    }
+    return players;
 }

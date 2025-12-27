@@ -3,7 +3,7 @@
 import {
     state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies,
     initSharedAPPool, isHexInZone, setOnAPDepletedCallback,
-    clearPlayerOverwatch, cleanupSuppression
+    clearPlayerOverwatch, cleanupSuppression, hasAlliances, getPlayersInTeam
 } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
@@ -18,13 +18,14 @@ import { isAIPlayer, executeAITurn, isSpectatorMode } from './ai.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 // === SHRINKING ZONE CONSTANTS ===
+// AGGRESSIV: Zone schrumpft schnell, um Wegrennen zu verhindern!
 const ZONE_CONFIG = {
-    ROUNDS_BEFORE_SHRINK: 4,      // Runden ohne Kampf bevor Zone schrumpft
-    SHRINK_AMOUNT: 2,             // Wie viele Felder pro Schrumpfung
-    MIN_ZONE_RADIUS: 5,           // Minimaler Radius
-    ZONE_DAMAGE: 15,              // Schaden pro Runde außerhalb der Zone
-    REVEAL_INTERVAL: 5,           // Alle X Runden ohne Kampf: versteckte Einheiten aufdecken
-    WARNING_ROUNDS: 1             // Runden Vorwarnung bevor Zone schrumpft
+    ROUNDS_BEFORE_SHRINK: 2,      // NUR 2 Runden ohne Kampf bevor Zone schrumpft (vorher 4)
+    SHRINK_AMOUNT: 3,             // 3 Felder pro Schrumpfung (vorher 2) - DRASTISCH
+    MIN_ZONE_RADIUS: 3,           // Minimaler Radius nur 3 Felder (vorher 5) - erzwingt Nahkampf!
+    ZONE_DAMAGE: 25,              // 25 Schaden pro Runde außerhalb (vorher 15) - TÖDLICH
+    REVEAL_INTERVAL: 3,           // Alle 3 Runden (vorher 5) versteckte Einheiten aufdecken
+    WARNING_ROUNDS: 1             // 1 Runde Vorwarnung
 };
 
 // === AI TURN WATCHDOG ===
@@ -287,8 +288,10 @@ export async function handleReady() {
 
 /**
  * End the game
+ * @param {number|null} winner - Winning player index or null for draw
+ * @param {Object} result - Optional result object from checkGameOver (for team victories)
  */
-export function endGame(winner) {
+export function endGame(winner, result = null) {
     state.gameOver = true;
 
     // Stop ambient sounds
@@ -313,8 +316,23 @@ export function endGame(winner) {
     const winnerText = document.getElementById('winner-text');
     if (winnerText) {
         if (winner !== null) {
-            winnerText.textContent = `Spieler ${winner + 1} gewinnt!`;
-            winnerText.style.color = CONFIG.PLAYER_COLORS[winner];
+            // === TEAM-SIEG ANZEIGE ===
+            if (result && result.isTeamVictory && hasAlliances()) {
+                const teamPlayers = getPlayersInTeam(result.winningTeam);
+                if (teamPlayers.length > 1) {
+                    // Team-Sieg: Zeige alle Spieler des Teams
+                    const playerNames = teamPlayers.map(p => `Spieler ${p + 1}`).join(' & ');
+                    winnerText.innerHTML = `🏆 TEAM GEWINNT!<br><span style="font-size: 0.8em">${playerNames}</span>`;
+                    // Mische die Farben der Sieger
+                    winnerText.style.color = CONFIG.PLAYER_COLORS[teamPlayers[0]];
+                } else {
+                    winnerText.textContent = `Spieler ${winner + 1} gewinnt!`;
+                    winnerText.style.color = CONFIG.PLAYER_COLORS[winner];
+                }
+            } else {
+                winnerText.textContent = `Spieler ${winner + 1} gewinnt!`;
+                winnerText.style.color = CONFIG.PLAYER_COLORS[winner];
+            }
         } else {
             winnerText.textContent = 'Unentschieden!';
             winnerText.style.color = '#e2e8f0';
@@ -332,11 +350,22 @@ export function checkWinCondition() {
     if (result.gameOver) {
         // Show announcement toast before game over screen
         if (result.winner !== null) {
-            showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+            // === TEAM-SIEG TOAST ===
+            if (result.isTeamVictory && hasAlliances()) {
+                const teamPlayers = getPlayersInTeam(result.winningTeam);
+                if (teamPlayers.length > 1) {
+                    const playerNums = teamPlayers.map(p => p + 1).join(' & ');
+                    showToast(`🏆 TEAM GEWINNT! (Spieler ${playerNums})`, 'levelup');
+                } else {
+                    showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+                }
+            } else {
+                showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+            }
         } else {
             showToast('⚖️ UNENTSCHIEDEN!', 'special');
         }
-        setTimeout(() => endGame(result.winner), 1500);
+        setTimeout(() => endGame(result.winner, result), 1500);
         return true;
     }
     return false;

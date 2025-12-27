@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack, arePlayersAllied } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -767,8 +767,8 @@ function updateMemoryWithVisibleEnemies(enemies) {
 function learnFromGhostIndicators() {
     // Get ghost indicators that are visible to the AI player (enemy attacks)
     const ghosts = state.ghostIndicators.filter(ghost => {
-        // Only learn from ghosts of enemy units
-        return ghost.player !== state.currentPlayer;
+        // Only learn from ghosts of enemy units (nicht von Verbündeten!)
+        return !arePlayersAllied(state.currentPlayer, ghost.player);
     });
 
     for (const ghost of ghosts) {
@@ -1844,11 +1844,12 @@ async function executeRetreat(unit, enemies, spectatorMode = false) {
 
 /**
  * Find all enemies visible to any AI unit
+ * Schließt Verbündete aus (nur echte Feinde werden zurückgegeben)
  */
 function findAllVisibleEnemies() {
     return state.units.filter(u =>
         u.alive &&
-        u.player !== state.currentPlayer &&
+        !arePlayersAllied(state.currentPlayer, u.player) &&
         isUnitVisible(u)
     );
 }

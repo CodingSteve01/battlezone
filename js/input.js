@@ -1,6 +1,6 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied } from './state.js';
 import { pixelToHex, hexToPixel, hexDistance } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
@@ -771,9 +771,15 @@ function handleTapOrClick(clientX, clientY) {
         return;
     }
 
-    // 2. Check if clicking on enemy unit
-    if (hex.unit && hex.unit.player !== state.currentPlayer && hex.unit.alive) {
+    // 2. Check if clicking on enemy unit (NOT an ally!)
+    if (hex.unit && !areUnitsAllied(unit, hex.unit) && hex.unit.alive) {
         handleEnemyClick(unit, hex);
+        return;
+    }
+
+    // 2b. Check if clicking on allied unit (different player but same team)
+    if (hex.unit && areUnitsAllied(unit, hex.unit) && hex.unit.player !== unit.player && hex.unit.alive) {
+        showToast('🤝 Verbündeter - Team ' + (state.settings.alliances[hex.unit.player] + 1), 'info');
         return;
     }
 
@@ -1636,7 +1642,8 @@ function stopPendingMoveAnimation() {
  * Handle attack action click
  */
 async function handleAttackClick(unit, hex) {
-    if (hex.unit && hex.unit.player !== unit.player && hex.unit.alive) {
+    // Prüfe ob Einheit auf Hex ist, ob sie ein FEIND ist (nicht verbündet), und ob sie lebt
+    if (hex.unit && !areUnitsAllied(unit, hex.unit) && hex.unit.alive) {
         const attackable = getAttackableUnits(unit);
         const canAttack = attackable.some(u => u.id === hex.unit.id);
 
@@ -1662,6 +1669,12 @@ async function handleAttackClick(unit, hex) {
             // Target is out of range
             showToast('❌ Ziel außer Reichweite!', 'warning');
         }
+    } else if (hex.unit && areUnitsAllied(unit, hex.unit) && hex.unit.player !== unit.player) {
+        // Verbündeter angeklickt - zeige Hinweis
+        showToast('🤝 Verbündete können nicht angegriffen werden!', 'info');
+        state.targetedUnit = null;
+        render();
+        updateUI();
     } else {
         state.targetedUnit = null;
         render();

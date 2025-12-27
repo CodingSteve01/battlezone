@@ -43,6 +43,24 @@
                 </div>
             </div>
 
+            <div class="menu-section" id="alliance-section" style="display: none;">
+                <div class="section-label">🤝 Team-Allianzen</div>
+                <div class="alliance-info">
+                    Spieler im gleichen Team können sich nicht angreifen und gewinnen gemeinsam.
+                </div>
+                <div class="alliance-toggle-row">
+                    <button class="alliance-mode-btn selected" data-alliance-mode="ffa" id="alliance-ffa-btn">
+                        ⚔️ Jeder gegen jeden
+                    </button>
+                    <button class="alliance-mode-btn" data-alliance-mode="teams" id="alliance-teams-btn">
+                        🤝 Teams bilden
+                    </button>
+                </div>
+                <div class="alliance-config-grid" id="alliance-config-grid" style="display: none;">
+                    <!-- Dynamically populated when teams mode is selected -->
+                </div>
+            </div>
+
             <div class="menu-section map-section">
                 <div class="map-options-row">
                     <div class="map-option-group">
@@ -96,7 +114,13 @@
                     </div>
                     <div class="advanced-row">
                         <span class="advanced-label">📖 Tutorial</span>
-                        <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn">🔄 Zurücksetzen</button>
+                        <div class="tutorial-controls">
+                            <div class="setting-buttons" id="tutorial-toggle">
+                                <button class="setting-btn" data-value="off">Aus</button>
+                                <button class="setting-btn active" data-value="on">An</button>
+                            </div>
+                            <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn" title="Tutorial von vorne beginnen">🔄</button>
+                        </div>
                     </div>
                 </div>
             </div>
