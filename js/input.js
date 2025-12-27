@@ -707,7 +707,8 @@ async function handleEnemyClick(unit, hex) {
             playTarget();
             render();
             updateUI();
-            showToast(`🎯 ${enemy.name} anvisiert - nochmal tippen zum Angriff`, 'warning');
+            // Note: The target info panel now shows all attack details
+            // No toast needed here as it would overlap with the target info panel
         }
     } else {
         // Enemy not in range - show message
@@ -1580,21 +1581,34 @@ function setupMenuButtons() {
         };
     }
 
-    // Round info dropdown toggle
+    // Round info dropdown toggle (AP display and round info)
     const roundInfoToggle = document.getElementById('round-info-toggle');
     const roundDropdown = document.getElementById('round-dropdown');
     if (roundInfoToggle && roundDropdown) {
-        roundInfoToggle.onclick = (e) => {
+        // Toggle dropdown on click/touch
+        const toggleDropdown = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             roundDropdown.classList.toggle('visible');
         };
 
-        // Close dropdown when clicking elsewhere
-        document.addEventListener('click', (e) => {
+        // Support both click and touch events for reliable mobile handling
+        roundInfoToggle.onclick = toggleDropdown;
+        roundInfoToggle.addEventListener('touchend', (e) => {
+            // Only handle if not already handled by onclick
+            if (e.cancelable) {
+                toggleDropdown(e);
+            }
+        }, { passive: false });
+
+        // Close dropdown when clicking/touching elsewhere
+        const closeDropdown = (e) => {
             if (!roundDropdown.contains(e.target) && !roundInfoToggle.contains(e.target)) {
                 roundDropdown.classList.remove('visible');
             }
-        });
+        };
+        document.addEventListener('click', closeDropdown);
+        document.addEventListener('touchend', closeDropdown);
     }
 
     const giveUpBtn = document.getElementById('give-up-btn');
@@ -1604,6 +1618,11 @@ function setupMenuButtons() {
             // Close dropdown
             const roundDropdown = document.getElementById('round-dropdown');
             if (roundDropdown) roundDropdown.classList.remove('visible');
+
+            // Show confirmation dialog
+            if (!confirm('Spiel wirklich aufgeben?')) {
+                return;
+            }
 
             const remainingPlayers = [];
             for (let p = 0; p < state.settings.players; p++) {
@@ -1624,6 +1643,11 @@ function setupMenuButtons() {
             // Close dropdown
             const roundDropdown = document.getElementById('round-dropdown');
             if (roundDropdown) roundDropdown.classList.remove('visible');
+
+            // Show confirmation dialog
+            if (!confirm('Spiel wirklich beenden und zum Menü?')) {
+                return;
+            }
 
             // Stop ambient audio
             import('./audio.js').then(({ stopAmbient }) => {

@@ -273,6 +273,8 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
 
 /**
  * Update target info overlay
+ * This is the unified place for showing targeting information
+ * No separate toast notifications needed - all info is shown here
  */
 function updateTargetInfo(unit) {
     const infoEl = document.getElementById('target-info');
@@ -363,6 +365,14 @@ function updateTargetInfo(unit) {
                 coverEl.textContent = `⚠️ Maximale Reichweite - schwieriger Schuss!`;
                 coverEl.className = 'cover-info hard-shot';
             }
+        }
+
+        // The attack-hint element in the target info panel already shows the instruction
+        // We update the UI to make it clear and visible
+        const attackHintEl = infoEl.querySelector('.attack-hint');
+        if (attackHintEl) {
+            attackHintEl.textContent = '👆 Nochmal tippen zum Angriff';
+            attackHintEl.classList.add('visible');
         }
 
         infoEl.classList.add('visible');
