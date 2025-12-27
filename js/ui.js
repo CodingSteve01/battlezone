@@ -2,7 +2,11 @@
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection } from './state.js';
-import { calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
+import {
+    calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
+    canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
+} from './combat.js';
+import { isUnitOnOverwatch } from './state.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { hexToPixel } from './hexMath.js';
@@ -319,6 +323,47 @@ function updateActionButtons(unit, isAiTurnHidden = false) {
             } else {
                 coordBtn.style.display = 'none';
             }
+        }
+    }
+
+    // === UNTERDRÜCKUNGSFEUER BUTTON ===
+    const suppressBtn = document.getElementById('suppress-btn');
+    if (suppressBtn) {
+        if (!unit || isAiTurnHidden) {
+            suppressBtn.style.display = 'none';
+        } else if (canUseSuppression(unit)) {
+            suppressBtn.style.display = 'flex';
+            suppressBtn.classList.remove('disabled');
+            suppressBtn.classList.add('suggested');
+        } else if (['assault', 'sniper'].includes(unit.class)) {
+            // Assault/Sniper können unterdrücken, aber nicht genug AP
+            suppressBtn.style.display = 'flex';
+            suppressBtn.classList.add('disabled');
+            suppressBtn.classList.remove('suggested');
+        } else {
+            suppressBtn.style.display = 'none';
+        }
+    }
+
+    // === OVERWATCH BUTTON ===
+    const overwatchBtn = document.getElementById('overwatch-btn');
+    if (overwatchBtn) {
+        if (!unit || isAiTurnHidden) {
+            overwatchBtn.style.display = 'none';
+        } else if (isUnitOnOverwatch(unit.id)) {
+            // Einheit ist bereits im Overwatch
+            overwatchBtn.style.display = 'flex';
+            overwatchBtn.classList.add('disabled');
+            overwatchBtn.querySelector('.label').textContent = 'Aktiv!';
+        } else if (canUseOverwatch(unit)) {
+            overwatchBtn.style.display = 'flex';
+            overwatchBtn.classList.remove('disabled');
+            overwatchBtn.querySelector('.label').textContent = 'Overwatch';
+        } else {
+            // Nicht genug AP oder bereits angegriffen
+            overwatchBtn.style.display = 'flex';
+            overwatchBtn.classList.add('disabled');
+            overwatchBtn.querySelector('.label').textContent = 'Overwatch';
         }
     }
 }
