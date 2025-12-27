@@ -5,7 +5,10 @@ import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGh
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
-import { executeAttack, useSpecialAbility, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
+import {
+    executeAttack, useSpecialAbility, canUseSpecialAbility, getSpecialAbilityCost,
+    canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch
+} from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
 import { render } from './renderer.js';
@@ -1238,6 +1241,17 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
                 trackAPSpent(1);
             }
         }
+
+        // 7. Consider tactical abilities if we have AP left
+        await considerTacticalAbilities(unit, enemies, plan, {
+            canSpendAP,
+            trackAPSpent,
+            hasHumanViewer,
+            spectatorMode,
+            renderIfVisible,
+            actionDelayBase,
+            shortDelay
+        });
     } catch (error) {
         console.error(`AI error for unit ${unit.id} (${unit.class}):`, error);
         // Continue to next unit - don't let one unit's error stop the entire turn
@@ -2422,6 +2436,192 @@ async function executeAIMove(unit, target, spectatorMode = false) {
         updateUI();
         render();
     }
+}
+
+/**
+ * Consider using tactical abilities (Suppression, Overwatch)
+ * Called after main actions when unit has AP remaining
+ */
+async function considerTacticalAbilities(unit, enemies, plan, context) {
+    const { canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode, actionDelayBase, shortDelay } = context;
+
+    // === UNTERDRÜCKUNGSFEUER (SUPPRESSION) ===
+    // Best used by Assault/Sniper when enemies are in predictable positions
+    if (canSpendAP(2) && canUseSuppression(unit)) {
+        const suppressTarget = selectSuppressionTarget(unit, enemies, plan);
+        if (suppressTarget) {
+            const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+            addAIThought(`${unitName}: Unterdrückungsfeuer auf strategische Position! 🔥`, 'strategy');
+
+            useSuppression(unit, suppressTarget.q, suppressTarget.r);
+            trackAPSpent(2);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return; // Don't also use overwatch in same turn
+        }
+    }
+
+    // === OVERWATCH (DECKUNGSFEUER) ===
+    // Best used when in defensive position and expecting enemy movement
+    if (canSpendAP(2) && canUseOverwatch(unit)) {
+        const shouldUseOverwatch = evaluateOverwatchValue(unit, enemies, plan);
+        if (shouldUseOverwatch) {
+            const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+            addAIThought(`${unitName}: Overwatch aktiviert - bereit für Feindkontakt! 👁️`, 'strategy');
+
+            activateOverwatch(unit);
+            trackAPSpent(2);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+        }
+    }
+}
+
+/**
+ * Select best target hex for suppression
+ * Looks for strategic positions enemies might move through
+ */
+function selectSuppressionTarget(unit, enemies, plan) {
+    if (enemies.length === 0) return null;
+
+    let bestTarget = null;
+    let bestScore = 0;
+
+    // Check hexes within range for good suppression targets
+    for (const enemy of enemies) {
+        const distToEnemy = hexDistance(
+            { q: unit.q, r: unit.r },
+            { q: enemy.q, r: enemy.r }
+        );
+
+        // Focus on hexes the enemy might move through
+        const targetHexes = getNeighborHexes(enemy.q, enemy.r);
+        targetHexes.push({ q: enemy.q, r: enemy.r }); // Also consider enemy's current position
+
+        for (const targetHex of targetHexes) {
+            const dist = hexDistance(
+                { q: unit.q, r: unit.r },
+                { q: targetHex.q, r: targetHex.r }
+            );
+
+            // Must be within attack range
+            if (dist > unit.range || dist === 0) continue;
+
+            const hex = getHex(targetHex.q, targetHex.r);
+            if (!hex || !hex.walkable) continue;
+
+            let score = 0;
+
+            // Higher score for enemy's current position
+            if (targetHex.q === enemy.q && targetHex.r === enemy.r) {
+                score += 50;
+                // Even higher if enemy is dangerous
+                if (['sniper', 'assault'].includes(enemy.class)) {
+                    score += 30;
+                }
+            }
+
+            // Score based on how many enemies are near this hex
+            for (const e of enemies) {
+                const eDist = hexDistance(
+                    { q: e.q, r: e.r },
+                    { q: targetHex.q, r: targetHex.r }
+                );
+                if (eDist <= 2) score += 20;
+            }
+
+            // Chokepoints and cover hexes are better suppression targets
+            if (hex.cover) score += 15;
+
+            // High-traffic areas (between enemies and our units)
+            const allies = getPlayerUnits(unit.player).filter(u => u.alive && u.id !== unit.id);
+            for (const ally of allies) {
+                const distToAlly = hexDistance(
+                    { q: ally.q, r: ally.r },
+                    { q: targetHex.q, r: targetHex.r }
+                );
+                // If hex is between enemy and ally, it's a good chokepoint
+                if (distToAlly < distToEnemy) {
+                    score += 10;
+                }
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = targetHex;
+            }
+        }
+    }
+
+    // Only use suppression if we found a good target
+    return bestScore >= 30 ? bestTarget : null;
+}
+
+/**
+ * Get neighboring hexes for a position
+ */
+function getNeighborHexes(q, r) {
+    const directions = [
+        { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+        { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+    ];
+    return directions.map(d => ({ q: q + d.q, r: r + d.r }));
+}
+
+/**
+ * Evaluate if overwatch is a good use of AP
+ * Returns true if unit should activate overwatch
+ */
+function evaluateOverwatchValue(unit, enemies, plan) {
+    // Don't use overwatch if no enemies visible and not in defensive mode
+    if (enemies.length === 0 && !plan.inHuntMode) return false;
+
+    let value = 0;
+
+    // Good defensive position (cover) increases overwatch value
+    const hex = getHex(unit.q, unit.r);
+    if (hex && hex.cover) value += 20;
+    if (hex && hex.type === 'hills') value += 15;
+
+    // More enemies nearby = higher value
+    for (const enemy of enemies) {
+        const dist = hexDistance(
+            { q: unit.q, r: unit.r },
+            { q: enemy.q, r: enemy.r }
+        );
+
+        // Enemies in attack range are good overwatch targets
+        if (dist <= unit.range) {
+            value += 25;
+        } else if (dist <= unit.range + 3) {
+            // Enemies might move into range
+            value += 15;
+        }
+    }
+
+    // Snipers benefit more from overwatch (long range)
+    if (unit.class === 'sniper') value += 20;
+
+    // Less value if unit is low on HP (might be attacked)
+    if (unit.currentHp < unit.maxHp * 0.4) {
+        value -= 30;
+    }
+
+    // In hunt mode, overwatch is useful for ambushes
+    if (plan.inHuntMode) {
+        value += 10;
+    }
+
+    // Use overwatch if value is high enough
+    return value >= 35;
 }
 
 /**

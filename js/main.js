@@ -15,7 +15,7 @@ import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory, isSpectatorMode } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
-import { resetTutorial } from './tutorial.js';
+import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial } from './tutorial.js';
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -184,6 +184,11 @@ function showTeamSelectForPlayer(playerIndex) {
     }
 
     showScreen('team-select');
+
+    // Start team selection tutorial for first player
+    if (playerIndex === 0) {
+        setTimeout(() => startTeamSelectTutorial(), 300);
+    }
 }
 
 /**
@@ -214,6 +219,11 @@ function generateUnitCards() {
             playClick();
             toggleUnitSelection(classKey, card);
         };
+
+        // Show unit class hint on first interaction
+        card.onmouseenter = () => showUnitClassHint(classKey);
+        card.onfocus = () => showUnitClassHint(classKey);
+
         grid.appendChild(card);
     });
 }
@@ -328,6 +338,9 @@ function confirmTeamSelection() {
  * Start a new game with selected teams
  */
 function startGameWithTeams() {
+    // Hide team selection tutorial
+    hideTeamSelectTutorial();
+
     // Initialize audio on game start (requires user interaction)
     initAudio();
     resumeAudio();

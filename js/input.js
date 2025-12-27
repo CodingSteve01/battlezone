@@ -1,10 +1,16 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP } from './state.js';
-import { pixelToHex, hexToPixel } from './hexMath.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch } from './state.js';
+import { pixelToHex, hexToPixel, hexDistance } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
-import { executeAttack, executeAttackWithMinigame, useSpecialAbility, useMedicHealingWithMinigame, prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack, canUseSpecialAbility, getSpecialAbilityCost } from './combat.js';
+import {
+    executeAttack, executeAttackWithMinigame, useSpecialAbility, useMedicHealingWithMinigame,
+    prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack,
+    canUseSpecialAbility, getSpecialAbilityCost,
+    canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch,
+    checkOverwatchTriggers, executeOverwatchAttack, onUnitMoved
+} from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
@@ -663,6 +669,13 @@ function handleTapOrClick(clientX, clientY) {
 
     if (!unit) return;
 
+    // === UNTERDRÜCKUNGSFEUER-MODUS ===
+    // Wenn im Suppress-Modus, versuche das Hex zu unterdrücken
+    if (state.selectedAction === 'suppress') {
+        handleSuppressionClick(unit, hex);
+        return;
+    }
+
     // 2. Check if clicking on enemy unit
     if (hex.unit && hex.unit.player !== state.currentPlayer && hex.unit.alive) {
         handleEnemyClick(unit, hex);
@@ -849,9 +862,12 @@ function handleMoveClick(unit, hex) {
         }
 
         // Animate the movement
-        animateUnitMovement(unit, reachablePath, totalCost, () => {
+        animateUnitMovement(unit, reachablePath, totalCost, async () => {
             // Play move end sound
             playMoveEnd();
+
+            // Bewegung beendet Stellung-halten Bonus
+            onUnitMoved(unit);
 
             // Check for power-up pickup after animation
             const pickup = checkPowerupPickup(unit);
@@ -864,8 +880,22 @@ function handleMoveClick(unit, hex) {
             // Check for newly discovered enemies
             checkForNewEnemies(prevEnemyIds);
 
+            // === OVERWATCH TRIGGER ===
+            // Prüfe ob feindliche Einheiten im Overwatch sind und angreifen
+            const overwatchTriggers = checkOverwatchTriggers(unit);
+            for (const trigger of overwatchTriggers) {
+                if (unit.alive) {
+                    await executeOverwatchAttack(trigger.watcher, unit);
+                    render();
+                    if (!unit.alive) {
+                        checkWinCondition();
+                        break;
+                    }
+                }
+            }
+
             // Auto-take cover if on valid terrain (forest)
-            if (canAutoTakeCover(unit)) {
+            if (unit.alive && canAutoTakeCover(unit)) {
                 autoTakeCover(unit);
                 showToast('🌲 Automatisch in Deckung gegangen!', 'special');
             }
@@ -1381,8 +1411,11 @@ async function executeQueuedPathForUnit(unit) {
             unit.hiding = false;
         }
 
-        animateUnitMovement(unit, reachablePath, totalCost, () => {
+        animateUnitMovement(unit, reachablePath, totalCost, async () => {
             playMoveEnd();
+
+            // Bewegung beendet Stellung-halten Bonus
+            onUnitMoved(unit);
 
             // Check for power-up pickup
             const pickup = checkPowerupPickup(unit);
@@ -1392,8 +1425,21 @@ async function executeQueuedPathForUnit(unit) {
 
             updateVisibility();
 
+            // === OVERWATCH TRIGGER ===
+            const overwatchTriggers = checkOverwatchTriggers(unit);
+            for (const trigger of overwatchTriggers) {
+                if (unit.alive) {
+                    await executeOverwatchAttack(trigger.watcher, unit);
+                    render();
+                    if (!unit.alive) {
+                        checkWinCondition();
+                        break;
+                    }
+                }
+            }
+
             // Auto-take cover if on valid terrain
-            if (canAutoTakeCover(unit)) {
+            if (unit.alive && canAutoTakeCover(unit)) {
                 autoTakeCover(unit);
             }
 
@@ -1522,6 +1568,38 @@ async function handleAttackClick(unit, hex) {
             showToast('❌ Ziel außer Reichweite!', 'warning');
         }
     } else {
+        state.targetedUnit = null;
+        render();
+        updateUI();
+    }
+}
+
+/**
+ * Handle suppression action click - suppress a hex within attack range
+ */
+function handleSuppressionClick(unit, hex) {
+    // Prüfe ob das Hex in Angriffsreichweite ist
+    const distance = hexDistance({ q: unit.q, r: unit.r }, { q: hex.q, r: hex.r });
+    const attackRange = unit.range || 2;
+
+    if (distance > attackRange) {
+        showToast('❌ Hex außer Reichweite!', 'warning');
+        playError();
+        return;
+    }
+
+    if (distance === 0) {
+        showToast('❌ Kann eigenes Feld nicht unterdrücken!', 'warning');
+        playError();
+        return;
+    }
+
+    // Führe Unterdrückung aus
+    const success = useSuppression(unit, hex.q, hex.r);
+
+    if (success) {
+        // Zurück zum Move-Modus
+        state.selectedAction = 'move';
         state.targetedUnit = null;
         render();
         updateUI();
@@ -1756,6 +1834,46 @@ function setupActionButtons() {
             render();
             updateUI();
             checkWinCondition();
+        };
+    }
+
+    // === UNTERDRÜCKUNGSFEUER BUTTON ===
+    const suppressBtn = document.getElementById('suppress-btn');
+    if (suppressBtn) {
+        suppressBtn.onclick = () => {
+            const unit = getCurrentUnit();
+            if (!unit) return;
+
+            if (canUseSuppression(unit)) {
+                // Wechsle in den Unterdrückungs-Modus
+                state.selectedAction = 'suppress';
+                showToast('🔥 Wähle ein Feld zum Unterdrücken (2 AP)', 'info');
+                render();
+                updateUI();
+            } else if (!['assault', 'sniper'].includes(unit.class)) {
+                showToast('❌ Nur Assault und Sniper können unterdrücken!', 'warning');
+            } else if (state.sharedAP < 2) {
+                showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
+            }
+        };
+    }
+
+    // === OVERWATCH BUTTON ===
+    const overwatchBtn = document.getElementById('overwatch-btn');
+    if (overwatchBtn) {
+        overwatchBtn.onclick = () => {
+            const unit = getCurrentUnit();
+            if (!unit) return;
+
+            if (canUseOverwatch(unit)) {
+                activateOverwatch(unit);
+                render();
+                updateUI();
+            } else if (isUnitOnOverwatch(unit.id)) {
+                showToast('👁️ Einheit ist bereits im Overwatch!', 'info');
+            } else if (state.sharedAP < 2) {
+                showToast('❌ Nicht genug AP (braucht 2)!', 'warning');
+            }
         };
     }
 }

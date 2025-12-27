@@ -1,6 +1,12 @@
 // ===== COMBAT SYSTEM =====
 
-import { state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP, trackUnitAttack, getRemainingAttacks, canUnitAttack, markCombat, triggerScreenShake } from './state.js';
+import {
+    state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP,
+    trackUnitAttack, getRemainingAttacks, canUnitAttack, markCombat, triggerScreenShake,
+    addSuppressedHex, isHexSuppressed, getSuppressionInfo,
+    setOverwatch, removeOverwatch, isUnitOnOverwatch, queueOverwatchTrigger,
+    getHoldPositionBonus, clearHoldPosition, updateHoldPosition
+} from './state.js';
 import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
 import { killUnit } from './units.js';
@@ -302,9 +308,15 @@ export function calculateHitChance(attacker, defender) {
         chance += 5;
     }
 
-    // Minimum 75% Chance (außer für sehr schwierige Schüsse)
-    // Maximum 100%
-    return Math.min(100, Math.max(75, chance));
+    // === UNTERDRÜCKUNGS-MALUS ===
+    // Angreifer auf unterdrücktem Hex hat -30% Trefferchance
+    if (isHexSuppressed(attacker.q, attacker.r)) {
+        chance -= 30;
+    }
+
+    // Minimum 50% Chance wenn unterdrückt, sonst 75%
+    const minChance = isHexSuppressed(attacker.q, attacker.r) ? 50 : 75;
+    return Math.min(100, Math.max(minChance, chance));
 }
 
 /**
@@ -382,8 +394,15 @@ function calculateCoverDamageReduction(attacker, defender) {
         reduction *= (1 - armorPiercing); // 50% weniger effektive Deckung gegen Assault
     }
 
-    // Maximum 50% Schadensreduktion
-    return Math.min(0.50, reduction);
+    // === STELLUNG HALTEN BONUS ===
+    // Verteidiger bekommt Bonus wenn er Position gehalten hat
+    const holdBonus = getHoldPositionBonus(defender.id);
+    if (holdBonus > 0) {
+        reduction += holdBonus;
+    }
+
+    // Maximum 60% Schadensreduktion (erhöht wegen Stellung halten)
+    return Math.min(0.60, reduction);
 }
 
 /**
@@ -1185,4 +1204,213 @@ export async function executeCoordinatedAttack(attackers, target) {
     }
 
     return results;
+}
+
+// ===== UNTERDRÜCKUNGSFEUER (SUPPRESSION) =====
+
+/**
+ * Prüfe ob eine Einheit Unterdrückungsfeuer legen kann
+ * Nur Assault und Sniper können unterdrücken
+ */
+export function canUseSuppression(unit) {
+    if (!unit || !unit.alive) return false;
+    if (!['assault', 'sniper'].includes(unit.class)) return false;
+    if (state.sharedAP < 2) return false;  // Kostet 2 AP
+    if (!canUnitAttack(unit)) return false;
+
+    return true;
+}
+
+/**
+ * Lege Unterdrückungsfeuer auf ein Ziel-Hex
+ * Feinde auf diesem Hex: -30% Trefferchance, +1 Bewegungskosten
+ */
+export function useSuppression(unit, targetQ, targetR) {
+    if (!canUseSuppression(unit)) return false;
+
+    // Prüfe Reichweite und Sichtlinie
+    const distance = hexDistance(
+        { q: unit.q, r: unit.r },
+        { q: targetQ, r: targetR }
+    );
+
+    if (distance > unit.range) {
+        showToast('❌ Ziel außer Reichweite!', 'error');
+        return false;
+    }
+
+    const los = hasLineOfSight(unit.q, unit.r, targetQ, targetR);
+    if (!los.clear) {
+        showToast('❌ Keine Sichtlinie!', 'error');
+        return false;
+    }
+
+    // AP verbrauchen und Angriff tracken
+    spendSharedAP(2);
+    trackUnitAttack(unit);
+
+    // Unterdrückung hinzufügen (hält bis zum Ende der nächsten Runde)
+    addSuppressedHex(targetQ, targetR, unit.id, 2);
+
+    // Visueller Effekt
+    const targetPos = hexToPixel(targetQ, targetR, state.hexSize);
+    particles.burst('warning', targetPos.x, targetPos.y - 10, 12);
+
+    // Sound und Toast
+    playWeaponSound(unit.class);
+    showToast('🔥 Unterdrückungsfeuer! Feinde sind festgenagelt.', 'special');
+
+    return true;
+}
+
+/**
+ * Berechne Unterdrückungs-Malus für Trefferchance
+ */
+export function getSuppressionPenalty(unit) {
+    if (isHexSuppressed(unit.q, unit.r)) {
+        return -30; // -30% Trefferchance
+    }
+    return 0;
+}
+
+/**
+ * Berechne zusätzliche Bewegungskosten durch Unterdrückung
+ */
+export function getSuppressionMoveCost(q, r) {
+    if (isHexSuppressed(q, r)) {
+        return 1; // +1 Bewegungskosten
+    }
+    return 0;
+}
+
+// ===== OVERWATCH (DECKUNGSFEUER) =====
+
+/**
+ * Prüfe ob eine Einheit Overwatch aktivieren kann
+ */
+export function canUseOverwatch(unit) {
+    if (!unit || !unit.alive) return false;
+    if (isUnitOnOverwatch(unit.id)) return false;  // Bereits aktiv
+    if (state.sharedAP < 2) return false;  // Kostet 2 AP
+    if (!canUnitAttack(unit)) return false;
+
+    return true;
+}
+
+/**
+ * Aktiviere Overwatch für eine Einheit
+ * Die Einheit schießt automatisch auf Feinde die sich in Reichweite bewegen
+ */
+export function activateOverwatch(unit) {
+    if (!canUseOverwatch(unit)) return false;
+
+    spendSharedAP(2);
+    setOverwatch(unit.id);
+
+    // Visuelles Feedback
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.burst('shield', unitPos.x, unitPos.y - 10, 8);
+
+    showToast('👁️ Overwatch aktiviert! Feinde werden beim Bewegen angegriffen.', 'special');
+
+    return true;
+}
+
+/**
+ * Prüfe Overwatch-Trigger wenn sich eine Einheit bewegt
+ * Wird nach jedem Bewegungsschritt aufgerufen
+ * @returns {Array} Liste von Overwatch-Events
+ */
+export function checkOverwatchTriggers(movedUnit) {
+    if (!movedUnit || !movedUnit.alive) return [];
+
+    const triggers = [];
+
+    // Finde alle feindlichen Einheiten im Overwatch
+    const watchers = state.units.filter(u =>
+        u.alive &&
+        u.player !== movedUnit.player &&
+        isUnitOnOverwatch(u.id)
+    );
+
+    for (const watcher of watchers) {
+        const distance = hexDistance(
+            { q: watcher.q, r: watcher.r },
+            { q: movedUnit.q, r: movedUnit.r }
+        );
+
+        // Ist das bewegte Ziel in Reichweite?
+        if (distance <= watcher.range) {
+            // Prüfe Sichtlinie
+            const los = hasLineOfSight(watcher.q, watcher.r, movedUnit.q, movedUnit.r);
+            if (los.clear) {
+                triggers.push({
+                    watcher,
+                    target: movedUnit
+                });
+            }
+        }
+    }
+
+    return triggers;
+}
+
+/**
+ * Führe Overwatch-Angriff aus
+ * Automatischer Angriff mit reduziertem Schaden (70%)
+ */
+export async function executeOverwatchAttack(watcher, target) {
+    // Overwatch verbraucht sich
+    removeOverwatch(watcher.id);
+
+    showToast(`⚡ ${UNIT_CLASSES[watcher.class].name} feuert aus Overwatch!`, 'special');
+
+    // Kurze Pause für Drama
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // Überwatch-Schaden ist reduziert (Reaktionsschuss)
+    const originalDamage = watcher.damage;
+    watcher.damage = Math.round(watcher.damage * 0.7);
+
+    // Führe Angriff aus ohne Minigame
+    const result = executeAttack(watcher, target, {
+        level: RESULT_LEVELS.GOOD,
+        multiplier: { ...RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD], damage: 0.85 }
+    });
+
+    // Schaden zurücksetzen
+    watcher.damage = originalDamage;
+
+    return result;
+}
+
+// ===== STELLUNG HALTEN BONUS =====
+
+/**
+ * Berechne Verteidigungsbonus durch Stellung halten
+ * Wird bei Schadensberechnung angewendet
+ */
+export function calculateHoldPositionDefense(defender) {
+    const bonus = getHoldPositionBonus(defender.id);
+    return bonus; // 0-20% Schadensreduktion
+}
+
+/**
+ * Wird aufgerufen wenn eine Einheit sich bewegt
+ * Löscht den Stellung-Halten-Bonus
+ */
+export function onUnitMoved(unit) {
+    clearHoldPosition(unit.id);
+}
+
+/**
+ * Wird am Ende jeder Runde aufgerufen
+ * Aktualisiert den Stellung-Halten-Status für alle Einheiten
+ */
+export function updateAllHoldPositions() {
+    for (const unit of state.units) {
+        if (unit.alive) {
+            updateHoldPosition(unit);
+        }
+    }
 }

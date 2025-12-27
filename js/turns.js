@@ -1,10 +1,14 @@
 // ===== TURN MANAGEMENT =====
 
-import { state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies, initSharedAPPool, isHexInZone, setOnAPDepletedCallback } from './state.js';
+import {
+    state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies,
+    initSharedAPPool, isHexInZone, setOnAPDepletedCallback,
+    clearPlayerOverwatch, cleanupSuppression
+} from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
-import { checkGameOver } from './combat.js';
+import { checkGameOver, updateAllHoldPositions } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
@@ -67,6 +71,9 @@ export function startTurn() {
 
     // Reset units for turn
     resetUnitsForTurn(state.currentPlayer);
+
+    // Lösche Overwatch des aktiven Spielers (Overwatch gilt nur bis zum eigenen Zug)
+    clearPlayerOverwatch(state.currentPlayer);
 
     // Initialize shared AP pool for this player
     initSharedAPPool(state.currentPlayer);
@@ -202,6 +209,13 @@ export function nextPlayer() {
     if (state.currentPlayer === 0) {
         state.round++;
         resetSpecialAbilities();
+
+        // === TAKTISCHE SYSTEME AKTUALISIEREN ===
+        // Unterdrückungsfeuer bereinigen (abgelaufene entfernen)
+        cleanupSuppression();
+
+        // Stellung-Halten Status für alle Einheiten aktualisieren
+        updateAllHoldPositions();
 
         // Clear previous round's event
         clearRoundEvent();

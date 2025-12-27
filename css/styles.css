@@ -2796,6 +2796,31 @@ button:focus:not(:focus-visible),
     color: var(--text-primary);
 }
 
+.tutorial-btn-more {
+    background: linear-gradient(135deg, var(--blue), #3b82f6);
+    color: white;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.tutorial-btn-more:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Team selection tutorial hint styling */
+.team-select-hint {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(26, 26, 62, 0.95));
+    border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.team-select-hint .tutorial-hint-message {
+    line-height: 1.6;
+}
+
+.team-select-hint .tutorial-hint-message b {
+    color: var(--yellow);
+}
+
 /* Mobile adjustments */
 @media (max-width: 480px) {
     .tutorial-overlay {

@@ -133,7 +133,17 @@ export const state = {
 
     // === HINTERHALT-SYSTEM ===
     ambushQueue: [],                // Warteschlange für ausstehende Hinterhalte
-    ambushProcessing: false         // Wird gerade ein Hinterhalt verarbeitet?
+    ambushProcessing: false,        // Wird gerade ein Hinterhalt verarbeitet?
+
+    // === UNTERDRÜCKUNGSFEUER (SUPPRESSION) ===
+    suppressedHexes: [],            // Array von {q, r, suppressorId, expiresRound}
+
+    // === OVERWATCH (DECKUNGSFEUER) ===
+    overwatchUnits: [],             // Array von Unit-IDs im Overwatch-Modus
+    overwatchQueue: [],             // Warteschlange für Overwatch-Trigger
+
+    // === STELLUNG HALTEN (HOLD POSITION) ===
+    holdingPosition: {}             // unitId -> {rounds: number, q, r} - Wie lange auf Position gehalten
 };
 
 /**
@@ -238,6 +248,12 @@ export function resetState() {
     // Hinterhalt-System zurücksetzen
     state.ambushQueue = [];
     state.ambushProcessing = false;
+
+    // Neue taktische Systeme zurücksetzen
+    state.suppressedHexes = [];
+    state.overwatchUnits = [];
+    state.overwatchQueue = [];
+    state.holdingPosition = {};
 }
 
 /**
@@ -726,4 +742,151 @@ export function hasQueuedAmbushes() {
  */
 export function clearAmbushQueue() {
     state.ambushQueue = [];
+}
+
+// === UNTERDRÜCKUNGSFEUER (SUPPRESSION) HELPER ===
+
+/**
+ * Füge ein unterdrücktes Hex hinzu
+ */
+export function addSuppressedHex(q, r, suppressorId, duration = 1) {
+    // Entferne existierende Unterdrückung auf diesem Hex
+    state.suppressedHexes = state.suppressedHexes.filter(s => !(s.q === q && s.r === r));
+
+    state.suppressedHexes.push({
+        q, r,
+        suppressorId,
+        expiresRound: state.round + duration
+    });
+}
+
+/**
+ * Prüfe ob ein Hex unterdrückt ist
+ */
+export function isHexSuppressed(q, r) {
+    return state.suppressedHexes.some(s =>
+        s.q === q && s.r === r && s.expiresRound > state.round
+    );
+}
+
+/**
+ * Hole Unterdrückungs-Info für ein Hex
+ */
+export function getSuppressionInfo(q, r) {
+    return state.suppressedHexes.find(s =>
+        s.q === q && s.r === r && s.expiresRound > state.round
+    ) || null;
+}
+
+/**
+ * Entferne abgelaufene Unterdrückungen
+ */
+export function cleanupSuppression() {
+    state.suppressedHexes = state.suppressedHexes.filter(s => s.expiresRound > state.round);
+}
+
+// === OVERWATCH (DECKUNGSFEUER) HELPER ===
+
+/**
+ * Setze eine Einheit in Overwatch-Modus
+ */
+export function setOverwatch(unitId) {
+    if (!state.overwatchUnits.includes(unitId)) {
+        state.overwatchUnits.push(unitId);
+    }
+}
+
+/**
+ * Entferne Overwatch von einer Einheit
+ */
+export function removeOverwatch(unitId) {
+    state.overwatchUnits = state.overwatchUnits.filter(id => id !== unitId);
+}
+
+/**
+ * Prüfe ob Einheit im Overwatch ist
+ */
+export function isUnitOnOverwatch(unitId) {
+    return state.overwatchUnits.includes(unitId);
+}
+
+/**
+ * Lösche alle Overwatch für einen Spieler (am Zugstart)
+ */
+export function clearPlayerOverwatch(player) {
+    const playerUnitIds = state.units
+        .filter(u => u.player === player && u.alive)
+        .map(u => u.id);
+    state.overwatchUnits = state.overwatchUnits.filter(id => !playerUnitIds.includes(id));
+}
+
+/**
+ * Füge Overwatch-Trigger zur Queue hinzu
+ */
+export function queueOverwatchTrigger(watcherId, targetId) {
+    state.overwatchQueue.push({
+        watcherId,
+        targetId,
+        timestamp: Date.now()
+    });
+}
+
+/**
+ * Hole nächsten Overwatch-Trigger
+ */
+export function getNextOverwatchTrigger() {
+    return state.overwatchQueue.shift() || null;
+}
+
+/**
+ * Prüfe ob Overwatch-Trigger ausstehen
+ */
+export function hasQueuedOverwatch() {
+    return state.overwatchQueue.length > 0;
+}
+
+// === STELLUNG HALTEN HELPER ===
+
+/**
+ * Aktualisiere Position-Halten Status für eine Einheit
+ */
+export function updateHoldPosition(unit) {
+    const current = state.holdingPosition[unit.id];
+
+    if (current && current.q === unit.q && current.r === unit.r) {
+        // Einheit ist auf derselben Position geblieben
+        current.rounds++;
+    } else {
+        // Einheit hat sich bewegt oder neue Position
+        state.holdingPosition[unit.id] = {
+            q: unit.q,
+            r: unit.r,
+            rounds: 1
+        };
+    }
+}
+
+/**
+ * Hole die Anzahl Runden die eine Einheit Position gehalten hat
+ */
+export function getHoldPositionRounds(unitId) {
+    const holding = state.holdingPosition[unitId];
+    return holding ? holding.rounds : 0;
+}
+
+/**
+ * Berechne den Verteidigungsbonus für Stellung-Halten
+ * 5% pro Runde, max 20%
+ */
+export function getHoldPositionBonus(unitId) {
+    const rounds = getHoldPositionRounds(unitId);
+    if (rounds <= 1) return 0;
+    return Math.min(0.20, (rounds - 1) * 0.05); // Max 20% nach 5 Runden
+}
+
+/**
+ * Entferne Hold-Position Status wenn Einheit sich bewegt
+ */
+export function clearHoldPosition(unitId) {
+    delete state.holdingPosition[unitId];
 }
