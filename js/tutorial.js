@@ -13,6 +13,93 @@ const tutorialState = {
     firstGamePlayed: false
 };
 
+// Team selection tutorial hints - shown during unit selection
+const TEAM_SELECT_HINTS = {
+    teamIntro: {
+        id: 'teamIntro',
+        title: '🎖️ Stelle dein Team zusammen!',
+        message: 'Wähle 3 Einheiten für dein Team. Jede Klasse hat einzigartige Stärken - eine gute Mischung ist der Schlüssel zum Sieg!',
+        position: 'top'
+    },
+    scoutTip: {
+        id: 'scoutTip',
+        title: '🧭 Scout - Der Aufklärer',
+        message: '<b>Stärken:</b> Beste Sichtweite (8 Felder), schnell (5 Bewegung), Sprint-Fähigkeit<br><b>Taktik:</b> Ideal zum Aufdecken von Feinden und Flankenangriffe. Findet versteckte Einheiten!',
+        position: 'bottom',
+        forClass: 'scout'
+    },
+    assaultTip: {
+        id: 'assaultTip',
+        title: '🪖 Assault - Der Panzer',
+        message: '<b>Stärken:</b> Höchste HP (120), hoher Schaden (40), Powershot (+25 DMG)<br><b>Taktik:</b> Frontlinie halten, Deckung durchbrechen. Ignoriert 50% der feindlichen Deckung!',
+        position: 'bottom',
+        forClass: 'assault'
+    },
+    medicTip: {
+        id: 'medicTip',
+        title: '⛑️ Medic - Der Sanitäter',
+        message: '<b>Stärken:</b> Heilt Team (+40 HP), gute Reichweite (3 Felder)<br><b>Taktik:</b> Hinter der Front bleiben. UNVERZICHTBAR für längere Gefechte!',
+        position: 'bottom',
+        forClass: 'medic'
+    },
+    sniperTip: {
+        id: 'sniperTip',
+        title: '🎯 Sniper - Der Scharfschütze',
+        message: '<b>Stärken:</b> Höchster Schaden (65!), größte Reichweite (6), Tarnung<br><b>Taktik:</b> Auf Hügeln positionieren. Kann Feinde mit einem Schuss eliminieren!',
+        position: 'bottom',
+        forClass: 'sniper'
+    },
+    commandoTip: {
+        id: 'commandoTip',
+        title: '⚔️ Commando - Der Assassine',
+        message: '<b>Stärken:</b> Brutaler Nahkampf (50+20 Bonus!), Schleichen, schnell<br><b>Taktik:</b> Aus dem Hinterhalt angreifen. Perfekt für Flanken und Hinterhalte!',
+        position: 'bottom',
+        forClass: 'commando'
+    },
+    synergy_balanced: {
+        id: 'synergy_balanced',
+        title: '⚖️ Tipp: Ausgewogenes Team',
+        message: '<b>Scout + Assault + Medic</b> = Klassiker!<br>Scout findet Feinde → Assault greift an → Medic heilt. Solide Basis für Anfänger.',
+        position: 'center'
+    },
+    synergy_stealth: {
+        id: 'synergy_stealth',
+        title: '🌙 Tipp: Schattentaktik',
+        message: '<b>Scout + Sniper + Commando</b> = Hinterhalt!<br>Scout späht aus → Sniper dezimiert → Commando erledigt den Rest. Für aggressive Spieler.',
+        position: 'center'
+    },
+    synergy_defensive: {
+        id: 'synergy_defensive',
+        title: '🛡️ Tipp: Defensive Formation',
+        message: '<b>Assault + Medic + Sniper</b> = Festung!<br>Assault hält die Linie → Medic heilt → Sniper kontrolliert das Feld. Für geduldige Spieler.',
+        position: 'center'
+    },
+    tactical_ambush: {
+        id: 'tactical_ambush',
+        title: '🎯 Taktik: Hinterhalt',
+        message: 'Versteckte Einheiten (Wald/Tarnung) können <b>Hinterhalte</b> legen! Feinde die in Reichweite kommen werden automatisch mit Bonus-Schaden angegriffen.',
+        position: 'center'
+    },
+    tactical_coordinated: {
+        id: 'tactical_coordinated',
+        title: '👥 Taktik: Koordinierter Angriff',
+        message: 'Mehrere Einheiten können gemeinsam angreifen! <b>+15% Schaden pro zusätzlichem Angreifer.</b> Den 👥-Button nutzen wenn verfügbar.',
+        position: 'center'
+    },
+    tactical_flanking: {
+        id: 'tactical_flanking',
+        title: '📐 Taktik: Flankieren',
+        message: 'Greife Feinde von der Seite oder hinten an! <b>Flankenangriffe</b> umgehen Deckung und erhöhen die Trefferchance.',
+        position: 'center'
+    },
+    tactical_cover: {
+        id: 'tactical_cover',
+        title: '🌲 Taktik: Deckung nutzen',
+        message: '<b>Wälder:</b> -25% Trefferchance für Feinde<br><b>Hügel:</b> +1 Reichweite, +10% Verteidigung<br>Positionierung ist entscheidend!',
+        position: 'center'
+    }
+};
+
 // Tutorial hint definitions
 const TUTORIAL_HINTS = {
     welcome: {
@@ -318,6 +405,148 @@ export function showActionHint(actionType) {
     }
 }
 
+// ===== TEAM SELECTION TUTORIAL =====
+
+// Track shown team selection hints
+let teamSelectHintsShown = new Set();
+let currentTeamHintIndex = 0;
+const TEAM_HINT_SEQUENCE = ['teamIntro', 'synergy_balanced', 'tactical_ambush', 'tactical_coordinated'];
+
+/**
+ * Start team selection tutorial
+ * Called when entering the team selection screen
+ */
+export function startTeamSelectTutorial() {
+    // Check if tutorial is enabled
+    if (state.settings && state.settings.showTutorial === false) return;
+
+    // Load shown hints from localStorage
+    try {
+        const saved = localStorage.getItem('shadowSquad_teamSelectHints');
+        if (saved) {
+            teamSelectHintsShown = new Set(JSON.parse(saved));
+        }
+    } catch { /* ignore */ }
+
+    // Show intro hint if not shown before
+    if (!teamSelectHintsShown.has('teamIntro')) {
+        showTeamSelectHint('teamIntro');
+    }
+}
+
+/**
+ * Show a team selection hint
+ */
+export function showTeamSelectHint(hintId) {
+    const hint = TEAM_SELECT_HINTS[hintId];
+    if (!hint) return;
+
+    // Mark as shown
+    teamSelectHintsShown.add(hintId);
+
+    // Save to localStorage
+    try {
+        localStorage.setItem('shadowSquad_teamSelectHints', JSON.stringify([...teamSelectHintsShown]));
+    } catch { /* ignore */ }
+
+    // Create or update hint overlay
+    let overlay = document.getElementById('team-tutorial-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'team-tutorial-overlay';
+        overlay.className = 'tutorial-overlay';
+        document.body.appendChild(overlay);
+    }
+
+    // Position classes
+    overlay.className = `tutorial-overlay tutorial-${hint.position || 'center'}`;
+
+    overlay.innerHTML = `
+        <div class="tutorial-hint team-select-hint">
+            <div class="tutorial-hint-header">
+                <span class="tutorial-hint-title">${hint.title}</span>
+                <button class="tutorial-close-btn" onclick="window.dismissTeamSelectHint()">✕</button>
+            </div>
+            <div class="tutorial-hint-message">${hint.message}</div>
+            <div class="tutorial-hint-actions">
+                <button class="tutorial-btn tutorial-btn-more" onclick="window.showNextTeamTip()">💡 Mehr Tipps</button>
+                <button class="tutorial-btn tutorial-btn-ok" onclick="window.dismissTeamSelectHint()">Verstanden!</button>
+            </div>
+        </div>
+    `;
+
+    overlay.style.display = 'flex';
+}
+
+/**
+ * Show hint for a specific unit class when hovered/selected
+ */
+export function showUnitClassHint(classKey) {
+    const hintId = classKey + 'Tip';
+    const hint = TEAM_SELECT_HINTS[hintId];
+    if (!hint) return;
+
+    // Don't show if recently shown
+    if (teamSelectHintsShown.has(hintId)) return;
+
+    showTeamSelectHint(hintId);
+}
+
+/**
+ * Hide team selection tutorial overlay
+ */
+export function hideTeamSelectTutorial() {
+    const overlay = document.getElementById('team-tutorial-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+/**
+ * Dismiss current team select hint (global function)
+ */
+window.dismissTeamSelectHint = function() {
+    hideTeamSelectTutorial();
+};
+
+/**
+ * Show next team tip (cycles through synergies and tactics)
+ */
+window.showNextTeamTip = function() {
+    const allTips = [
+        'synergy_balanced', 'synergy_stealth', 'synergy_defensive',
+        'tactical_ambush', 'tactical_coordinated', 'tactical_flanking', 'tactical_cover'
+    ];
+
+    // Find next unshown tip
+    let nextTip = null;
+    for (const tip of allTips) {
+        if (!teamSelectHintsShown.has(tip)) {
+            nextTip = tip;
+            break;
+        }
+    }
+
+    // If all shown, cycle through
+    if (!nextTip) {
+        currentTeamHintIndex = (currentTeamHintIndex + 1) % allTips.length;
+        nextTip = allTips[currentTeamHintIndex];
+    }
+
+    showTeamSelectHint(nextTip);
+};
+
+/**
+ * Reset team selection tutorial hints
+ */
+export function resetTeamSelectTutorial() {
+    teamSelectHintsShown.clear();
+    currentTeamHintIndex = 0;
+    try {
+        localStorage.removeItem('shadowSquad_teamSelectHints');
+    } catch { /* ignore */ }
+}
+
 /**
  * Reset tutorial (for testing or user request)
  */
@@ -328,6 +557,9 @@ export function resetTutorial() {
     tutorialState.dismissedForGame = false;
     tutorialState.firstGamePlayed = false;
     globalShownHints.clear();
+
+    // Also reset team selection hints
+    resetTeamSelectTutorial();
 
     try {
         localStorage.removeItem('shadowSquad_tutorialHints');
