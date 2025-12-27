@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.9.2...shadow-squad-v3.10.0) (2025-12-27)
+
+
+### Features
+
+* **assets:** add elitesoldat (Kommando-Soldat) support with fallback ([#139](https://github.com/CodingSteve01/battlezone/issues/139)) ([1e683f5](https://github.com/CodingSteve01/battlezone/commit/1e683f565ffaea4f6708ad574e4f0d9fe93104bc))
+
 ## [3.9.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.9.1...shadow-squad-v3.9.2) (2025-12-27)
 
 
