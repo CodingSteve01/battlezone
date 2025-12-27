@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -1187,11 +1187,12 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         }
 
         // 2. Attack assigned target if possible (focus fire)
-        if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1)) {
+        // WICHTIG: canUnitAttack prüft MAX_ATTACKS_PER_UNIT (gleiche Regel wie für Menschen)
+        if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1) && canUnitAttack(unit)) {
             const target = attackable.find(t => t.id === assignedTargetId);
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
             trackAPSpent(1);
-        } else if (attackable.length > 0 && canSpendAP(1)) {
+        } else if (attackable.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             // 3. Attack best available target
             const target = selectBestTarget(unit, attackable);
             if (target) {
@@ -1235,8 +1236,9 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         }
 
         // 6. Attack again after moving (if budget allows)
+        // Erneuter Angriff nur möglich wenn vorheriger Angriff VERFEHLT hat (canUnitAttack)
         const attackableAfterMove = getAttackableUnits(unit);
-        if (attackableAfterMove.length > 0 && canSpendAP(1)) {
+        if (attackableAfterMove.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             const target = selectBestTarget(unit, attackableAfterMove);
             if (target) {
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
@@ -1578,8 +1580,9 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer,
     }
 
     // 2. Only attack if it's safe (kill shot or enemy is almost dead)
+    // WICHTIG: canUnitAttack wird über getAttackableUnits geprüft (MAX_ATTACKS_PER_UNIT: 1)
     const attackable = getAttackableUnits(unit);
-    if (attackable.length > 0 && state.sharedAP >= 1) {
+    if (attackable.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
         // Only attack if we can kill or target is nearly dead
         const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
         if (killableTarget) {
@@ -1636,8 +1639,9 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
     }
 
     // 3. Attack aggressively when in range!
+    // WICHTIG: Defensive Prüfung - Einheit darf nur 1x pro Zug treffen (Fehlschüsse zählen nicht)
     const attackableNow = getAttackableUnits(unit);
-    if (attackableNow.length > 0 && state.sharedAP >= 1) {
+    if (attackableNow.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
         // Prioritize enemies that attacked/engaged the decoy
         const target = selectBestTarget(unit, attackableNow);
         if (target) {
@@ -1659,7 +1663,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
 
             // Attack with powershot bonus
             const targetAfterPowershot = getAttackableUnits(unit);
-            if (targetAfterPowershot.length > 0 && state.sharedAP >= 1) {
+            if (targetAfterPowershot.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
                 const target = selectBestTarget(unit, targetAfterPowershot);
                 if (target) {
                     await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
@@ -1668,9 +1672,10 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         }
     }
 
-    // 5. Attack again if possible
+    // 5. Erneuter Angriff NUR nach Fehlschuss (gleiche Regel wie für Menschen)
+    // canUnitAttack() gibt false zurück nach einem erfolgreichen Treffer
     const finalAttackable = getAttackableUnits(unit);
-    if (finalAttackable.length > 0 && state.sharedAP >= 1) {
+    if (finalAttackable.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
         const target = selectBestTarget(unit, finalAttackable);
         if (target) {
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);

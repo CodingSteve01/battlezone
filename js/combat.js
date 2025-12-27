@@ -573,8 +573,8 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     if (!hit) {
         playMiss();
         // NEUES SYSTEM: Fehlschuss kostet KEINE AP!
-        // Spieler darf erneut versuchen (zählt aber als Angriff für diese Einheit)
-        trackUnitAttack(attacker);
+        // Spieler darf erneut versuchen - zählt NICHT als Angriff
+        // (trackUnitAttack wird NICHT aufgerufen bei Fehlschuss)
 
         // Zeige Info dass erneuter Versuch möglich ist (wenn noch AP vorhanden)
         if (state.sharedAP >= 1) {
@@ -628,6 +628,17 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     // Assault has damage variance
     if (attacker.class === 'assault') {
         damage += Math.floor(Math.random() * 15);
+    }
+
+    // === ALLGEMEINER NAHKAMPF-BONUS (Distanz 1) ===
+    // Jede Einheit macht im Nahkampf mehr Schaden - niemand ist hilflos!
+    // Spezialisten (commando, elitesoldat) haben zusätzlich ihren eigenen Bonus
+    if (dist === 1 && !['commando', 'elitesoldat'].includes(attacker.class)) {
+        const generalMeleeBonus = 15; // +15 Schaden im Nahkampf für alle
+        damage += generalMeleeBonus;
+        setTimeout(() => {
+            showToast('⚔️ Nahkampf-Bonus!', 'info');
+        }, 100);
     }
 
     // Commando melee bonus (at range 1)
