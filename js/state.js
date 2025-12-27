@@ -94,12 +94,12 @@ export const state = {
     // Queued path for multi-turn movement
     queuedPaths: {},  // unitId -> { path: [{q, r}, ...], targetQ, targetR }
 
-    // Previously visible enemies (for detection alerts)
-    previouslyVisibleEnemies: new Set(),
+    // Previously visible enemies (for detection alerts) - PER PLAYER
+    previouslyVisibleEnemies: [],   // Array of Sets, one per player
 
-    // Enemy tracking for compass feature
-    lastEnemyContactRound: 0,       // Last round when any enemy was spotted
-    roundsWithoutContact: 0,        // Consecutive rounds without seeing enemies
+    // Enemy tracking for compass feature - PER PLAYER
+    lastEnemyContactRound: [],      // Array: Last round when enemy was spotted per player
+    roundsWithoutContact: [],       // Array: Consecutive rounds without seeing enemies per player
 
     // === SHRINKING ZONE (Battle Royale Mechanik) ===
     zoneRadius: 0,                  // Aktueller spielbarer Radius (schrumpft)
@@ -172,9 +172,16 @@ export function resetState() {
     state.cameraY = 0;
     state.zoomLevel = 1.0;
     state.queuedPaths = {};
-    state.previouslyVisibleEnemies = new Set();
-    state.lastEnemyContactRound = 0;
-    state.roundsWithoutContact = 0;
+
+    // Initialize per-player tracking arrays
+    state.previouslyVisibleEnemies = [];
+    state.lastEnemyContactRound = [];
+    state.roundsWithoutContact = [];
+    for (let i = 0; i < state.settings.players; i++) {
+        state.previouslyVisibleEnemies.push(new Set());
+        state.lastEnemyContactRound.push(0);
+        state.roundsWithoutContact.push(0);
+    }
     state.sharedAP = 0;
     state.maxSharedAP = 0;
     state.unitAttacksThisTurn = {};
@@ -204,6 +211,9 @@ export function resetState() {
         state.playerExploredHexes.push(new Set());
         state.playerVisibleHexes.push(new Set());
     }
+
+    // Reset debug flags
+    state._visibilityWarningLogged = false;
 }
 
 /**
@@ -239,9 +249,12 @@ export function getVisibleGhosts() {
     const now = Date.now();
     const maxAge = 8000;  // Ghosts disappear after 8 seconds
 
+    // Use viewingPlayer for rendering (important for AI vs AI spectator mode)
+    const viewPlayer = state.viewingPlayer;
+
     return state.ghostIndicators.filter(ghost => {
-        // Only show ghosts of enemy units
-        if (ghost.player === state.currentPlayer) return false;
+        // Only show ghosts of enemy units (from the viewer's perspective)
+        if (ghost.player === viewPlayer) return false;
         // Remove old ghosts
         if (now - ghost.timestamp > maxAge) return false;
         return true;
@@ -406,36 +419,61 @@ export function clearQueuedPath(unitId) {
 }
 
 /**
- * Update the set of previously visible enemies
+ * Update the set of previously visible enemies for a player
+ * @param {Array} visibleEnemyIds - Array of enemy unit IDs
+ * @param {number} player - Player index (defaults to currentPlayer)
  */
-export function updatePreviouslyVisibleEnemies(visibleEnemyIds) {
-    state.previouslyVisibleEnemies = new Set(visibleEnemyIds);
+export function updatePreviouslyVisibleEnemies(visibleEnemyIds, player = state.currentPlayer) {
+    // Ensure array exists for this player
+    if (!state.previouslyVisibleEnemies[player]) {
+        state.previouslyVisibleEnemies[player] = new Set();
+    }
+    state.previouslyVisibleEnemies[player] = new Set(visibleEnemyIds);
 }
 
 /**
- * Get the set of previously visible enemies
+ * Get the set of previously visible enemies for a player
+ * @param {number} player - Player index (defaults to currentPlayer)
  */
-export function getPreviouslyVisibleEnemies() {
-    return state.previouslyVisibleEnemies;
+export function getPreviouslyVisibleEnemies(player = state.currentPlayer) {
+    return state.previouslyVisibleEnemies[player] || new Set();
 }
 
 /**
- * Mark that an enemy was spotted this round
+ * Mark that an enemy was spotted this round for a player
+ * @param {number} player - Player index (defaults to currentPlayer)
  */
-export function markEnemyContact() {
-    state.lastEnemyContactRound = state.round;
-    state.roundsWithoutContact = 0;
+export function markEnemyContact(player = state.currentPlayer) {
+    // Ensure arrays exist for this player
+    if (state.lastEnemyContactRound[player] === undefined) {
+        state.lastEnemyContactRound[player] = 0;
+    }
+    if (state.roundsWithoutContact[player] === undefined) {
+        state.roundsWithoutContact[player] = 0;
+    }
+    state.lastEnemyContactRound[player] = state.round;
+    state.roundsWithoutContact[player] = 0;
 }
 
 /**
- * Update contact tracking at end of round
+ * Update contact tracking at end of round for a player
+ * @param {boolean} enemiesVisible - Whether enemies are visible
+ * @param {number} player - Player index (defaults to currentPlayer)
  */
-export function updateContactTracking(enemiesVisible) {
+export function updateContactTracking(enemiesVisible, player = state.currentPlayer) {
+    // Ensure arrays exist for this player
+    if (state.lastEnemyContactRound[player] === undefined) {
+        state.lastEnemyContactRound[player] = 0;
+    }
+    if (state.roundsWithoutContact[player] === undefined) {
+        state.roundsWithoutContact[player] = 0;
+    }
+
     if (enemiesVisible) {
-        state.lastEnemyContactRound = state.round;
-        state.roundsWithoutContact = 0;
+        state.lastEnemyContactRound[player] = state.round;
+        state.roundsWithoutContact[player] = 0;
     } else {
-        state.roundsWithoutContact = state.round - state.lastEnemyContactRound;
+        state.roundsWithoutContact[player] = state.round - state.lastEnemyContactRound[player];
     }
 }
 
@@ -521,8 +559,9 @@ export function updateScreenShake() {
  * Returns { direction: 'N'|'NE'|'E'|'SE'|'S'|'SW'|'W'|'NW', distance: number } or null
  */
 export function getEnemyDirection() {
-    // Only show compass after 3 rounds without contact
-    if (state.roundsWithoutContact < 3) return null;
+    // Only show compass after 3 rounds without contact (use currentPlayer's data)
+    const playerRoundsWithoutContact = state.roundsWithoutContact[state.currentPlayer] || 0;
+    if (playerRoundsWithoutContact < 3) return null;
 
     const myUnits = getPlayerUnits(state.currentPlayer);
     if (myUnits.length === 0) return null;
@@ -582,6 +621,6 @@ export function getEnemyDirection() {
         direction,
         directionName: directionNames[direction],
         distance: Math.round(nearestDist),
-        roundsSearching: state.roundsWithoutContact
+        roundsSearching: playerRoundsWithoutContact
     };
 }

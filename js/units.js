@@ -181,30 +181,38 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
     let currentStep = 0;
 
     function nextStep() {
-        currentStep++;
+        try {
+            currentStep++;
 
-        if (currentStep >= path.length) {
-            // Animation complete
+            if (currentStep >= path.length) {
+                // Animation complete
+                state.animating = false;
+                state.movementAnimation = null;
+                // Deduct cost from shared pool
+                spendSharedAP(totalCost);
+                if (onComplete) onComplete();
+                return;
+            }
+
+            const nextPos = path[currentStep];
+            const nextHex = getHex(nextPos.q, nextPos.r);
+
+            if (nextHex) {
+                moveUnitInstant(unit, nextHex);
+                state.movementAnimation.currentStep = currentStep;
+                // Update visibility after each step so fog of war is dynamically updated
+                updateVisibility();
+                render();
+            }
+
+            setTimeout(nextStep, stepDelay);
+        } catch (error) {
+            // Ensure animation state is cleaned up even if an error occurs
+            console.error('[Animation] Error during movement animation:', error);
             state.animating = false;
             state.movementAnimation = null;
-            // Deduct cost from shared pool
-            spendSharedAP(totalCost);
             if (onComplete) onComplete();
-            return;
         }
-
-        const nextPos = path[currentStep];
-        const nextHex = getHex(nextPos.q, nextPos.r);
-
-        if (nextHex) {
-            moveUnitInstant(unit, nextHex);
-            state.movementAnimation.currentStep = currentStep;
-            // Update visibility after each step so fog of war is dynamically updated
-            updateVisibility();
-            render();
-        }
-
-        setTimeout(nextStep, stepDelay);
     }
 
     // Start animation

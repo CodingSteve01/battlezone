@@ -5,7 +5,8 @@ import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlay
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha } from './fogOfWar.js';
+import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
+import { isSpectatorMode } from './ai.js';
 import { getTexture, drawUnit as drawUnitSprite, getRandomDetailSprite, hasAnimatedTexture, getAnimatedTexture } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -2932,6 +2933,18 @@ export function render() {
 
     // Skip rendering if canvas has invalid dimensions (not yet sized)
     if (canvas.width === 0 || canvas.height === 0) return;
+
+    // SAFETY: In spectator mode (AI vs AI), ensure visibility is always up-to-date
+    // This prevents black screen issues from stale visibility data during turn transitions
+    // or when animation callbacks fire at unexpected times.
+    if (isSpectatorMode()) {
+        const viewPlayer = state.viewingPlayer;
+        const visibleHexes = state.playerVisibleHexes[viewPlayer];
+        // Only refresh if visibility seems stale (empty or undefined)
+        if (!visibleHexes || visibleHexes.size === 0) {
+            updateVisibilityForPlayer(viewPlayer);
+        }
+    }
 
     // Update animations
     animationTick(performance.now());
