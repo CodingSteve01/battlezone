@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.9.1...shadow-squad-v3.9.2) (2025-12-27)
+
+
+### Bug Fixes
+
+* **ui:** optimize main menu UX with cleaner layout ([#137](https://github.com/CodingSteve01/battlezone/issues/137)) ([cd79d2b](https://github.com/CodingSteve01/battlezone/commit/cd79d2b03e24116d08310fe2df266a7038e92d2d))
+
 ## [3.9.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.9.0...shadow-squad-v3.9.1) (2025-12-27)
 
 
