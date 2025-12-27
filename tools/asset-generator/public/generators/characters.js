@@ -53,6 +53,15 @@ const CharacterGenerator = {
             bodyBuild: 'athletic',
             gear: ['garrote', 'throwing_knives'],
             camouflage: 'black'
+        },
+        elitesoldat: {
+            helmet: 'tactical',
+            armor: 'heavy',
+            weapon: 'rifle',
+            bodyBuild: 'heavy',
+            gear: ['grenades', 'radio'],
+            camouflage: 'digital',
+            badge: true  // Elite badge/insignia
         }
     },
 
