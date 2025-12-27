@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.8.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.7.0...shadow-squad-v3.8.0) (2025-12-27)
+
+
+### Features
+
+* **ux:** improve minigames, events, and zone blocking ([#126](https://github.com/CodingSteve01/battlezone/issues/126)) ([c779399](https://github.com/CodingSteve01/battlezone/commit/c7793992c9fdf6de447ec64c17b00fbd10fb911d))
+
+
+### Bug Fixes
+
+* **ai,ux:** improve sniper damage, AI stability, and UI notifications ([#127](https://github.com/CodingSteve01/battlezone/issues/127)) ([d6c9266](https://github.com/CodingSteve01/battlezone/commit/d6c9266df203c8b332f3f906fc06bddbfab14d20))
+* **ai:** block player input during spectator mode and fix visibility ([#122](https://github.com/CodingSteve01/battlezone/issues/122)) ([4a69ba5](https://github.com/CodingSteve01/battlezone/commit/4a69ba531e8926f4e3794b94497a550dcb314d18))
+* **ai:** prevent game freeze in AI-only spectator mode ([#123](https://github.com/CodingSteve01/battlezone/issues/123)) ([997167e](https://github.com/CodingSteve01/battlezone/commit/997167edea6e0a8470b70c6fb096e515c55164b7))
+* **render:** fix black screen in AI vs AI spectator mode ([#124](https://github.com/CodingSteve01/battlezone/issues/124)) ([39b10fa](https://github.com/CodingSteve01/battlezone/commit/39b10faca57775cbe02f8fd1537324d911f69d4e))
+* **render:** prevent black screen in AI vs AI spectator mode ([#125](https://github.com/CodingSteve01/battlezone/issues/125)) ([b45b97f](https://github.com/CodingSteve01/battlezone/commit/b45b97f409db65cbe6471dfd91bc170be112f61f))
+* **render:** remove white borders around terrain hex tiles ([#119](https://github.com/CodingSteve01/battlezone/issues/119)) ([8a726d4](https://github.com/CodingSteve01/battlezone/commit/8a726d4df81ea94be3a44b6c109ce9660fb8ad87))
+* **ui,ai:** improve spectator mode and fix hex border rendering ([#121](https://github.com/CodingSteve01/battlezone/issues/121)) ([55ddbf1](https://github.com/CodingSteve01/battlezone/commit/55ddbf1d3d88adbf7d409b9ab8363e43d2892e66))
+
 ## [3.7.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.6.0...shadow-squad-v3.7.0) (2025-12-26)
 
 
