@@ -646,6 +646,21 @@ export function executeAttack(attacker, defender, minigameResult = null) {
         }
     }
 
+    // Elite Soldier (Kommando-Soldat) dual attack mode
+    // Can attack at range but gets melee bonus at range 1
+    if (attacker.class === 'elitesoldat') {
+        const unitClass = UNIT_CLASSES.elitesoldat;
+        if (dist === 1) {
+            // Nahkampf-Modus: Extra Schaden
+            damage += unitClass.meleeBonus || 30;
+            setTimeout(() => {
+                showToast('⚔️ Nahkampf! Bonus-Schaden!', 'special');
+            }, 200);
+        }
+        // Elite always ignores some cover
+        // (already handled by armorPiercing property)
+    }
+
     // === NEUES SYSTEM: Deckung reduziert Schaden ===
     const coverReduction = calculateCoverDamageReduction(attacker, defender);
     if (coverReduction > 0) {
@@ -746,6 +761,8 @@ export function getSpecialAbilityCost(unitClass) {
             return 2; // Tarnung kostet 2 AP (strategischer Vorteil)
         case 'commando':
             return 2; // Stealth + Bewegung kostet 2 AP
+        case 'elitesoldat':
+            return 1; // Taktischer Wechsel kostet 1 AP - schnelle Modusumschaltung
         default:
             return 2;
     }
@@ -803,6 +820,8 @@ export function useSpecialAbility(unit) {
             return useSniperSpecial(unit);
         case 'commando':
             return useNinjaSpecial(unit);
+        case 'elitesoldat':
+            return useEliteSpecial(unit);
         default:
             return false;
     }
@@ -973,6 +992,26 @@ function useNinjaSpecial(unit) {
     particles.sprintEffect(unitPos.x, unitPos.y);
 
     showToast('🥷 Schleichen aktiviert!', 'special');
+    return true;
+}
+
+/**
+ * Elite Soldier tactical mode ability
+ * Grants bonus damage and movement for a tactical assault
+ */
+function useEliteSpecial(unit) {
+    // Tactical Mode: Damage boost + movement bonus
+    unit.damage += 15;      // +15 damage for next attack
+    unit.move += 2;         // +2 movement for repositioning
+    unit.tacticalMode = true;
+
+    // Visual effect
+    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    particles.powershotEffect(unitPos.x, unitPos.y - 10, 0);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
+    playPowershot();
+    showToast('🎖️ Taktischer Modus! +15 DMG, +2 Bewegung', 'special');
     return true;
 }
 

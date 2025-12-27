@@ -20,6 +20,7 @@ import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSele
 // Team selection state
 let currentTeamSelectPlayer = 0;
 let currentPlayerSelection = [];
+let currentBudgetSpent = 0;
 
 /**
  * Start team selection process
@@ -37,52 +38,73 @@ function startTeamSelection() {
     showTeamSelectForPlayer(0);
 }
 
-// AI personality types for team selection variety
+// AI personality types for team selection variety - Budget-aware compositions
 const AI_PERSONALITIES = {
     aggressive: {
         name: 'Aggressor',
+        description: 'Bevorzugt offensive Einheiten und schnelle Eliminierung',
+        // Budget-aware compositions: each has a cost
         compositions: [
-            ['assault', 'commando', 'medic'],    // Heavy offense with healing
-            ['assault', 'assault', 'medic'],     // Double tank
-            ['commando', 'commando', 'scout'],   // Assassin squad
+            ['assault', 'commando', 'medic'],           // 100+90+80 = 270
+            ['assault', 'assault', 'medic'],            // 100+100+80 = 280
+            ['commando', 'commando', 'scout', 'medic'], // 90+90+70+80 = 330
+            ['elitesoldat', 'commando', 'medic'],       // 150+90+80 = 320
         ],
-        weight: 1
+        weight: 1.0
     },
     defensive: {
         name: 'Defender',
+        description: 'Bevorzugt Verteidigung und Heilung',
         compositions: [
-            ['medic', 'sniper', 'assault'],      // Long range with tank
-            ['medic', 'medic', 'assault'],       // Extreme sustain
-            ['sniper', 'sniper', 'scout'],       // Long range focus
+            ['medic', 'sniper', 'assault'],             // 80+110+100 = 290
+            ['medic', 'medic', 'assault', 'scout'],     // 80+80+100+70 = 330
+            ['sniper', 'sniper', 'medic'],              // 110+110+80 = 300
+            ['elitesoldat', 'medic', 'scout'],          // 150+80+70 = 300
         ],
-        weight: 1
+        weight: 1.0
     },
     balanced: {
         name: 'Taktiker',
+        description: 'Ausgewogene Teams mit vielseitigen Fähigkeiten',
         compositions: [
-            ['scout', 'assault', 'medic'],       // Classic balanced
-            ['scout', 'sniper', 'medic'],        // Vision + range + heal
-            ['assault', 'sniper', 'medic'],      // All-rounder
+            ['scout', 'assault', 'medic'],              // 70+100+80 = 250
+            ['scout', 'sniper', 'medic'],               // 70+110+80 = 260
+            ['assault', 'sniper', 'medic'],             // 100+110+80 = 290
+            ['scout', 'assault', 'medic', 'commando'],  // 70+100+80+90 = 340
         ],
         weight: 1.5  // Slightly prefer balanced teams
     },
     stealth: {
         name: 'Schattenjäger',
+        description: 'Spezialisiert auf Hinterhalte und Überraschungsangriffe',
         compositions: [
-            ['scout', 'commando', 'sniper'],     // Stealth + assassination
-            ['commando', 'sniper', 'medic'],     // Ambush squad
-            ['scout', 'commando', 'commando'],   // Fast strike team
+            ['scout', 'commando', 'sniper'],            // 70+90+110 = 270
+            ['commando', 'sniper', 'medic'],            // 90+110+80 = 280
+            ['scout', 'commando', 'commando', 'medic'], // 70+90+90+80 = 330
         ],
         weight: 0.8
     },
-    specialist: {
-        name: 'Spezialist',
+    elite: {
+        name: 'Elite-Kommando',
+        description: 'Weniger Einheiten, dafür Elite-Soldaten',
         compositions: [
-            ['scout', 'scout', 'sniper'],        // Maximum vision
-            ['assault', 'assault', 'assault'],   // Brute force
-            ['medic', 'scout', 'commando'],      // Support + mobility
+            ['elitesoldat', 'medic'],                   // 150+80 = 230 (nur 2 Einheiten!)
+            ['elitesoldat', 'sniper'],                  // 150+110 = 260
+            ['elitesoldat', 'assault'],                 // 150+100 = 250
+            ['elitesoldat', 'elitesoldat'],             // 150+150 = 300 (zwei Elite!)
         ],
-        weight: 0.6  // Rarer specialist teams
+        weight: 0.6  // Rarer elite teams
+    },
+    swarm: {
+        name: 'Schwarm',
+        description: 'Viele günstige Einheiten für Überzahl',
+        compositions: [
+            ['scout', 'scout', 'medic', 'medic'],       // 70+70+80+80 = 300
+            ['scout', 'scout', 'scout', 'medic'],       // 70+70+70+80 = 290
+            ['commando', 'commando', 'scout', 'scout'], // 90+90+70+70 = 320
+            ['scout', 'medic', 'medic', 'commando', 'scout'], // 70+80+80+90+70 = 390 (5 Einheiten, über Budget!)
+        ],
+        weight: 0.7
     }
 };
 
@@ -90,8 +112,18 @@ const AI_PERSONALITIES = {
 let lastAITeamKey = null;
 
 /**
- * Generate a balanced team for AI
- * Wählt ein intelligentes Team basierend auf KI-Persönlichkeit und vermeidet Wiederholungen
+ * Calculate team cost
+ */
+function calculateTeamCost(team) {
+    return team.reduce((total, classKey) => {
+        const unitClass = UNIT_CLASSES[classKey];
+        return total + (unitClass ? unitClass.cost : 0);
+    }, 0);
+}
+
+/**
+ * Generate a balanced team for AI respecting budget
+ * Wählt ein intelligentes Team basierend auf KI-Persönlichkeit und Budget
  */
 function generateAITeam() {
     // Select a personality based on weighted random
@@ -100,16 +132,31 @@ function generateAITeam() {
     let random = Math.random() * totalWeight;
 
     let selectedPersonality = personalities[0][1]; // Default fallback
-    for (const [, personality] of personalities) {
+    let personalityName = personalities[0][0];
+    for (const [name, personality] of personalities) {
         random -= personality.weight;
         if (random <= 0) {
             selectedPersonality = personality;
+            personalityName = name;
             break;
         }
     }
 
-    // Get compositions for this personality
-    const compositions = selectedPersonality.compositions;
+    // Get compositions for this personality and filter by budget
+    const validCompositions = selectedPersonality.compositions.filter(comp => {
+        const cost = calculateTeamCost(comp);
+        const unitCount = comp.length;
+        return cost <= CONFIG.TEAM_BUDGET &&
+               unitCount >= CONFIG.MIN_UNITS &&
+               unitCount <= CONFIG.MAX_UNITS;
+    });
+
+    // If no valid compositions, fall back to balanced
+    const compositions = validCompositions.length > 0 ?
+        validCompositions :
+        AI_PERSONALITIES.balanced.compositions.filter(comp =>
+            calculateTeamCost(comp) <= CONFIG.TEAM_BUDGET
+        );
 
     // Try to pick a different composition than last time
     let attempts = 0;
@@ -129,7 +176,44 @@ function generateAITeam() {
         selectedTeam = [...selectedTeam].sort(() => Math.random() - 0.5);
     }
 
+    // Log AI team selection for debugging
+    console.log(`[AI] ${selectedPersonality.name}: ${selectedTeam.join(', ')} (${calculateTeamCost(selectedTeam)}/${CONFIG.TEAM_BUDGET})`);
+
     return selectedTeam;
+}
+
+/**
+ * Calculate total cost of current selection
+ */
+function calculateSelectionCost(selection) {
+    return selection.reduce((total, classKey) => {
+        const unitClass = UNIT_CLASSES[classKey];
+        return total + (unitClass ? unitClass.cost : 0);
+    }, 0);
+}
+
+/**
+ * Check if selection is valid (within budget and unit limits)
+ */
+function isSelectionValid(selection) {
+    const cost = calculateSelectionCost(selection);
+    const unitCount = selection.length;
+    return cost <= CONFIG.TEAM_BUDGET &&
+           unitCount >= CONFIG.MIN_UNITS &&
+           unitCount <= CONFIG.MAX_UNITS;
+}
+
+/**
+ * Check if can add a unit (budget and max units check)
+ */
+function canAddUnit(classKey) {
+    const unitClass = UNIT_CLASSES[classKey];
+    if (!unitClass) return false;
+
+    const newCost = currentBudgetSpent + unitClass.cost;
+    const newCount = currentPlayerSelection.length + 1;
+
+    return newCost <= CONFIG.TEAM_BUDGET && newCount <= CONFIG.MAX_UNITS;
 }
 
 /**
@@ -153,6 +237,7 @@ function showTeamSelectForPlayer(playerIndex) {
 
     currentTeamSelectPlayer = playerIndex;
     currentPlayerSelection = [];
+    currentBudgetSpent = 0;
 
     // Update header
     const badge = document.getElementById('team-select-badge');
@@ -167,7 +252,7 @@ function showTeamSelectForPlayer(playerIndex) {
         playerNum.textContent = playerIndex + 1;
     }
     if (hint) {
-        hint.textContent = `Spieler ${playerIndex + 1}: Wähle dein Team`;
+        hint.textContent = `Spieler ${playerIndex + 1}: Stelle dein Team zusammen`;
     }
 
     // Generate unit cards
@@ -176,18 +261,38 @@ function showTeamSelectForPlayer(playerIndex) {
     // Update card selection state and preview
     updateCardSelectionState();
     updateTeamPreview();
+    updateBudgetDisplay();
 
     // Enable/disable confirm button based on current selection
-    const confirmBtn = document.getElementById('team-confirm-btn');
-    if (confirmBtn) {
-        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
-    }
+    updateConfirmButton();
 
     showScreen('team-select');
 
     // Start team selection tutorial for first player
     if (playerIndex === 0) {
         setTimeout(() => startTeamSelectTutorial(), 300);
+    }
+}
+
+/**
+ * Update confirm button state
+ */
+function updateConfirmButton() {
+    const confirmBtn = document.getElementById('team-confirm-btn');
+    if (confirmBtn) {
+        const isValid = currentPlayerSelection.length >= CONFIG.MIN_UNITS &&
+                       currentPlayerSelection.length <= CONFIG.MAX_UNITS &&
+                       currentBudgetSpent <= CONFIG.TEAM_BUDGET;
+        confirmBtn.disabled = !isValid;
+
+        // Update button text to show unit count
+        if (isValid) {
+            confirmBtn.textContent = `Weiter (${currentPlayerSelection.length} Einheiten)`;
+        } else if (currentPlayerSelection.length < CONFIG.MIN_UNITS) {
+            confirmBtn.textContent = `Noch ${CONFIG.MIN_UNITS - currentPlayerSelection.length} Einheit(en) wählen`;
+        } else {
+            confirmBtn.textContent = 'Budget überschritten!';
+        }
     }
 }
 
@@ -204,13 +309,25 @@ function generateUnitCards() {
         const card = document.createElement('div');
         card.className = 'unit-card';
         card.dataset.class = classKey;
+        card.dataset.cost = classData.cost;
+
+        // Determine cost category for styling
+        let costCategory = 'normal';
+        if (classData.cost >= 140) costCategory = 'expensive';
+        else if (classData.cost <= 80) costCategory = 'cheap';
+
+        // Check if this is an elite unit (has special dual-attack capability)
+        const isElite = classData.canMelee && classData.canRanged;
 
         card.innerHTML = `
+            <div class="unit-cost cost-${costCategory}">${classData.cost} 💰</div>
+            ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
             <div class="unit-icon">${classData.icon}</div>
             <div class="unit-name">${classData.name}</div>
             <div class="unit-stats">
                 ❤️ ${classData.hp} HP • ⚔️ ${classData.damage} DMG<br>
                 📍 ${classData.move} Felder • 🎯 ${classData.range} Reichweite
+                ${classData.meleeBonus ? `<br>🗡️ +${classData.meleeBonus} Nahkampf` : ''}
             </div>
             <div class="unit-special">✨ ${classData.special}: ${classData.specialDesc}</div>
         `;
@@ -229,22 +346,69 @@ function generateUnitCards() {
 }
 
 /**
+ * Update budget display
+ */
+function updateBudgetDisplay() {
+    let budgetDisplay = document.getElementById('budget-display');
+
+    // Create budget display if it doesn't exist
+    if (!budgetDisplay) {
+        const preview = document.querySelector('.team-select-preview');
+        if (preview) {
+            budgetDisplay = document.createElement('div');
+            budgetDisplay.id = 'budget-display';
+            budgetDisplay.className = 'budget-display';
+            preview.insertBefore(budgetDisplay, preview.firstChild);
+        }
+    }
+
+    if (budgetDisplay) {
+        const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
+        const percentage = (currentBudgetSpent / CONFIG.TEAM_BUDGET) * 100;
+
+        let statusClass = 'budget-ok';
+        if (percentage > 90) statusClass = 'budget-warning';
+        if (remaining < 0) statusClass = 'budget-over';
+
+        budgetDisplay.innerHTML = `
+            <div class="budget-bar">
+                <div class="budget-fill ${statusClass}" style="width: ${Math.min(100, percentage)}%"></div>
+            </div>
+            <div class="budget-text">
+                <span class="budget-spent">${currentBudgetSpent}</span>
+                <span class="budget-separator">/</span>
+                <span class="budget-total">${CONFIG.TEAM_BUDGET}</span>
+                <span class="budget-label">💰 Budget</span>
+                <span class="budget-remaining">(${remaining} übrig)</span>
+            </div>
+        `;
+    }
+}
+
+/**
  * Toggle unit selection
  */
 function toggleUnitSelection(classKey, card) {
-    if (currentPlayerSelection.length < CONFIG.UNITS_PER_PLAYER) {
+    const unitClass = UNIT_CLASSES[classKey];
+    if (!unitClass) return;
+
+    // Check if we can add this unit (budget and max units)
+    if (canAddUnit(classKey)) {
         // Add to selection (allow duplicates)
         currentPlayerSelection.push(classKey);
+        currentBudgetSpent += unitClass.cost;
         updateCardSelectionState();
+    } else if (currentPlayerSelection.length >= CONFIG.MAX_UNITS) {
+        // Show max units warning
+        import('./ui.js').then(ui => ui.showToast(`Maximum ${CONFIG.MAX_UNITS} Einheiten erlaubt!`, 'error'));
+    } else {
+        // Show budget warning
+        import('./ui.js').then(ui => ui.showToast('Nicht genug Budget!', 'error'));
     }
 
     updateTeamPreview();
-
-    // Enable/disable confirm button
-    const confirmBtn = document.getElementById('team-confirm-btn');
-    if (confirmBtn) {
-        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
-    }
+    updateBudgetDisplay();
+    updateConfirmButton();
 }
 
 /**
@@ -255,8 +419,14 @@ function updateCardSelectionState() {
     cards.forEach(card => {
         const classKey = card.dataset.class;
         const count = currentPlayerSelection.filter(c => c === classKey).length;
+        const unitClass = UNIT_CLASSES[classKey];
 
         card.classList.toggle('selected', count > 0);
+
+        // Check if unit is affordable
+        const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
+        const canAfford = unitClass && unitClass.cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
+        card.classList.toggle('unaffordable', !canAfford && count === 0);
 
         // Update or remove count badge
         let countBadge = card.querySelector('.select-count');
@@ -280,44 +450,63 @@ function updateTeamPreview() {
     const previewContainer = document.getElementById('team-preview-units');
     if (!previewContainer) return;
 
-    const slots = previewContainer.querySelectorAll('.team-slot');
-    slots.forEach((slot, index) => {
-        if (currentPlayerSelection[index]) {
-            const classData = UNIT_CLASSES[currentPlayerSelection[index]];
-            slot.textContent = classData.icon;
-            slot.classList.add('filled');
-            slot.classList.remove('empty');
-            slot.style.cursor = 'pointer';
-            slot.onclick = () => removeFromSelection(index);
-        } else {
-            slot.textContent = '?';
-            slot.classList.remove('filled');
-            slot.classList.add('empty');
-            slot.style.cursor = 'default';
-            slot.onclick = null;
-        }
+    // Clear existing slots
+    previewContainer.innerHTML = '';
+
+    // Create slots for selected units
+    currentPlayerSelection.forEach((classKey, index) => {
+        const classData = UNIT_CLASSES[classKey];
+        const slot = document.createElement('div');
+        slot.className = 'team-slot filled';
+        slot.innerHTML = `
+            <span class="slot-icon">${classData.icon}</span>
+            <span class="slot-cost">${classData.cost}</span>
+        `;
+        slot.style.cursor = 'pointer';
+        slot.onclick = () => removeFromSelection(index);
+        slot.title = `${classData.name} - Klicken zum Entfernen`;
+        previewContainer.appendChild(slot);
     });
+
+    // Add empty slots up to max units
+    const emptySlots = CONFIG.MAX_UNITS - currentPlayerSelection.length;
+    for (let i = 0; i < emptySlots; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'team-slot empty';
+        slot.textContent = '+';
+        slot.title = 'Einheit hinzufügen';
+        previewContainer.appendChild(slot);
+    }
 }
 
 /**
  * Remove unit from selection by index
  */
 function removeFromSelection(index) {
+    const removedClass = currentPlayerSelection[index];
+    const unitClass = UNIT_CLASSES[removedClass];
+
+    if (unitClass) {
+        currentBudgetSpent -= unitClass.cost;
+    }
+
     currentPlayerSelection.splice(index, 1);
     updateCardSelectionState();
     updateTeamPreview();
-
-    const confirmBtn = document.getElementById('team-confirm-btn');
-    if (confirmBtn) {
-        confirmBtn.disabled = currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER;
-    }
+    updateBudgetDisplay();
+    updateConfirmButton();
 }
 
 /**
  * Confirm team selection for current player
  */
 function confirmTeamSelection() {
-    if (currentPlayerSelection.length !== CONFIG.UNITS_PER_PLAYER) return;
+    // Validate selection
+    if (currentPlayerSelection.length < CONFIG.MIN_UNITS ||
+        currentPlayerSelection.length > CONFIG.MAX_UNITS ||
+        currentBudgetSpent > CONFIG.TEAM_BUDGET) {
+        return;
+    }
 
     // Save selection
     state.teamSelections[currentTeamSelectPlayer] = [...currentPlayerSelection];

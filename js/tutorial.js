@@ -18,8 +18,14 @@ const TEAM_SELECT_HINTS = {
     teamIntro: {
         id: 'teamIntro',
         title: '🎖️ Stelle dein Team zusammen!',
-        message: 'Wähle 3 Einheiten für dein Team. Jede Klasse hat einzigartige Stärken - eine gute Mischung ist der Schlüssel zum Sieg!',
+        message: 'Du hast <b>350 Budget</b> um dein Team zusammenzustellen. Wähle zwischen 2-5 Einheiten - günstige Einheiten für Überzahl oder teure Elite-Soldaten für Qualität!',
         position: 'top'
+    },
+    budgetTip: {
+        id: 'budgetTip',
+        title: '💰 Das Budget-System',
+        message: '<b>Günstig (70-80):</b> Scout, Medic - mehr Einheiten möglich<br><b>Mittel (90-110):</b> Assault, Commando, Sniper - solide Wahl<br><b>Elite (150):</b> Kommando-Soldat - teuer aber mächtig!',
+        position: 'center'
     },
     scoutTip: {
         id: 'scoutTip',
@@ -52,26 +58,45 @@ const TEAM_SELECT_HINTS = {
     commandoTip: {
         id: 'commandoTip',
         title: '⚔️ Commando - Der Assassine',
-        message: '<b>Stärken:</b> Brutaler Nahkampf (50+20 Bonus!), Schleichen, schnell<br><b>Taktik:</b> Aus dem Hinterhalt angreifen. Perfekt für Flanken und Hinterhalte!',
+        message: '<b>Kosten:</b> 90 💰<br><b>Stärken:</b> Brutaler Nahkampf (50+20 Bonus!), Schleichen, schnell<br><b>Taktik:</b> Aus dem Hinterhalt angreifen. Perfekt für Flanken und Hinterhalte!',
         position: 'bottom',
         forClass: 'commando'
     },
+    elitesoldatTip: {
+        id: 'elitesoldatTip',
+        title: '🎖️ Kommando-Soldat - Die Elite',
+        message: '<b>Kosten:</b> 150 💰 (TEUER!)<br><b>Stärken:</b> Vielseitig! Kann sowohl Nahkampf (+30 Bonus) als auch Fernkampf (Reichweite 3)<br><b>Taktik:</b> Ein Elite-Soldat kann 2 normale Einheiten ersetzen. Perfekt für kleine, starke Teams!',
+        position: 'bottom',
+        forClass: 'elitesoldat'
+    },
     synergy_balanced: {
         id: 'synergy_balanced',
-        title: '⚖️ Tipp: Ausgewogenes Team',
-        message: '<b>Scout + Assault + Medic</b> = Klassiker!<br>Scout findet Feinde → Assault greift an → Medic heilt. Solide Basis für Anfänger.',
+        title: '⚖️ Tipp: Ausgewogenes Team (250 💰)',
+        message: '<b>Scout + Assault + Medic</b> = Klassiker!<br>Scout findet Feinde → Assault greift an → Medic heilt. <b>100 Budget übrig</b> für eine weitere Einheit!',
         position: 'center'
     },
     synergy_stealth: {
         id: 'synergy_stealth',
-        title: '🌙 Tipp: Schattentaktik',
-        message: '<b>Scout + Sniper + Commando</b> = Hinterhalt!<br>Scout späht aus → Sniper dezimiert → Commando erledigt den Rest. Für aggressive Spieler.',
+        title: '🌙 Tipp: Schattentaktik (270 💰)',
+        message: '<b>Scout + Sniper + Commando</b> = Hinterhalt!<br>Scout späht aus → Sniper dezimiert → Commando erledigt den Rest. <b>80 Budget übrig</b>!',
         position: 'center'
     },
     synergy_defensive: {
         id: 'synergy_defensive',
-        title: '🛡️ Tipp: Defensive Formation',
-        message: '<b>Assault + Medic + Sniper</b> = Festung!<br>Assault hält die Linie → Medic heilt → Sniper kontrolliert das Feld. Für geduldige Spieler.',
+        title: '🛡️ Tipp: Defensive Formation (290 💰)',
+        message: '<b>Assault + Medic + Sniper</b> = Festung!<br>Assault hält die Linie → Medic heilt → Sniper kontrolliert das Feld. <b>60 Budget übrig</b>!',
+        position: 'center'
+    },
+    synergy_elite: {
+        id: 'synergy_elite',
+        title: '🎖️ Tipp: Elite-Trupp (230-300 💰)',
+        message: '<b>Kommando-Soldat + Medic</b> = Qualität über Quantität!<br>Nur 2 Einheiten, aber der Elite-Soldat kann kämpfen wie zwei. <b>Riskant aber mächtig!</b>',
+        position: 'center'
+    },
+    synergy_swarm: {
+        id: 'synergy_swarm',
+        title: '🐜 Tipp: Schwarm-Taktik (300 💰)',
+        message: '<b>4x günstige Einheiten</b> = Überzahl!<br>Scout + Scout + Medic + Medic oder ähnlich. <b>Mehr Einheiten = mehr Aktionspunkte!</b>',
         position: 'center'
     },
     tactical_ambush: {
@@ -514,7 +539,8 @@ window.dismissTeamSelectHint = function() {
  */
 window.showNextTeamTip = function() {
     const allTips = [
-        'synergy_balanced', 'synergy_stealth', 'synergy_defensive',
+        'budgetTip', 'synergy_balanced', 'synergy_stealth', 'synergy_defensive',
+        'synergy_elite', 'synergy_swarm',
         'tactical_ambush', 'tactical_coordinated', 'tactical_flanking', 'tactical_cover'
     ];
 

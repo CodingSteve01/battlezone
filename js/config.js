@@ -4,7 +4,12 @@ export const CONFIG = {
     BASE_HEX_SIZE: 170,
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
-    UNITS_PER_PLAYER: 3,
+
+    // Team Budget System - players spend points to build their team
+    TEAM_BUDGET: 350,         // Total points available for team composition
+    MIN_UNITS: 2,             // Minimum units required
+    MAX_UNITS: 5,             // Maximum units allowed
+
     AP_PER_TURN: 4,
     MAX_ROUNDS: 30,
     VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
@@ -335,6 +340,7 @@ export const UNIT_CLASSES = {
     scout: {
         name: 'Scout',
         icon: '🧭',
+        cost: 70,           // Günstig - Aufklärer und Unterstützung
         hp: 70,             // Erhöht von 60 - robuster Aufklärer
         damage: 22,         // Erhöht von 18 - besserer Schaden
         range: 4,
@@ -348,6 +354,7 @@ export const UNIT_CLASSES = {
     assault: {
         name: 'Assault',
         icon: '🪖',
+        cost: 100,          // Mittel - solider Frontkämpfer
         hp: 120,            // Erhöht von 100 - der Tank des Teams
         damage: 40,         // Erhöht von 35 - hoher Burst-Schaden
         range: 2,
@@ -361,6 +368,7 @@ export const UNIT_CLASSES = {
     medic: {
         name: 'Medic',
         icon: '⛑️',
+        cost: 80,           // Günstig - wichtige Unterstützung
         hp: 90,             // Erhöht von 80 - überlebensfähiger
         damage: 15,         // Erhöht von 12
         range: 3,           // Erhöht von 2 - kann aus sicherer Distanz helfen
@@ -374,6 +382,7 @@ export const UNIT_CLASSES = {
     sniper: {
         name: 'Sniper',
         icon: '🎯',
+        cost: 110,          // Mittel-hoch - hoher Schaden aber fragil
         hp: 45,             // Leicht erhöht von 40 - etwas robuster
         damage: 65,         // STARK ERHÖHT von 45 - Sniper soll mit einem Schuss töten können!
         range: 6,
@@ -388,6 +397,7 @@ export const UNIT_CLASSES = {
     commando: {
         name: 'Commando',
         icon: '⚔️',
+        cost: 90,           // Mittel - schneller Nahkämpfer
         hp: 75,             // Erhöht von 65 - robuster im Nahkampf
         damage: 50,         // Erhöht von 40 - SEHR gefährlich im Nahkampf
         range: 1,           // Nahkampf
@@ -399,6 +409,26 @@ export const UNIT_CLASSES = {
         meleeBonus: 20,     // Erhöht von 15 - brutaler Nahkampf
         // Commando-Bonus: Erste Attacke nach Stealth macht Bonusschaden
         ambushBonus: 15     // Extra Schaden aus dem Hinterhalt
+    },
+    elitesoldat: {
+        name: 'Kommando-Soldat',
+        icon: '🎖️',
+        cost: 150,          // TEUER - Elite-Einheit mit Vielseitigkeit
+        hp: 100,            // Robust - kann einiges einstecken
+        damage: 40,         // Solider Fernkampfschaden
+        range: 3,           // Kann auf Distanz kämpfen
+        move: 3,
+        vision: 5,
+        special: 'Taktischer Wechsel',
+        specialDesc: 'Wechselt zwischen Nah- und Fernkampfmodus',
+        // Dual-Attack-System: Kann sowohl Nahkampf als auch Fernkampf
+        meleeBonus: 30,     // +30 Schaden im Nahkampf (Gesamt: 70 bei Range 1)
+        meleeDamage: 55,    // Alternativer Basis-Schaden im Nahkampf-Modus
+        canMelee: true,     // Kann Nahkampf-Angriffe ausführen
+        canRanged: true,    // Kann Fernkampf-Angriffe ausführen
+        // Taktischer Bonus: Kein Bewegungsmalus nach Angriff
+        tacticalAdvantage: true,
+        armorPiercing: 0.3  // 30% Deckung ignorieren
     }
 };
 
