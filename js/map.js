@@ -33,6 +33,7 @@ function getActiveBiome() {
 
 /**
  * Generate a new map with the current settings
+ * Uses state.mapSeed for reproducible generation
  */
 export function generateMap() {
     state.hexes = [];
@@ -43,13 +44,16 @@ export function generateMap() {
 
     const radius = CONFIG.MAP_SIZES[state.settings.size];
 
+    // Use the stored mapSeed for reproducible generation
+    const seed = state.mapSeed || 0;
+
     // Generate hexagonal grid with biome-specific terrain
     for (let q = -radius; q <= radius; q++) {
         for (let r = -radius; r <= radius; r++) {
             if (!isValidHex(q, r, radius)) continue;
 
             const distFromCenter = hexDistance({ q: 0, r: 0 }, { q, r });
-            const hex = createHex(q, r, distFromCenter, radius, biome);
+            const hex = createHex(q, r, distFromCenter, radius, biome, seed);
             setHex(hex);
         }
     }
@@ -228,15 +232,16 @@ function fractalNoise(q, r, baseScale, octaves, seed) {
 /**
  * Create a single hex with terrain using biome-specific noise generation
  */
-function createHex(q, r, distFromCenter, radius, biome) {
+function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
     const edgeFactor = distFromCenter / radius;
 
     // Use multiple noise layers for different terrain features
-    const elevationNoise = fractalNoise(q, r, 16, 4, 1);
-    const moistureNoise = fractalNoise(q, r, 14, 3, 2);
-    const vegetationNoise = fractalNoise(q, r, 10, 3, 3);
-    const roughnessNoise = fractalNoise(q, r, 8, 2, 4);
-    const varietyNoise = fractalNoise(q, r, 6, 2, 5);
+    // Each layer uses an offset from the base seed for variety
+    const elevationNoise = fractalNoise(q, r, 16, 4, baseSeed + 1);
+    const moistureNoise = fractalNoise(q, r, 14, 3, baseSeed + 1000);
+    const vegetationNoise = fractalNoise(q, r, 10, 3, baseSeed + 2000);
+    const roughnessNoise = fractalNoise(q, r, 8, 2, baseSeed + 3000);
+    const varietyNoise = fractalNoise(q, r, 6, 2, baseSeed + 4000);
 
     // Get biome-specific thresholds
     const elev = biome.elevationThresholds;

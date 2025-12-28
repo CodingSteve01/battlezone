@@ -2,7 +2,7 @@
 
 import { state, resetState, initZone } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { generateMap, generatePreviewMap } from './map.js';
+import { generateMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
 // Use the legacy canvas renderer for stability/performance
@@ -20,7 +20,6 @@ import { hexToPixel } from './hexMath.js';
 
 // Map preview state
 let mapPreviewTimeout = null;
-let previewHexes = [];
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -720,6 +719,7 @@ function setupWizardNavigation() {
 
 /**
  * Update map preview in wizard
+ * Generates the actual game map and renders it as preview
  */
 function updateMapPreview() {
     const canvas = document.getElementById('map-preview-canvas');
@@ -735,82 +735,20 @@ function updateMapPreview() {
     }
 
     mapPreviewTimeout = setTimeout(() => {
+        // Generate a new random seed for this map
+        state.mapSeed = Math.floor(Math.random() * 100000);
+
+        // Generate the ACTUAL game map (this is what will be played)
+        generateMap();
+
+        // Render preview using the generated map
         renderMapPreview(canvas, overlay);
     }, 150);
 }
 
 /**
- * Get a representative color for a hex that includes vegetation/details
- * This creates a more accurate preview of how the hex will look in-game
- */
-function getPreviewColor(terrainType, q, r) {
-    const terrain = TERRAIN[terrainType];
-    if (!terrain) return '#1a1a3e';
-
-    // Use deterministic random based on position for consistent results
-    const hash = Math.abs(((q * 73856093) ^ (r * 19349663)) % 100);
-
-    switch (terrainType) {
-        case 'forest':
-            // Forest hexes have trees - blend terrain color with darker tree color
-            // Trees make forest appear darker/more saturated
-            return blendColors(terrain.color, '#2a4a30', 0.4);
-
-        case 'grass':
-            // Some grass hexes have bushes or tall grass
-            if (hash < 30) {
-                // Has vegetation - slightly darker/more saturated
-                return blendColors(terrain.color, '#5a8a48', 0.2);
-            }
-            return terrain.color;
-
-        case 'hills':
-            // Hills may have rocks or sparse vegetation
-            if (hash < 20) {
-                return blendColors(terrain.color, '#8a8878', 0.15);
-            }
-            return terrain.color;
-
-        case 'sand':
-            // Sand with occasional rocks
-            if (hash < 15) {
-                return blendColors(terrain.color, '#a09888', 0.1);
-            }
-            return terrain.color;
-
-        case 'swamp':
-            // Swamp with water patches and vegetation
-            return blendColors(terrain.color, '#3a5a48', 0.2);
-
-        default:
-            return terrain.color;
-    }
-}
-
-/**
- * Blend two hex colors together
- * @param {string} color1 - First hex color
- * @param {string} color2 - Second hex color
- * @param {number} ratio - Blend ratio (0 = all color1, 1 = all color2)
- */
-function blendColors(color1, color2, ratio) {
-    const r1 = parseInt(color1.slice(1, 3), 16);
-    const g1 = parseInt(color1.slice(3, 5), 16);
-    const b1 = parseInt(color1.slice(5, 7), 16);
-
-    const r2 = parseInt(color2.slice(1, 3), 16);
-    const g2 = parseInt(color2.slice(3, 5), 16);
-    const b2 = parseInt(color2.slice(5, 7), 16);
-
-    const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
-    const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
-    const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
-
-    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-/**
  * Render the map preview on canvas
+ * Uses the actual game map (state.hexes) for accurate preview
  */
 function renderMapPreview(canvas, overlay) {
     const ctx = canvas.getContext('2d');
@@ -822,12 +760,16 @@ function renderMapPreview(canvas, overlay) {
     canvas.height = size * window.devicePixelRatio;
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    // Generate preview map data
-    const previewData = generatePreviewMap(state.settings.size, state.settings.landscape);
-    previewHexes = previewData.hexes;
+    // Use the actual game map (already generated in updateMapPreview)
+    const hexes = state.hexes;
+    if (!hexes || hexes.length === 0) {
+        // Fallback if map not yet generated
+        if (overlay) overlay.classList.add('hidden');
+        return;
+    }
 
-    // Calculate hex size for preview
-    const radius = previewData.radius;
+    // Calculate hex size for preview based on map radius
+    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
     const previewHexSize = (size * 0.4) / (radius + 1);
 
     // Clear and fill background
@@ -838,13 +780,14 @@ function renderMapPreview(canvas, overlay) {
     const centerX = size / 2;
     const centerY = size / 2;
 
-    // Draw hexes
-    for (const hex of previewHexes) {
+    // Draw hexes using terrain color (like minimap)
+    for (const hex of hexes) {
         const x = centerX + hex.q * previewHexSize * 1.5;
         const y = centerY + (hex.r + hex.q * 0.5) * previewHexSize * Math.sqrt(3);
 
-        // Get representative color including vegetation/details
-        const color = getPreviewColor(hex.type, hex.q, hex.r);
+        // Use terrain color directly (consistent with minimap)
+        const terrain = TERRAIN[hex.type];
+        const color = terrain ? terrain.color : '#1a1a3e';
 
         // Draw hex
         drawPreviewHex(ctx, x, y, previewHexSize * 0.95, color);
