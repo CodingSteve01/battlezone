@@ -17,53 +17,97 @@
 </head>
 <body>
     <div id="app">
-        <!-- MENU SCREEN -->
+        <!-- MENU SCREEN - Simplified -->
         <div id="menu" class="screen active">
             <div class="menu-header">
                 <h1 class="menu-title">SHADOW SQUAD</h1>
             </div>
 
-            <div class="menu-section" id="players-section">
-                <div class="section-label">👥 Anzahl Spieler</div>
-                <div class="option-grid">
-                    <button class="option-btn selected" data-players="2">2</button>
-                    <button class="option-btn" data-players="3">3</button>
-                    <button class="option-btn" data-players="4">4</button>
-                    <button class="option-btn" data-players="5">5</button>
-                    <button class="option-btn" data-players="6">6</button>
-                    <button class="option-btn" data-players="7">7</button>
-                    <button class="option-btn" data-players="8">8</button>
+            <div class="menu-main-buttons">
+                <button class="menu-big-btn start-game-btn" id="start-btn">
+                    <span class="btn-icon">⚔️</span>
+                    <span class="btn-text">Spiel starten</span>
+                </button>
+                <button class="menu-big-btn options-btn" id="options-btn">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">Optionen</span>
+                </button>
+            </div>
+
+            <div class="version-info" id="version-info">
+                Version DEV • Build: --
+            </div>
+        </div>
+
+        <!-- OPTIONS SCREEN -->
+        <div id="options-screen" class="screen">
+            <button class="back-btn" id="options-back-btn">← Zurück</button>
+            <div class="options-header">
+                <h2 class="options-title">⚙️ Optionen</h2>
+            </div>
+
+            <div class="options-content">
+                <div class="option-section">
+                    <div class="option-row audio-row">
+                        <span class="option-label">🔊 Lautstärke</span>
+                        <div class="audio-controls">
+                            <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="70">
+                            <button class="mute-btn" id="mute-btn" title="Ton an/aus">🔊</button>
+                        </div>
+                    </div>
+                    <div class="option-row">
+                        <span class="option-label">💬 Hinweise</span>
+                        <div class="setting-buttons" id="notification-level">
+                            <button class="setting-btn" data-value="minimal">Minimal</button>
+                            <button class="setting-btn active" data-value="normal">Normal</button>
+                            <button class="setting-btn" data-value="verbose">Alle</button>
+                        </div>
+                    </div>
+                    <div class="option-row">
+                        <span class="option-label">📖 Tutorial</span>
+                        <div class="tutorial-controls">
+                            <div class="setting-buttons" id="tutorial-toggle">
+                                <button class="setting-btn" data-value="off">Aus</button>
+                                <button class="setting-btn active" data-value="on">An</button>
+                            </div>
+                            <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn" title="Tutorial von vorne beginnen">🔄</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="menu-section" id="ai-config-section">
-                <div class="section-label">🎮 Spieler-Typen</div>
-                <div class="ai-config-grid" id="ai-config-grid">
-                    <!-- Dynamically populated -->
+            <button class="help-toggle" id="help-toggle">
+                <span>?</span> Hilfe
+            </button>
+
+            <div class="help-panel" id="help-panel">
+                <p>Ziehen = Scrollen • Tippen = Aktion • 4 AP pro Zug</p>
+            </div>
+        </div>
+
+        <!-- GAME WIZARD - Step 1: Map Selection -->
+        <div id="wizard-map" class="screen wizard-screen">
+            <div class="wizard-header">
+                <div class="wizard-progress">
+                    <div class="wizard-step active">1</div>
+                    <div class="wizard-step-line"></div>
+                    <div class="wizard-step">2</div>
+                    <div class="wizard-step-line"></div>
+                    <div class="wizard-step">3</div>
                 </div>
+                <h2 class="wizard-title">🗺️ Wähle deine Map</h2>
             </div>
 
-            <div class="menu-section" id="alliance-section" style="display: none;">
-                <div class="section-label">🤝 Team-Allianzen</div>
-                <div class="alliance-info">
-                    Spieler im gleichen Team können sich nicht angreifen und gewinnen gemeinsam.
+            <div class="wizard-content">
+                <div class="map-preview-container">
+                    <canvas id="map-preview-canvas" class="map-preview-canvas"></canvas>
+                    <div class="map-preview-overlay" id="map-preview-overlay">
+                        <span class="preview-loading">Generiere Vorschau...</span>
+                    </div>
                 </div>
-                <div class="alliance-toggle-row">
-                    <button class="alliance-mode-btn selected" data-alliance-mode="ffa" id="alliance-ffa-btn">
-                        ⚔️ Jeder gegen jeden
-                    </button>
-                    <button class="alliance-mode-btn" data-alliance-mode="teams" id="alliance-teams-btn">
-                        🤝 Teams bilden
-                    </button>
-                </div>
-                <div class="alliance-config-grid" id="alliance-config-grid" style="display: none;">
-                    <!-- Dynamically populated when teams mode is selected -->
-                </div>
-            </div>
 
-            <div class="menu-section map-section">
-                <div class="map-options-row">
-                    <div class="map-option-group">
+                <div class="wizard-options">
+                    <div class="wizard-option-group">
                         <div class="section-label">📐 Größe</div>
                         <div class="option-grid size-grid">
                             <button class="option-btn" data-size="small" title="Klein">S</button>
@@ -71,7 +115,7 @@
                             <button class="option-btn" data-size="large" title="Groß">L</button>
                         </div>
                     </div>
-                    <div class="map-option-group">
+                    <div class="wizard-option-group">
                         <div class="section-label">🗺️ Landschaft</div>
                         <div class="option-grid landscape-grid">
                             <button class="option-btn selected" data-landscape="random" title="Zufällig">🎲</button>
@@ -84,68 +128,92 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="landscape-preview" id="landscape-preview">
                     <span class="landscape-preview-icon">🎲</span>
                     <span class="landscape-preview-name">Zufällig</span>
                 </div>
             </div>
 
-            <div class="menu-section advanced-section collapsed" id="advanced-section">
-                <button class="advanced-toggle" id="advanced-toggle">
-                    <span class="toggle-icon">⚙️</span>
-                    <span class="toggle-label">Erweiterte Einstellungen</span>
-                    <span class="toggle-arrow">▼</span>
-                </button>
-                <div class="advanced-content" id="advanced-content">
-                    <div class="advanced-row audio-row">
-                        <span class="advanced-label">🔊 Lautstärke</span>
-                        <div class="audio-controls">
-                            <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="70">
-                            <button class="mute-btn" id="mute-btn" title="Ton an/aus">🔊</button>
-                        </div>
+            <div class="wizard-footer">
+                <button class="wizard-btn secondary" id="wizard-map-back">← Menü</button>
+                <button class="wizard-btn primary" id="wizard-map-next">Weiter →</button>
+            </div>
+        </div>
+
+        <!-- GAME WIZARD - Step 2: Player Setup -->
+        <div id="wizard-players" class="screen wizard-screen">
+            <div class="wizard-header">
+                <div class="wizard-progress">
+                    <div class="wizard-step completed">✓</div>
+                    <div class="wizard-step-line completed"></div>
+                    <div class="wizard-step active">2</div>
+                    <div class="wizard-step-line"></div>
+                    <div class="wizard-step">3</div>
+                </div>
+                <h2 class="wizard-title">👥 Spieler einrichten</h2>
+            </div>
+
+            <div class="wizard-content">
+                <div class="menu-section" id="players-section">
+                    <div class="section-label">👥 Anzahl Spieler</div>
+                    <div class="option-grid">
+                        <button class="option-btn selected" data-players="2">2</button>
+                        <button class="option-btn" data-players="3">3</button>
+                        <button class="option-btn" data-players="4">4</button>
+                        <button class="option-btn" data-players="5">5</button>
+                        <button class="option-btn" data-players="6">6</button>
+                        <button class="option-btn" data-players="7">7</button>
+                        <button class="option-btn" data-players="8">8</button>
                     </div>
-                    <div class="advanced-row">
-                        <span class="advanced-label">💬 Hinweise</span>
-                        <div class="setting-buttons" id="notification-level">
-                            <button class="setting-btn" data-value="minimal">Minimal</button>
-                            <button class="setting-btn active" data-value="normal">Normal</button>
-                            <button class="setting-btn" data-value="verbose">Alle</button>
-                        </div>
+                </div>
+
+                <div class="menu-section" id="ai-config-section">
+                    <div class="section-label">🎮 Spieler einrichten</div>
+                    <div class="player-config-grid" id="player-config-grid">
+                        <!-- Dynamically populated with name inputs and type toggles -->
                     </div>
-                    <div class="advanced-row">
-                        <span class="advanced-label">📖 Tutorial</span>
-                        <div class="tutorial-controls">
-                            <div class="setting-buttons" id="tutorial-toggle">
-                                <button class="setting-btn" data-value="off">Aus</button>
-                                <button class="setting-btn active" data-value="on">An</button>
-                            </div>
-                            <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn" title="Tutorial von vorne beginnen">🔄</button>
-                        </div>
+                </div>
+
+                <div class="menu-section" id="alliance-section" style="display: none;">
+                    <div class="section-label">🤝 Team-Allianzen</div>
+                    <div class="alliance-info">
+                        Spieler im gleichen Team können sich nicht angreifen und gewinnen gemeinsam.
+                    </div>
+                    <div class="alliance-toggle-row">
+                        <button class="alliance-mode-btn selected" data-alliance-mode="ffa" id="alliance-ffa-btn">
+                            ⚔️ Jeder gegen jeden
+                        </button>
+                        <button class="alliance-mode-btn" data-alliance-mode="teams" id="alliance-teams-btn">
+                            🤝 Teams bilden
+                        </button>
+                    </div>
+                    <div class="alliance-config-grid" id="alliance-config-grid" style="display: none;">
+                        <!-- Dynamically populated when teams mode is selected -->
                     </div>
                 </div>
             </div>
 
-            <button class="start-btn" id="start-btn">Spiel starten</button>
-
-            <button class="help-toggle" id="help-toggle">
-                <span>?</span> Hilfe
-            </button>
-
-            <div class="help-panel" id="help-panel">
-                <p>Ziehen = Scrollen • Tippen = Aktion • 4 AP pro Zug</p>
-            </div>
-
-            <div class="version-info" id="version-info">
-                Version DEV • Build: --
+            <div class="wizard-footer">
+                <button class="wizard-btn secondary" id="wizard-players-back">← Zurück</button>
+                <button class="wizard-btn primary" id="wizard-players-next">Weiter →</button>
             </div>
         </div>
 
-        <!-- TEAM SELECTION SCREEN -->
-        <div id="team-select" class="screen">
-            <button class="back-btn" id="team-back-btn">← Zurück</button>
-            <div class="team-select-header">
-                <div class="team-select-badge" id="team-select-badge">1</div>
-                <h2 class="team-select-title">Spieler <span id="team-select-player">1</span></h2>
+        <!-- TEAM SELECTION SCREEN - Wizard Step 3 -->
+        <div id="team-select" class="screen wizard-screen">
+            <div class="wizard-header">
+                <div class="wizard-progress">
+                    <div class="wizard-step completed">✓</div>
+                    <div class="wizard-step-line completed"></div>
+                    <div class="wizard-step completed">✓</div>
+                    <div class="wizard-step-line completed"></div>
+                    <div class="wizard-step active">3</div>
+                </div>
+                <div class="team-select-header">
+                    <div class="team-select-badge" id="team-select-badge">1</div>
+                    <h2 class="team-select-title">Spieler <span id="team-select-player">1</span></h2>
+                </div>
             </div>
 
             <div class="team-select-grid" id="team-select-grid">
@@ -160,7 +228,10 @@
                 </div>
             </div>
 
-            <button class="start-btn team-confirm-btn" id="team-confirm-btn" disabled>Weiter</button>
+            <div class="wizard-footer">
+                <button class="wizard-btn secondary" id="team-back-btn">← Zurück</button>
+                <button class="wizard-btn primary" id="team-confirm-btn" disabled>Weiter</button>
+            </div>
         </div>
 
         <!-- TURN SCREEN -->

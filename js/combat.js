@@ -3,7 +3,7 @@
 import {
     state, getHex, getPlayerUnits, addGhostIndicator, spendSharedAP,
     trackUnitAttack, getRemainingAttacks, canUnitAttack, markCombat, triggerScreenShake,
-    addSuppressedHex, isHexSuppressed, getSuppressionInfo,
+    addSuppressedHex, isHexSuppressed, isHexSuppressedForUnit, getSuppressionInfo,
     setOverwatch, removeOverwatch, isUnitOnOverwatch, queueOverwatchTrigger,
     getHoldPositionBonus, clearHoldPosition, updateHoldPosition,
     areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances,
@@ -332,12 +332,13 @@ export function calculateHitChance(attacker, defender) {
 
     // === UNTERDRÜCKUNGS-MALUS ===
     // Angreifer auf unterdrücktem Hex hat -30% Trefferchance
-    if (isHexSuppressed(attacker.q, attacker.r)) {
+    // WICHTIG: Nur feindliche Unterdrückung betrifft die Einheit!
+    if (isHexSuppressedForUnit(attacker.q, attacker.r, attacker)) {
         chance -= 30;
     }
 
     // Minimum 50% Chance wenn unterdrückt, sonst 75%
-    const minChance = isHexSuppressed(attacker.q, attacker.r) ? 50 : 75;
+    const minChance = isHexSuppressedForUnit(attacker.q, attacker.r, attacker) ? 50 : 75;
     return Math.min(100, Math.max(minChance, chance));
 }
 
@@ -1181,9 +1182,11 @@ export function checkAmbushTriggers(movedUnit) {
     const triggers = [];
 
     // Finde alle feindlichen Einheiten mit vorbereitetem Hinterhalt
+    // WICHTIG: Verbündete lösen keinen Hinterhalt aus!
     const ambushers = state.units.filter(u =>
         u.alive &&
         u.player !== movedUnit.player &&
+        !areUnitsAllied(u, movedUnit) &&
         u.ambushReady &&
         !u.ambushUsedThisTurn
     );
@@ -1403,9 +1406,10 @@ export function useSuppression(unit, targetQ, targetR) {
 
 /**
  * Berechne Unterdrückungs-Malus für Trefferchance
+ * WICHTIG: Nur feindliche Unterdrückung betrifft die Einheit!
  */
 export function getSuppressionPenalty(unit) {
-    if (isHexSuppressed(unit.q, unit.r)) {
+    if (isHexSuppressedForUnit(unit.q, unit.r, unit)) {
         return -30; // -30% Trefferchance
     }
     return 0;
@@ -1413,10 +1417,21 @@ export function getSuppressionPenalty(unit) {
 
 /**
  * Berechne zusätzliche Bewegungskosten durch Unterdrückung
+ * WICHTIG: Nur feindliche Unterdrückung betrifft die Einheit!
+ * @param {number} q - Hex-Koordinate Q
+ * @param {number} r - Hex-Koordinate R
+ * @param {Object} unit - Die sich bewegende Einheit (optional, für Allianz-Check)
  */
-export function getSuppressionMoveCost(q, r) {
-    if (isHexSuppressed(q, r)) {
-        return 1; // +1 Bewegungskosten
+export function getSuppressionMoveCost(q, r, unit = null) {
+    if (unit) {
+        if (isHexSuppressedForUnit(q, r, unit)) {
+            return 1; // +1 Bewegungskosten
+        }
+    } else {
+        // Fallback für Aufrufe ohne Einheit - nutze alte Logik
+        if (isHexSuppressed(q, r)) {
+            return 1;
+        }
     }
     return 0;
 }
@@ -1465,9 +1480,11 @@ export function checkOverwatchTriggers(movedUnit) {
     const triggers = [];
 
     // Finde alle feindlichen Einheiten im Overwatch
+    // WICHTIG: Verbündete lösen kein Overwatch aus!
     const watchers = state.units.filter(u =>
         u.alive &&
         u.player !== movedUnit.player &&
+        !areUnitsAllied(u, movedUnit) &&
         isUnitOnOverwatch(u.id)
     );
 
