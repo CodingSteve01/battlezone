@@ -15,6 +15,40 @@ import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
 import { logRender, logError } from './errorLog.js';
 
+// ===== SAFE GRADIENT HELPERS =====
+// Prevents "non-finite value" errors when coordinates are NaN/Infinity
+
+/**
+ * Check if all values are finite numbers
+ */
+function areValuesFinite(...values) {
+    return values.every(v => Number.isFinite(v));
+}
+
+/**
+ * Create a radial gradient safely, returning a fallback color if values are invalid
+ */
+function safeRadialGradient(ctx, x0, y0, r0, x1, y1, r1, fallbackColor = 'transparent') {
+    if (!areValuesFinite(x0, y0, r0, x1, y1, r1) || r1 <= 0) {
+        return fallbackColor;
+    }
+    return ctx.createRadialGradient(x0, y0, r0, x1, y1, r1);
+}
+
+/**
+ * Create a linear gradient safely, returning a fallback color if values are invalid
+ */
+function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') {
+    if (!areValuesFinite(x0, y0, x1, y1)) {
+        return fallbackColor;
+    }
+    // Prevent zero-length gradients
+    if (x0 === x1 && y0 === y1) {
+        return fallbackColor;
+    }
+    return ctx.createLinearGradient(x0, y0, x1, y1);
+}
+
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
 
@@ -98,17 +132,21 @@ function drawTerrainBlend(ctx, cx, cy, size, terrainType, neighborTerrains) {
         };
 
         // Create gradient with neighbor's color fading in
-        const gradient = ctx.createLinearGradient(
+        const gradient = safeLinearGradient(
+            ctx,
             gradientStart.x, gradientStart.y,
-            gradientEnd.x, gradientEnd.y
+            gradientEnd.x, gradientEnd.y,
+            'transparent'
         );
 
         // Use neighbor's color at edge, fading to transparent
         const blendColor = neighborTerrain.colorDark || neighborTerrain.color;
-        gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
-        gradient.addColorStop(0.4, blendColor + '55');
-        gradient.addColorStop(0.7, blendColor + '22');
-        gradient.addColorStop(1, 'transparent');
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
+            gradient.addColorStop(0.4, blendColor + '55');
+            gradient.addColorStop(0.7, blendColor + '22');
+            gradient.addColorStop(1, 'transparent');
+        }
 
         // Draw blend triangle
         ctx.beginPath();
@@ -792,10 +830,12 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
     drawHexPathToContext(context, cx, cy, hexSize);
 
     // Subtle radial gradient - darker at edges, slightly lighter in center
-    const dimGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
-    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    const dimGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(8, 12, 20, 0.6)');
+    if (typeof dimGradient !== 'string') {
+        dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+        dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+        dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    }
     context.fillStyle = dimGradient;
     context.fill();
 
@@ -872,10 +912,12 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.closePath();
     } else if (terrain && terrain.colorLight && terrain.colorDark) {
         // Fallback: gradient fill
-        const gradient = context.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
+        const gradient = safeLinearGradient(context, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, terrain.colorLight);
+            gradient.addColorStop(0.5, terrain.color);
+            gradient.addColorStop(1, terrain.colorDark);
+        }
         context.fillStyle = gradient;
         context.fill();
     } else {
@@ -946,13 +988,17 @@ function drawCamouflagePattern(cx, cy, size, unit) {
     ctx.globalAlpha = 0.22;
 
     // Soft camo fill with terrain-tinted gradient
-    const baseGrad = ctx.createRadialGradient(
+    const baseGrad = safeRadialGradient(
+        ctx,
         cx, cy - size * 0.2, 0,
-        cx, cy, size * 0.9
+        cx, cy, size * 0.9,
+        `rgba(${r}, ${g}, ${b}, 0.2)`
     );
-    baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
-    baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
-    baseGrad.addColorStop(1, 'transparent');
+    if (typeof baseGrad !== 'string') {
+        baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
+        baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
+        baseGrad.addColorStop(1, 'transparent');
+    }
     ctx.fillStyle = baseGrad;
 
     // Draw subtle humanoid shape
@@ -1284,10 +1330,12 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.closePath();
     } else if (terrain && terrain.colorLight && terrain.colorDark) {
         // Fallback: gradient fill
-        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
+        const gradient = safeLinearGradient(ctx, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, terrain.colorLight);
+            gradient.addColorStop(0.5, terrain.color);
+            gradient.addColorStop(1, terrain.colorDark);
+        }
         ctx.fillStyle = gradient;
         ctx.fill();
     } else {
@@ -1822,17 +1870,22 @@ function drawStaticWaterSurface(cx, cy, hexSize, seed, isDeep = false) {
     ctx.save();
 
     // Very subtle depth variation
-    const gradient = ctx.createRadialGradient(
+    const fallbackColor = isDeep ? 'rgba(25, 55, 90, 0.12)' : 'rgba(80, 140, 180, 0.1)';
+    const gradient = safeRadialGradient(
+        ctx,
         cx + hexSize * 0.2, cy - hexSize * 0.2, 0,
-        cx, cy, hexSize * 0.8
+        cx, cy, hexSize * 0.8,
+        fallbackColor
     );
 
-    if (isDeep) {
-        gradient.addColorStop(0, 'rgba(40, 80, 120, 0.1)');
-        gradient.addColorStop(1, 'rgba(10, 30, 60, 0.15)');
-    } else {
-        gradient.addColorStop(0, 'rgba(100, 160, 200, 0.08)');
-        gradient.addColorStop(1, 'rgba(60, 120, 160, 0.12)');
+    if (typeof gradient !== 'string') {
+        if (isDeep) {
+            gradient.addColorStop(0, 'rgba(40, 80, 120, 0.1)');
+            gradient.addColorStop(1, 'rgba(10, 30, 60, 0.15)');
+        } else {
+            gradient.addColorStop(0, 'rgba(100, 160, 200, 0.08)');
+            gradient.addColorStop(1, 'rgba(60, 120, 160, 0.12)');
+        }
     }
 
     ctx.fillStyle = gradient;
@@ -2075,12 +2128,16 @@ function drawStaticHeather(cx, cy, hexSize, seed) {
  */
 function drawWaterDetails(cx, cy, s, seed) {
     // Subtle depth gradient only
-    const gradient = ctx.createRadialGradient(
+    const gradient = safeRadialGradient(
+        ctx,
         cx + s * 0.15, cy - s * 0.15, 0,
-        cx, cy, s * 0.7
+        cx, cy, s * 0.7,
+        'rgba(90, 140, 180, 0.09)'
     );
-    gradient.addColorStop(0, 'rgba(120, 180, 220, 0.08)');
-    gradient.addColorStop(1, 'rgba(60, 100, 140, 0.1)');
+    if (typeof gradient !== 'string') {
+        gradient.addColorStop(0, 'rgba(120, 180, 220, 0.08)');
+        gradient.addColorStop(1, 'rgba(60, 100, 140, 0.1)');
+    }
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -2228,10 +2285,12 @@ function drawGhostIndicator(cx, cy, ghost) {
     ctx.setLineDash([]);
 
     // Inner danger zone
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size + 10);
-    gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
-    gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    const gradient = safeRadialGradient(ctx, cx, cy, 0, cx, cy, size + 10, `rgba(239, 68, 68, ${alpha * 0.2})`);
+    if (typeof gradient !== 'string') {
+        gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
+        gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    }
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(cx, cy, size + 10, 0, Math.PI * 2);
@@ -2650,16 +2709,18 @@ function drawUnitOverlay(unit, cx, cy) {
 
     // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
     const gradientWidth = Math.max(1, barWidth * hpPct);
-    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY);
-    if (hpPct > 0.5) {
-        barGradient.addColorStop(0, '#22c55e');
-        barGradient.addColorStop(1, '#16a34a');
-    } else if (hpPct > 0.25) {
-        barGradient.addColorStop(0, '#eab308');
-        barGradient.addColorStop(1, '#ca8a04');
-    } else {
-        barGradient.addColorStop(0, '#ef4444');
-        barGradient.addColorStop(1, '#dc2626');
+    const barGradient = safeLinearGradient(ctx, cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY, '#22c55e');
+    if (typeof barGradient !== 'string') {
+        if (hpPct > 0.5) {
+            barGradient.addColorStop(0, '#22c55e');
+            barGradient.addColorStop(1, '#16a34a');
+        } else if (hpPct > 0.25) {
+            barGradient.addColorStop(0, '#eab308');
+            barGradient.addColorStop(1, '#ca8a04');
+        } else {
+            barGradient.addColorStop(0, '#ef4444');
+            barGradient.addColorStop(1, '#dc2626');
+        }
     }
 
     ctx.fillStyle = barGradient;
@@ -3137,10 +3198,12 @@ export function render() {
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
                 // Clean dim overlay for explored areas
-                const dimGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-                dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-                dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-                dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+                const dimGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(8, 12, 20, 0.6)');
+                if (typeof dimGradient !== 'string') {
+                    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+                    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+                    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+                }
                 ctx.fillStyle = dimGradient;
                 ctx.fill();
                 ctx.restore();
@@ -3184,10 +3247,12 @@ export function render() {
                 ctx.save();
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
-                const zoneGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-                zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
-                zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
-                zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
+                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(220, 38, 38, 0.25)');
+                if (typeof zoneGradient !== 'string') {
+                    zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
+                    zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
+                    zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
+                }
                 ctx.fillStyle = zoneGradient;
                 ctx.fill();
 
@@ -3285,13 +3350,17 @@ export function render() {
         const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r, state.hexSize);
 
         // Gradient attack line
-        const gradient = ctx.createLinearGradient(
+        const gradient = safeLinearGradient(
+            ctx,
             state.offsetX + fromPos.x, state.offsetY + fromPos.y,
-            state.offsetX + toPos.x, state.offsetY + toPos.y
+            state.offsetX + toPos.x, state.offsetY + toPos.y,
+            'rgba(239, 68, 68, 0.6)'
         );
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
-        gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
-        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+        }
 
         ctx.save();
         ctx.strokeStyle = gradient;
