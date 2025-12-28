@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.4...shadow-squad-v3.14.5) (2025-12-28)
+
+
+### Bug Fixes
+
+* **config:** reduce BASE_HEX_SIZE from 170 to 100 ([#164](https://github.com/CodingSteve01/battlezone/issues/164)) ([33e5645](https://github.com/CodingSteve01/battlezone/commit/33e5645efe24ef6a77aa49cee4a1a31f24746b43))
+
 ## [3.14.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.3...shadow-squad-v3.14.4) (2025-12-28)
 
 
