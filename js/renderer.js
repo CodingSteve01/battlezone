@@ -1140,7 +1140,21 @@ function animationLoop(timestamp) {
     const frameInterval = 1000 / getTargetFps();
     if (!lastFrameTime || timestamp - lastFrameTime >= frameInterval) {
         lastFrameTime = timestamp;
-        render();
+        try {
+            render();
+        } catch (error) {
+            // CRITICAL: Never let render errors crash the animation loop
+            // Log error and continue - a partially rendered frame is better than a black screen
+            console.error('[Renderer] RENDER ERROR (animation loop will continue):', error);
+            // Attempt to draw a simple error indicator instead of crashing
+            if (canvas && ctx) {
+                ctx.fillStyle = '#1a1a3e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = '16px monospace';
+                ctx.fillText('Render Error - See Console', 20, 30);
+            }
+        }
     }
 
     ensureAnimationLoop();
