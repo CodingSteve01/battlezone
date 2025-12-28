@@ -189,7 +189,7 @@ function drawRiverDetails() { }
 function drawTree2D5(x, y, size, treeType, seed) {
     const result = getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
     if (result) {
-        const { sprite, anchor, contentScale } = result;
+        const { sprite, contentScale } = result;
 
         // Size variation: 0.7x to 1.3x base size
         const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
@@ -198,23 +198,22 @@ function drawTree2D5(x, y, size, treeType, seed) {
         const baseHeight = size * 2.8 * sizeVariation;
 
         // Apply content scale - this accounts for cropping
-        // If content was 50% of original cell, we draw at 50% of target size
         const spriteHeight = baseHeight * contentScale.scaleY;
         const spriteWidth = spriteHeight * (sprite.width / sprite.height);
 
         // Random horizontal mirror (50% chance)
         const shouldMirror = seededRandom(seed * 2.2) > 0.5;
 
-        // Position using anchor point - anchor.x/y are normalized (0-1)
-        // For center-bottom anchor (0.5, 1.0), sprite is drawn with bottom-center at (x, y)
-        const drawX = x - spriteWidth * anchor.x;
-        const drawY = y - spriteHeight * anchor.y;
+        // Position: center horizontally at x, bottom at y (ground level)
+        // Trees can extend beyond tile edges - trunk is centered
+        const drawX = x - spriteWidth / 2;
+        const drawY = y - spriteHeight;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteWidth * anchor.x, -spriteHeight * anchor.y, spriteWidth, spriteHeight);
+            ctx.drawImage(sprite, -spriteWidth / 2, -spriteHeight, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
@@ -225,7 +224,7 @@ function drawTree2D5(x, y, size, treeType, seed) {
 function drawBush2D5(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('bush', seed * 0.001);
     if (result) {
-        const { sprite, anchor, contentScale } = result;
+        const { sprite, contentScale } = result;
 
         // Size variation: 0.6x to 1.4x
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
@@ -238,15 +237,15 @@ function drawBush2D5(x, y, size, seed) {
         // Random horizontal mirror
         const shouldMirror = seededRandom(seed * 2.4) > 0.5;
 
-        // Position using anchor point
-        const drawX = x - spriteSize * anchor.x;
-        const drawY = y - spriteSize * anchor.y;
+        // Position: center horizontally at x, bottom at y (ground level)
+        const drawX = x - spriteSize / 2;
+        const drawY = y - spriteSize;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteSize * anchor.x, -spriteSize * anchor.y, spriteSize, spriteSize);
+            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize, spriteSize, spriteSize);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
         }
@@ -257,7 +256,7 @@ function drawBush2D5(x, y, size, seed) {
 function drawSmallShrub(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
     if (result) {
-        const { sprite, anchor, contentScale } = result;
+        const { sprite, contentScale } = result;
 
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
         const baseSize = size * 1.3 * sizeVariation;
@@ -267,15 +266,15 @@ function drawSmallShrub(x, y, size, seed) {
         const spriteSize = baseSize * avgScale;
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
 
-        // Position using anchor point
-        const drawX = x - spriteSize * anchor.x;
-        const drawY = y - spriteSize * anchor.y;
+        // Position: center horizontally at x, bottom at y (ground level)
+        const drawX = x - spriteSize / 2;
+        const drawY = y - spriteSize;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteSize * anchor.x, -spriteSize * anchor.y, spriteSize, spriteSize);
+            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize, spriteSize, spriteSize);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
         }
@@ -286,7 +285,7 @@ function drawSmallShrub(x, y, size, seed) {
 function drawFlowerCluster(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
     if (result) {
-        const { sprite, anchor, contentScale } = result;
+        const { sprite, contentScale } = result;
 
         const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
         const baseSize = size * 0.9 * sizeVariation;
@@ -295,9 +294,9 @@ function drawFlowerCluster(x, y, size, seed) {
         const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
         const spriteSize = baseSize * avgScale;
 
-        // Position using anchor point
-        const drawX = x - spriteSize * anchor.x;
-        const drawY = y - spriteSize * anchor.y;
+        // Position: center horizontally at x, bottom at y (ground level)
+        const drawX = x - spriteSize / 2;
+        const drawY = y - spriteSize;
         ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
     }
 }
@@ -2542,7 +2541,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
     // Size increased from 1.3 to 1.8 for better visibility at 100% zoom
-    drawUnitSprite(ctx, cx, cy - size * 0.2, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
