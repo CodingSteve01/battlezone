@@ -11,6 +11,37 @@ import { test, expect } from '@playwright/test';
  * For comprehensive AI behavior testing, use unit tests instead.
  */
 
+/**
+ * Helper: Navigate through wizard to start AI vs AI game
+ * @param {Page} page - Playwright page
+ */
+async function startAIvsAIGame(page) {
+  // Step 1: Main menu -> Wizard map
+  await page.locator('#start-btn').click();
+  await expect(page.locator('#wizard-map')).toHaveClass(/active/, { timeout: 3000 });
+
+  // Select small map for speed
+  await page.locator('[data-size="small"]').click();
+
+  // Step 2: Wizard map -> Wizard players
+  await page.locator('#wizard-map-next').click();
+  await expect(page.locator('#wizard-players')).toHaveClass(/active/, { timeout: 3000 });
+
+  // Set player 1 to AI (player 2 is AI by default)
+  const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
+  const player1Text = await player1Toggle.textContent();
+  if (player1Text?.includes('Mensch')) {
+    await player1Toggle.click();
+    await page.waitForTimeout(100);
+  }
+
+  // Step 3: Start game (AI vs AI skips team selection)
+  await page.locator('#wizard-players-next').click();
+
+  // Wait for game to initialize
+  await page.waitForTimeout(2000);
+}
+
 test.describe('AI vs AI Spectator Mode', () => {
   test.beforeEach(async ({ page }) => {
     // Set shorter default timeout for AI tests
@@ -34,24 +65,11 @@ test.describe('AI vs AI Spectator Mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Set up AI vs AI
-    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
-    const player1Text = await player1Toggle.textContent();
-    if (player1Text?.includes('Mensch')) {
-      await player1Toggle.click();
-    }
+    // Screenshot: Initial menu
+    await page.screenshot({ path: 'test-results/ai-vs-ai-menu.png' });
 
-    // Small map for speed
-    await page.locator('[data-size="small"]').click();
-
-    // Screenshot: Config
-    await page.screenshot({ path: 'test-results/ai-vs-ai-config.png' });
-
-    // Start game
-    await page.locator('#start-btn').click();
-
-    // Wait for game to initialize
-    await page.waitForTimeout(3000);
+    // Navigate through wizard and start AI vs AI game
+    await startAIvsAIGame(page);
 
     // Screenshot: Game started
     await page.screenshot({ path: 'test-results/ai-vs-ai-started.png' });
@@ -115,18 +133,8 @@ test.describe('AI vs AI Spectator Mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Set up AI vs AI
-    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
-    const player1Text = await player1Toggle.textContent();
-    if (player1Text?.includes('Mensch')) {
-      await player1Toggle.click();
-    }
-
-    await page.locator('[data-size="small"]').click();
-    await page.locator('#start-btn').click();
-
-    // Wait for game to start
-    await page.waitForTimeout(2000);
+    // Navigate through wizard and start AI vs AI game
+    await startAIvsAIGame(page);
 
     // Check round number advances over 10 seconds
     const initialRound = await page.evaluate(() => {
@@ -176,16 +184,8 @@ test.describe('AI vs AI Spectator Mode', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Set up AI vs AI
-    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
-    const player1Text = await player1Toggle.textContent();
-    if (player1Text?.includes('Mensch')) {
-      await player1Toggle.click();
-    }
-
-    await page.locator('[data-size="small"]').click();
-    await page.locator('#start-btn').click();
-    await page.waitForTimeout(2000);
+    // Navigate through wizard and start AI vs AI game
+    await startAIvsAIGame(page);
 
     // Quick canvas validity checks (3 checks over 6 seconds)
     let invalidCount = 0;

@@ -1,15 +1,25 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Menu Functionality', () => {
+/**
+ * Menu and Wizard Navigation Tests
+ *
+ * Tests the game's wizard flow:
+ * 1. Main Menu (#menu) - Click start
+ * 2. Map Setup (#wizard-map) - Select size, click next
+ * 3. Player Setup (#wizard-players) - Configure players/AI, click next
+ * 4. Team Selection (#team-select) - Select units (or auto for AI)
+ */
+
+test.describe('Menu Navigation', () => {
   test.beforeEach(async ({ page }) => {
-    // Collect all console errors
+    test.setTimeout(30000);
+
     page.on('console', msg => {
       if (msg.type() === 'error') {
         console.log(`Console error: ${msg.text()}`);
       }
     });
 
-    // Collect page errors (uncaught exceptions)
     page.on('pageerror', error => {
       console.log(`Page error: ${error.message}`);
     });
@@ -17,16 +27,11 @@ test.describe('Menu Functionality', () => {
 
   test('page loads without JavaScript errors', async ({ page }) => {
     const errors = [];
-
-    page.on('pageerror', error => {
-      errors.push(error.message);
-    });
+    page.on('pageerror', error => errors.push(error.message));
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-
-    // Wait a bit for any async initialization
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500);
 
     expect(errors).toEqual([]);
   });
@@ -35,12 +40,12 @@ test.describe('Menu Functionality', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // The menu element has id="menu", not "main-menu"
     const menu = page.locator('#menu');
     await expect(menu).toBeVisible();
+    await expect(menu).toHaveClass(/active/);
   });
 
-  test('start button is clickable and responsive', async ({ page }) => {
+  test('start button navigates to wizard-map', async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
 
@@ -51,121 +56,126 @@ test.describe('Menu Functionality', () => {
     await expect(startBtn).toBeVisible();
     await expect(startBtn).toBeEnabled();
 
-    // Click the button
     await startBtn.click();
 
-    // Check no errors occurred
-    expect(errors).toEqual([]);
+    // Should now be on wizard-map
+    const wizardMap = page.locator('#wizard-map');
+    await expect(wizardMap).toHaveClass(/active/, { timeout: 3000 });
 
-    // Menu should be hidden or team selection should appear
-    await page.waitForTimeout(500);
+    expect(errors).toEqual([]);
   });
 
-  test('single player button works', async ({ page }) => {
+  test('map size selection works', async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Single player button uses data-mode="single" attribute
-    const singlePlayerBtn = page.locator('[data-mode="single"]');
-    await expect(singlePlayerBtn).toBeVisible();
+    // Navigate to wizard-map
+    await page.locator('#start-btn').click();
+    await expect(page.locator('#wizard-map')).toHaveClass(/active/);
 
-    await singlePlayerBtn.click();
-    expect(errors).toEqual([]);
-
-    // Verify button is selected after click
-    await expect(singlePlayerBtn).toHaveClass(/selected/);
-  });
-
-  test('multiplayer button works', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Multiplayer button uses data-mode="multi" attribute
-    const multiplayerBtn = page.locator('[data-mode="multi"]');
-    await expect(multiplayerBtn).toBeVisible();
-
-    await multiplayerBtn.click();
-    expect(errors).toEqual([]);
-
-    // Verify button is selected after click
-    await expect(multiplayerBtn).toHaveClass(/selected/);
-  });
-
-  test('map size buttons work', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Test small map button
+    // Select small map
     const smallBtn = page.locator('[data-size="small"]');
-    await expect(smallBtn).toBeVisible();
     await smallBtn.click();
-    expect(errors).toEqual([]);
-
-    // Verify button is selected after click
     await expect(smallBtn).toHaveClass(/selected/);
-  });
 
-  test('full game flow - start single player game', async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
+    // Select large map
+    const largeBtn = page.locator('[data-size="large"]');
+    await largeBtn.click();
+    await expect(largeBtn).toHaveClass(/selected/);
+    await expect(smallBtn).not.toHaveClass(/selected/);
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    // Select single player using correct selector
-    const singlePlayerBtn = page.locator('[data-mode="single"]');
-    await expect(singlePlayerBtn).toBeVisible();
-    await singlePlayerBtn.click();
-    await page.waitForTimeout(300);
-
-    // Click start
-    const startBtn = page.locator('#start-btn');
-    await expect(startBtn).toBeVisible();
-    await startBtn.click();
-
-    await page.waitForTimeout(500);
-
-    // Team selection should appear
-    const teamSelect = page.locator('#team-select');
-    await expect(teamSelect).toBeVisible();
-
-    // Verify no JS errors occurred during the flow
-    if (errors.length > 0) {
-      console.log('Errors found:', errors);
-    }
     expect(errors).toEqual([]);
   });
 
-  test('player count buttons work in multiplayer mode', async ({ page }) => {
+  test('wizard navigation to player setup', async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    // Ensure multiplayer mode is selected (should be default)
-    const multiplayerBtn = page.locator('[data-mode="multi"]');
-    await multiplayerBtn.click();
+    // Navigate through wizard
+    await page.locator('#start-btn').click();
+    await expect(page.locator('#wizard-map')).toHaveClass(/active/);
 
-    // Test player count buttons
+    await page.locator('#wizard-map-next').click();
+    await expect(page.locator('#wizard-players')).toHaveClass(/active/, { timeout: 3000 });
+
+    expect(errors).toEqual([]);
+  });
+
+  test('player count selection works', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Navigate to player setup
+    await page.locator('#start-btn').click();
+    await page.locator('#wizard-map-next').click();
+    await expect(page.locator('#wizard-players')).toHaveClass(/active/);
+
+    // Select 3 players
     const threePlayerBtn = page.locator('[data-players="3"]');
-    await expect(threePlayerBtn).toBeVisible();
     await threePlayerBtn.click();
     await expect(threePlayerBtn).toHaveClass(/selected/);
 
+    // Select 4 players
     const fourPlayerBtn = page.locator('[data-players="4"]');
-    await expect(fourPlayerBtn).toBeVisible();
     await fourPlayerBtn.click();
     await expect(fourPlayerBtn).toHaveClass(/selected/);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('full wizard flow to team selection', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Step 1: Main menu -> Wizard map
+    await page.locator('#start-btn').click();
+    await expect(page.locator('#wizard-map')).toHaveClass(/active/);
+
+    // Step 2: Wizard map -> Wizard players
+    await page.locator('[data-size="small"]').click();
+    await page.locator('#wizard-map-next').click();
+    await expect(page.locator('#wizard-players')).toHaveClass(/active/);
+
+    // Step 3: Wizard players -> Team selection
+    await page.locator('#wizard-players-next').click();
+
+    // Should reach team selection
+    const teamSelect = page.locator('#team-select');
+    await expect(teamSelect).toBeVisible({ timeout: 5000 });
+
+    expect(errors).toEqual([]);
+  });
+
+  test('back navigation works', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // Navigate forward
+    await page.locator('#start-btn').click();
+    await page.locator('#wizard-map-next').click();
+    await expect(page.locator('#wizard-players')).toHaveClass(/active/);
+
+    // Navigate back
+    await page.locator('#wizard-players-back').click();
+    await expect(page.locator('#wizard-map')).toHaveClass(/active/);
+
+    await page.locator('#wizard-map-back').click();
+    await expect(page.locator('#menu')).toHaveClass(/active/);
 
     expect(errors).toEqual([]);
   });
