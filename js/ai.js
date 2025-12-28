@@ -14,7 +14,7 @@ import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
-import { scrollToUnit, scrollToUnitWithZoom } from './input.js';
+import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom } from './input.js';
 import { logAI, logError } from './errorLog.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
@@ -1034,11 +1034,11 @@ async function performAIActions() {
                 break;
             }
 
-            // In spectator mode, use cinematic zoom scroll to follow the action
+            // In spectator mode, scroll to follow the action with situational zoom
             if (spectatorMode) {
-                // Dynamic zoom: zoom in for a close-up view of the unit
-                // Use safeAwait to prevent hanging on animation issues
-                await safeAwait(scrollToUnitWithZoom(unit, 500, 1.3), 2000);
+                // Get relevant units for dynamic zoom based on situation
+                const relevantUnits = getRelevantUnitsForZoom(unit, state.viewingPlayer);
+                await safeAwait(scrollToUnitWithZoom(unit, 500, null, relevantUnits), 2000);
                 await delay(300);
             }
 
@@ -1730,10 +1730,11 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         addAIThought(`${unitName} greift ${targetName} an (${hpPercent}% HP)`, 'attack');
     }
 
-    // In spectator mode, use cinematic zoom to show the attack action
+    // In spectator mode, scroll to show the attack action with situational zoom
     if (spectatorMode) {
-        // Zoom in closer for combat (1.4x for dramatic effect)
-        await scrollToUnitWithZoom(target, scrollDelay, 1.4);
+        // Include attacker and nearby units for situational zoom
+        const relevantUnits = [unit, ...getRelevantUnitsForZoom(target, state.viewingPlayer)];
+        await scrollToUnitWithZoom(target, scrollDelay, null, relevantUnits);
         await delay(200);
     } else if (hasHumanViewer) {
         // Normal scroll for human player watching AI
@@ -2419,8 +2420,9 @@ async function executeAIMove(unit, target, spectatorMode = false) {
 
     // If unit starts visible or in spectator mode, scroll to it first
     if (spectatorMode) {
-        // Use cinematic zoom scroll for spectator mode (zoom out slightly to see more of path)
-        await scrollToUnitWithZoom(unit, scrollDuration, 1.1);
+        // Situational zoom based on unit and nearby enemies/allies
+        const relevantUnits = getRelevantUnitsForZoom(unit, state.viewingPlayer);
+        await scrollToUnitWithZoom(unit, scrollDuration, null, relevantUnits);
     } else if (hasHumanViewer && wasVisible) {
         scrollToUnit(unit, scrollDuration);
         await delay(scrollDuration + 100);
@@ -2448,9 +2450,10 @@ async function executeAIMove(unit, target, spectatorMode = false) {
         // Check if unit just became visible
         if (hasHumanViewer && isNowVisible && !unitBecameVisible) {
             unitBecameVisible = true;
-            // Scroll to show the newly visible enemy
+            // Scroll to show the newly visible enemy with situational zoom
             if (spectatorMode) {
-                await scrollToUnitWithZoom(unit, 400, 1.2);
+                const relevantUnits = getRelevantUnitsForZoom(unit, state.viewingPlayer);
+                await scrollToUnitWithZoom(unit, 400, null, relevantUnits);
             } else {
                 scrollToUnit(unit, 300);
                 await delay(350);
