@@ -750,6 +750,76 @@ function updateMapPreview() {
 }
 
 /**
+ * Get a representative color for a hex that includes vegetation/details
+ * This creates a more accurate preview of how the hex will look in-game
+ */
+function getPreviewColor(terrainType, q, r) {
+    const terrain = TERRAIN[terrainType];
+    if (!terrain) return '#1a1a3e';
+
+    // Use deterministic random based on position for consistent results
+    const hash = Math.abs(((q * 73856093) ^ (r * 19349663)) % 100);
+
+    switch (terrainType) {
+        case 'forest':
+            // Forest hexes have trees - blend terrain color with darker tree color
+            // Trees make forest appear darker/more saturated
+            return blendColors(terrain.color, '#2a4a30', 0.4);
+
+        case 'grass':
+            // Some grass hexes have bushes or tall grass
+            if (hash < 30) {
+                // Has vegetation - slightly darker/more saturated
+                return blendColors(terrain.color, '#5a8a48', 0.2);
+            }
+            return terrain.color;
+
+        case 'hills':
+            // Hills may have rocks or sparse vegetation
+            if (hash < 20) {
+                return blendColors(terrain.color, '#8a8878', 0.15);
+            }
+            return terrain.color;
+
+        case 'sand':
+            // Sand with occasional rocks
+            if (hash < 15) {
+                return blendColors(terrain.color, '#a09888', 0.1);
+            }
+            return terrain.color;
+
+        case 'swamp':
+            // Swamp with water patches and vegetation
+            return blendColors(terrain.color, '#3a5a48', 0.2);
+
+        default:
+            return terrain.color;
+    }
+}
+
+/**
+ * Blend two hex colors together
+ * @param {string} color1 - First hex color
+ * @param {string} color2 - Second hex color
+ * @param {number} ratio - Blend ratio (0 = all color1, 1 = all color2)
+ */
+function blendColors(color1, color2, ratio) {
+    const r1 = parseInt(color1.slice(1, 3), 16);
+    const g1 = parseInt(color1.slice(3, 5), 16);
+    const b1 = parseInt(color1.slice(5, 7), 16);
+
+    const r2 = parseInt(color2.slice(1, 3), 16);
+    const g2 = parseInt(color2.slice(3, 5), 16);
+    const b2 = parseInt(color2.slice(5, 7), 16);
+
+    const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+    const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+    const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
  * Render the map preview on canvas
  */
 function renderMapPreview(canvas, overlay) {
@@ -783,9 +853,8 @@ function renderMapPreview(canvas, overlay) {
         const x = centerX + hex.q * previewHexSize * 1.5;
         const y = centerY + (hex.r + hex.q * 0.5) * previewHexSize * Math.sqrt(3);
 
-        // Get terrain color
-        const terrain = TERRAIN[hex.type];
-        const color = terrain ? terrain.color : '#1a1a3e';
+        // Get representative color including vegetation/details
+        const color = getPreviewColor(hex.type, hex.q, hex.r);
 
         // Draw hex
         drawPreviewHex(ctx, x, y, previewHexSize * 0.95, color);
