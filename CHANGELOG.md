@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.12.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.11.1...shadow-squad-v3.12.0) (2025-12-28)
+
+
+### Features
+
+* **ui:** add game wizard with map preview and player names ([#146](https://github.com/CodingSteve01/battlezone/issues/146)) ([9146015](https://github.com/CodingSteve01/battlezone/commit/9146015ed75702bf3406bdfdd815d379f70b4448))
+
 ## [3.11.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.11.0...shadow-squad-v3.11.1) (2025-12-27)
 
 
