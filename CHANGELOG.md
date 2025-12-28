@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.0...shadow-squad-v3.14.1) (2025-12-28)
+
+
+### Bug Fixes
+
+* **renderer:** prevent NaN values in zoom, camera, and hexSize ([#156](https://github.com/CodingSteve01/battlezone/issues/156)) ([aeae34e](https://github.com/CodingSteve01/battlezone/commit/aeae34efe1d7785e6ec86ada3b6381207edb3e90))
+
 ## [3.14.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.13.1...shadow-squad-v3.14.0) (2025-12-28)
 
 
