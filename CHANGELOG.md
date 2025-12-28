@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.13.1...shadow-squad-v3.14.0) (2025-12-28)
+
+
+### Features
+
+* **ui:** add in-game debug log and improve player naming ([#154](https://github.com/CodingSteve01/battlezone/issues/154)) ([3234117](https://github.com/CodingSteve01/battlezone/commit/3234117a8d9d644468fc62c416ac62ea75fe5cc0))
+
 ## [3.13.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.13.0...shadow-squad-v3.13.1) (2025-12-28)
 
 
