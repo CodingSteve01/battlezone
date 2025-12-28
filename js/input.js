@@ -484,7 +484,7 @@ export function centerOnCurrentUnit() {
 }
 
 /**
- * Center view on all player's units and zoom to fit them
+ * Center view on all player's units at 100% zoom
  * @param {number} playerIndex - The player index to center on
  * @param {number} duration - Animation duration in ms
  * @returns {Promise} - Resolves when animation completes
@@ -498,51 +498,29 @@ export function centerOnTeam(playerIndex, duration = 600) {
             return;
         }
 
-        // Calculate bounding box of player's units
+        // Set zoom to 100% (1.0) - no auto-zoom calculation
+        const targetZoom = 1.0;
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * targetZoom;
+
+        // Calculate center of units at target zoom level
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
 
         for (const unit of playerUnits) {
-            const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+            const pos = hexToPixel(unit.q, unit.r, targetHexSize);
             minX = Math.min(minX, pos.x);
             maxX = Math.max(maxX, pos.x);
             minY = Math.min(minY, pos.y);
             maxY = Math.max(maxY, pos.y);
         }
 
-        // Calculate center of units
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-
-        // Calculate required zoom to fit all units with padding
-        const canvas = document.getElementById('game-canvas');
-        if (!canvas) {
-            resolve();
-            return;
-        }
-
-        const rect = canvas.getBoundingClientRect();
-        const padding = 100; // Padding around units
-        const unitSpreadX = maxX - minX + padding * 2;
-        const unitSpreadY = maxY - minY + padding * 2;
-
-        // Ensure zoomLevel is valid before calculations
-        const currentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
-
-        // Calculate zoom level to fit units (guard against division by zero)
-        const spreadX = unitSpreadX / currentZoom;
-        const spreadY = unitSpreadY / currentZoom;
-        const zoomX = spreadX > 0 ? rect.width / spreadX : 1.0;
-        const zoomY = spreadY > 0 ? rect.height / spreadY : 1.0;
-        // Use state.minZoom and state.maxZoom for clamping
-        const minZoom = state.minZoom || 0.5;
-        const maxZoom = state.maxZoom || 2.0;
-        const targetZoom = Math.min(Math.max(Math.min(zoomX, zoomY), minZoom), maxZoom);
+        const targetCenterX = (minX + maxX) / 2;
+        const targetCenterY = (minY + maxY) / 2;
 
         // Animate to position and zoom
         const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
         const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-        const startZoom = currentZoom;
+        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
         const startTime = Date.now();
 
         function animate() {
@@ -554,11 +532,11 @@ export function centerOnTeam(playerIndex, duration = 600) {
                 ? 4 * progress * progress * progress
                 : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
-            // Animate zoom
+            // Animate zoom to 100%
             state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
             state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
 
-            // Recalculate center position at current zoom level
+            // Recalculate center at current zoom level for smooth animation
             let newMinX = Infinity, newMaxX = -Infinity;
             let newMinY = Infinity, newMaxY = -Infinity;
 

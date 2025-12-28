@@ -205,8 +205,7 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
 
     // Draw the unit
     if (sprite) {
-        // Get anchor and content scale for proper positioning and sizing
-        const anchor = SpriteSheet.getUnitAnchor(classType, playerIndex, status);
+        // Get content scale for proper sizing
         const contentScale = SpriteSheet.getUnitContentScale(classType, playerIndex, status);
 
         // Base sprite size - units should be smaller than hex size
@@ -218,9 +217,10 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
         const spriteWidth = baseSize * avgScale * (sprite.width / sprite.height);
         const spriteHeight = baseSize * avgScale;
 
-        // Position using anchor point (typically center-bottom for units)
-        const drawX = cx - spriteWidth * anchor.x;
-        const drawY = cy - spriteHeight * anchor.y;
+        // Position: center horizontally, bottom at cy (ground level)
+        // The renderer passes a position that's already adjusted for ground level
+        const drawX = cx - spriteWidth / 2;
+        const drawY = cy - spriteHeight;  // Bottom of sprite at cy
 
         ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
     } else {
