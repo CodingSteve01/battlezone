@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.13.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.12.0...shadow-squad-v3.13.0) (2025-12-28)
+
+
+### Features
+
+* **ci:** add manual workflow for asset generation with PR ([#148](https://github.com/CodingSteve01/battlezone/issues/148)) ([30e5efd](https://github.com/CodingSteve01/battlezone/commit/30e5efd0d9d116807c04d5bd0a7578bf3008bd95))
+
 ## [3.12.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.11.1...shadow-squad-v3.12.0) (2025-12-28)
 
 
