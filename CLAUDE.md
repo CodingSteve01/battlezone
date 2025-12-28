@@ -460,6 +460,29 @@ After pushing, wait 1-2 minutes for the pipeline to complete, then:
 
 9. **Conventional Commits** - All commits must follow the format `type(scope): description`. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+   **Allowed commit types:**
+   | Type       | Description                                      |
+   |------------|--------------------------------------------------|
+   | `feat`     | A new feature                                    |
+   | `fix`      | A bug fix                                        |
+   | `docs`     | Documentation only changes                       |
+   | `style`    | Code style (formatting, semicolons, etc.)        |
+   | `refactor` | Code refactoring without feature/fix             |
+   | `perf`     | Performance improvements                         |
+   | `test`     | Adding or updating tests                         |
+   | `ci`       | CI/CD configuration changes                      |
+   | `chore`    | Maintenance tasks                                |
+
+   **Examples:**
+   ```
+   feat(ui): add fog-of-war toggle
+   fix(ai): prevent units from moving off-grid
+   test(fogOfWar): add visibility unit tests
+   chore(deps): update vite to v6.0.0
+   ```
+
+   **Important:** Do NOT use types like `debug:` or custom types - CI will reject them!
+
 ## Related Documentation
 
 - [README.md](README.md) - Project overview and quick start

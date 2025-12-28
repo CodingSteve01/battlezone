@@ -963,16 +963,6 @@ async function init() {
         });
     });
 
-    // Setup help toggle
-    const helpToggle = document.getElementById('help-toggle');
-    const helpPanel = document.getElementById('help-panel');
-    if (helpToggle && helpPanel) {
-        helpToggle.onclick = () => {
-            helpToggle.classList.toggle('active');
-            helpPanel.classList.toggle('show');
-        };
-    }
-
     // Setup advanced settings toggle
     const advancedToggle = document.getElementById('advanced-toggle');
     const advancedSection = document.getElementById('advanced-section');
