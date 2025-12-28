@@ -1260,42 +1260,14 @@ function animationLoop(timestamp) {
 
 /**
  * Calculate appropriate hex size for screen
+ * Uses CONFIG.BASE_HEX_SIZE as the base, scaled by zoomLevel
  */
 function calculateHexSize() {
-    const container = canvas.parentElement;
-    if (!container) return CONFIG.BASE_HEX_SIZE;
-
-    const rect = container.getBoundingClientRect();
-
-    // Validate rect dimensions
-    if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
-        return CONFIG.BASE_HEX_SIZE;
-    }
-
-    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-
-    // Calculate grid dimensions
-    const gridWidth = (2 * radius + 1) * 1.8;
-    const gridHeight = (2 * radius + 1) * 1.6;
-
-    const padding = 40;
-    const availableWidth = rect.width - padding * 2;
-    const availableHeight = rect.height - padding * 2;
-
-    // Ensure we have positive available space
-    if (availableWidth <= 0 || availableHeight <= 0) {
-        return CONFIG.BASE_HEX_SIZE;
-    }
-
-    // Calculate hex size to fit
-    const hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
-
-    // Clamp to reasonable range - doubled for better visibility at 100% zoom
-    const baseSize = Math.max(60, Math.min(130, hexSize));
-
-    // Apply zoom level (ensure zoomLevel is valid)
+    // Ensure zoomLevel is valid
     const zoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
-    const result = baseSize * zoom;
+
+    // Simple calculation: base size * zoom level
+    const result = CONFIG.BASE_HEX_SIZE * zoom;
 
     // Final validation
     return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;

@@ -587,9 +587,11 @@ function startGameWithTeams() {
     // Clear cached hex tiles since map is regenerating
     clearRenderCaches();
 
-    // Reset camera position
+    // Reset camera and zoom to defaults
     state.cameraX = 0;
     state.cameraY = 0;
+    state.zoomLevel = 1.0;
+    state.hexSize = CONFIG.BASE_HEX_SIZE;  // Reset to base size (will be recalculated by resizeCanvas)
 
     // Generate map and units
     generateMap();
