@@ -11,6 +11,7 @@ export const state = {
         landscape: 'random',    // 'random', 'temperate', 'desert', 'tundra', 'tropical', 'highland', 'wetland'
         singlePlayer: false,    // Legacy: true = all non-0 players are AI
         aiPlayers: [],          // Array of player indices controlled by AI (e.g., [1, 3] for players 2 and 4)
+        playerNames: [],        // Array of player names (optional, defaults to "Spieler 1", "Spieler 2", etc.)
         renderQuality: 'auto',  // 'low', 'medium', 'high', 'auto'
         gore: false,            // Blut-Effekte (standardmäßig aus, kinderfreundlich)
         particleQuality: 'high', // 'low', 'medium', 'high' - Partikelanzahl
@@ -160,6 +161,16 @@ export const state = {
  */
 export function getHex(q, r) {
     return state.hexMap.get(`${q},${r}`);
+}
+
+/**
+ * Get player name (uses custom name or falls back to default)
+ */
+export function getPlayerName(playerIndex) {
+    if (state.settings.playerNames && state.settings.playerNames[playerIndex]) {
+        return state.settings.playerNames[playerIndex];
+    }
+    return `Spieler ${playerIndex + 1}`;
 }
 
 /**
