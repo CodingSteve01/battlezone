@@ -834,6 +834,31 @@ export function cleanupSuppression() {
     state.suppressedHexes = state.suppressedHexes.filter(s => s.expiresRound > state.round);
 }
 
+/**
+ * Prüfe ob ein Hex für eine bestimmte Einheit unterdrückt ist
+ * WICHTIG: Unterdrückung betrifft nur Feinde, nicht Verbündete!
+ * @param {number} q - Hex-Koordinate Q
+ * @param {number} r - Hex-Koordinate R
+ * @param {Object} unit - Die zu prüfende Einheit
+ * @returns {boolean} True wenn das Hex für diese Einheit unterdrückt ist
+ */
+export function isHexSuppressedForUnit(q, r, unit) {
+    if (!unit) return isHexSuppressed(q, r);
+
+    const suppression = getSuppressionInfo(q, r);
+    if (!suppression) return false;
+
+    // Finde den Unterdrücker
+    const suppressor = state.units.find(u => u.id === suppression.suppressorId);
+    if (!suppressor) return false;
+
+    // Unterdrückung betrifft nur Feinde des Unterdrückers!
+    if (suppressor.player === unit.player) return false;
+    if (areUnitsAllied(suppressor, unit)) return false;
+
+    return true;
+}
+
 // === OVERWATCH (DECKUNGSFEUER) HELPER ===
 
 /**

@@ -323,9 +323,10 @@ export function checkUnitSpotted(unit) {
     if (unit.cloaked) return false;
 
     // Check if any enemy unit has line of sight to this unit
+    // WICHTIG: Verbündete zählen nicht als Feinde!
     const enemyPlayers = [];
     for (let p = 0; p < state.settings.players; p++) {
-        if (p !== unit.player) {
+        if (p !== unit.player && !arePlayersAllied(unit.player, p)) {
             enemyPlayers.push(p);
         }
     }
