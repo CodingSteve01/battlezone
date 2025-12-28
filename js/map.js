@@ -86,6 +86,9 @@ export function generatePreviewMap(size, landscape) {
     const previewHexes = [];
     const radius = CONFIG.MAP_SIZES[size] || CONFIG.MAP_SIZES.medium;
 
+    // Generate random seed for this preview (different map each time)
+    const mapSeed = Math.floor(Math.random() * 100000);
+
     // Resolve biome
     let biome;
     if (landscape === 'random') {
@@ -102,7 +105,7 @@ export function generatePreviewMap(size, landscape) {
             if (!isValidHex(q, r, radius)) continue;
 
             const distFromCenter = hexDistance({ q: 0, r: 0 }, { q, r });
-            const hex = createPreviewHex(q, r, distFromCenter, radius, biome);
+            const hex = createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed);
             previewHexes.push(hex);
         }
     }
@@ -113,12 +116,12 @@ export function generatePreviewMap(size, landscape) {
 /**
  * Create a hex for preview (simplified, no state)
  */
-function createPreviewHex(q, r, distFromCenter, radius, biome) {
+function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
     const edgeFactor = distFromCenter / radius;
 
-    // Use simplified noise for faster preview
-    const elevationNoise = simpleFractalNoise(q, r, 16, 3, 1);
-    const moistureNoise = simpleFractalNoise(q, r, 14, 2, 2);
+    // Use simplified noise with random seed for variety
+    const elevationNoise = simpleFractalNoise(q, r, 16, 3, mapSeed);
+    const moistureNoise = simpleFractalNoise(q, r, 14, 2, mapSeed + 1000);
 
     const elev = biome.elevationThresholds;
     const moist = biome.moistureThresholds;
