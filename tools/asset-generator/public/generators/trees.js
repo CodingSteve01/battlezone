@@ -389,51 +389,186 @@ const TreeGenerator = {
     },
 
     drawMicroBranches(ctx, width, height, config, rand) {
-        // Draw tiny twigs that extend into the foliage area
+        // Draw a realistic network of fine branches visible through foliage
         const centerX = width / 2;
         const baseY = height - 15;
         const trunkHeight = height * 0.45;
         const foliageY = baseY - trunkHeight;
+        const foliageHeight = height * 0.45;
+        const foliageWidth = width * 0.42;
 
-        ctx.strokeStyle = config.trunkShadow;
-        ctx.lineWidth = 1;
-        ctx.lineCap = 'round';
+        // === MAIN STRUCTURAL BRANCHES (visible through gaps in foliage) ===
+        // These are medium branches that support the foliage structure
+        const structuralCount = 5 + Math.floor(config.branchiness * 4);
 
-        const twigCount = 20 + Math.floor(config.branchiness * 15);
+        for (let i = 0; i < structuralCount; i++) {
+            const angle = (i / structuralCount) * Math.PI * 2 + rand() * 0.5;
+            const startY = foliageY + foliageHeight * 0.3;
 
-        for (let i = 0; i < twigCount; i++) {
-            const angle = rand() * Math.PI * 2;
-            const startDist = 5 + rand() * 15;
-            const startX = centerX + Math.cos(angle) * startDist;
-            const startY = foliageY - rand() * height * 0.25;
-            const twigLength = 8 + rand() * 20;
-            const twigAngle = angle + (rand() - 0.5) * 1.5;
+            // Main structural branch
+            const length = foliageWidth * (0.5 + rand() * 0.4);
+            const branchAngle = angle + (rand() - 0.5) * 0.4;
+            const endX = centerX + Math.cos(branchAngle) * length;
+            const endY = startY - length * 0.4 - rand() * 20;
 
-            ctx.globalAlpha = 0.4 + rand() * 0.3;
+            // Draw main branch with gradient thickness
+            ctx.strokeStyle = config.trunkShadow;
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.globalAlpha = 0.5;
+
             ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(
-                startX + Math.cos(twigAngle) * twigLength,
-                startY + Math.sin(twigAngle) * twigLength * 0.6 - twigLength * 0.3
+            ctx.moveTo(centerX, startY);
+            ctx.quadraticCurveTo(
+                centerX + Math.cos(branchAngle) * length * 0.4,
+                startY - length * 0.2,
+                endX,
+                endY
             );
             ctx.stroke();
 
-            // Tiny sub-twigs
-            if (rand() > 0.5) {
-                const subLen = twigLength * 0.4;
-                const midX = startX + Math.cos(twigAngle) * twigLength * 0.6;
-                const midY = startY + Math.sin(twigAngle) * twigLength * 0.3 - twigLength * 0.2;
+            // Secondary branches off the main structural branch
+            const secondaryCount = 2 + Math.floor(rand() * 3);
+            for (let j = 0; j < secondaryCount; j++) {
+                const t = 0.3 + (j / secondaryCount) * 0.5;
+                const branchX = centerX + Math.cos(branchAngle) * length * t;
+                const branchY = startY - length * 0.2 * t - t * 15;
+                const subAngle = branchAngle + (rand() - 0.5) * 1.2;
+                const subLength = length * (0.3 + rand() * 0.2);
+
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = 0.4;
+                ctx.beginPath();
+                ctx.moveTo(branchX, branchY);
+                ctx.quadraticCurveTo(
+                    branchX + Math.cos(subAngle) * subLength * 0.5,
+                    branchY - subLength * 0.3,
+                    branchX + Math.cos(subAngle) * subLength,
+                    branchY - subLength * 0.5
+                );
+                ctx.stroke();
+
+                // Tertiary twigs off secondary branches
+                this.drawTwigCluster(ctx, branchX + Math.cos(subAngle) * subLength * 0.7,
+                    branchY - subLength * 0.35, config, rand, 3);
+            }
+
+            // End twig cluster
+            this.drawTwigCluster(ctx, endX, endY, config, rand, 4 + Math.floor(rand() * 3));
+        }
+
+        // === FINE TWIGS throughout foliage ===
+        const twigCount = 30 + Math.floor(config.branchiness * 25);
+
+        for (let i = 0; i < twigCount; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = rand() * foliageWidth * 0.8;
+            const startX = centerX + Math.cos(angle) * dist * 0.5;
+            const startY = foliageY - rand() * foliageHeight * 0.6;
+            const twigLength = 10 + rand() * 25;
+            const twigAngle = angle + (rand() - 0.5) * 1.2;
+
+            ctx.strokeStyle = config.trunkShadow;
+            ctx.globalAlpha = 0.25 + rand() * 0.25;
+            ctx.lineWidth = 0.8;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+
+            // Curved twig
+            const ctrlX = startX + Math.cos(twigAngle) * twigLength * 0.5;
+            const ctrlY = startY - twigLength * 0.3;
+            const endX = startX + Math.cos(twigAngle) * twigLength;
+            const endY = startY - twigLength * 0.4 + Math.sin(twigAngle) * twigLength * 0.2;
+
+            ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+            ctx.stroke();
+
+            // Mini-twigs branching off
+            if (rand() > 0.4) {
+                const midX = ctrlX;
+                const midY = ctrlY;
+                const miniLen = twigLength * 0.3;
 
                 ctx.lineWidth = 0.5;
+                ctx.globalAlpha = 0.2;
+
+                // Left mini-twig
                 ctx.beginPath();
                 ctx.moveTo(midX, midY);
-                ctx.lineTo(midX + (rand() - 0.5) * subLen, midY - subLen * 0.5);
+                ctx.lineTo(midX - miniLen * 0.5, midY - miniLen * 0.7);
+                ctx.stroke();
+
+                // Right mini-twig
+                ctx.beginPath();
+                ctx.moveTo(midX, midY);
+                ctx.lineTo(midX + miniLen * 0.5, midY - miniLen * 0.6);
                 ctx.stroke();
             }
         }
 
+        // === PERIPHERAL TWIGS at foliage edges ===
+        const edgeTwigCount = 15 + Math.floor(config.branchiness * 10);
+
+        for (let i = 0; i < edgeTwigCount; i++) {
+            const angle = (i / edgeTwigCount) * Math.PI * 2;
+            const edgeDist = foliageWidth * (0.85 + rand() * 0.15);
+            const x = centerX + Math.cos(angle) * edgeDist;
+            const y = foliageY + Math.sin(angle) * edgeDist * 0.5;
+
+            // Twigs pointing outward from edge
+            ctx.strokeStyle = config.trunkShadow;
+            ctx.globalAlpha = 0.3 + rand() * 0.2;
+            ctx.lineWidth = 0.6;
+
+            const twigLen = 8 + rand() * 12;
+            ctx.beginPath();
+            ctx.moveTo(x - Math.cos(angle) * 10, y - Math.sin(angle) * 5);
+            ctx.lineTo(x + Math.cos(angle) * twigLen, y + Math.sin(angle) * twigLen * 0.3 - twigLen * 0.2);
+            ctx.stroke();
+        }
+
         ctx.globalAlpha = 1;
         ctx.lineWidth = 1;
+    },
+
+    /**
+     * Draw a cluster of fine twigs at a branch endpoint
+     */
+    drawTwigCluster(ctx, x, y, config, rand, count) {
+        ctx.strokeStyle = config.trunkShadow;
+        ctx.lineCap = 'round';
+
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 1.5 - Math.PI * 0.75 + (rand() - 0.5) * 0.5;
+            const len = 6 + rand() * 10;
+
+            ctx.lineWidth = 0.6;
+            ctx.globalAlpha = 0.3 + rand() * 0.2;
+
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(
+                x + Math.cos(angle) * len,
+                y + Math.sin(angle) * len * 0.3 - len * 0.7
+            );
+            ctx.stroke();
+
+            // Tiny sub-twigs
+            if (rand() > 0.6) {
+                const midX = x + Math.cos(angle) * len * 0.6;
+                const midY = y + Math.sin(angle) * len * 0.15 - len * 0.4;
+                const subLen = len * 0.4;
+                const subAngle = angle + (rand() - 0.5) * 1.0;
+
+                ctx.lineWidth = 0.4;
+                ctx.globalAlpha = 0.2;
+                ctx.beginPath();
+                ctx.moveTo(midX, midY);
+                ctx.lineTo(midX + Math.cos(subAngle) * subLen, midY - subLen * 0.5);
+                ctx.stroke();
+            }
+        }
     },
 
     drawFoliage(ctx, width, height, config, rand) {
