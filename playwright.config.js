@@ -35,10 +35,10 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
   },
 
-  // Test timeout
-  timeout: 120000, // 2 minutes per test (AI games can take time)
+  // Test timeout - keep tests fast
+  timeout: 45000, // 45 seconds max per test
   expect: {
-    timeout: 10000, // 10 seconds for expect assertions
+    timeout: 5000, // 5 seconds for expect assertions
   },
 
   // Projects for different browsers (desktop only for now)

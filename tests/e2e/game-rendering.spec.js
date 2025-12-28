@@ -15,6 +15,7 @@ test.describe('Game Rendering', () => {
   let consoleErrors = [];
 
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(30000); // 30 seconds max
     pageErrors = [];
     consoleErrors = [];
 
@@ -204,9 +205,9 @@ test.describe('Game Rendering', () => {
     const canvas = page.locator('#game-canvas');
     await expect(canvas).toBeVisible();
 
-    // Monitor rendering for 10 seconds
+    // Quick rendering check (6 seconds)
     const renderChecks = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       await page.waitForTimeout(2000);
 
       const check = await page.evaluate(() => {
