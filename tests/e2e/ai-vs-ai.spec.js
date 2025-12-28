@@ -17,9 +17,17 @@ import { test, expect } from '@playwright/test';
  */
 async function disableTutorial(page) {
   await page.addInitScript(() => {
+    // Completely disable all tutorials
+    localStorage.setItem('shadowSquad_showTutorial', 'off');
     localStorage.setItem('shadowSquad_firstGame', 'true');
     localStorage.setItem('shadowSquad_tutorialHints', '["welcome","teamIntro"]');
-    localStorage.setItem('shadowSquad_teamSelectHints', '["teamIntro"]');
+    // Add ALL unit class hints to prevent popups on hover
+    localStorage.setItem('shadowSquad_teamSelectHints', JSON.stringify([
+      'teamIntro', 'budgetTip',
+      'scoutTip', 'assaultTip', 'medicTip', 'sniperTip', 'commandoTip', 'elitesoldatTip',
+      'synergy_balanced', 'synergy_stealth', 'synergy_defensive', 'synergy_elite', 'synergy_swarm',
+      'tactical_ambush', 'tactical_coordinated', 'tactical_flanking', 'tactical_cover'
+    ]));
   });
 }
 
