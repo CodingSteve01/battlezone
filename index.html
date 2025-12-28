@@ -73,6 +73,13 @@
                             <button class="setting-btn tutorial-reset-btn" id="reset-tutorial-btn" title="Tutorial von vorne beginnen">🔄</button>
                         </div>
                     </div>
+                    <!-- Hidden debug option -->
+                    <div class="option-row debug-option-row">
+                        <span class="option-label">🔧 Debug</span>
+                        <button class="debug-btn" id="show-log-btn">
+                            📋 Log anzeigen<span class="error-badge" id="error-count-badge" style="display: none;">0</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -205,7 +212,7 @@
                 </div>
                 <div class="team-select-header">
                     <div class="team-select-badge" id="team-select-badge">1</div>
-                    <h2 class="team-select-title">Spieler <span id="team-select-player">1</span></h2>
+                    <h2 class="team-select-title"><span id="team-select-player">Spieler 1</span></h2>
                 </div>
             </div>
 
@@ -231,7 +238,7 @@
         <div id="turn-screen" class="screen">
             <button class="back-btn" id="turn-back-btn">← Menü</button>
             <div class="turn-badge" id="turn-badge">1</div>
-            <h2 class="turn-title">Spieler <span id="turn-num">1</span></h2>
+            <h2 class="turn-title"><span id="turn-num">Spieler 1</span></h2>
             <p class="turn-hint">Gerät weitergeben!</p>
             <div class="players-alive-container" id="turn-players-alive"></div>
             <button class="ready-btn" id="ready-btn">Bereit</button>

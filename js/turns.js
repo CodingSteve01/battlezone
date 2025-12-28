@@ -3,7 +3,8 @@
 import {
     state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies,
     initSharedAPPool, isHexInZone, setOnAPDepletedCallback,
-    clearPlayerOverwatch, cleanupSuppression, hasAlliances, getPlayersInTeam
+    clearPlayerOverwatch, cleanupSuppression, hasAlliances, getPlayersInTeam,
+    getPlayerName
 } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
@@ -15,6 +16,7 @@ import { centerOnCurrentUnit, centerOnTeam, executeQueuedPathsForPlayer, playGam
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn, isSpectatorMode } from './ai.js';
+import { logInfo, logError } from './errorLog.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 // === SHRINKING ZONE CONSTANTS ===
@@ -65,10 +67,13 @@ export function startTurn() {
     // Clear any pending auto-end timer from previous turn
     clearAutoEndTurnTimer();
 
+    logInfo('Zug startet', `Spieler ${state.currentPlayer + 1}, Runde ${state.round}, AI: ${isAIPlayer()}, Spectator: ${isSpectatorMode()}`);
+
     const units = getPlayerUnits(state.currentPlayer);
 
     // Skip players with no units
     if (units.length === 0) {
+        logInfo('Spieler übersprungen - keine Einheiten');
         nextPlayer();
         return;
     }
@@ -119,6 +124,7 @@ export function startTurn() {
 
     // Update fog of war
     updateVisibility();
+    logInfo('Sichtbarkeit aktualisiert', `viewingPlayer: ${state.viewingPlayer}, visibleHexes: ${state.visibleHexes?.size || 0}`);
 
     // Initialize enemy tracking for this player's turn
     const visibleEnemies = getVisibleEnemies();
@@ -160,7 +166,8 @@ export function startTurn() {
 
     const turnNum = document.getElementById('turn-num');
     if (turnNum) {
-        turnNum.textContent = state.currentPlayer + 1;
+        // Use full player name instead of just number
+        turnNum.textContent = getPlayerName(state.currentPlayer);
     }
 
     // Skip the turn screen for the sole human player after first turn
@@ -354,16 +361,16 @@ export function endGame(winner, result = null) {
                 const teamPlayers = getPlayersInTeam(result.winningTeam);
                 if (teamPlayers.length > 1) {
                     // Team-Sieg: Zeige alle Spieler des Teams
-                    const playerNames = teamPlayers.map(p => `Spieler ${p + 1}`).join(' & ');
+                    const playerNames = teamPlayers.map(p => getPlayerName(p)).join(' & ');
                     winnerText.innerHTML = `🏆 TEAM GEWINNT!<br><span style="font-size: 0.8em">${playerNames}</span>`;
                     // Mische die Farben der Sieger
                     winnerText.style.color = CONFIG.PLAYER_COLORS[teamPlayers[0]];
                 } else {
-                    winnerText.textContent = `Spieler ${winner + 1} gewinnt!`;
+                    winnerText.textContent = `${getPlayerName(winner)} gewinnt!`;
                     winnerText.style.color = CONFIG.PLAYER_COLORS[winner];
                 }
             } else {
-                winnerText.textContent = `Spieler ${winner + 1} gewinnt!`;
+                winnerText.textContent = `${getPlayerName(winner)} gewinnt!`;
                 winnerText.style.color = CONFIG.PLAYER_COLORS[winner];
             }
         } else {
@@ -390,13 +397,13 @@ export function checkWinCondition() {
             if (result.isTeamVictory && hasAlliances()) {
                 const teamPlayers = getPlayersInTeam(result.winningTeam);
                 if (teamPlayers.length > 1) {
-                    const playerNums = teamPlayers.map(p => p + 1).join(' & ');
-                    showToast(`🏆 TEAM GEWINNT! (Spieler ${playerNums})`, 'levelup');
+                    const playerNames = teamPlayers.map(p => getPlayerName(p)).join(' & ');
+                    showToast(`🏆 TEAM GEWINNT! (${playerNames})`, 'levelup');
                 } else {
-                    showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+                    showToast(`🏆 ${getPlayerName(result.winner).toUpperCase()} GEWINNT!`, 'levelup');
                 }
             } else {
-                showToast(`🏆 SPIELER ${result.winner + 1} GEWINNT!`, 'levelup');
+                showToast(`🏆 ${getPlayerName(result.winner).toUpperCase()} GEWINNT!`, 'levelup');
             }
         } else {
             showToast('⚖️ UNENTSCHIEDEN!', 'special');

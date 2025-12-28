@@ -13,6 +13,7 @@ import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
+import { logRender, logError } from './errorLog.js';
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
@@ -1149,15 +1150,19 @@ function animationLoop(timestamp) {
             render();
         } catch (error) {
             // CRITICAL: Never let render errors crash the animation loop
-            // Log error and continue - a partially rendered frame is better than a black screen
-            console.error('[Renderer] RENDER ERROR (animation loop will continue):', error);
+            // Log error to our error log system so it can be viewed on mobile
+            logError('[Render] Fehler in render()', error);
+
             // Attempt to draw a simple error indicator instead of crashing
             if (canvas && ctx) {
                 ctx.fillStyle = '#1a1a3e';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff6b6b';
                 ctx.font = '16px monospace';
-                ctx.fillText('Render Error - See Console', 20, 30);
+                ctx.fillText('Renderfehler - Optionen > Debug-Log', 20, 30);
+                ctx.fillStyle = '#aaa';
+                ctx.font = '12px monospace';
+                ctx.fillText(error.message || String(error), 20, 50);
             }
         }
     }
@@ -2957,17 +2962,42 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
  * Main render function
  */
 export function render() {
-    if (!canvas || !ctx) return;
+    if (!canvas || !ctx) {
+        logRender('Canvas oder Context nicht verfügbar', `canvas: ${!!canvas}, ctx: ${!!ctx}`);
+        return;
+    }
 
     // Skip rendering if canvas has invalid dimensions (not yet sized)
-    if (canvas.width === 0 || canvas.height === 0) return;
+    if (canvas.width === 0 || canvas.height === 0) {
+        logRender('Canvas hat keine Dimensionen', `width: ${canvas.width}, height: ${canvas.height}`);
+        return;
+    }
 
-    // SAFETY: In spectator mode (AI vs AI), ensure visibility is always up-to-date
+    // Validate critical state before rendering
+    if (!state.hexes || state.hexes.length === 0) {
+        logRender('Keine Hexfelder vorhanden', `hexes: ${state.hexes?.length || 0}`);
+        // Draw a helpful message instead of black screen
+        const w = canvas.width / window.devicePixelRatio;
+        const h = canvas.height / window.devicePixelRatio;
+        ctx.fillStyle = '#1a1a3e';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Karte wird geladen...', w / 2, h / 2);
+        return;
+    }
+
+    // SAFETY: Ensure visibility arrays exist for current viewing player
+    const viewPlayer = state.viewingPlayer;
+    if (viewPlayer < 0 || viewPlayer >= state.settings.players) {
+        logRender('Ungültiger viewingPlayer', `viewPlayer: ${viewPlayer}, players: ${state.settings.players}`);
+        state.viewingPlayer = 0;
+    }
+
+    // SAFETY: In any AI mode, ensure visibility is always up-to-date
     // This prevents black screen issues from stale visibility data during turn transitions
-    // or when animation callbacks fire at unexpected times.
-    if (isSpectatorMode()) {
-        const viewPlayer = state.viewingPlayer;
-
+    if (isAIPlayer() || isSpectatorMode()) {
         // Ensure visibility arrays exist for this player
         if (!state.playerVisibleHexes[viewPlayer]) {
             state.playerVisibleHexes[viewPlayer] = new Set();
@@ -2979,7 +3009,7 @@ export function render() {
         const visibleHexes = state.playerVisibleHexes[viewPlayer];
         // Refresh if visibility seems stale (empty or undefined)
         if (!visibleHexes || visibleHexes.size === 0) {
-            console.log('[Render] Spectator mode: refreshing visibility for player', viewPlayer);
+            logRender('Visibility leer, aktualisiere', `viewPlayer: ${viewPlayer}, spectator: ${isSpectatorMode()}`);
             updateVisibilityForPlayer(viewPlayer);
         }
     }
