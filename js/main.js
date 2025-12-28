@@ -614,6 +614,16 @@ function startGameWithTeams() {
     // Initialize visibility for the viewing player
     updateVisibility();
 
+    // DEBUG: Log game initialization state
+    console.log('[DEBUG] Game initialized:');
+    console.log('[DEBUG]   - Players:', state.settings.players);
+    console.log('[DEBUG]   - Units created:', state.units.length);
+    console.log('[DEBUG]   - Hexes created:', state.hexes.length);
+    console.log('[DEBUG]   - Current player:', state.currentPlayer);
+    console.log('[DEBUG]   - Viewing player:', state.viewingPlayer);
+    console.log('[DEBUG]   - Player 0 visible hexes:', state.playerVisibleHexes[0]?.size || 0);
+    console.log('[DEBUG]   - Player 0 explored hexes:', state.playerExploredHexes[0]?.size || 0);
+
     // Show game area
     showScreen(null);
 

@@ -3021,6 +3021,9 @@ export function render() {
     // Collect AP cost overlay positions for drawing on top of everything
     const apCostOverlays = [];
 
+    // DEBUG: Track fog level distribution
+    let fogStats = { visible: 0, explored: 0, hidden: 0 };
+
     // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
@@ -3034,6 +3037,7 @@ export function render() {
         }
 
         const fogLevel = getFogLevel(hex.q, hex.r);
+        fogStats[fogLevel]++;
         const terrain = TERRAIN[hex.type];
 
         // Try to use cached tile for better performance
@@ -3246,6 +3250,13 @@ export function render() {
         ctx.stroke();
         ctx.setLineDash([]);
         ctx.restore();
+    }
+
+    // DEBUG: Log fog level distribution (once per frame)
+    if (!window._lastFogLog || Date.now() - window._lastFogLog > 5000) {
+        console.log('[DEBUG] Fog distribution - visible:', fogStats.visible, 'explored:', fogStats.explored, 'hidden:', fogStats.hidden);
+        console.log('[DEBUG] Total hexes rendered:', fogStats.visible + fogStats.explored + fogStats.hidden);
+        window._lastFogLog = Date.now();
     }
 
     // Draw ghost indicators for cloaked enemy attacks
