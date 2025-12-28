@@ -484,7 +484,7 @@ export function centerOnCurrentUnit() {
 }
 
 /**
- * Center view on all player's units at 100% zoom
+ * Center view on all player's units with slight zoom out for overview
  * @param {number} playerIndex - The player index to center on
  * @param {number} duration - Animation duration in ms
  * @returns {Promise} - Resolves when animation completes
@@ -498,8 +498,24 @@ export function centerOnTeam(playerIndex, duration = 600) {
             return;
         }
 
-        // Set zoom to 100% (1.0) - no auto-zoom calculation
-        const targetZoom = 1.0;
+        // Get visible enemies for situational zoom
+        const visibleEnemies = [];
+        for (const unit of state.units) {
+            if (unit.player === playerIndex || unit.hp <= 0) continue;
+            const hex = getHex(unit.q, unit.r);
+            if (hex && hex.visible && hex.visible[playerIndex]) {
+                visibleEnemies.push(unit);
+            }
+        }
+
+        // Calculate situational zoom: show own units + visible enemies
+        // Use first player unit as reference, include all relevant units
+        const referenceUnit = playerUnits[0];
+        const allRelevantUnits = [...playerUnits.slice(1), ...visibleEnemies];
+        const situationalZoom = calculateSituationalZoom(referenceUnit, allRelevantUnits);
+
+        // Clamp between 0.7 and 0.95 for turn start overview
+        const targetZoom = Math.max(0.7, Math.min(0.95, situationalZoom));
         const targetHexSize = CONFIG.BASE_HEX_SIZE * targetZoom;
 
         // Calculate center of units at target zoom level
@@ -1193,11 +1209,106 @@ export function scrollToUnit(unit, duration = 500) {
 }
 
 /**
+ * Calculate optimal zoom level to capture all relevant action in view
+ * Used for situational/dynamic zoom during AI turns or spectator mode
+ * @param {Object} focusUnit - The main unit to focus on
+ * @param {Array} relevantUnits - Other units that should be visible (enemies, allies in combat)
+ * @returns {number} Optimal zoom level (0.5 to 1.2 range)
+ */
+export function calculateSituationalZoom(focusUnit, relevantUnits = []) {
+    if (!focusUnit || !canvas) return 0.85; // Default zoom
+
+    // Gather all units that should be visible
+    const unitsToShow = [focusUnit, ...relevantUnits].filter(u => u && u.hp > 0);
+
+    if (unitsToShow.length <= 1) {
+        // Single unit - use moderate zoom for context
+        return 0.9;
+    }
+
+    // Calculate bounding box of all relevant units
+    let minQ = Infinity, maxQ = -Infinity;
+    let minR = Infinity, maxR = -Infinity;
+
+    for (const unit of unitsToShow) {
+        minQ = Math.min(minQ, unit.q);
+        maxQ = Math.max(maxQ, unit.q);
+        minR = Math.min(minR, unit.r);
+        maxR = Math.max(maxR, unit.r);
+    }
+
+    // Calculate the spread of units in hex coordinates
+    const spreadQ = maxQ - minQ;
+    const spreadR = maxR - minR;
+    const maxSpread = Math.max(spreadQ, spreadR);
+
+    // Calculate zoom to fit all units with padding
+    // More units spread out = zoom out more
+    const viewportWidth = canvas.width || 800;
+    const viewportHeight = canvas.height || 600;
+    const minViewportDim = Math.min(viewportWidth, viewportHeight);
+
+    // Each hex at zoom=1.0 is BASE_HEX_SIZE * 2 pixels wide approximately
+    const hexPixelSize = CONFIG.BASE_HEX_SIZE * 2;
+    const requiredPixels = (maxSpread + 2) * hexPixelSize; // +2 for padding
+
+    // Calculate zoom that would fit all units
+    const zoomToFit = minViewportDim / requiredPixels;
+
+    // Clamp to reasonable range:
+    // - Minimum 0.6 for complex situations (many units spread out)
+    // - Maximum 1.0 for close combat (don't zoom in too much)
+    const minZoom = state.minZoom || 0.5;
+    const maxZoom = Math.min(state.maxZoom || 2.0, 1.0); // Cap at 1.0 for situational
+
+    return Math.max(minZoom, Math.min(maxZoom, zoomToFit * 0.8)); // 0.8 factor for extra padding
+}
+
+/**
+ * Get units relevant to current action for situational zoom
+ * @param {Object} activeUnit - The unit performing an action
+ * @param {number} playerIndex - The player viewing
+ * @returns {Array} Units that should be visible in the camera
+ */
+export function getRelevantUnitsForZoom(activeUnit, playerIndex) {
+    if (!activeUnit) return [];
+
+    const relevantUnits = [];
+    const maxRelevantDistance = 8; // Only consider units within this hex distance
+
+    for (const unit of state.units) {
+        if (unit === activeUnit || unit.hp <= 0) continue;
+
+        const dist = hexDistance(activeUnit, unit);
+        if (dist > maxRelevantDistance) continue;
+
+        // Include enemies visible to the viewer
+        if (unit.player !== activeUnit.player) {
+            // Check if visible to viewer
+            const hex = getHex(unit.q, unit.r);
+            if (hex && hex.visible && hex.visible[playerIndex]) {
+                relevantUnits.push(unit);
+            }
+        }
+        // Include nearby allies (for coordinated attacks, etc.)
+        else if (dist <= 4) {
+            relevantUnits.push(unit);
+        }
+    }
+
+    return relevantUnits;
+}
+
+/**
  * Smoothly scroll camera to unit with dynamic zoom for spectator mode
  * Zooms in closer for a cinematic follow-cam experience
+ * @param {Object} unit - Unit to focus on
+ * @param {number} duration - Animation duration in ms
+ * @param {number|null} targetZoom - Explicit zoom level, or null for situational zoom
+ * @param {Array} relevantUnits - Additional units to keep in view (for situational zoom)
  * @returns Promise that resolves when animation completes
  */
-export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
+export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, relevantUnits = null) {
     return new Promise(resolve => {
         if (!unit) {
             resolve();
@@ -1207,9 +1318,21 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
         // Ensure valid starting zoom level
         const safeCurrentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
 
-        // Calculate target zoom - closer zoom for better viewing in spectator mode
-        // Default: zoom in to 1.2 or current zoom if already closer
-        const idealZoom = targetZoom || Math.max(1.2, safeCurrentZoom);
+        // Determine ideal zoom level:
+        // 1. If explicit targetZoom is provided, use it
+        // 2. If relevantUnits are provided (spectator mode), calculate situational zoom
+        // 3. Otherwise keep current zoom
+        let idealZoom;
+        if (targetZoom !== null) {
+            idealZoom = targetZoom;
+        } else if (relevantUnits !== null) {
+            // Situational zoom based on unit distribution
+            idealZoom = calculateSituationalZoom(unit, relevantUnits);
+        } else {
+            // Keep current zoom
+            idealZoom = safeCurrentZoom;
+        }
+
         // Use state.minZoom and state.maxZoom for clamping
         const minZoom = state.minZoom || 0.5;
         const maxZoom = state.maxZoom || 2.0;
