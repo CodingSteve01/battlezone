@@ -149,6 +149,125 @@ const TerrainGenerator = {
             accentColor: '#8aba80',
             detailType: 'grass',
             noiseScale: 0.02
+        },
+        // Directional stream tiles - straight connection (opposite edges)
+        stream_ew: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_straight',
+            direction: 'ew', // East-West (horizontal)
+            noiseScale: 0.025
+        },
+        stream_nesw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_straight',
+            direction: 'nesw', // Northeast-Southwest diagonal
+            noiseScale: 0.025
+        },
+        stream_nwse: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_straight',
+            direction: 'nwse', // Northwest-Southeast diagonal
+            noiseScale: 0.025
+        },
+        // Directional stream tiles - curved connections (adjacent edges)
+        stream_e_ne: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'e_ne', // East to Northeast
+            noiseScale: 0.025
+        },
+        stream_ne_nw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'ne_nw', // Northeast to Northwest
+            noiseScale: 0.025
+        },
+        stream_nw_w: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'nw_w', // Northwest to West
+            noiseScale: 0.025
+        },
+        stream_w_sw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'w_sw', // West to Southwest
+            noiseScale: 0.025
+        },
+        stream_sw_se: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'sw_se', // Southwest to Southeast
+            noiseScale: 0.025
+        },
+        stream_se_e: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            waterColor: '#5a9aaa',
+            waterLight: '#7abaca',
+            bankColor: '#8a7a60',
+            detailType: 'stream_curve',
+            direction: 'se_e', // Southeast to East
+            noiseScale: 0.025
         }
     },
 
@@ -399,6 +518,12 @@ const TerrainGenerator = {
                 break;
             case 'mud':
                 this.renderMudDetails(ctx, noise, detailNoise, width, height, variant, cx, cy, radius, terrain);
+                break;
+            case 'stream_straight':
+                this.renderStreamStraight(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
+                break;
+            case 'stream_curve':
+                this.renderStreamCurve(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
                 break;
         }
     },
@@ -2097,6 +2222,335 @@ const TerrainGenerator = {
             ctx.beginPath();
             ctx.ellipse(x, y, 2 + Math.random() * 2, 3 + Math.random() * 3, Math.random() * 0.5, 0, Math.PI * 2);
             ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    // ============================================
+    // DIRECTIONAL STREAM TILES
+    // ============================================
+
+    /**
+     * Get hex edge center points for a flat-top hex
+     * Edges: E=0, NE=1, NW=2, W=3, SW=4, SE=5
+     */
+    getHexEdgeCenter(cx, cy, radius, edgeIndex) {
+        const angle1 = (Math.PI / 3) * edgeIndex;
+        const angle2 = (Math.PI / 3) * ((edgeIndex + 1) % 6);
+        return {
+            x: cx + radius * (Math.cos(angle1) + Math.cos(angle2)) / 2,
+            y: cy + radius * (Math.sin(angle1) + Math.sin(angle2)) / 2
+        };
+    },
+
+    getEdgeIndex(dir) {
+        const edges = { e: 0, ne: 1, nw: 2, w: 3, sw: 4, se: 5 };
+        return edges[dir] ?? 0;
+    },
+
+    /**
+     * Render straight stream connecting opposite edges
+     */
+    renderStreamStraight(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain) {
+        const dir = terrain.direction || 'ew';
+        let edge1, edge2;
+
+        if (dir === 'ew') { edge1 = 0; edge2 = 3; }
+        else if (dir === 'nesw') { edge1 = 1; edge2 = 4; }
+        else if (dir === 'nwse') { edge1 = 2; edge2 = 5; }
+
+        const start = this.getHexEdgeCenter(cx, cy, radius, edge1);
+        const end = this.getHexEdgeCenter(cx, cy, radius, edge2);
+
+        this.drawStreamChannel(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant);
+        this.addBankDetails(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant);
+    },
+
+    /**
+     * Render curved stream connecting adjacent edges
+     */
+    renderStreamCurve(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain) {
+        const dir = terrain.direction || 'e_ne';
+        const parts = dir.split('_');
+        const edge1 = this.getEdgeIndex(parts[0]);
+        const edge2 = this.getEdgeIndex(parts[1]);
+
+        const start = this.getHexEdgeCenter(cx, cy, radius, edge1);
+        const end = this.getHexEdgeCenter(cx, cy, radius, edge2);
+
+        this.drawStreamChannelCurved(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant);
+        this.addBankDetailsCurved(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant);
+    },
+
+    drawStreamChannel(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const waterColor = terrain.waterColor || '#5a9aaa';
+        const waterLight = terrain.waterLight || '#7abaca';
+        const bankColor = terrain.bankColor || '#8a7a60';
+
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+
+        const streamWidth = radius * 0.32;
+        const bankWidth = streamWidth * 1.4;
+        const steps = 12;
+
+        // Bank
+        ctx.fillStyle = bankColor;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 3 + variant, 0) * 6;
+            if (i === 0) ctx.moveTo(x + nx * (bankWidth + wobble), y + ny * (bankWidth + wobble));
+            else ctx.lineTo(x + nx * (bankWidth + wobble), y + ny * (bankWidth + wobble));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 3 + variant, 0) * 6;
+            ctx.lineTo(x - nx * (bankWidth + wobble), y - ny * (bankWidth + wobble));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Water
+        ctx.fillStyle = waterColor;
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 4 + variant, 1) * 4;
+            if (i === 0) ctx.moveTo(x + nx * (streamWidth + wobble), y + ny * (streamWidth + wobble));
+            else ctx.lineTo(x + nx * (streamWidth + wobble), y + ny * (streamWidth + wobble));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 4 + variant, 1) * 4;
+            ctx.lineTo(x - nx * (streamWidth + wobble), y - ny * (streamWidth + wobble));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Flow lines
+        ctx.strokeStyle = waterLight;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = 0.35;
+        ctx.lineCap = 'round';
+
+        for (let l = 0; l < 3; l++) {
+            const offset = (l - 1) * streamWidth * 0.45;
+            ctx.beginPath();
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const x = start.x + dx * t + nx * (offset + noise.noise2D(t * 5 + l, l) * 3);
+                const y = start.y + dy * t + ny * (offset + noise.noise2D(t * 5 + l, l) * 3);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // Pebbles
+        ctx.globalAlpha = 0.45;
+        for (let i = 0; i < 8; i++) {
+            const t = 0.15 + noise.noise2D(i * 2, variant) * 0.7;
+            const offset = (noise.noise2D(i * 3, variant) - 0.5) * streamWidth * 0.5;
+            const x = start.x + dx * t + nx * offset;
+            const y = start.y + dy * t + ny * offset;
+            ctx.fillStyle = ['#7a6a5a', '#8a7a6a', '#6a5a4a'][i % 3];
+            ctx.beginPath();
+            ctx.ellipse(x, y, 1.5 + Math.random() * 2, 1 + Math.random(), Math.atan2(dy, dx), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    drawStreamChannelCurved(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const waterColor = terrain.waterColor || '#5a9aaa';
+        const waterLight = terrain.waterLight || '#7abaca';
+        const bankColor = terrain.bankColor || '#8a7a60';
+
+        const streamWidth = radius * 0.28;
+        const bankWidth = streamWidth * 1.4;
+        const steps = 14;
+
+        const getCurve = (t) => {
+            const mt = 1 - t;
+            return {
+                x: mt * mt * start.x + 2 * mt * t * cx + t * t * end.x,
+                y: mt * mt * start.y + 2 * mt * t * cy + t * t * end.y
+            };
+        };
+
+        const getNormal = (t) => {
+            const mt = 1 - t;
+            const dx = 2 * mt * (cx - start.x) + 2 * t * (end.x - cx);
+            const dy = 2 * mt * (cy - start.y) + 2 * t * (end.y - cy);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            return { x: -dy / len, y: dx / len };
+        };
+
+        // Bank
+        ctx.fillStyle = bankColor;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 3 + variant, 0) * 5;
+            if (i === 0) ctx.moveTo(pt.x + n.x * (bankWidth + w), pt.y + n.y * (bankWidth + w));
+            else ctx.lineTo(pt.x + n.x * (bankWidth + w), pt.y + n.y * (bankWidth + w));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 3 + variant, 0) * 5;
+            ctx.lineTo(pt.x - n.x * (bankWidth + w), pt.y - n.y * (bankWidth + w));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Water
+        ctx.fillStyle = waterColor;
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 4 + variant, 1) * 3;
+            if (i === 0) ctx.moveTo(pt.x + n.x * (streamWidth + w), pt.y + n.y * (streamWidth + w));
+            else ctx.lineTo(pt.x + n.x * (streamWidth + w), pt.y + n.y * (streamWidth + w));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 4 + variant, 1) * 3;
+            ctx.lineTo(pt.x - n.x * (streamWidth + w), pt.y - n.y * (streamWidth + w));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Flow lines
+        ctx.strokeStyle = waterLight;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = 0.35;
+        for (let l = 0; l < 2; l++) {
+            const offset = (l - 0.5) * streamWidth * 0.5;
+            ctx.beginPath();
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const pt = getCurve(t);
+                const n = getNormal(t);
+                const x = pt.x + n.x * (offset + noise.noise2D(t * 4 + l, l) * 2);
+                const y = pt.y + n.y * (offset + noise.noise2D(t * 4 + l, l) * 2);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    addBankDetails(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+        const bankOffset = radius * 0.5;
+
+        // Grass on banks
+        ctx.globalAlpha = 0.55;
+        const grassColors = ['#4a7a38', '#5a8a48', '#4a8a40'];
+
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < 12; i++) {
+                const t = 0.1 + (i / 12) * 0.8;
+                const offset = bankOffset + Math.abs(noise.noise2D(i, variant)) * radius * 0.2;
+                const x = start.x + dx * t + nx * offset * side;
+                const y = start.y + dy * t + ny * offset * side;
+
+                if (!this.isPointInHex(x, y, cx, cy, radius * 0.92)) continue;
+
+                ctx.strokeStyle = grassColors[i % 3];
+                ctx.lineWidth = 0.6;
+                for (let b = 0; b < 3; b++) {
+                    const angle = -Math.PI / 2 + (b - 1) * 0.3;
+                    const h = 4 + Math.random() * 5;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.quadraticCurveTo(x + Math.cos(angle) * h * 0.4, y - h * 0.5, x + Math.cos(angle) * h, y - h);
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    addBankDetailsCurved(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const streamWidth = radius * 0.28;
+        const bankOffset = streamWidth * 1.8;
+        const steps = 10;
+
+        const getCurve = (t) => {
+            const mt = 1 - t;
+            return {
+                x: mt * mt * start.x + 2 * mt * t * cx + t * t * end.x,
+                y: mt * mt * start.y + 2 * mt * t * cy + t * t * end.y
+            };
+        };
+
+        const getNormal = (t) => {
+            const mt = 1 - t;
+            const dx = 2 * mt * (cx - start.x) + 2 * t * (end.x - cx);
+            const dy = 2 * mt * (cy - start.y) + 2 * t * (end.y - cy);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            return { x: -dy / len, y: dx / len };
+        };
+
+        ctx.globalAlpha = 0.55;
+        const grassColors = ['#4a7a38', '#5a8a48', '#4a8a40'];
+
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < steps; i++) {
+                const t = 0.1 + (i / steps) * 0.8;
+                const pt = getCurve(t);
+                const n = getNormal(t);
+                const offset = bankOffset + Math.abs(noise.noise2D(i, variant)) * radius * 0.15;
+                const x = pt.x + n.x * offset * side;
+                const y = pt.y + n.y * offset * side;
+
+                if (!this.isPointInHex(x, y, cx, cy, radius * 0.92)) continue;
+
+                ctx.strokeStyle = grassColors[i % 3];
+                ctx.lineWidth = 0.6;
+                for (let b = 0; b < 2; b++) {
+                    const angle = -Math.PI / 2 + (b - 0.5) * 0.4;
+                    const h = 3 + Math.random() * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(angle) * h, y - h);
+                    ctx.stroke();
+                }
+            }
         }
         ctx.globalAlpha = 1;
     },
