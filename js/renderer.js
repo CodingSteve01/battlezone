@@ -3090,10 +3090,12 @@ export function render() {
         ctx.fillRect(0, 0, w, h);
     } else {
         // Background with modern gradient
-        const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
-        bgGradient.addColorStop(0, '#1a1a3e');
-        bgGradient.addColorStop(0.5, '#12122b');
-        bgGradient.addColorStop(1, '#0c0c1d');
+        const bgGradient = safeRadialGradient(ctx, w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8, '#12122b');
+        if (typeof bgGradient !== 'string') {
+            bgGradient.addColorStop(0, '#1a1a3e');
+            bgGradient.addColorStop(0.5, '#12122b');
+            bgGradient.addColorStop(1, '#0c0c1d');
+        }
         ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, w, h);
 
@@ -3101,9 +3103,11 @@ export function render() {
         if (state.effectiveQuality === 'high') {
             ctx.save();
             ctx.globalAlpha = 0.1;
-            const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
-            ambientGlow.addColorStop(0, '#10b981');
-            ambientGlow.addColorStop(1, 'transparent');
+            const ambientGlow = safeRadialGradient(ctx, w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5, 'transparent');
+            if (typeof ambientGlow !== 'string') {
+                ambientGlow.addColorStop(0, '#10b981');
+                ambientGlow.addColorStop(1, 'transparent');
+            }
             ctx.fillStyle = ambientGlow;
             ctx.fillRect(0, 0, w, h);
             ctx.restore();
