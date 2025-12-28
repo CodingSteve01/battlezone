@@ -19,33 +19,48 @@ battlezone/
 ├── css/
 │   └── styles.css      # Complete styling with CSS variables & animations
 ├── js/
-│   ├── main.js         # Entry point, game initialization, team selection
-│   ├── config.js       # Game constants, unit classes, terrain definitions
-│   ├── state.js        # Central game state management
-│   ├── map.js          # Procedural hex map generation
-│   ├── hexMath.js      # Hex coordinate math utilities
-│   ├── renderer.js     # Canvas rendering, terrain details, unit sprites
-│   ├── input.js        # Mouse/touch input handling, camera pan/zoom
-│   ├── units.js        # Unit creation, movement, animation
-│   ├── combat.js       # Attack calculations, special abilities
-│   ├── turns.js        # Turn management, round progression
-│   ├── pathfinding.js  # A* pathfinding for hex grids
-│   ├── fogOfWar.js     # Visibility and exploration system
-│   ├── ai.js           # AI opponent logic for single-player
-│   ├── ui.js           # UI updates, toasts, screen management
-│   ├── powerups.js     # Power-up spawning and effects
-│   ├── progression.js  # XP, leveling, rank system
-│   ├── events.js       # Random round events (storms, etc.)
-│   ├── assets.js       # Runtime sprite/texture generation (fallback)
-│   └── assetLoader.js  # Static asset loading with fallback support
-├── assets/             # Pre-generated static PNG assets (optional)
-│   ├── terrain/        # Terrain textures (grass.png, forest.png, etc.)
-│   ├── units/          # Unit sprites (scout_p0.png, assault_p1_selected.png, etc.)
-│   └── details/        # Terrain details (tree_0_0.png, bush_0.png, rock_0.png, etc.)
+│   ├── main.js            # Entry point, game initialization, team selection
+│   ├── config.js          # Game constants, unit classes, terrain definitions
+│   ├── state.js           # Central game state management
+│   ├── map.js             # Procedural hex map generation
+│   ├── hexMath.js         # Hex coordinate math utilities
+│   ├── renderer.js        # Canvas rendering, terrain details, unit sprites
+│   ├── input.js           # Mouse/touch input handling, camera pan/zoom
+│   ├── units.js           # Unit creation, movement, animation
+│   ├── combat.js          # Attack calculations, special abilities
+│   ├── turns.js           # Turn management, round progression
+│   ├── pathfinding.js     # A* pathfinding for hex grids
+│   ├── fogOfWar.js        # Visibility and exploration system
+│   ├── ai.js              # AI opponent logic for single-player
+│   ├── ui.js              # UI updates, toasts, screen management
+│   ├── powerups.js        # Power-up spawning and effects
+│   ├── progression.js     # XP, leveling, rank system
+│   ├── events.js          # Random round events (storms, etc.)
+│   ├── assets.js          # Runtime sprite/texture generation (fallback)
+│   ├── assetLoader.js     # Unified asset loading with anchor point support
+│   └── spriteSheetLoader.js # Sprite sheet parsing and extraction
+├── assets/
+│   └── spritesheets/   # Generated sprite sheet files
+│       ├── terrain-hexes.png/.json    # Terrain tiles (grass, forest, streams, paths, etc.)
+│       ├── trees.png/.json            # Tree sprites with variants
+│       ├── environment-details.png/.json  # Bushes, grass, rocks
+│       └── unit-sprites.png/.json     # All unit classes and states
 ├── tools/
-│   └── asset-generator.html  # Browser-based asset generator tool
+│   └── asset-generator/  # Browser-based asset generator (Express server)
+│       ├── server.js     # Express server for serving generator
+│       ├── public/
+│       │   ├── index.html    # Generator UI
+│       │   ├── app.js        # Main generator logic, sprite sheet creation
+│       │   └── generators/   # Individual asset generators
+│       │       ├── terrain.js    # Hex terrain textures (including streams, paths)
+│       │       ├── trees.js      # Tree sprites with branch networks
+│       │       ├── bushes.js     # Bush/vegetation sprites
+│       │       ├── characters.js # Unit character sprites
+│       │       ├── noise.js      # Perlin noise for procedural textures
+│       │       └── color.js      # Color utility functions
+│       └── package.json
 └── scripts/
-    └── generate-assets.js    # Playwright-based asset generation (requires browser)
+    └── generate-assets.js    # Playwright-based headless asset generation
 ```
 
 ## Key Architecture Patterns
@@ -111,6 +126,15 @@ Rendering is handled in `renderer.js`:
 | Water  | No       | -     | ∞         | Impassable |
 | Sand   | Yes      | No    | 1         | - |
 | Swamp  | Yes      | No    | 3         | Slow movement |
+
+**Directional Terrain Tiles** (for streams and paths):
+
+The asset generator supports directional tiles that connect specific hex edges:
+- **Straight connections**: `_ew` (East-West), `_nesw` (NE-SW), `_nwse` (NW-SE)
+- **Curved connections**: `_e_ne`, `_ne_nw`, `_nw_w`, `_w_sw`, `_sw_se`, `_se_e`
+
+Stream tiles (`stream_ew`, `stream_nesw`, etc.) show flowing water with banks.
+Path tiles (`path_ew`, `path_nesw`, etc.) show worn dirt tracks with grass edges.
 
 ### Combat System (`combat.js`)
 - Base hit chance: 70%
@@ -196,52 +220,87 @@ npm run preview
 - Movement animations use `requestAnimationFrame`
 - Canvas uses device pixel ratio for crisp rendering
 
-### Static Asset System
+### Sprite Sheet System
 
-The game supports both **runtime-generated** and **pre-generated static** assets:
+The game uses a **sprite sheet system** for efficient asset loading:
 
 **Architecture:**
-- `assetLoader.js` - Unified asset loading with automatic fallback
+- `spriteSheetLoader.js` - Loads sprite sheets and extracts individual sprites
+- `assetLoader.js` - Unified API with anchor point support for positioning
 - `assets.js` - Runtime canvas-based generation (fallback)
-- `tools/asset-generator.html` - Browser-based static asset generator
+- `tools/asset-generator/` - Browser-based sprite sheet generator
 - `scripts/generate-assets.js` - Automated Playwright-based generation
 
 **How it works:**
-1. On load, `assetLoader.js` checks if static assets exist in `assets/`
-2. If found, loads PNG files for textures, sprites, and details
-3. If not found, falls back to runtime canvas generation
-4. Both methods are transparent to the renderer
+1. On load, `spriteSheetLoader.js` loads sprite sheet PNGs and JSON metadata
+2. Individual sprites are extracted from the sheet based on JSON coordinates
+3. If sprite sheets are unavailable, falls back to runtime canvas generation
+4. The renderer uses `assetLoader.js` API transparently
+
+**Sprite Sheet Format (V2.0):**
+
+Sprite sheets use a JSON metadata format with anchor points:
+```json
+{
+  "version": "2.0",
+  "sprites": {
+    "tree_oak_0": {
+      "x": 0, "y": 0,
+      "width": 256, "height": 256,
+      "contentBounds": { "x": 20, "y": 10, "width": 200, "height": 230 },
+      "anchor": { "x": 0.5, "y": 0.95 }
+    }
+  }
+}
+```
+
+- `contentBounds` - Actual content area within the sprite cell (for cropped assets)
+- `anchor` - Normalized (0-1) positioning point (e.g., 0.5, 1.0 = center-bottom)
+
+**Anchor Points:**
+
+Anchor points enable correct sprite positioning:
+```javascript
+// Get anchor for a detail sprite
+const anchor = getDetailAnchor('tree', 0); // { x: 0.5, y: 0.95 }
+
+// Draw sprite with anchor-based positioning
+drawDetailSprite(ctx, 'tree', 0, tileX, tileY, scale);
+```
+
+Trees and details use center-bottom anchors so they're planted at the correct ground position regardless of sprite dimensions.
 
 **CI/CD Asset Generation:**
 Assets are automatically generated during GitHub Pages deployment:
 1. The `static.yml` workflow runs `npm run build` (which calls `generate-assets.js`)
 2. Playwright launches a headless browser to render all assets
-3. Assets are saved to `assets/` and included in the deployment
-4. The repository only contains `.gitkeep` files (assets are generated at deploy time)
+3. Assets are saved to `assets/spritesheets/` and included in the deployment
 
 **Generating Assets Locally:**
 Option 1 - Automated (requires Playwright):
 ```bash
 npm ci
 npx playwright install chromium
-npm run build
+npm run generate-assets
 ```
 
 Option 2 - Manual (browser-based):
-1. Open `tools/asset-generator.html` in a browser
-2. Click "Generate All Assets" to create previews
-3. Right-click to save individual assets, or use browser dev tools
-4. Save files to the `assets/` directory structure
+```bash
+cd tools/asset-generator && npm ci && npm start
+# Open http://localhost:3000 in browser
+# Click "Generate All" then "Save All to Assets"
+```
 
-**Asset Types:**
-- **Terrain textures** (128x128): `assets/terrain/grass.png`, `forest.png`, etc.
-- **Unit sprites** (130x130): `assets/units/scout_p0.png`, `assault_p1_selected.png`, etc.
-- **Terrain details** (128x128): `assets/details/tree_0_0.png`, `bush_0.png`, `rock_0.png`, etc.
+**Sprite Sheet Files:**
+- `terrain-hexes.png/.json` - All terrain tiles (grass, forest, streams, paths, etc.)
+- `trees.png/.json` - Tree variants with cropped content and anchors
+- `environment-details.png/.json` - Bushes, grass, rocks with anchors
+- `unit-sprites.png/.json` - All unit classes, players, and states
 
-**Benefits of Static Assets:**
-- Faster initial load (no runtime generation)
-- Ability to create more detailed/hand-crafted graphics
-- Reduced CPU usage during gameplay
+**Benefits:**
+- Fewer HTTP requests (one sheet vs. many individual files)
+- Efficient GPU texture batching
+- Whitespace-cropped sprites with anchor-based positioning
 - Consistent visuals across devices
 
 ## Common Tasks
@@ -269,7 +328,7 @@ main.js
 ├── map.js → hexMath.js, state.js, config.js
 ├── units.js → config.js, state.js, map.js
 ├── turns.js → state.js, config.js, units.js, fogOfWar.js, combat.js, ui.js
-├── renderer.js → config.js, state.js, hexMath.js, pathfinding.js, units.js, fogOfWar.js, assets.js
+├── renderer.js → config.js, state.js, hexMath.js, pathfinding.js, units.js, fogOfWar.js, assetLoader.js
 ├── input.js → state.js, hexMath.js, pathfinding.js, units.js, combat.js, turns.js, ui.js, renderer.js
 ├── combat.js → state.js, config.js, hexMath.js, units.js, ui.js, progression.js
 ├── fogOfWar.js → state.js, hexMath.js, config.js
@@ -278,14 +337,16 @@ main.js
 ├── pathfinding.js → state.js, config.js, hexMath.js
 ├── powerups.js → state.js, config.js
 ├── progression.js → config.js
-└── events.js → state.js
+├── events.js → state.js
+├── assetLoader.js → config.js, spriteSheetLoader.js
+└── spriteSheetLoader.js (standalone)
 ```
 
 ## CI/CD Pipeline
 
 ### Workflow Overview
 
-The project uses four GitHub Actions workflows that work together:
+The project uses five GitHub Actions workflows that work together:
 
 ```
 Push to main
@@ -299,6 +360,10 @@ Push to main
     └─→ static.yml ─→ Generate assets + Deploy to Pages
                             │
                             └─→ Also triggered by: release published
+
+Manual trigger (workflow_dispatch)
+    │
+    └─→ generate-assets.yml ─→ Generate sprite sheets + Create PR
 ```
 
 ### Workflow Files
@@ -309,6 +374,15 @@ Push to main
 | `release.yml` | Push to main | Release-please automation, publish ZIP |
 | `static.yml` | Push, release, manual | Asset generation, Pages deployment |
 | `preview.yml` | Manual dispatch | Preview deployments from branches |
+| `generate-assets.yml` | Manual dispatch | Generate assets and create PR |
+
+**Manual Asset Generation Workflow:**
+
+The `generate-assets.yml` workflow allows on-demand asset regeneration:
+1. Go to Actions → "Generate Assets" → "Run workflow"
+2. Optionally specify a custom branch name
+3. The workflow generates all sprite sheets via Playwright
+4. Creates a PR with the updated assets for review
 
 ### Release Please (Semantic Versioning)
 
