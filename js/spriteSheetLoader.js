@@ -23,6 +23,11 @@ const spriteRegistry = {
 // Key: sprite id, Value: { x: 0-1, y: 0-1 } where (0.5, 1.0) means center-bottom
 const anchorRegistry = new Map();
 
+// Content scale registry - stores the scale factor for cropped sprites
+// Key: sprite id, Value: { scaleX, scaleY } where 1.0 means no cropping
+// Used to draw sprites at correct size relative to originalSize
+const contentScaleRegistry = new Map();
+
 // Cache for mirrored (horizontally flipped) sprites
 const mirroredSpriteCache = new Map();
 
@@ -328,6 +333,15 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
             });
         }
 
+        // Store content scale if we have both contentBounds and originalSize
+        // This tells us how much of the original cell the content occupies
+        const originalSize = sprite.metadata?.originalSize || sprite.bounds;
+        if (sprite.contentBounds && originalSize) {
+            const scaleX = sprite.contentBounds.width / originalSize.width;
+            const scaleY = sprite.contentBounds.height / originalSize.height;
+            contentScaleRegistry.set(sprite.id, { scaleX, scaleY });
+        }
+
         // Handle different sprite types
         if (type === 'units') {
             const unitClass = sprite.metadata?.unitClass;
@@ -338,9 +352,12 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
                 // New format: sprites already have player index
                 const key = `${unitClass}_${state}_${player}`;
                 spriteRegistry.units.set(key, bitmap);
-                // Also store anchor for unit key
+                // Also store anchor and content scale for unit key
                 if (sprite.anchor) {
                     anchorRegistry.set(key, sprite.anchor);
+                }
+                if (contentScaleRegistry.has(sprite.id)) {
+                    contentScaleRegistry.set(key, contentScaleRegistry.get(sprite.id));
                 }
             } else if (definition.colorize?.enabled) {
                 // Old format: colorize to generate player variants
@@ -769,6 +786,31 @@ export function getRandomDetailSprite(detailType, seed = Math.random()) {
 }
 
 /**
+ * Get a random detail sprite with its anchor point and content scale
+ * @param {string} detailType - Type of detail (tree, bush, grass, rock)
+ * @param {number} seed - Random seed for consistent selection
+ * @returns {Object|null} { sprite: ImageBitmap, anchor: { x, y }, contentScale: { scaleX, scaleY } } or null
+ */
+export function getRandomDetailSpriteWithAnchor(detailType, seed = Math.random()) {
+    const info = variantRegistry.details[detailType];
+    if (!info || info.ids.length === 0) return null;
+
+    const index = Math.floor(seed * info.ids.length) % info.ids.length;
+    const spriteId = info.ids[index];
+    const sprite = spriteRegistry.details.get(spriteId);
+
+    if (!sprite) return null;
+
+    // Get anchor for this specific sprite, default to center-bottom
+    const anchor = anchorRegistry.get(spriteId) || { x: 0.5, y: 1.0 };
+
+    // Get content scale for this specific sprite, default to no scaling
+    const contentScale = contentScaleRegistry.get(spriteId) || { scaleX: 1, scaleY: 1 };
+
+    return { sprite, anchor, contentScale };
+}
+
+/**
  * Get number of variants for a detail type
  */
 export function getDetailVariantCount(detailType) {
@@ -841,6 +883,33 @@ export function getDetailAnchor(detailType, variant = 0) {
 export function getUnitAnchor(unitClass, playerIndex, state = 'normal') {
     const key = `${unitClass}_${state}_${playerIndex}`;
     return anchorRegistry.get(key) || { x: 0.5, y: 1.0 };
+}
+
+/**
+ * Get content scale for a unit sprite
+ * Returns how much of the original cell the cropped content occupies
+ * @param {string} unitClass - Unit class
+ * @param {number} playerIndex - Player index
+ * @param {string} state - Unit state
+ * @returns {Object} { scaleX: 0-1, scaleY: 0-1 } or { scaleX: 1, scaleY: 1 } if not cropped
+ */
+export function getUnitContentScale(unitClass, playerIndex, state = 'normal') {
+    const key = `${unitClass}_${state}_${playerIndex}`;
+    return contentScaleRegistry.get(key) || { scaleX: 1, scaleY: 1 };
+}
+
+/**
+ * Get content scale for a detail sprite
+ * @param {string} detailType - Detail type (tree, bush, grass, etc.)
+ * @param {number} variant - Variant index
+ * @returns {Object} { scaleX: 0-1, scaleY: 0-1 } or { scaleX: 1, scaleY: 1 } if not cropped
+ */
+export function getDetailContentScale(detailType, variant = 0) {
+    const info = variantRegistry.details[detailType];
+    if (!info || info.ids.length === 0) return { scaleX: 1, scaleY: 1 };
+
+    const spriteId = info.ids.find((id, i) => info.variants[i] === variant) || info.ids[0];
+    return contentScaleRegistry.get(spriteId) || { scaleX: 1, scaleY: 1 };
 }
 
 /**
