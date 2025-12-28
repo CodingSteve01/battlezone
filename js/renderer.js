@@ -1224,6 +1224,12 @@ function calculateHexSize() {
     if (!container) return CONFIG.BASE_HEX_SIZE;
 
     const rect = container.getBoundingClientRect();
+
+    // Validate rect dimensions
+    if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+        return CONFIG.BASE_HEX_SIZE;
+    }
+
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
 
     // Calculate grid dimensions
@@ -1234,14 +1240,23 @@ function calculateHexSize() {
     const availableWidth = rect.width - padding * 2;
     const availableHeight = rect.height - padding * 2;
 
+    // Ensure we have positive available space
+    if (availableWidth <= 0 || availableHeight <= 0) {
+        return CONFIG.BASE_HEX_SIZE;
+    }
+
     // Calculate hex size to fit
     const hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
 
     // Clamp to reasonable range - doubled for better visibility at 100% zoom
     const baseSize = Math.max(60, Math.min(130, hexSize));
 
-    // Apply zoom level
-    return baseSize * state.zoomLevel;
+    // Apply zoom level (ensure zoomLevel is valid)
+    const zoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+    const result = baseSize * zoom;
+
+    // Final validation
+    return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;
 }
 
 /**
@@ -1262,18 +1277,34 @@ export function resizeCanvas() {
     state.canvasHeight = rect.height;
 
     // Set canvas resolution
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.scale(dpr, dpr);
+
+    // Ensure camera values are valid numbers
+    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
 
     // Update hex size and center offset
     state.hexSize = calculateHexSize();
-    state.offsetX = rect.width / 2 + state.cameraX;
-    state.offsetY = rect.height / 2 + state.cameraY;
+    state.offsetX = rect.width / 2 + cameraX;
+    state.offsetY = rect.height / 2 + cameraY;
+
+    // Final validation - ensure we have valid render state
+    if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        state.hexSize = CONFIG.BASE_HEX_SIZE;
+    }
+    if (!Number.isFinite(state.offsetX)) {
+        state.offsetX = rect.width / 2;
+    }
+    if (!Number.isFinite(state.offsetY)) {
+        state.offsetY = rect.height / 2;
+    }
 
     render();
 }
@@ -3034,12 +3065,29 @@ export function render() {
         return;
     }
 
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
+    // CRITICAL: Ensure hexSize and offset are valid before rendering
+    // This prevents black screen when resizeCanvas hasn't completed yet
+    if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        console.warn('[Render] Fixing invalid hexSize:', state.hexSize);
+        state.hexSize = CONFIG.BASE_HEX_SIZE;
+    }
+    if (!Number.isFinite(state.offsetX)) {
+        console.warn('[Render] Fixing invalid offsetX:', state.offsetX);
+        state.offsetX = w / 2;
+    }
+    if (!Number.isFinite(state.offsetY)) {
+        console.warn('[Render] Fixing invalid offsetY:', state.offsetY);
+        state.offsetY = h / 2;
+    }
+
     // Validate critical state before rendering
     if (!state.hexes || state.hexes.length === 0) {
         logRender('Keine Hexfelder vorhanden', `hexes: ${state.hexes?.length || 0}`);
         // Draw a helpful message instead of black screen
-        const w = canvas.width / window.devicePixelRatio;
-        const h = canvas.height / window.devicePixelRatio;
         ctx.fillStyle = '#1a1a3e';
         ctx.fillRect(0, 0, w, h);
         ctx.fillStyle = '#fff';
@@ -3080,9 +3128,6 @@ export function render() {
 
     // Track performance for auto-quality adjustment
     updatePerformance();
-
-    const w = canvas.width / window.devicePixelRatio;
-    const h = canvas.height / window.devicePixelRatio;
 
     // Background - simplified on low quality
     if (state.effectiveQuality === 'low') {
