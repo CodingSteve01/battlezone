@@ -19,7 +19,7 @@ import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
 import { isAIPlayer } from './ai.js';
-import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint } from './tutorial.js';
+import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, shouldStartGuidedTutorial, startGuidedTutorial, notifyTutorialAction, isGuidedTutorialActive } from './tutorial.js';
 
 let canvas;
 let pendingMoveAnimationId = null;
@@ -857,6 +857,8 @@ function handleTapOrClick(clientX, clientY) {
             updateUI();
             render();
             showToast(`${hex.unit.name} ausgewählt`, 'info');
+            // Notify guided tutorial of unit selection
+            notifyTutorialAction('unitSelected');
             // Check for tutorial hints after selection
             checkTutorialHint();
             return;
@@ -918,6 +920,8 @@ async function handleEnemyClick(unit, hex) {
             render();
             updateUI();
 
+            // Notify guided tutorial of attack
+            notifyTutorialAction('unitAttacked');
             // Check for tutorial hints after attack
             showActionHint('attacked');
             checkTutorialHint();
@@ -1105,6 +1109,8 @@ function handleMoveClick(unit, hex) {
             render();
             updateUI();
 
+            // Notify guided tutorial of movement
+            notifyTutorialAction('unitMoved');
             // Check for tutorial hints after movement
             showActionHint('moved');
             checkTutorialHint();
@@ -1419,8 +1425,17 @@ export async function playGameIntro() {
  * Start the tutorial if this is the player's first game
  */
 function startTutorialIfNeeded() {
-    if (shouldStartTutorial()) {
+    // Try guided tutorial first (for better first-time experience)
+    if (shouldStartGuidedTutorial()) {
         // Small delay to let the UI settle
+        setTimeout(() => {
+            startGuidedTutorial();
+        }, 500);
+        return;
+    }
+
+    // Fall back to simple tutorial hints
+    if (shouldStartTutorial()) {
         setTimeout(() => {
             startTutorial();
         }, 500);
