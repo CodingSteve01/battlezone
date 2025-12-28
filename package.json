@@ -14,7 +14,9 @@
     "test:e2e:headed": "playwright test --headed",
     "lint": "eslint js/ tests/",
     "lint:fix": "eslint js/ tests/ --fix",
-    "validate": "npm run lint && npm run test && npm run test:e2e"
+    "validate": "npm run lint && npm run test && npm run test:e2e",
+    "generate-assets": "node scripts/generate-assets.js",
+    "generate-assets:headed": "node scripts/generate-assets.js --headed"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
