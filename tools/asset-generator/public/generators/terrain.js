@@ -625,8 +625,109 @@ const TerrainGenerator = {
         }
         ctx.globalAlpha = 1;
 
+        // Dandelions (both yellow flowers and fuzzy seed heads)
+        ctx.globalAlpha = 0.7;
+        const dandelionCount = 2 + Math.floor(Math.abs(noise.noise2D(variant * 8, 0)) * 3);
+        for (let i = 0; i < dandelionCount; i++) {
+            const x = cx + (noise.noise2D(i * 9, variant * 8) - 0.5) * radius * 1.2;
+            const y = cy + (noise.noise2D(variant * 8, i * 9) - 0.5) * radius;
+            const size = 2 + Math.abs(microNoise.noise2D(x, y)) * 1.5;
+            const isSeedHead = i % 2 === 0;
+
+            if (isSeedHead) {
+                // Fuzzy seed head (puffball)
+                ctx.fillStyle = 'rgba(245, 245, 235, 0.9)';
+                const seedCount = 12 + Math.floor(Math.random() * 8);
+                for (let s = 0; s < seedCount; s++) {
+                    const sAngle = (s / seedCount) * Math.PI * 2;
+                    const sRadius = size * (0.6 + Math.random() * 0.4);
+                    ctx.beginPath();
+                    ctx.arc(x + Math.cos(sAngle) * sRadius, y + Math.sin(sAngle) * sRadius, 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                // Center
+                ctx.fillStyle = '#d0d0c0';
+                ctx.beginPath();
+                ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Yellow dandelion flower
+                ctx.fillStyle = '#e8d030';
+                const petalCount = 16 + Math.floor(Math.random() * 8);
+                for (let p = 0; p < petalCount; p++) {
+                    const pAngle = (p / petalCount) * Math.PI * 2;
+                    const pLen = size * 0.9;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(pAngle) * pLen, y + Math.sin(pAngle) * pLen);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = '#e8d030';
+                    ctx.stroke();
+                }
+                ctx.fillStyle = '#c8a020';
+                ctx.beginPath();
+                ctx.arc(x, y, size * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Grass seed heads (tall grass with drooping seeds)
+        ctx.globalAlpha = 0.5;
+        const seedHeadCount = 4 + Math.floor(Math.abs(noise.noise2D(variant * 9, 0)) * 4);
+        for (let i = 0; i < seedHeadCount; i++) {
+            const baseX = cx + (noise.noise2D(i * 10, variant * 9) - 0.5) * radius * 1.3;
+            const baseY = cy + (noise.noise2D(variant * 9, i * 10) - 0.5) * radius * 1.1;
+            const height = 8 + Math.abs(microNoise.noise2D(baseX, baseY)) * 10;
+            const bend = (microNoise.noise2D(baseX * 0.1, baseY * 0.1) - 0.5) * 0.6;
+
+            // Stem
+            ctx.strokeStyle = '#7a9a60';
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(baseX, baseY);
+            const tipX = baseX + bend * height;
+            const tipY = baseY - height;
+            ctx.quadraticCurveTo(baseX + bend * height * 0.3, baseY - height * 0.6, tipX, tipY);
+            ctx.stroke();
+
+            // Seed cluster at top (drooping)
+            ctx.fillStyle = '#b0a070';
+            const seedDropAngle = Math.PI / 2 + bend * 0.5;
+            for (let s = 0; s < 6; s++) {
+                const sAngle = seedDropAngle + (s - 2.5) * 0.2;
+                const sLen = 2 + Math.random() * 2;
+                const seedX = tipX + Math.cos(sAngle) * sLen;
+                const seedY = tipY + Math.sin(sAngle) * sLen;
+                ctx.beginPath();
+                ctx.ellipse(seedX, seedY, 0.8, 0.4, sAngle, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Small ants/insects trail (optional detail)
+        if (variant % 3 === 0) {
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = '#2a2015';
+            const antX = cx + (noise.noise2D(variant * 11, 0) - 0.5) * radius * 0.8;
+            const antY = cy + (noise.noise2D(0, variant * 11) - 0.5) * radius * 0.6;
+            const antDirection = noise.noise2D(variant, variant) * Math.PI * 2;
+
+            for (let a = 0; a < 5; a++) {
+                const ax = antX + Math.cos(antDirection) * a * 6 + (Math.random() - 0.5) * 2;
+                const ay = antY + Math.sin(antDirection) * a * 6 + (Math.random() - 0.5) * 2;
+                // Ant body (simple)
+                ctx.beginPath();
+                ctx.ellipse(ax, ay, 0.8, 0.5, antDirection, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(ax + Math.cos(antDirection) * 0.8, ay + Math.sin(antDirection) * 0.8, 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         // Fine texture dots
-        ctx.fillStyle = 'rgba(0,0,0,0.05)';
+        ctx.globalAlpha = 0.05;
+        ctx.fillStyle = '#000000';
         for (let i = 0; i < 80; i++) {
             const x = cx + (noise.noise2D(i * 3, variant) - 0.5) * radius * 1.7;
             const y = cy + (noise.noise2D(variant, i * 3) - 0.5) * radius * 1.5;
@@ -634,6 +735,8 @@ const TerrainGenerator = {
             ctx.arc(x, y, 0.3 + Math.random() * 0.6, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        ctx.globalAlpha = 1;
     },
 
     /**
