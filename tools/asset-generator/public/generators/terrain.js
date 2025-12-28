@@ -268,6 +268,125 @@ const TerrainGenerator = {
             detailType: 'stream_curve',
             direction: 'se_e', // Southeast to East
             noiseScale: 0.025
+        },
+        // Directional path tiles - straight connections
+        path_ew: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_straight',
+            direction: 'ew',
+            noiseScale: 0.025
+        },
+        path_nesw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_straight',
+            direction: 'nesw',
+            noiseScale: 0.025
+        },
+        path_nwse: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_straight',
+            direction: 'nwse',
+            noiseScale: 0.025
+        },
+        // Directional path tiles - curved connections
+        path_e_ne: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'e_ne',
+            noiseScale: 0.025
+        },
+        path_ne_nw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'ne_nw',
+            noiseScale: 0.025
+        },
+        path_nw_w: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'nw_w',
+            noiseScale: 0.025
+        },
+        path_w_sw: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'w_sw',
+            noiseScale: 0.025
+        },
+        path_sw_se: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'sw_se',
+            noiseScale: 0.025
+        },
+        path_se_e: {
+            baseColor: '#5a8a48',
+            lightColor: '#6d9a58',
+            darkColor: '#4a7a38',
+            midColor: '#558842',
+            accentColor: '#7aaa68',
+            pathColor: '#8a7a60',
+            pathLight: '#9a8a70',
+            pathDark: '#6a5a48',
+            detailType: 'path_curve',
+            direction: 'se_e',
+            noiseScale: 0.025
         }
     },
 
@@ -524,6 +643,12 @@ const TerrainGenerator = {
                 break;
             case 'stream_curve':
                 this.renderStreamCurve(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
+                break;
+            case 'path_straight':
+                this.renderPathStraight(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
+                break;
+            case 'path_curve':
+                this.renderPathCurve(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
                 break;
         }
     },
@@ -2545,6 +2670,308 @@ const TerrainGenerator = {
                 for (let b = 0; b < 2; b++) {
                     const angle = -Math.PI / 2 + (b - 0.5) * 0.4;
                     const h = 3 + Math.random() * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(angle) * h, y - h);
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    // ============================================
+    // DIRECTIONAL PATH TILES
+    // ============================================
+
+    /**
+     * Render straight path connecting opposite edges
+     */
+    renderPathStraight(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain) {
+        const dir = terrain.direction || 'ew';
+        let edge1, edge2;
+
+        if (dir === 'ew') { edge1 = 0; edge2 = 3; }
+        else if (dir === 'nesw') { edge1 = 1; edge2 = 4; }
+        else if (dir === 'nwse') { edge1 = 2; edge2 = 5; }
+
+        const start = this.getHexEdgeCenter(cx, cy, radius, edge1);
+        const end = this.getHexEdgeCenter(cx, cy, radius, edge2);
+
+        this.drawPathChannel(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant);
+        this.addPathEdgeDetails(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant);
+    },
+
+    /**
+     * Render curved path connecting adjacent edges
+     */
+    renderPathCurve(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain) {
+        const dir = terrain.direction || 'e_ne';
+        const parts = dir.split('_');
+        const edge1 = this.getEdgeIndex(parts[0]);
+        const edge2 = this.getEdgeIndex(parts[1]);
+
+        const start = this.getHexEdgeCenter(cx, cy, radius, edge1);
+        const end = this.getHexEdgeCenter(cx, cy, radius, edge2);
+
+        this.drawPathChannelCurved(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant);
+        this.addPathEdgeDetailsCurved(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant);
+    },
+
+    drawPathChannel(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const pathColor = terrain.pathColor || '#8a7a60';
+        const pathLight = terrain.pathLight || '#9a8a70';
+        const pathDark = terrain.pathDark || '#6a5a48';
+
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+
+        const pathWidth = radius * 0.38;
+        const steps = 14;
+
+        // Path base with worn texture
+        ctx.fillStyle = pathColor;
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 3 + variant, 0) * 5;
+            if (i === 0) ctx.moveTo(x + nx * (pathWidth + wobble), y + ny * (pathWidth + wobble));
+            else ctx.lineTo(x + nx * (pathWidth + wobble), y + ny * (pathWidth + wobble));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 3 + variant, 0) * 5;
+            ctx.lineTo(x - nx * (pathWidth + wobble), y - ny * (pathWidth + wobble));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Worn center track (darker)
+        ctx.fillStyle = pathDark;
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+
+        const trackWidth = pathWidth * 0.5;
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 4 + variant, 1) * 3;
+            if (i === 0) ctx.moveTo(x + nx * (trackWidth + wobble), y + ny * (trackWidth + wobble));
+            else ctx.lineTo(x + nx * (trackWidth + wobble), y + ny * (trackWidth + wobble));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const x = start.x + dx * t;
+            const y = start.y + dy * t;
+            const wobble = microNoise.noise2D(t * 4 + variant, 1) * 3;
+            ctx.lineTo(x - nx * (trackWidth + wobble), y - ny * (trackWidth + wobble));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Footprints/impressions
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = pathDark;
+        for (let i = 0; i < 8; i++) {
+            const t = 0.1 + (noise.noise2D(i * 2, variant) * 0.8);
+            const offset = (noise.noise2D(i * 3, variant) - 0.5) * pathWidth * 0.6;
+            const x = start.x + dx * t + nx * offset;
+            const y = start.y + dy * t + ny * offset;
+            ctx.beginPath();
+            ctx.ellipse(x, y, 2 + Math.random() * 2, 1.5 + Math.random(), Math.atan2(dy, dx) + Math.random() * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Pebbles on path
+        ctx.globalAlpha = 0.35;
+        for (let i = 0; i < 12; i++) {
+            const t = 0.1 + noise.noise2D(i * 2.5, variant * 2) * 0.8;
+            const offset = (noise.noise2D(i * 3.5, variant) - 0.5) * pathWidth * 0.8;
+            const x = start.x + dx * t + nx * offset;
+            const y = start.y + dy * t + ny * offset;
+            ctx.fillStyle = ['#7a7068', '#8a8078', '#6a6058'][i % 3];
+            ctx.beginPath();
+            ctx.arc(x, y, 1 + Math.random() * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+    },
+
+    drawPathChannelCurved(ctx, noise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const pathColor = terrain.pathColor || '#8a7a60';
+        const pathDark = terrain.pathDark || '#6a5a48';
+
+        const pathWidth = radius * 0.32;
+        const steps = 16;
+
+        const getCurve = (t) => {
+            const mt = 1 - t;
+            return {
+                x: mt * mt * start.x + 2 * mt * t * cx + t * t * end.x,
+                y: mt * mt * start.y + 2 * mt * t * cy + t * t * end.y
+            };
+        };
+
+        const getNormal = (t) => {
+            const mt = 1 - t;
+            const dx = 2 * mt * (cx - start.x) + 2 * t * (end.x - cx);
+            const dy = 2 * mt * (cy - start.y) + 2 * t * (end.y - cy);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            return { x: -dy / len, y: dx / len };
+        };
+
+        // Path base
+        ctx.fillStyle = pathColor;
+        ctx.globalAlpha = 1;
+        ctx.beginPath();
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 3 + variant, 0) * 4;
+            if (i === 0) ctx.moveTo(pt.x + n.x * (pathWidth + w), pt.y + n.y * (pathWidth + w));
+            else ctx.lineTo(pt.x + n.x * (pathWidth + w), pt.y + n.y * (pathWidth + w));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 3 + variant, 0) * 4;
+            ctx.lineTo(pt.x - n.x * (pathWidth + w), pt.y - n.y * (pathWidth + w));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Worn track
+        ctx.fillStyle = pathDark;
+        ctx.globalAlpha = 0.35;
+        ctx.beginPath();
+
+        const trackWidth = pathWidth * 0.45;
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 4 + variant, 1) * 2;
+            if (i === 0) ctx.moveTo(pt.x + n.x * (trackWidth + w), pt.y + n.y * (trackWidth + w));
+            else ctx.lineTo(pt.x + n.x * (trackWidth + w), pt.y + n.y * (trackWidth + w));
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const w = microNoise.noise2D(t * 4 + variant, 1) * 2;
+            ctx.lineTo(pt.x - n.x * (trackWidth + w), pt.y - n.y * (trackWidth + w));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Pebbles
+        ctx.globalAlpha = 0.3;
+        for (let i = 0; i < 8; i++) {
+            const t = 0.15 + noise.noise2D(i * 2, variant) * 0.7;
+            const pt = getCurve(t);
+            const n = getNormal(t);
+            const offset = (noise.noise2D(i * 3, variant) - 0.5) * pathWidth * 0.6;
+            const x = pt.x + n.x * offset;
+            const y = pt.y + n.y * offset;
+            ctx.fillStyle = ['#7a7068', '#8a8078'][i % 2];
+            ctx.beginPath();
+            ctx.arc(x, y, 1 + Math.random(), 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+    },
+
+    addPathEdgeDetails(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+        const edgeOffset = radius * 0.45;
+
+        // Grass along path edges
+        ctx.globalAlpha = 0.5;
+        const grassColors = ['#4a7a38', '#5a8a48', '#4a8a40'];
+
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < 15; i++) {
+                const t = 0.05 + (i / 15) * 0.9;
+                const offset = edgeOffset + Math.abs(noise.noise2D(i, variant)) * radius * 0.15;
+                const x = start.x + dx * t + nx * offset * side;
+                const y = start.y + dy * t + ny * offset * side;
+
+                if (!this.isPointInHex(x, y, cx, cy, radius * 0.92)) continue;
+
+                ctx.strokeStyle = grassColors[i % 3];
+                ctx.lineWidth = 0.5;
+                for (let b = 0; b < 2; b++) {
+                    const angle = -Math.PI / 2 + (b - 0.5) * 0.3 + side * 0.2;
+                    const h = 3 + Math.random() * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(angle) * h, y - h);
+                    ctx.stroke();
+                }
+            }
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    addPathEdgeDetailsCurved(ctx, noise, detailNoise, microNoise, start, end, cx, cy, radius, terrain, variant) {
+        const pathWidth = radius * 0.32;
+        const edgeOffset = pathWidth * 1.5;
+        const steps = 12;
+
+        const getCurve = (t) => {
+            const mt = 1 - t;
+            return {
+                x: mt * mt * start.x + 2 * mt * t * cx + t * t * end.x,
+                y: mt * mt * start.y + 2 * mt * t * cy + t * t * end.y
+            };
+        };
+
+        const getNormal = (t) => {
+            const mt = 1 - t;
+            const dx = 2 * mt * (cx - start.x) + 2 * t * (end.x - cx);
+            const dy = 2 * mt * (cy - start.y) + 2 * t * (end.y - cy);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            return { x: -dy / len, y: dx / len };
+        };
+
+        ctx.globalAlpha = 0.5;
+        const grassColors = ['#4a7a38', '#5a8a48', '#4a8a40'];
+
+        for (let side = -1; side <= 1; side += 2) {
+            for (let i = 0; i < steps; i++) {
+                const t = 0.1 + (i / steps) * 0.8;
+                const pt = getCurve(t);
+                const n = getNormal(t);
+                const offset = edgeOffset + Math.abs(noise.noise2D(i, variant)) * radius * 0.1;
+                const x = pt.x + n.x * offset * side;
+                const y = pt.y + n.y * offset * side;
+
+                if (!this.isPointInHex(x, y, cx, cy, radius * 0.92)) continue;
+
+                ctx.strokeStyle = grassColors[i % 3];
+                ctx.lineWidth = 0.5;
+                for (let b = 0; b < 2; b++) {
+                    const angle = -Math.PI / 2 + (b - 0.5) * 0.3;
+                    const h = 3 + Math.random() * 3;
                     ctx.beginPath();
                     ctx.moveTo(x, y);
                     ctx.lineTo(x + Math.cos(angle) * h, y - h);

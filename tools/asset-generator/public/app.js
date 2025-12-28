@@ -162,10 +162,11 @@ function addPreviewItem(container, canvas, label) {
 // Terrain generation
 async function generateTerrain() {
     const settings = getSettings();
-    // Combine regular terrain types with stream types
+    // Combine regular terrain types with stream and path types
     const terrainTypes = getSelectedTypes('terrainTypes');
     const streamTypes = getSelectedTypes('streamTypes');
-    const types = [...terrainTypes, ...streamTypes];
+    const pathTypes = getSelectedTypes('pathTypes');
+    const types = [...terrainTypes, ...streamTypes, ...pathTypes];
 
     const preview = document.getElementById('terrainPreview');
     preview.innerHTML = '';
