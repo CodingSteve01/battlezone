@@ -2,7 +2,7 @@
 
 import { state, resetState, initZone } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { generateMap, generatePreviewMap } from './map.js';
+import { generateMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
 // Use the legacy canvas renderer for stability/performance
@@ -20,7 +20,6 @@ import { hexToPixel } from './hexMath.js';
 
 // Map preview state
 let mapPreviewTimeout = null;
-let previewHexes = [];
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
@@ -720,6 +719,7 @@ function setupWizardNavigation() {
 
 /**
  * Update map preview in wizard
+ * Generates the actual game map and renders it as preview
  */
 function updateMapPreview() {
     const canvas = document.getElementById('map-preview-canvas');
@@ -735,12 +735,20 @@ function updateMapPreview() {
     }
 
     mapPreviewTimeout = setTimeout(() => {
+        // Generate a new random seed for this map
+        state.mapSeed = Math.floor(Math.random() * 100000);
+
+        // Generate the ACTUAL game map (this is what will be played)
+        generateMap();
+
+        // Render preview using the generated map
         renderMapPreview(canvas, overlay);
     }, 150);
 }
 
 /**
  * Render the map preview on canvas
+ * Uses the actual game map (state.hexes) for accurate preview
  */
 function renderMapPreview(canvas, overlay) {
     const ctx = canvas.getContext('2d');
@@ -752,12 +760,16 @@ function renderMapPreview(canvas, overlay) {
     canvas.height = size * window.devicePixelRatio;
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-    // Generate preview map data
-    const previewData = generatePreviewMap(state.settings.size, state.settings.landscape);
-    previewHexes = previewData.hexes;
+    // Use the actual game map (already generated in updateMapPreview)
+    const hexes = state.hexes;
+    if (!hexes || hexes.length === 0) {
+        // Fallback if map not yet generated
+        if (overlay) overlay.classList.add('hidden');
+        return;
+    }
 
-    // Calculate hex size for preview
-    const radius = previewData.radius;
+    // Calculate hex size for preview based on map radius
+    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
     const previewHexSize = (size * 0.4) / (radius + 1);
 
     // Clear and fill background
@@ -768,12 +780,12 @@ function renderMapPreview(canvas, overlay) {
     const centerX = size / 2;
     const centerY = size / 2;
 
-    // Draw hexes
-    for (const hex of previewHexes) {
+    // Draw hexes using terrain color (like minimap)
+    for (const hex of hexes) {
         const x = centerX + hex.q * previewHexSize * 1.5;
         const y = centerY + (hex.r + hex.q * 0.5) * previewHexSize * Math.sqrt(3);
 
-        // Get terrain color
+        // Use terrain color directly (consistent with minimap)
         const terrain = TERRAIN[hex.type];
         const color = terrain ? terrain.color : '#1a1a3e';
 
@@ -952,16 +964,6 @@ async function init() {
             btn.click();
         });
     });
-
-    // Setup help toggle
-    const helpToggle = document.getElementById('help-toggle');
-    const helpPanel = document.getElementById('help-panel');
-    if (helpToggle && helpPanel) {
-        helpToggle.onclick = () => {
-            helpToggle.classList.toggle('active');
-            helpPanel.classList.toggle('show');
-        };
-    }
 
     // Setup advanced settings toggle
     const advancedToggle = document.getElementById('advanced-toggle');

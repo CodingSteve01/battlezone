@@ -27,6 +27,10 @@ export const state = {
     // Current active biome (resolved from 'random' or selected)
     activeBiome: 'temperate',
 
+    // Map seed for reproducible map generation
+    // Set when preview is generated, used for actual game
+    mapSeed: 0,
+
     // Performance tracking for auto-quality
     frameCount: 0,
     lastFrameTime: 0,

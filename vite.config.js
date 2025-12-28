@@ -113,11 +113,6 @@ export default defineConfig({
         __VERSION__: JSON.stringify(process.env.npm_package_version || 'dev')
     },
 
-    // Optimize dependencies
-    optimizeDeps: {
-        include: ['pixi.js']
-    },
-
     // Public directory for static assets that shouldn't be processed
     publicDir: false
 });

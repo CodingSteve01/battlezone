@@ -307,6 +307,29 @@ export function getFogLevel(q, r) {
                 return 'explored';
             }
         }
+
+        // ULTIMATE FALLBACK: If NO player has ANY visibility data at all,
+        // something went very wrong (units not created, visibility never calculated, etc.)
+        // Rather than showing a black screen, show all hexes as 'explored' (dimmed but visible).
+        // This ensures players can at least see the map and report the bug.
+        let anyPlayerHasVisibility = false;
+        for (let p = 0; p < state.settings.players; p++) {
+            const pv = state.playerVisibleHexes[p];
+            const pe = state.playerExploredHexes[p];
+            if ((pv && pv.size > 0) || (pe && pe.size > 0)) {
+                anyPlayerHasVisibility = true;
+                break;
+            }
+        }
+
+        if (!anyPlayerHasVisibility) {
+            // Log critical warning once
+            if (!state._criticalVisibilityWarningLogged) {
+                console.error('[FogOfWar] CRITICAL: No visibility data for ANY player! Showing all hexes as explored to prevent black screen.');
+                state._criticalVisibilityWarningLogged = true;
+            }
+            return 'explored';  // Show map dimmed rather than completely black
+        }
     }
 
     return 'hidden';

@@ -1123,9 +1123,14 @@ function getTargetFps() {
 }
 
 function shouldAnimate() {
+    // Don't animate if a menu screen is showing or no map exists
     if (state.screen !== null || state.hexes.length === 0) return false;
-    if (state.animating || state.movementAnimation) return true;
-    return particles.getActiveCount() > 0;
+
+    // ALWAYS animate when game is active (hexes exist and no menu showing)
+    // This ensures the render loop keeps running even when there are no
+    // active animations or particles. Without this, the game shows a black
+    // screen because the render loop stops immediately after the first frame.
+    return true;
 }
 
 function ensureAnimationLoop() {
@@ -1140,7 +1145,21 @@ function animationLoop(timestamp) {
     const frameInterval = 1000 / getTargetFps();
     if (!lastFrameTime || timestamp - lastFrameTime >= frameInterval) {
         lastFrameTime = timestamp;
-        render();
+        try {
+            render();
+        } catch (error) {
+            // CRITICAL: Never let render errors crash the animation loop
+            // Log error and continue - a partially rendered frame is better than a black screen
+            console.error('[Renderer] RENDER ERROR (animation loop will continue):', error);
+            // Attempt to draw a simple error indicator instead of crashing
+            if (canvas && ctx) {
+                ctx.fillStyle = '#1a1a3e';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff6b6b';
+                ctx.font = '16px monospace';
+                ctx.fillText('Render Error - See Console', 20, 30);
+            }
+        }
     }
 
     ensureAnimationLoop();
@@ -2480,6 +2499,11 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
  * Called after all depth-sorted elements to ensure visibility
  */
 function drawUnitOverlay(unit, cx, cy) {
+    // Safety check: bail out if coordinates are not finite (prevents NaN errors)
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        return;
+    }
+
     const size = state.hexSize * 0.65;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
@@ -2606,7 +2630,9 @@ function drawUnitOverlay(unit, cx, cy) {
     ctx.restore();
 
     // HP bar with gradient
-    const hpPct = unit.currentHp / unit.maxHp;
+    // Ensure hpPct is a valid number between 0 and 1
+    const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
+    const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
     const barWidth = size * 1.6;
     const barHeight = 8;
     const barY = cy + size * 0.65;
@@ -2617,8 +2643,9 @@ function drawUnitOverlay(unit, cx, cy) {
     ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
     ctx.fill();
 
-    // HP bar fill with gradient
-    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + barWidth * hpPct, barY);
+    // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
+    const gradientWidth = Math.max(1, barWidth * hpPct);
+    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY);
     if (hpPct > 0.5) {
         barGradient.addColorStop(0, '#22c55e');
         barGradient.addColorStop(1, '#16a34a');
