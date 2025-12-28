@@ -1,26 +1,56 @@
 // ===== MAIN ENTRY POINT =====
 
 import { state, resetState, initZone } from './state.js';
-import { CONFIG, UNIT_CLASSES } from './config.js';
-import { generateMap } from './map.js';
+import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
+import { generateMap, generatePreviewMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
 // Use the legacy canvas renderer for stability/performance
 import { initRenderer, resizeCanvas, render, clearRenderCaches } from './renderer.js';
 import { updateUI, showScreen, showToast } from './ui.js';
-import { initInput, centerOnCurrentUnit } from './input.js';
+import { initInput, centerOnCurrentUnit, centerOnTeam } from './input.js';
 import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory, isSpectatorMode } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
-import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial } from './tutorial.js';
+import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial, shouldStartTutorial } from './tutorial.js';
+import { hexToPixel } from './hexMath.js';
+
+// Map preview state
+let mapPreviewTimeout = null;
+let previewHexes = [];
 
 // Team selection state
 let currentTeamSelectPlayer = 0;
 let currentPlayerSelection = [];
 let currentBudgetSpent = 0;
+
+// Common German first names for random player name suggestions
+const GERMAN_NAMES = [
+    // Male names
+    'Max', 'Felix', 'Leon', 'Paul', 'Finn', 'Noah', 'Elias', 'Ben', 'Lukas', 'Jonas',
+    'Tim', 'Moritz', 'David', 'Jan', 'Tom', 'Niklas', 'Erik', 'Philipp', 'Julian', 'Liam',
+    'Anton', 'Emil', 'Luca', 'Theo', 'Oskar', 'Matteo', 'Jakob', 'Simon', 'Daniel', 'Alex',
+    // Female names
+    'Emma', 'Mia', 'Hannah', 'Sofia', 'Lena', 'Marie', 'Anna', 'Emilia', 'Lea', 'Clara',
+    'Lara', 'Lisa', 'Laura', 'Julia', 'Sarah', 'Nele', 'Nina', 'Sophie', 'Ella', 'Maya',
+    'Amelie', 'Johanna', 'Paula', 'Ida', 'Frieda', 'Greta', 'Charlotte', 'Pia', 'Zoe', 'Lina',
+    // Neutral/Nicknames
+    'Sam', 'Robin', 'Kim', 'Jo', 'Charlie', 'Alex', 'Sascha', 'Toni', 'Nico', 'Mika'
+];
+
+/**
+ * Get a random German name
+ */
+function getRandomName(usedNames = []) {
+    const availableNames = GERMAN_NAMES.filter(n => !usedNames.includes(n));
+    if (availableNames.length === 0) {
+        return GERMAN_NAMES[Math.floor(Math.random() * GERMAN_NAMES.length)];
+    }
+    return availableNames[Math.floor(Math.random() * availableNames.length)];
+}
 
 /**
  * Start team selection process
@@ -647,6 +677,140 @@ export function checkAITurn() {
 }
 
 /**
+ * Setup wizard navigation buttons
+ */
+function setupWizardNavigation() {
+    // Wizard Map - Back to Menu
+    const wizardMapBack = document.getElementById('wizard-map-back');
+    if (wizardMapBack) {
+        wizardMapBack.onclick = () => {
+            playClick();
+            showScreen('menu');
+        };
+    }
+
+    // Wizard Map - Next to Players
+    const wizardMapNext = document.getElementById('wizard-map-next');
+    if (wizardMapNext) {
+        wizardMapNext.onclick = () => {
+            playClick();
+            showScreen('wizard-players');
+        };
+    }
+
+    // Wizard Players - Back to Map
+    const wizardPlayersBack = document.getElementById('wizard-players-back');
+    if (wizardPlayersBack) {
+        wizardPlayersBack.onclick = () => {
+            playClick();
+            showScreen('wizard-map');
+            setTimeout(() => updateMapPreview(), 100);
+        };
+    }
+
+    // Wizard Players - Next to Team Selection
+    const wizardPlayersNext = document.getElementById('wizard-players-next');
+    if (wizardPlayersNext) {
+        wizardPlayersNext.onclick = () => {
+            playClick();
+            startTeamSelection();
+        };
+    }
+}
+
+/**
+ * Update map preview in wizard
+ */
+function updateMapPreview() {
+    const canvas = document.getElementById('map-preview-canvas');
+    const overlay = document.getElementById('map-preview-overlay');
+    if (!canvas) return;
+
+    // Show loading overlay
+    if (overlay) overlay.classList.remove('hidden');
+
+    // Debounce preview generation
+    if (mapPreviewTimeout) {
+        clearTimeout(mapPreviewTimeout);
+    }
+
+    mapPreviewTimeout = setTimeout(() => {
+        renderMapPreview(canvas, overlay);
+    }, 150);
+}
+
+/**
+ * Render the map preview on canvas
+ */
+function renderMapPreview(canvas, overlay) {
+    const ctx = canvas.getContext('2d');
+    const container = canvas.parentElement;
+
+    // Set canvas size based on container
+    const size = Math.min(container.clientWidth, container.clientHeight) || 300;
+    canvas.width = size * window.devicePixelRatio;
+    canvas.height = size * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+    // Generate preview map data
+    const previewData = generatePreviewMap(state.settings.size, state.settings.landscape);
+    previewHexes = previewData.hexes;
+
+    // Calculate hex size for preview
+    const radius = previewData.radius;
+    const previewHexSize = (size * 0.4) / (radius + 1);
+
+    // Clear and fill background
+    ctx.fillStyle = '#0c0c1d';
+    ctx.fillRect(0, 0, size, size);
+
+    // Center offset
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    // Draw hexes
+    for (const hex of previewHexes) {
+        const x = centerX + hex.q * previewHexSize * 1.5;
+        const y = centerY + (hex.r + hex.q * 0.5) * previewHexSize * Math.sqrt(3);
+
+        // Get terrain color
+        const terrain = TERRAIN[hex.type];
+        const color = terrain ? terrain.color : '#1a1a3e';
+
+        // Draw hex
+        drawPreviewHex(ctx, x, y, previewHexSize * 0.95, color);
+    }
+
+    // Hide loading overlay
+    if (overlay) overlay.classList.add('hidden');
+}
+
+/**
+ * Draw a single hex for preview
+ */
+function drawPreviewHex(ctx, x, y, size, color) {
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i - Math.PI / 6;
+        const hx = x + size * Math.cos(angle);
+        const hy = y + size * Math.sin(angle);
+        if (i === 0) {
+            ctx.moveTo(hx, hy);
+        } else {
+            ctx.lineTo(hx, hy);
+        }
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Subtle border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+}
+
+/**
  * Initialize the application
  */
 async function init() {
@@ -662,11 +826,37 @@ async function init() {
         console.log('Using runtime-generated assets');
     }
 
-    // Setup start button
+    // Setup start button - now goes to wizard
     const startBtn = document.getElementById('start-btn');
     if (startBtn) {
-        startBtn.onclick = startGame;
+        startBtn.onclick = () => {
+            playClick();
+            showScreen('wizard-map');
+            // Trigger initial map preview
+            setTimeout(() => updateMapPreview(), 100);
+        };
     }
+
+    // Setup options button
+    const optionsBtn = document.getElementById('options-btn');
+    if (optionsBtn) {
+        optionsBtn.onclick = () => {
+            playClick();
+            showScreen('options-screen');
+        };
+    }
+
+    // Setup options back button
+    const optionsBackBtn = document.getElementById('options-back-btn');
+    if (optionsBackBtn) {
+        optionsBackBtn.onclick = () => {
+            playClick();
+            showScreen('menu');
+        };
+    }
+
+    // Setup wizard navigation
+    setupWizardNavigation();
 
     // Initialize AI config grid on startup (default: Player 2 is AI)
     state.settings.aiPlayers = [1];
@@ -706,6 +896,9 @@ async function init() {
             btn.classList.add('selected');
 
             state.settings.size = btn.dataset.size;
+
+            // Update map preview in wizard
+            updateMapPreview();
         });
 
         btn.addEventListener('touchend', (e) => {
@@ -749,6 +942,9 @@ async function init() {
 
             state.settings.landscape = btn.dataset.landscape;
             updateLandscapePreview(btn.dataset.landscape);
+
+            // Update map preview in wizard
+            updateMapPreview();
         });
 
         btn.addEventListener('touchend', (e) => {
@@ -928,15 +1124,15 @@ async function init() {
     const teamBackBtn = document.getElementById('team-back-btn');
     if (teamBackBtn) {
         teamBackBtn.onclick = () => {
-            // Go back to previous player or main menu
+            // Go back to previous player or wizard-players
             if (currentTeamSelectPlayer > 0) {
                 // Go back to previous player's selection
                 currentTeamSelectPlayer--;
                 currentPlayerSelection = [...state.teamSelections[currentTeamSelectPlayer]];
                 showTeamSelectForPlayer(currentTeamSelectPlayer);
             } else {
-                // Go back to main menu
-                showScreen('menu');
+                // Go back to wizard-players step
+                showScreen('wizard-players');
             }
         };
     }
@@ -1088,14 +1284,30 @@ function setupAllianceButtons() {
 }
 
 /**
- * Update the AI config grid based on current player count
+ * Update the player config grid based on current player count
+ * Includes player names and AI/Human toggles
  */
 function updateAIConfigGrid() {
-    const grid = document.getElementById('ai-config-grid');
+    const grid = document.getElementById('player-config-grid') || document.getElementById('ai-config-grid');
     if (!grid) return;
 
     // Filter out AI players that are no longer valid (when player count reduced)
     state.settings.aiPlayers = state.settings.aiPlayers.filter(p => p < state.settings.players);
+
+    // Initialize player names array if needed
+    if (!state.settings.playerNames || state.settings.playerNames.length < state.settings.players) {
+        const usedNames = state.settings.playerNames || [];
+        state.settings.playerNames = [];
+        for (let i = 0; i < state.settings.players; i++) {
+            if (usedNames[i]) {
+                state.settings.playerNames[i] = usedNames[i];
+            } else {
+                state.settings.playerNames[i] = getRandomName(state.settings.playerNames);
+            }
+        }
+    }
+    // Trim excess names if player count reduced
+    state.settings.playerNames = state.settings.playerNames.slice(0, state.settings.players);
 
     grid.innerHTML = '';
 
@@ -1104,17 +1316,55 @@ function updateAIConfigGrid() {
 
     for (let i = 0; i < state.settings.players; i++) {
         const item = document.createElement('div');
-        item.className = 'ai-config-item';
+        item.className = 'player-config-item';
 
+        // Player badge with number
         const badge = document.createElement('div');
         badge.className = 'player-badge';
         badge.style.backgroundColor = CONFIG.PLAYER_COLORS[i];
         badge.textContent = i + 1;
 
+        // Name input with refresh button
+        const nameContainer = document.createElement('div');
+        nameContainer.className = 'player-name-container';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'player-name-input';
+        nameInput.value = state.settings.playerNames[i] || '';
+        nameInput.placeholder = `Spieler ${i + 1}`;
+        nameInput.maxLength = 15;
+        nameInput.dataset.player = i;
+
+        nameInput.addEventListener('input', (e) => {
+            const playerIndex = parseInt(e.target.dataset.player, 10);
+            state.settings.playerNames[playerIndex] = e.target.value;
+        });
+
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'name-refresh-btn';
+        refreshBtn.textContent = '🎲';
+        refreshBtn.title = 'Zufälliger Name';
+        refreshBtn.dataset.player = i;
+
+        refreshBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const playerIndex = parseInt(e.target.closest('button').dataset.player, 10);
+            const newName = getRandomName(state.settings.playerNames.filter((_, idx) => idx !== playerIndex));
+            state.settings.playerNames[playerIndex] = newName;
+            nameInput.value = newName;
+            playClick();
+        });
+
+        nameContainer.appendChild(nameInput);
+        nameContainer.appendChild(refreshBtn);
+
+        // AI/Human toggle
         const isAI = state.settings.aiPlayers.includes(i);
         const toggle = document.createElement('button');
         toggle.className = `type-toggle ${isAI ? 'ai' : 'human'}`;
-        toggle.textContent = isAI ? '🤖 KI' : '👤 Mensch';
+        toggle.textContent = isAI ? '🤖 KI' : '👤';
+        toggle.title = isAI ? 'KI-Spieler' : 'Mensch';
         toggle.dataset.player = i;
 
         toggle.addEventListener('click', () => {
@@ -1125,16 +1375,20 @@ function updateAIConfigGrid() {
                 // Remove from AI players
                 state.settings.aiPlayers = state.settings.aiPlayers.filter(p => p !== playerIndex);
                 toggle.className = 'type-toggle human';
-                toggle.textContent = '👤 Mensch';
+                toggle.textContent = '👤';
+                toggle.title = 'Mensch';
             } else {
                 // Add to AI players
                 state.settings.aiPlayers.push(playerIndex);
                 toggle.className = 'type-toggle ai';
                 toggle.textContent = '🤖 KI';
+                toggle.title = 'KI-Spieler';
             }
+            playClick();
         });
 
         item.appendChild(badge);
+        item.appendChild(nameContainer);
         item.appendChild(toggle);
         grid.appendChild(item);
     }

@@ -19,7 +19,7 @@ import { CONFIG, TERRAIN } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
 import { isAIPlayer } from './ai.js';
-import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint } from './tutorial.js';
+import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, shouldStartGuidedTutorial, startGuidedTutorial, notifyTutorialAction, isGuidedTutorialActive } from './tutorial.js';
 
 let canvas;
 let pendingMoveAnimationId = null;
@@ -469,6 +469,107 @@ export function centerOnCurrentUnit() {
 }
 
 /**
+ * Center view on all player's units and zoom to fit them
+ * @param {number} playerIndex - The player index to center on
+ * @param {number} duration - Animation duration in ms
+ * @returns {Promise} - Resolves when animation completes
+ */
+export function centerOnTeam(playerIndex, duration = 600) {
+    return new Promise(resolve => {
+        const playerUnits = getPlayerUnits(playerIndex);
+
+        if (playerUnits.length === 0) {
+            resolve();
+            return;
+        }
+
+        // Calculate bounding box of player's units
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+
+        for (const unit of playerUnits) {
+            const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+            minX = Math.min(minX, pos.x);
+            maxX = Math.max(maxX, pos.x);
+            minY = Math.min(minY, pos.y);
+            maxY = Math.max(maxY, pos.y);
+        }
+
+        // Calculate center of units
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+
+        // Calculate required zoom to fit all units with padding
+        const canvas = document.getElementById('game-canvas');
+        if (!canvas) {
+            resolve();
+            return;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const padding = 100; // Padding around units
+        const unitSpreadX = maxX - minX + padding * 2;
+        const unitSpreadY = maxY - minY + padding * 2;
+
+        // Calculate zoom level to fit units
+        const zoomX = rect.width / (unitSpreadX / state.zoomLevel);
+        const zoomY = rect.height / (unitSpreadY / state.zoomLevel);
+        const targetZoom = Math.min(Math.max(Math.min(zoomX, zoomY), CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
+
+        // Animate to position and zoom
+        const startCameraX = state.cameraX;
+        const startCameraY = state.cameraY;
+        const startZoom = state.zoomLevel;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            // Ease in-out cubic
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            // Animate zoom
+            state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+
+            // Recalculate center position at current zoom level
+            let newMinX = Infinity, newMaxX = -Infinity;
+            let newMinY = Infinity, newMaxY = -Infinity;
+
+            for (const unit of playerUnits) {
+                const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+                newMinX = Math.min(newMinX, pos.x);
+                newMaxX = Math.max(newMaxX, pos.x);
+                newMinY = Math.min(newMinY, pos.y);
+                newMaxY = Math.max(newMaxY, pos.y);
+            }
+
+            const newCenterX = (newMinX + newMaxX) / 2;
+            const newCenterY = (newMinY + newMaxY) / 2;
+
+            // Animate camera position
+            state.cameraX = startCameraX + (-newCenterX - startCameraX) * ease;
+            state.cameraY = startCameraY + (-newCenterY - startCameraY) * ease;
+
+            limitCameraBounds();
+            updateCameraOffset();
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
  * Handle mouse wheel for zooming and scrolling
  */
 function handleWheel(e) {
@@ -756,6 +857,8 @@ function handleTapOrClick(clientX, clientY) {
             updateUI();
             render();
             showToast(`${hex.unit.name} ausgewählt`, 'info');
+            // Notify guided tutorial of unit selection
+            notifyTutorialAction('unitSelected');
             // Check for tutorial hints after selection
             checkTutorialHint();
             return;
@@ -817,6 +920,8 @@ async function handleEnemyClick(unit, hex) {
             render();
             updateUI();
 
+            // Notify guided tutorial of attack
+            notifyTutorialAction('unitAttacked');
             // Check for tutorial hints after attack
             showActionHint('attacked');
             checkTutorialHint();
@@ -1004,6 +1109,8 @@ function handleMoveClick(unit, hex) {
             render();
             updateUI();
 
+            // Notify guided tutorial of movement
+            notifyTutorialAction('unitMoved');
             // Check for tutorial hints after movement
             showActionHint('moved');
             checkTutorialHint();
@@ -1318,8 +1425,17 @@ export async function playGameIntro() {
  * Start the tutorial if this is the player's first game
  */
 function startTutorialIfNeeded() {
-    if (shouldStartTutorial()) {
+    // Try guided tutorial first (for better first-time experience)
+    if (shouldStartGuidedTutorial()) {
         // Small delay to let the UI settle
+        setTimeout(() => {
+            startGuidedTutorial();
+        }, 500);
+        return;
+    }
+
+    // Fall back to simple tutorial hints
+    if (shouldStartTutorial()) {
         setTimeout(() => {
             startTutorial();
         }, 500);
@@ -1726,15 +1842,15 @@ function setupMenuButtons() {
             updateVisibility();
             updateUI();
 
-            // Center on current unit immediately
-            requestAnimationFrame(() => {
-                centerOnCurrentUnit();
+            // Center on team and zoom to show all units
+            requestAnimationFrame(async () => {
+                await centerOnTeam(state.currentPlayer, 600);
             });
 
             // Execute any queued paths after a short delay
             setTimeout(async () => {
                 await executeQueuedPathsForPlayer();
-            }, 500);
+            }, 700);
         };
     }
 

@@ -11,7 +11,7 @@ import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWa
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards } from './ui.js';
 import { render } from './renderer.js';
-import { centerOnCurrentUnit, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
+import { centerOnCurrentUnit, centerOnTeam, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
 import { rollRoundEvent, clearRoundEvent } from './events.js';
 import { isAIPlayer, executeAITurn, isSpectatorMode } from './ai.js';
@@ -179,14 +179,16 @@ export function startTurn() {
         showScreen(null);
         updateUI();
         render();
-        requestAnimationFrame(() => {
-            centerOnCurrentUnit();
+
+        // Center on team and zoom to show all units at round start
+        requestAnimationFrame(async () => {
+            await centerOnTeam(state.currentPlayer, 600);
         });
 
         // Execute any queued paths after a short delay
         setTimeout(async () => {
             await executeQueuedPathsForPlayer();
-        }, 500);
+        }, 700);
         return;
     }
 

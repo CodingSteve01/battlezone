@@ -79,6 +79,101 @@ export function getActiveBiomeName() {
 }
 
 /**
+ * Generate a lightweight map preview for the wizard
+ * Returns an array of hex objects with terrain data (no state modification)
+ */
+export function generatePreviewMap(size, landscape) {
+    const previewHexes = [];
+    const radius = CONFIG.MAP_SIZES[size] || CONFIG.MAP_SIZES.medium;
+
+    // Resolve biome
+    let biome;
+    if (landscape === 'random') {
+        const biomeKeys = Object.keys(BIOMES);
+        const randomIndex = Math.floor(Math.random() * biomeKeys.length);
+        biome = BIOMES[biomeKeys[randomIndex]];
+    } else {
+        biome = BIOMES[landscape] || BIOMES.temperate;
+    }
+
+    // Generate hex data for preview
+    for (let q = -radius; q <= radius; q++) {
+        for (let r = -radius; r <= radius; r++) {
+            if (!isValidHex(q, r, radius)) continue;
+
+            const distFromCenter = hexDistance({ q: 0, r: 0 }, { q, r });
+            const hex = createPreviewHex(q, r, distFromCenter, radius, biome);
+            previewHexes.push(hex);
+        }
+    }
+
+    return { hexes: previewHexes, biome, radius };
+}
+
+/**
+ * Create a hex for preview (simplified, no state)
+ */
+function createPreviewHex(q, r, distFromCenter, radius, biome) {
+    const edgeFactor = distFromCenter / radius;
+
+    // Use simplified noise for faster preview
+    const elevationNoise = simpleFractalNoise(q, r, 16, 3, 1);
+    const moistureNoise = simpleFractalNoise(q, r, 14, 2, 2);
+
+    const elev = biome.elevationThresholds;
+    const moist = biome.moistureThresholds;
+
+    let type = biome.baseType || 'grass';
+
+    // Water at edges or low elevation
+    if (edgeFactor > 0.85 || (elevationNoise < elev.water && !biome.noWaterEdge)) {
+        type = 'water';
+    } else if (elevationNoise > elev.rock) {
+        type = biome.rockType || 'rock';
+    } else if (elevationNoise > elev.hills) {
+        type = biome.hillType || 'hills';
+    } else if (moistureNoise > moist.forest) {
+        type = biome.forestType || 'forest';
+    } else if (moistureNoise < moist.sand) {
+        type = biome.sandType || 'sand';
+    }
+
+    return {
+        q,
+        r,
+        type,
+        walkable: TERRAIN[type]?.walkable ?? true
+    };
+}
+
+/**
+ * Simplified fractal noise for preview
+ */
+function simpleFractalNoise(q, r, baseScale, octaves, seed) {
+    let value = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let maxValue = 0;
+
+    for (let i = 0; i < octaves; i++) {
+        value += simpleNoise(q / (baseScale / frequency), r / (baseScale / frequency), seed + i * 11) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2;
+    }
+
+    return value / maxValue;
+}
+
+/**
+ * Simple noise for preview
+ */
+function simpleNoise(x, y, seed) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453;
+    return n - Math.floor(n);
+}
+
+/**
  * Simple noise function for terrain generation
  */
 function noise2D(x, y, seed = 0) {
