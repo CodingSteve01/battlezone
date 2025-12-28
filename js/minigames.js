@@ -183,6 +183,22 @@ let minigameCanvas = null;
 let minigameCtx = null;
 let animationFrameId = null;
 
+// Anti-cheat: Tap cooldown tracking
+let lastTapTime = 0;
+const TAP_COOLDOWN_MS = 120; // Minimum ms between taps to prevent spam
+
+/**
+ * Anti-cheat tap validator - returns true if tap is valid (not spam)
+ */
+function isValidTap() {
+    const now = Date.now();
+    if (now - lastTapTime < TAP_COOLDOWN_MS) {
+        return false; // Too fast, ignore tap
+    }
+    lastTapTime = now;
+    return true;
+}
+
 /**
  * Initialize the minigame overlay (called once on game start)
  */
@@ -196,32 +212,37 @@ export function initMinigames() {
     minigameCtx = minigameCanvas?.getContext('2d');
 }
 
-// Unit-specific minigame descriptions
+// Unit-specific minigame descriptions with detailed explanations
 const MINIGAME_DESCRIPTIONS = {
     scout: {
         title: 'Schnellfeuer',
         instruction: 'Tippe das bewegliche Ziel!',
-        hint: 'Je näher am Zentrum, desto besser!'
+        hint: 'Je näher am Zentrum, desto besser!',
+        detailedExplanation: 'Ein rotes Ziel bewegt sich über den Bildschirm.\n\nTippe darauf, um zu treffen!\n\n💎 Perfekt = Mitte des Ziels\n✅ Gut = Nahe am Zentrum\n⚠️ OK = Rand des Ziels'
     },
     assault: {
         title: 'Powerschuss',
         instruction: 'Stoppe im grünen Bereich!',
-        hint: 'Gold = Perfekt, Grün = Gut'
+        hint: 'Gold = Perfekt, Grün = Gut',
+        detailedExplanation: 'Ein Balken bewegt sich hin und her.\n\nTippe, um ihn zu stoppen!\n\n💎 Gold-Zone = Perfekter Treffer\n✅ Grüne Zone = Guter Treffer\n🟠 Orange Zone = OK\n❌ Roter Rand = Daneben'
     },
     sniper: {
         title: 'Präzisionsschuss',
         instruction: 'Schieße wenn das Fadenkreuz still steht!',
-        hint: 'Warte auf den grünen Moment!'
+        hint: 'Warte auf den grünen Moment!',
+        detailedExplanation: 'Das Fadenkreuz wackelt ständig.\n\nWarte auf den "stillen Moment"!\n\n🔴 Rot = Wackelt - NICHT schießen!\n🟡 Gelb = Gleich ruhig...\n🟢 Grün = JETZT schießen!'
     },
     medic: {
         title: 'Zielschuss',
         instruction: 'Stoppe im grünen Bereich!',
-        hint: 'Medic greift mit Pistole an'
+        hint: 'Medic greift mit Pistole an',
+        detailedExplanation: 'Ein Balken bewegt sich hin und her.\n\nTippe, um ihn zu stoppen!\n\n💎 Goldene Zone = Perfekt\n✅ Grüne Zone = Gut'
     },
     commando: {
         title: 'Nahkampf-Duell',
         instruction: 'Reagiere auf den Feind!',
-        hint: '⚔️>💨 • 🛡️>⚔️ • 💨>🛡️'
+        hint: 'Stein-Schere-Papier Prinzip',
+        detailedExplanation: 'Ein 3-Runden Duell!\n\n⚔️ ANGRIFF schlägt 💨 Ausweichen\n🛡️ BLOCK schlägt ⚔️ Angriff\n💨 AUSWEICHEN schlägt 🛡️ Block\n\nBeobachte den Feind und wähle die richtige Antwort!\n2 von 3 Runden gewinnen!'
     }
 };
 
@@ -229,7 +250,8 @@ const MINIGAME_DESCRIPTIONS = {
 const HEALING_MINIGAME_DESC = {
     title: 'Heilungsrhythmus',
     instruction: 'Tippe im Rhythmus des Herzschlags!',
-    hint: '4 Schläge im richtigen Timing'
+    hint: '4 Schläge im richtigen Timing',
+    detailedExplanation: 'Eine EKG-Linie zeigt den Herzschlag.\n\n4 Herz-Symbole erscheinen nacheinander.\nTippe GENAU wenn sie aufleuchten!\n\n🟡 Gelb = JETZT tippen!\n✅ Grün = Getroffen!\n❌ Rot = Verpasst\n\nTreffe alle 4 für Perfekt!'
 };
 
 /**
@@ -247,6 +269,8 @@ function createMinigameOverlay() {
             </div>
             <div class="minigame-instruction" id="minigame-instruction"></div>
             <div class="minigame-hint" id="minigame-hint"></div>
+            <div class="minigame-explanation" id="minigame-explanation"></div>
+            <div class="minigame-start-prompt" id="minigame-start-prompt">Tippe zum Starten</div>
             <div class="minigame-countdown" id="minigame-countdown"></div>
             <canvas id="minigame-canvas" width="300" height="200"></canvas>
             <div class="minigame-result" id="minigame-result"></div>
@@ -341,9 +365,54 @@ function addMinigameStyles() {
         .minigame-hint {
             color: #a0aec0;
             font-size: 13px;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             min-height: 16px;
             font-style: italic;
+        }
+
+        .minigame-explanation {
+            color: #e2e8f0;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 12px 0;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            white-space: pre-line;
+            text-align: left;
+            display: none;
+        }
+
+        .minigame-explanation.visible {
+            display: block;
+        }
+
+        .minigame-start-prompt {
+            color: #22c55e;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 15px 0;
+            padding: 12px 24px;
+            border: 2px solid #22c55e;
+            border-radius: 25px;
+            display: none;
+            animation: prompt-pulse 1.5s infinite;
+            cursor: pointer;
+        }
+
+        .minigame-start-prompt.visible {
+            display: inline-block;
+        }
+
+        @keyframes prompt-pulse {
+            0%, 100% {
+                opacity: 1;
+                box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+            }
+            50% {
+                opacity: 0.7;
+                box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+            }
         }
 
         .minigame-countdown {
@@ -430,6 +499,55 @@ function addMinigameStyles() {
 }
 
 /**
+ * Show explanation and wait for user to tap to start
+ * Returns a Promise that resolves when user taps
+ */
+function showExplanationAndWaitForStart(explanation) {
+    return new Promise((resolve) => {
+        const explanationEl = document.getElementById('minigame-explanation');
+        const startPromptEl = document.getElementById('minigame-start-prompt');
+        const countdownEl = document.getElementById('minigame-countdown');
+        const canvasEl = document.getElementById('minigame-canvas');
+
+        // Hide countdown and canvas, show explanation
+        countdownEl.classList.add('hidden');
+        canvasEl.style.display = 'none';
+
+        explanationEl.textContent = explanation;
+        explanationEl.classList.add('visible');
+        startPromptEl.classList.add('visible');
+
+        function handleStart(e) {
+            if (e) e.preventDefault();
+
+            // Clean up
+            explanationEl.classList.remove('visible');
+            startPromptEl.classList.remove('visible');
+            startPromptEl.removeEventListener('click', handleStart);
+            startPromptEl.removeEventListener('touchstart', handleStart);
+            minigameOverlay.removeEventListener('click', handleOverlayClick);
+            minigameOverlay.removeEventListener('touchstart', handleOverlayClick);
+
+            playClick();
+            resolve();
+        }
+
+        function handleOverlayClick(e) {
+            // Allow tapping anywhere on overlay to start
+            if (e.target === minigameOverlay || e.target.closest('.minigame-container')) {
+                handleStart(e);
+            }
+        }
+
+        // Allow both button click and anywhere tap
+        startPromptEl.addEventListener('click', handleStart);
+        startPromptEl.addEventListener('touchstart', handleStart);
+        minigameOverlay.addEventListener('click', handleOverlayClick);
+        minigameOverlay.addEventListener('touchstart', handleOverlayClick);
+    });
+}
+
+/**
  * Show countdown before minigame starts
  * Returns a Promise that resolves when countdown is complete
  */
@@ -437,9 +555,13 @@ function showCountdown() {
     return new Promise((resolve) => {
         const countdownEl = document.getElementById('minigame-countdown');
         const canvasEl = document.getElementById('minigame-canvas');
+        const explanationEl = document.getElementById('minigame-explanation');
+        const startPromptEl = document.getElementById('minigame-start-prompt');
 
-        // Hide canvas during countdown
+        // Hide canvas and explanation during countdown
         canvasEl.style.display = 'none';
+        explanationEl.classList.remove('visible');
+        startPromptEl.classList.remove('visible');
         countdownEl.classList.remove('hidden', 'go');
 
         const steps = ['3', '2', '1', 'LOS!'];
@@ -485,6 +607,9 @@ let currentModifiers = null;
 export async function startMinigame(unitClass, context = null) {
     initMinigames();
 
+    // Reset anti-cheat tap cooldown
+    lastTapTime = 0;
+
     const classInfo = UNIT_CLASSES[unitClass];
     if (!classInfo) {
         return { level: RESULT_LEVELS.GOOD, multiplier: RESULT_MULTIPLIERS[RESULT_LEVELS.GOOD] };
@@ -497,7 +622,8 @@ export async function startMinigame(unitClass, context = null) {
     const desc = MINIGAME_DESCRIPTIONS[unitClass] || {
         title: 'Angriff',
         instruction: 'Reagiere schnell!',
-        hint: ''
+        hint: '',
+        detailedExplanation: ''
     };
 
     // Show overlay with instructions
@@ -522,6 +648,11 @@ export async function startMinigame(unitClass, context = null) {
 
     document.getElementById('minigame-result').classList.remove('show');
     document.getElementById('minigame-result').textContent = '';
+
+    // Show detailed explanation and wait for tap to start
+    if (desc.detailedExplanation) {
+        await showExplanationAndWaitForStart(desc.detailedExplanation);
+    }
 
     // Show countdown
     await showCountdown();
@@ -613,6 +744,7 @@ function startScoutMinigame(resolve, mods = {}) {
     let target = null;
     let startTime = 0;
     let gameActive = true;
+    let lastDirectionChange = 0;
     const maxTime = Math.round(1200 * timeMult); // Adaptive Zeit
 
     function spawnTarget() {
@@ -623,16 +755,31 @@ function startScoutMinigame(resolve, mods = {}) {
             x: padding + Math.random() * (width - padding * 2),
             y: padding + Math.random() * (height - padding * 2),
             radius: baseRadius,
+            baseSpeed: baseSpeed,
             dx: (Math.random() - 0.5) * baseSpeed,
             dy: (Math.random() - 0.5) * baseSpeed
         };
         startTime = Date.now();
+        lastDirectionChange = startTime;
     }
 
     function update() {
         if (!gameActive) return;
 
-        const elapsed = Date.now() - startTime;
+        const now = Date.now();
+        const elapsed = now - startTime;
+
+        // VARIATION: Random direction changes every 200-400ms
+        if (now - lastDirectionChange > 200 + Math.random() * 200) {
+            // Slight random adjustment to direction (±30%)
+            const angleChange = (Math.random() - 0.5) * 0.6 * Math.PI;
+            const currentAngle = Math.atan2(target.dy, target.dx);
+            const newAngle = currentAngle + angleChange;
+            const speed = Math.sqrt(target.dx * target.dx + target.dy * target.dy);
+            target.dx = Math.cos(newAngle) * speed;
+            target.dy = Math.sin(newAngle) * speed;
+            lastDirectionChange = now;
+        }
 
         // Move target
         target.x += target.dx;
@@ -1528,9 +1675,29 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
                 ctx.fillStyle = '#fbbf24';
                 ctx.fillText('bereitet vor...', width - 60, centerY + 35);
             } else {
-                // Zeige tatsächliche Aktion
-                ctx.font = '28px sans-serif';
-                ctx.fillText(enemyMove.icon, width - 60, centerY + 40);
+                // Zeige tatsächliche Aktion mit Highlight-Hintergrund
+                const moveX = width - 60;
+                const moveY = centerY + 35;
+
+                // Highlight-Kreis hinter dem Icon
+                ctx.beginPath();
+                ctx.arc(moveX, moveY, 28, 0, Math.PI * 2);
+                ctx.fillStyle = enemyMove.color + '40'; // 25% opacity
+                ctx.fill();
+                ctx.strokeStyle = enemyMove.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Icon größer und zentriert
+                ctx.font = '32px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(enemyMove.icon, moveX, moveY);
+
+                // Move name darunter
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = enemyMove.color;
+                ctx.fillText(enemyMove.name.toUpperCase(), moveX, moveY + 35);
             }
             ctx.globalAlpha = 1;
         }
@@ -1605,12 +1772,28 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
             });
         }
 
-        // Hilfe-Text
-        if (phase === 'react' && !playerMove) {
-            ctx.font = '12px sans-serif';
-            ctx.fillStyle = '#6b7280';
+        // Hilfe-Text - clearer instruction based on enemy move
+        if (phase === 'react' && !playerMove && enemyMove) {
+            ctx.font = 'bold 13px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('⚔️ schlägt 💨 • 🛡️ schlägt ⚔️ • 💨 schlägt 🛡️', width / 2, height - 10);
+
+            // Show counter hint based on enemy move
+            let counterHint = '';
+            let counterColor = '#22c55e';
+            if (enemyMove.id === 'attack') {
+                counterHint = '🛡️ BLOCK gegen Angriff!';
+            } else if (enemyMove.id === 'block') {
+                counterHint = '💨 AUSWEICHEN gegen Block!';
+            } else if (enemyMove.id === 'dodge') {
+                counterHint = '⚔️ ANGRIFF gegen Ausweichen!';
+            }
+
+            // Draw hint with background
+            const hintY = height - 15;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(width / 2 - 100, hintY - 12, 200, 18);
+            ctx.fillStyle = counterColor;
+            ctx.fillText(counterHint, width / 2, hintY);
         }
 
         animationFrameId = requestAnimationFrame(update);
@@ -1696,6 +1879,9 @@ export const HEALING_RESULT_MULTIPLIERS = {
 export async function startHealingMinigame(context = null) {
     initMinigames();
 
+    // Reset anti-cheat tap cooldown
+    lastTapTime = 0;
+
     // Calculate modifiers based on context (stress, allies, etc.)
     const mods = context ? calculateDifficultyModifiers('medic', context) : {
         speedMultiplier: 1.0,
@@ -1722,6 +1908,11 @@ export async function startHealingMinigame(context = null) {
     document.getElementById('minigame-result').classList.remove('show');
     document.getElementById('minigame-result').textContent = '';
 
+    // Show detailed explanation and wait for tap to start
+    if (HEALING_MINIGAME_DESC.detailedExplanation) {
+        await showExplanationAndWaitForStart(HEALING_MINIGAME_DESC.detailedExplanation);
+    }
+
     // Show countdown
     await showCountdown();
 
@@ -1733,6 +1924,7 @@ export async function startHealingMinigame(context = null) {
 
 /**
  * Internal healing minigame - heartbeat rhythm
+ * With variation: randomized beat intervals to prevent memorization
  */
 function startHealingMinigameInternal(resolve, mods = {}) {
     document.getElementById('minigame-instruction').textContent = 'Tippe im Rhythmus des Herzschlags!';
@@ -1746,8 +1938,20 @@ function startHealingMinigameInternal(resolve, mods = {}) {
     const speedMult = mods.speedMultiplier || 1.0;
     const timeMult = mods.timeMultiplier || 1.0;
 
-    const beatInterval = Math.round(800 / speedMult * timeMult);
-    const beats = [0, beatInterval, beatInterval * 2, beatInterval * 3];
+    // VARIATION: Randomize beat intervals slightly (±15% variation)
+    const baseInterval = Math.round(800 / speedMult * timeMult);
+    const randomizeInterval = () => {
+        const variation = 0.15; // ±15%
+        return Math.round(baseInterval * (1 + (Math.random() - 0.5) * 2 * variation));
+    };
+
+    // Generate beats with variation
+    const beats = [
+        400, // First beat starts after a small delay
+        400 + randomizeInterval(),
+        400 + randomizeInterval() + randomizeInterval(),
+        400 + randomizeInterval() + randomizeInterval() + randomizeInterval()
+    ];
     const currentBeat = 0;
     const startTime = Date.now();
     const taps = [];
@@ -1877,6 +2081,11 @@ function startHealingMinigameInternal(resolve, mods = {}) {
 
     function handleTap() {
         if (!gameActive) return;
+
+        // Anti-cheat: Prevent fast-tapping spam
+        if (!isValidTap()) {
+            return; // Ignore spam taps
+        }
 
         const elapsed = Date.now() - startTime;
         playClick();
