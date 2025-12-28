@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.2...shadow-squad-v3.14.3) (2025-12-28)
+
+
+### Bug Fixes
+
+* **renderer:** fix sprite positioning and simplify centerOnTeam ([#160](https://github.com/CodingSteve01/battlezone/issues/160)) ([5e288e6](https://github.com/CodingSteve01/battlezone/commit/5e288e6abcdbf56eb86118bb8577bbd77ba45f70))
+
 ## [3.14.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.1...shadow-squad-v3.14.2) (2025-12-28)
 
 
