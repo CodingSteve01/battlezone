@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.1...shadow-squad-v3.14.2) (2025-12-28)
+
+
+### Bug Fixes
+
+* **renderer:** fix zoom limits and sprite scaling with contentBounds ([#158](https://github.com/CodingSteve01/battlezone/issues/158)) ([9887680](https://github.com/CodingSteve01/battlezone/commit/9887680f55e24b2bcfee7853ea0d4bf99dfcdd1b))
+
 ## [3.14.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.0...shadow-squad-v3.14.1) (2025-12-28)
 
 
