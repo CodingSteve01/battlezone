@@ -195,8 +195,9 @@ function handleMouseDown(e) {
     dragDistance = 0;
     dragStartX = e.clientX;
     dragStartY = e.clientY;
-    dragStartCameraX = state.cameraX;
-    dragStartCameraY = state.cameraY;
+    // Ensure valid camera values when starting drag
+    dragStartCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+    dragStartCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
 
     canvas.style.cursor = 'grabbing';
 }
@@ -260,9 +261,10 @@ function handleTouchStart(e) {
         isPinching = true;
         isDragging = false;
         initialPinchDistance = getPinchDistance(e.touches);
-        initialZoomLevel = state.zoomLevel;
-        initialCameraX = state.cameraX;
-        initialCameraY = state.cameraY;
+        // Ensure valid zoom level before pinch
+        initialZoomLevel = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+        initialCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        initialCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
         // Store initial pinch center for consistent zoom point
         const rect = canvas.getBoundingClientRect();
         const center = getPinchCenter(e.touches);
@@ -278,8 +280,9 @@ function handleTouchStart(e) {
         dragDistance = 0;
         dragStartX = touch.clientX;
         dragStartY = touch.clientY;
-        dragStartCameraX = state.cameraX;
-        dragStartCameraY = state.cameraY;
+        // Ensure valid camera values when starting touch drag
+        dragStartCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        dragStartCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
     }
 }
 
@@ -424,11 +427,17 @@ function handleTouchEnd(e) {
  */
 function limitCameraBounds() {
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    // Adjust max offset based on zoom level - allows more panning when zoomed in
-    const maxOffset = radius * state.hexSize * 2.5;
 
-    state.cameraX = Math.max(-maxOffset, Math.min(maxOffset, state.cameraX));
-    state.cameraY = Math.max(-maxOffset, Math.min(maxOffset, state.cameraY));
+    // Ensure hexSize is valid before calculating bounds
+    const hexSize = Number.isFinite(state.hexSize) && state.hexSize > 0 ? state.hexSize : CONFIG.BASE_HEX_SIZE;
+    const maxOffset = radius * hexSize * 2.5;
+
+    // Ensure camera values are valid before clamping
+    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+
+    state.cameraX = Math.max(-maxOffset, Math.min(maxOffset, cameraX));
+    state.cameraY = Math.max(-maxOffset, Math.min(maxOffset, cameraY));
 }
 
 /**
@@ -439,8 +448,14 @@ function updateCameraOffset() {
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    state.offsetX = rect.width / 2 + state.cameraX;
-    state.offsetY = rect.height / 2 + state.cameraY;
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // Ensure camera values are valid
+    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+
+    state.offsetX = rect.width / 2 + cameraX;
+    state.offsetY = rect.height / 2 + cameraY;
 }
 
 /**
@@ -511,15 +526,20 @@ export function centerOnTeam(playerIndex, duration = 600) {
         const unitSpreadX = maxX - minX + padding * 2;
         const unitSpreadY = maxY - minY + padding * 2;
 
-        // Calculate zoom level to fit units
-        const zoomX = rect.width / (unitSpreadX / state.zoomLevel);
-        const zoomY = rect.height / (unitSpreadY / state.zoomLevel);
+        // Ensure zoomLevel is valid before calculations
+        const currentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+
+        // Calculate zoom level to fit units (guard against division by zero)
+        const spreadX = unitSpreadX / currentZoom;
+        const spreadY = unitSpreadY / currentZoom;
+        const zoomX = spreadX > 0 ? rect.width / spreadX : 1.0;
+        const zoomY = spreadY > 0 ? rect.height / spreadY : 1.0;
         const targetZoom = Math.min(Math.max(Math.min(zoomX, zoomY), CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
 
         // Animate to position and zoom
-        const startCameraX = state.cameraX;
-        const startCameraY = state.cameraY;
-        const startZoom = state.zoomLevel;
+        const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+        const startZoom = currentZoom;
         const startTime = Date.now();
 
         function animate() {
@@ -597,7 +617,8 @@ function handleWheel(e) {
  * Apply zoom centered on a screen position
  */
 function applyZoom(zoomDelta, screenX, screenY) {
-    const oldZoom = state.zoomLevel;
+    // Ensure valid starting zoom level
+    const oldZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
     const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, oldZoom + zoomDelta));
 
     if (newZoom === oldZoom) return;
@@ -1202,9 +1223,12 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
             return;
         }
 
+        // Ensure valid starting zoom level
+        const safeCurrentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+
         // Calculate target zoom - closer zoom for better viewing in spectator mode
         // Default: zoom in to 1.2 or current zoom if already closer
-        const idealZoom = targetZoom || Math.max(1.2, state.zoomLevel);
+        const idealZoom = targetZoom || Math.max(1.2, safeCurrentZoom);
         const clampedZoom = Math.min(Math.max(idealZoom, CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
 
         // Calculate target position at the target zoom level
@@ -1213,9 +1237,9 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
         const targetCameraX = -targetPos.x;
         const targetCameraY = -targetPos.y;
 
-        const startCameraX = state.cameraX;
-        const startCameraY = state.cameraY;
-        const startZoom = state.zoomLevel;
+        const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+        const startZoom = safeCurrentZoom;
         const startTime = Date.now();
 
         function animate() {
@@ -1261,7 +1285,8 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
  */
 function animateZoom(targetZoom, duration = 500) {
     return new Promise(resolve => {
-        const startZoom = state.zoomLevel;
+        // Ensure valid starting zoom level
+        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
         const startTime = Date.now();
 
         function animate() {
