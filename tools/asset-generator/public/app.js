@@ -10,7 +10,114 @@ const generatedAssets = {
     characters: []
 };
 
-// Helper functions
+// ============================================
+// WHITESPACE CROPPING UTILITIES
+// ============================================
+
+/**
+ * Analyze a canvas to find the bounding box of non-transparent content
+ * @param {HTMLCanvasElement} canvas - Source canvas
+ * @param {number} alphaThreshold - Minimum alpha value to consider as content (0-255)
+ * @returns {Object} { left, top, right, bottom, width, height, isEmpty }
+ */
+function findContentBounds(canvas, alphaThreshold = 1) {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    let minX = canvas.width;
+    let minY = canvas.height;
+    let maxX = 0;
+    let maxY = 0;
+
+    for (let y = 0; y < canvas.height; y++) {
+        for (let x = 0; x < canvas.width; x++) {
+            const alpha = data[(y * canvas.width + x) * 4 + 3];
+            if (alpha >= alphaThreshold) {
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+            }
+        }
+    }
+
+    const isEmpty = minX > maxX || minY > maxY;
+
+    return {
+        left: isEmpty ? 0 : minX,
+        top: isEmpty ? 0 : minY,
+        right: isEmpty ? canvas.width : maxX + 1,
+        bottom: isEmpty ? canvas.height : maxY + 1,
+        width: isEmpty ? canvas.width : maxX - minX + 1,
+        height: isEmpty ? canvas.height : maxY - minY + 1,
+        isEmpty
+    };
+}
+
+/**
+ * Crop whitespace from a canvas and calculate anchor point
+ * The anchor point is the x-center at the bottom y position (where object touches ground)
+ * @param {HTMLCanvasElement} sourceCanvas - Source canvas to crop
+ * @param {number} padding - Optional padding to add around content
+ * @returns {Object} { canvas, anchor, originalSize, croppedSize, bounds }
+ */
+function cropWhitespace(sourceCanvas, padding = 2) {
+    const bounds = findContentBounds(sourceCanvas);
+
+    if (bounds.isEmpty) {
+        return {
+            canvas: sourceCanvas,
+            anchor: { x: 0.5, y: 1.0 }, // Normalized anchor (center-bottom)
+            originalSize: { width: sourceCanvas.width, height: sourceCanvas.height },
+            croppedSize: { width: sourceCanvas.width, height: sourceCanvas.height },
+            bounds: { left: 0, top: 0, right: sourceCanvas.width, bottom: sourceCanvas.height },
+            cropped: false
+        };
+    }
+
+    // Calculate new dimensions with padding
+    const newWidth = bounds.width + padding * 2;
+    const newHeight = bounds.height + padding * 2;
+
+    // Create cropped canvas
+    const croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = newWidth;
+    croppedCanvas.height = newHeight;
+    const ctx = croppedCanvas.getContext('2d');
+
+    // Copy the cropped region
+    ctx.drawImage(
+        sourceCanvas,
+        bounds.left, bounds.top, bounds.width, bounds.height,
+        padding, padding, bounds.width, bounds.height
+    );
+
+    // Calculate anchor point (normalized 0-1 range):
+    // - X: center of the original content relative to the cropped canvas
+    // - Y: bottom of the content (where it touches the ground)
+    const originalCenterX = (bounds.left + bounds.right) / 2;
+    const anchorXPixels = (originalCenterX - bounds.left + padding);
+    const anchorX = anchorXPixels / newWidth;
+    const anchorY = 1.0; // Always bottom for ground placement
+
+    return {
+        canvas: croppedCanvas,
+        anchor: {
+            x: anchorX,
+            y: anchorY
+        },
+        originalSize: { width: sourceCanvas.width, height: sourceCanvas.height },
+        croppedSize: { width: newWidth, height: newHeight },
+        bounds: bounds,
+        cropped: true
+    };
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 function getSettings() {
     return {
         variants: parseInt(document.getElementById('variants').value, 10) || 4,
@@ -232,36 +339,39 @@ async function createSpriteSheets() {
 
     updateStatus('Creating sprite sheets...');
 
-    // Terrain sprite sheet
+    // Terrain sprite sheet (NO cropping - tiles must fill entire hex)
     if (generatedAssets.terrain.length > 0) {
         const settings = getSettings();
         const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
-        const sheet = createSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, hexHeight);
+        const sheet = createSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, hexHeight, false);
         addSheetPreview(preview, sheet.canvas, 'terrain-hexes.png', sheet.json);
     }
 
-    // Trees sprite sheet
+    // Trees sprite sheet (WITH cropping and anchor points)
     if (generatedAssets.trees.length > 0) {
-        const sheet = createSpriteSheet(generatedAssets.trees, getSettings().variants, 256, 380);
+        const sheet = createCroppedSpriteSheet(generatedAssets.trees, getSettings().variants);
         addSheetPreview(preview, sheet.canvas, 'trees.png', sheet.json);
     }
 
-    // Vegetation sprite sheet
+    // Vegetation sprite sheet (WITH cropping and anchor points)
     if (generatedAssets.bushes.length > 0) {
-        const sheet = createSpriteSheet(generatedAssets.bushes, getSettings().variants, 307, 344);
+        const sheet = createCroppedSpriteSheet(generatedAssets.bushes, getSettings().variants);
         addSheetPreview(preview, sheet.canvas, 'environment-details.png', sheet.json);
     }
 
-    // Characters sprite sheet
+    // Characters sprite sheet (WITH cropping and anchor points)
     if (generatedAssets.characters.length > 0) {
-        const sheet = createSpriteSheet(generatedAssets.characters, 4, getSettings().charSize, getSettings().charSize);
+        const sheet = createCroppedSpriteSheet(generatedAssets.characters, 4);
         addSheetPreview(preview, sheet.canvas, 'unit-sprites.png', sheet.json);
     }
 
     showTab('sheets');
 }
 
-function createSpriteSheet(assets, columns, spriteWidth, spriteHeight) {
+/**
+ * Create sprite sheet with fixed-size sprites (for terrain)
+ */
+function createSpriteSheet(assets, columns, spriteWidth, spriteHeight, enableCropping = false) {
     const rows = Math.ceil(assets.length / columns);
     const sheetWidth = columns * spriteWidth;
     const sheetHeight = rows * spriteHeight;
@@ -298,6 +408,122 @@ function createSpriteSheet(assets, columns, spriteWidth, spriteHeight) {
     const json = {
         version: '1.0',
         dimensions: { width: sheetWidth, height: sheetHeight },
+        sprites
+    };
+
+    return { canvas, json };
+}
+
+/**
+ * Create sprite sheet with cropped sprites and anchor points
+ * Uses row-based packing where each row has uniform height
+ * @param {Array} assets - Array of asset objects with canvas property
+ * @param {number} columns - Number of columns (sprites per row)
+ * @returns {Object} { canvas, json }
+ */
+function createCroppedSpriteSheet(assets, columns) {
+    // First, crop all assets and calculate row heights
+    const croppedAssets = assets.map(asset => {
+        const cropped = cropWhitespace(asset.canvas, 2);
+        return {
+            ...asset,
+            croppedCanvas: cropped.canvas,
+            anchor: cropped.anchor,
+            originalSize: cropped.originalSize,
+            croppedSize: cropped.croppedSize
+        };
+    });
+
+    // Group into rows
+    const rows = [];
+    for (let i = 0; i < croppedAssets.length; i += columns) {
+        rows.push(croppedAssets.slice(i, i + columns));
+    }
+
+    // Calculate max height per row and max width per column
+    const rowHeights = rows.map(row =>
+        Math.max(...row.map(a => a.croppedSize.height))
+    );
+    const colWidths = [];
+    for (let col = 0; col < columns; col++) {
+        let maxWidth = 0;
+        for (const row of rows) {
+            if (row[col]) {
+                maxWidth = Math.max(maxWidth, row[col].croppedSize.width);
+            }
+        }
+        colWidths.push(maxWidth);
+    }
+
+    // Calculate total dimensions
+    const sheetWidth = colWidths.reduce((a, b) => a + b, 0);
+    const sheetHeight = rowHeights.reduce((a, b) => a + b, 0);
+
+    // Create sprite sheet canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = sheetWidth;
+    canvas.height = sheetHeight;
+    const ctx = canvas.getContext('2d');
+
+    const sprites = [];
+    let currentY = 0;
+
+    rows.forEach((row, rowIndex) => {
+        const rowHeight = rowHeights[rowIndex];
+        let currentX = 0;
+
+        row.forEach((asset, colIndex) => {
+            const colWidth = colWidths[colIndex];
+
+            // Center sprite horizontally within cell, align to bottom vertically
+            const offsetX = Math.floor((colWidth - asset.croppedSize.width) / 2);
+            const offsetY = rowHeight - asset.croppedSize.height;
+
+            const x = currentX + offsetX;
+            const y = currentY + offsetY;
+
+            // Draw the cropped sprite
+            ctx.drawImage(asset.croppedCanvas, x, y);
+
+            // Store sprite info with anchor point
+            sprites.push({
+                id: asset.label,
+                bounds: {
+                    x: currentX,
+                    y: currentY,
+                    width: colWidth,
+                    height: rowHeight
+                },
+                // Actual content bounds within the cell
+                contentBounds: {
+                    x: x,
+                    y: y,
+                    width: asset.croppedSize.width,
+                    height: asset.croppedSize.height
+                },
+                // Anchor point (normalized 0-1, relative to contentBounds)
+                anchor: asset.anchor,
+                metadata: {
+                    type: asset.type,
+                    subtype: asset.subtype,
+                    variant: asset.variant,
+                    unitClass: asset.unitClass,
+                    state: asset.state,
+                    player: asset.player,
+                    originalSize: asset.originalSize
+                }
+            });
+
+            currentX += colWidth;
+        });
+
+        currentY += rowHeight;
+    });
+
+    const json = {
+        version: '2.0', // New version with anchor support
+        dimensions: { width: sheetWidth, height: sheetHeight },
+        features: ['cropped', 'anchored'],
         sprites
     };
 

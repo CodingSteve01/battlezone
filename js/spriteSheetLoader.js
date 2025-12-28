@@ -19,6 +19,10 @@ const spriteRegistry = {
     details: new Map()     // detailType_variant -> ImageBitmap
 };
 
+// Anchor point registry - stores normalized anchor points for sprites
+// Key: sprite id, Value: { x: 0-1, y: 0-1 } where (0.5, 1.0) means center-bottom
+const anchorRegistry = new Map();
+
 // Cache for mirrored (horizontally flipped) sprites
 const mirroredSpriteCache = new Map();
 
@@ -285,15 +289,20 @@ async function loadAndExtractSpriteSheets() {
 
 /**
  * Extract sprites from a loaded sprite sheet image
+ * Supports both v1.0 (bounds only) and v2.0 (contentBounds + anchor) formats
  */
 async function extractSpritesFromSheet(type, sheetImg, definition) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    const isV2 = definition.version === '2.0' || definition.features?.includes('cropped');
 
     for (const sprite of definition.sprites || []) {
         if (!sprite.bounds) continue;
 
-        const { x, y, width, height } = sprite.bounds;
+        // V2.0 format: use contentBounds if available (actual sprite content)
+        // V1.0 format: use bounds directly
+        const sourceBounds = sprite.contentBounds || sprite.bounds;
+        const { x, y, width, height } = sourceBounds;
         const outputSize = sprite.outputSize || definition.globalSettings?.outputSize || { width, height };
 
         canvas.width = outputSize.width;
@@ -311,6 +320,14 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
         // Create ImageBitmap for better performance
         const bitmap = await createImageBitmap(canvas);
 
+        // Store anchor point if available (V2.0 format)
+        if (sprite.anchor) {
+            anchorRegistry.set(sprite.id, {
+                x: sprite.anchor.x,
+                y: sprite.anchor.y
+            });
+        }
+
         // Handle different sprite types
         if (type === 'units') {
             const unitClass = sprite.metadata?.unitClass;
@@ -319,14 +336,23 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
 
             if (unitClass && player !== undefined) {
                 // New format: sprites already have player index
-                spriteRegistry.units.set(`${unitClass}_${state}_${player}`, bitmap);
+                const key = `${unitClass}_${state}_${player}`;
+                spriteRegistry.units.set(key, bitmap);
+                // Also store anchor for unit key
+                if (sprite.anchor) {
+                    anchorRegistry.set(key, sprite.anchor);
+                }
             } else if (definition.colorize?.enabled) {
                 // Old format: colorize to generate player variants
                 const colors = definition.colorize.targetColors || CONFIG.PLAYER_COLORS;
                 for (let p = 0; p < colors.length; p++) {
                     const colored = colorizeCanvas(canvas, colors[p]);
                     const coloredBitmap = await createImageBitmap(colored);
-                    spriteRegistry.units.set(`${unitClass}_${state}_${p}`, coloredBitmap);
+                    const key = `${unitClass}_${state}_${p}`;
+                    spriteRegistry.units.set(key, coloredBitmap);
+                    if (sprite.anchor) {
+                        anchorRegistry.set(key, sprite.anchor);
+                    }
                 }
             } else {
                 // Fallback: just store by id
@@ -775,4 +801,52 @@ export function getVariantRegistry() {
  */
 export function getDefinitions() {
     return { ...definitions };
+}
+
+// ============================================
+// ANCHOR POINT API
+// ============================================
+
+/**
+ * Get anchor point for a sprite by ID
+ * Returns normalized coordinates (0-1) where (0.5, 1.0) is center-bottom
+ * @param {string} spriteId - The sprite ID
+ * @returns {Object|null} { x: 0-1, y: 0-1 } or null if no anchor defined
+ */
+export function getAnchorPoint(spriteId) {
+    return anchorRegistry.get(spriteId) || null;
+}
+
+/**
+ * Get anchor point for a detail sprite
+ * @param {string} detailType - Detail type (tree, bush, grass, etc.)
+ * @param {number} variant - Variant index
+ * @returns {Object|null} { x: 0-1, y: 0-1 } or default center-bottom
+ */
+export function getDetailAnchor(detailType, variant = 0) {
+    const info = variantRegistry.details[detailType];
+    if (!info || info.ids.length === 0) return { x: 0.5, y: 1.0 };
+
+    const spriteId = info.ids.find((id, i) => info.variants[i] === variant) || info.ids[0];
+    return anchorRegistry.get(spriteId) || { x: 0.5, y: 1.0 };
+}
+
+/**
+ * Get anchor point for a unit sprite
+ * @param {string} unitClass - Unit class
+ * @param {number} playerIndex - Player index
+ * @param {string} state - Unit state
+ * @returns {Object} { x: 0-1, y: 0-1 } or default center-bottom
+ */
+export function getUnitAnchor(unitClass, playerIndex, state = 'normal') {
+    const key = `${unitClass}_${state}_${playerIndex}`;
+    return anchorRegistry.get(key) || { x: 0.5, y: 1.0 };
+}
+
+/**
+ * Check if anchor points are available (V2.0 format sprites)
+ * @returns {boolean}
+ */
+export function hasAnchorPoints() {
+    return anchorRegistry.size > 0;
 }

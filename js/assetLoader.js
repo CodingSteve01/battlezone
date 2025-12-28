@@ -294,3 +294,64 @@ export function getAvailableDetailTypes() {
 export function getDetailVariantCount(type) {
     return SpriteSheet.getDetailVariantCount(type);
 }
+
+// ============================================
+// ANCHOR POINT API
+// ============================================
+
+/**
+ * Get anchor point for a detail sprite (tree, bush, grass, etc.)
+ * Returns normalized coordinates (0-1) where (0.5, 1.0) is center-bottom
+ * Use this to position sprites correctly on tiles based on their ground contact point
+ * @param {string} detailType - Detail type
+ * @param {number} variant - Variant index
+ * @returns {Object} { x: 0-1, y: 0-1 }
+ */
+export function getDetailAnchor(detailType, variant = 0) {
+    return SpriteSheet.getDetailAnchor(detailType, variant);
+}
+
+/**
+ * Get anchor point for a unit sprite
+ * @param {string} unitClass - Unit class
+ * @param {number} playerIndex - Player index
+ * @param {string} state - Unit state
+ * @returns {Object} { x: 0-1, y: 0-1 }
+ */
+export function getUnitAnchor(unitClass, playerIndex, state = 'normal') {
+    return SpriteSheet.getUnitAnchor(unitClass, playerIndex, state);
+}
+
+/**
+ * Check if anchor points are available (V2.0 format sprites)
+ * @returns {boolean}
+ */
+export function hasAnchorPoints() {
+    return SpriteSheet.hasAnchorPoints();
+}
+
+/**
+ * Draw a detail sprite using anchor-based positioning
+ * Positions the sprite so the anchor point (typically center-bottom) is at (x, y)
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {string} detailType - Detail type (tree, bush, etc.)
+ * @param {number} variant - Variant index
+ * @param {number} x - X position for anchor point
+ * @param {number} y - Y position for anchor point
+ * @param {number} scale - Scale factor (1.0 = original size)
+ */
+export function drawDetailSprite(ctx, detailType, variant, x, y, scale = 1.0) {
+    const sprite = SpriteSheet.getDetailSprite(detailType, variant);
+    if (!sprite) return false;
+
+    const anchor = SpriteSheet.getDetailAnchor(detailType, variant);
+    const width = sprite.width * scale;
+    const height = sprite.height * scale;
+
+    // Position so anchor point is at (x, y)
+    const drawX = x - width * anchor.x;
+    const drawY = y - height * anchor.y;
+
+    ctx.drawImage(sprite, drawX, drawY, width, height);
+    return true;
+}
