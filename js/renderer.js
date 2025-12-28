@@ -1123,9 +1123,14 @@ function getTargetFps() {
 }
 
 function shouldAnimate() {
+    // Don't animate if a menu screen is showing or no map exists
     if (state.screen !== null || state.hexes.length === 0) return false;
-    if (state.animating || state.movementAnimation) return true;
-    return particles.getActiveCount() > 0;
+
+    // ALWAYS animate when game is active (hexes exist and no menu showing)
+    // This ensures the render loop keeps running even when there are no
+    // active animations or particles. Without this, the game shows a black
+    // screen because the render loop stops immediately after the first frame.
+    return true;
 }
 
 function ensureAnimationLoop() {
