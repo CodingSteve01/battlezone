@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.15.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.5...shadow-squad-v3.15.0) (2025-12-28)
+
+
+### Features
+
+* **camera:** add intelligent situational zoom for AI/spectator mode ([#166](https://github.com/CodingSteve01/battlezone/issues/166)) ([c8cb8f8](https://github.com/CodingSteve01/battlezone/commit/c8cb8f8306c59b10c6a360edc3ca4032cac0eb8e))
+
 ## [3.14.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.4...shadow-squad-v3.14.5) (2025-12-28)
 
 
