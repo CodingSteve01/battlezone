@@ -12,6 +12,42 @@ import { test, expect } from '@playwright/test';
  */
 
 /**
+ * Helper: Disable tutorial before page load
+ * @param {Page} page - Playwright page
+ */
+async function disableTutorial(page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('shadowSquad_firstGame', 'true');
+    localStorage.setItem('shadowSquad_tutorialHints', '["welcome","teamIntro"]');
+    localStorage.setItem('shadowSquad_teamSelectHints', '["teamIntro"]');
+  });
+}
+
+/**
+ * Helper: Dismiss any tutorial popup if present
+ * @param {Page} page - Playwright page
+ */
+async function dismissTutorialIfPresent(page) {
+  // Check for various tutorial overlays and dismiss them
+  const tutorialSelectors = [
+    '#tutorial-overlay .tutorial-btn-ok',
+    '#tutorial-overlay .tutorial-close-btn',
+    '#team-tutorial-overlay .tutorial-btn-ok',
+    '#team-tutorial-overlay .tutorial-close-btn',
+    '#guided-tutorial-overlay .guided-tutorial-btn-skip',
+    '.tutorial-close-btn'
+  ];
+
+  for (const selector of tutorialSelectors) {
+    const btn = page.locator(selector);
+    if (await btn.isVisible({ timeout: 200 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(100);
+    }
+  }
+}
+
+/**
  * Helper: Navigate through wizard to start AI vs AI game
  * @param {Page} page - Playwright page
  */
@@ -27,25 +63,39 @@ async function startAIvsAIGame(page) {
   await page.locator('#wizard-map-next').click();
   await expect(page.locator('#wizard-players')).toHaveClass(/active/, { timeout: 3000 });
 
-  // Set player 1 to AI (player 2 is AI by default)
-  const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
-  const player1Text = await player1Toggle.textContent();
-  if (player1Text?.includes('Mensch')) {
+  // Set player 1 to AI (player 2 is already AI by default in single-player)
+  // The toggle shows "👤" for human, "🤖 KI" for AI
+  const player1Toggle = page.locator('.player-config-item:first-child .type-toggle');
+  const player1Class = await player1Toggle.getAttribute('class');
+  if (player1Class?.includes('human')) {
     await player1Toggle.click();
+    await page.waitForTimeout(100);
+  }
+
+  // Ensure player 2 is also AI
+  const player2Toggle = page.locator('.player-config-item:nth-child(2) .type-toggle');
+  const player2Class = await player2Toggle.getAttribute('class');
+  if (player2Class?.includes('human')) {
+    await player2Toggle.click();
     await page.waitForTimeout(100);
   }
 
   // Step 3: Start game (AI vs AI skips team selection)
   await page.locator('#wizard-players-next').click();
 
-  // Wait for game to initialize
+  // Wait for game to initialize - AI vs AI should skip team selection
   await page.waitForTimeout(2000);
+
+  // Dismiss any tutorial that might appear
+  await dismissTutorialIfPresent(page);
 }
 
 test.describe('AI vs AI Spectator Mode', () => {
   test.beforeEach(async ({ page }) => {
     // Set shorter default timeout for AI tests
     test.setTimeout(30000); // 30 seconds max per test
+    // Disable tutorial before page load
+    await disableTutorial(page);
   });
 
   test('AI vs AI game starts and renders without black screen', async ({ page }) => {

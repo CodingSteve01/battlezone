@@ -10,9 +10,41 @@ import { test, expect } from '@playwright/test';
  * 4. Team Selection (#team-select) - Select units (or auto for AI)
  */
 
+/**
+ * Helper: Disable tutorial before page load
+ */
+async function disableTutorial(page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('shadowSquad_firstGame', 'true');
+    localStorage.setItem('shadowSquad_tutorialHints', '["welcome","teamIntro"]');
+    localStorage.setItem('shadowSquad_teamSelectHints', '["teamIntro"]');
+  });
+}
+
+/**
+ * Helper: Dismiss any tutorial popup if present
+ */
+async function dismissTutorialIfPresent(page) {
+  const selectors = [
+    '#tutorial-overlay .tutorial-btn-ok',
+    '#team-tutorial-overlay .tutorial-btn-ok',
+    '.tutorial-close-btn'
+  ];
+  for (const sel of selectors) {
+    const btn = page.locator(sel);
+    if (await btn.isVisible({ timeout: 200 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(100);
+    }
+  }
+}
+
 test.describe('Menu Navigation', () => {
   test.beforeEach(async ({ page }) => {
     test.setTimeout(30000);
+
+    // Disable tutorial before page load
+    await disableTutorial(page);
 
     page.on('console', msg => {
       if (msg.type() === 'error') {
@@ -154,6 +186,9 @@ test.describe('Menu Navigation', () => {
     // Should reach team selection
     const teamSelect = page.locator('#team-select');
     await expect(teamSelect).toBeVisible({ timeout: 5000 });
+
+    // Dismiss any tutorial popup that might appear
+    await dismissTutorialIfPresent(page);
 
     expect(errors).toEqual([]);
   });

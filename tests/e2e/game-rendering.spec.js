@@ -10,6 +10,41 @@ import { test, expect } from '@playwright/test';
  */
 
 /**
+ * Helper: Disable tutorial before page load
+ * @param {Page} page - Playwright page
+ */
+async function disableTutorial(page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('shadowSquad_firstGame', 'true');
+    localStorage.setItem('shadowSquad_tutorialHints', '["welcome","teamIntro"]');
+    localStorage.setItem('shadowSquad_teamSelectHints', '["teamIntro"]');
+  });
+}
+
+/**
+ * Helper: Dismiss any tutorial popup if present
+ * @param {Page} page - Playwright page
+ */
+async function dismissTutorialIfPresent(page) {
+  const tutorialSelectors = [
+    '#tutorial-overlay .tutorial-btn-ok',
+    '#tutorial-overlay .tutorial-close-btn',
+    '#team-tutorial-overlay .tutorial-btn-ok',
+    '#team-tutorial-overlay .tutorial-close-btn',
+    '#guided-tutorial-overlay .guided-tutorial-btn-skip',
+    '.tutorial-close-btn'
+  ];
+
+  for (const selector of tutorialSelectors) {
+    const btn = page.locator(selector);
+    if (await btn.isVisible({ timeout: 200 }).catch(() => false)) {
+      await btn.click();
+      await page.waitForTimeout(100);
+    }
+  }
+}
+
+/**
  * Helper: Navigate through wizard to start a game
  * @param {Page} page - Playwright page
  * @param {Object} options - Configuration options
@@ -32,11 +67,19 @@ async function navigateToGame(page, options = {}) {
 
   // Configure AI if needed
   if (allAI) {
-    // Set player 1 to AI (player 2 is AI by default)
-    const player1Toggle = page.locator('.ai-config-item:first-child .type-toggle');
-    const player1Text = await player1Toggle.textContent();
-    if (player1Text?.includes('Mensch')) {
+    // Set both players to AI
+    // The toggle has class 'human' or 'ai', not text content
+    const player1Toggle = page.locator('.player-config-item:first-child .type-toggle');
+    const player1Class = await player1Toggle.getAttribute('class');
+    if (player1Class?.includes('human')) {
       await player1Toggle.click();
+      await page.waitForTimeout(100);
+    }
+
+    const player2Toggle = page.locator('.player-config-item:nth-child(2) .type-toggle');
+    const player2Class = await player2Toggle.getAttribute('class');
+    if (player2Class?.includes('human')) {
+      await player2Toggle.click();
       await page.waitForTimeout(100);
     }
   }
@@ -47,29 +90,50 @@ async function navigateToGame(page, options = {}) {
   if (allAI) {
     // AI vs AI skips team selection, wait for game to start
     await page.waitForTimeout(2000);
+    await dismissTutorialIfPresent(page);
   } else {
     // Wait for team selection
     const teamSelect = page.locator('#team-select');
     await expect(teamSelect).toBeVisible({ timeout: 5000 });
+    await dismissTutorialIfPresent(page);
   }
 }
 
 /**
  * Helper: Complete team selection and start game
+ * Need to select 3 units to fill the team
  */
 async function completeTeamSelection(page) {
-  // Select first unit card
-  const unitCard = page.locator('.unit-card').first();
-  await expect(unitCard).toBeVisible({ timeout: 3000 });
-  await unitCard.click();
-  await page.waitForTimeout(100);
+  // Dismiss any tutorial popup first
+  await dismissTutorialIfPresent(page);
 
-  // Click confirm button
-  const confirmBtn = page.locator('#confirm-team-btn');
+  // Select 3 unit cards (required for team)
+  for (let i = 0; i < 3; i++) {
+    const unitCards = page.locator('.unit-card:not(.selected)');
+    const cardCount = await unitCards.count();
+    if (cardCount > 0) {
+      await unitCards.first().click();
+      await page.waitForTimeout(200);
+    }
+  }
+
+  // Click confirm button (it's #team-confirm-btn not #confirm-team-btn)
+  const confirmBtn = page.locator('#team-confirm-btn');
+  await expect(confirmBtn).toBeEnabled({ timeout: 3000 });
   await confirmBtn.click();
+
+  // Wait for turn screen or game to start
+  await page.waitForTimeout(1000);
+
+  // If turn screen appears, click ready
+  const readyBtn = page.locator('#ready-btn');
+  if (await readyBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await readyBtn.click();
+  }
 
   // Wait for game to initialize
   await page.waitForTimeout(2000);
+  await dismissTutorialIfPresent(page);
 }
 
 test.describe('Game Rendering', () => {
@@ -80,6 +144,9 @@ test.describe('Game Rendering', () => {
     test.setTimeout(30000);
     pageErrors = [];
     consoleErrors = [];
+
+    // Disable tutorial before page load
+    await disableTutorial(page);
 
     page.on('pageerror', error => {
       pageErrors.push({ message: error.message, stack: error.stack });
