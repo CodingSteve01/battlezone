@@ -3139,7 +3139,35 @@ export function render() {
     // Collect AP cost overlay positions for drawing on top of everything
     const apCostOverlays = [];
 
+    // DIAGNOSTIC: Log render state once per second to debug black screen issue
+    const now = performance.now();
+    if (!state._lastRenderDiagnostic || now - state._lastRenderDiagnostic > 1000) {
+        state._lastRenderDiagnostic = now;
+        const diagInfo = {
+            hexCount: state.hexes.length,
+            hexSize: state.hexSize,
+            offsetX: state.offsetX,
+            offsetY: state.offsetY,
+            canvasW: w,
+            canvasH: h,
+            viewingPlayer: state.viewingPlayer,
+            visibleCount: state.playerVisibleHexes[state.viewingPlayer]?.size || 0,
+            exploredCount: state.playerExploredHexes[state.viewingPlayer]?.size || 0
+        };
+        console.log('[Render] State:', diagInfo);
+
+        // Check for NaN values that would cause invisible rendering
+        if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+            console.error('[Render] CRITICAL: hexSize is invalid:', state.hexSize);
+        }
+        if (!Number.isFinite(state.offsetX) || !Number.isFinite(state.offsetY)) {
+            console.error('[Render] CRITICAL: offset is invalid:', state.offsetX, state.offsetY);
+        }
+    }
+
     // Draw hexes (ground layer) - with tile caching for performance
+    let hexesDrawn = 0;
+    let hexesSkipped = 0;
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
@@ -3148,8 +3176,10 @@ export function render() {
         // Skip if off screen (with margin)
         if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
             sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+            hexesSkipped++;
             return;
         }
+        hexesDrawn++;
 
         const fogLevel = getFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
@@ -3335,6 +3365,24 @@ export function render() {
             }
         }
     });
+
+    // DIAGNOSTIC: Log hex draw statistics once per second
+    if (!state._lastHexDiagnostic || now - state._lastHexDiagnostic > 1000) {
+        state._lastHexDiagnostic = now;
+        console.log(`[Render] Hexes: ${hexesDrawn} drawn, ${hexesSkipped} skipped (total: ${state.hexes.length})`);
+        if (hexesDrawn === 0 && state.hexes.length > 0) {
+            console.error('[Render] CRITICAL: All hexes skipped! Check hexSize and offset values.');
+            // Log first hex position for debugging
+            const firstHex = state.hexes[0];
+            const pos = hexToPixel(firstHex.q, firstHex.r, state.hexSize);
+            console.error('[Render] First hex position:', {
+                hex: { q: firstHex.q, r: firstHex.r },
+                pixel: pos,
+                screen: { x: state.offsetX + pos.x, y: state.offsetY + pos.y },
+                canvas: { w, h }
+            });
+        }
+    }
 
     // Draw hex grid overlay only when planning movement or attack
     if (showGrid) {
