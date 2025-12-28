@@ -534,7 +534,10 @@ export function centerOnTeam(playerIndex, duration = 600) {
         const spreadY = unitSpreadY / currentZoom;
         const zoomX = spreadX > 0 ? rect.width / spreadX : 1.0;
         const zoomY = spreadY > 0 ? rect.height / spreadY : 1.0;
-        const targetZoom = Math.min(Math.max(Math.min(zoomX, zoomY), CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
+        // Use state.minZoom and state.maxZoom for clamping
+        const minZoom = state.minZoom || 0.5;
+        const maxZoom = state.maxZoom || 2.0;
+        const targetZoom = Math.min(Math.max(Math.min(zoomX, zoomY), minZoom), maxZoom);
 
         // Animate to position and zoom
         const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
@@ -1229,7 +1232,10 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null) {
         // Calculate target zoom - closer zoom for better viewing in spectator mode
         // Default: zoom in to 1.2 or current zoom if already closer
         const idealZoom = targetZoom || Math.max(1.2, safeCurrentZoom);
-        const clampedZoom = Math.min(Math.max(idealZoom, CONFIG.MIN_ZOOM), CONFIG.MAX_ZOOM);
+        // Use state.minZoom and state.maxZoom for clamping
+        const minZoom = state.minZoom || 0.5;
+        const maxZoom = state.maxZoom || 2.0;
+        const clampedZoom = Math.min(Math.max(idealZoom, minZoom), maxZoom);
 
         // Calculate target position at the target zoom level
         const targetHexSize = CONFIG.BASE_HEX_SIZE * clampedZoom;

@@ -157,6 +157,23 @@ export function getRandomDetailSprite(detailType, seed = Math.random()) {
 }
 
 /**
+ * Get a random detail sprite with its anchor point and content scale
+ * @param {string} detailType - Type of detail (tree, bush, grass, rock)
+ * @param {number} seed - Random seed for consistent selection
+ * @returns {Object|null} { sprite: ImageBitmap, anchor: { x, y }, contentScale: { scaleX, scaleY } } or null
+ */
+export function getRandomDetailSpriteWithAnchor(detailType, seed = Math.random()) {
+    return SpriteSheet.getRandomDetailSpriteWithAnchor(detailType, seed);
+}
+
+/**
+ * Get content scale for a unit sprite (for cropping compensation)
+ */
+export function getUnitContentScale(unitClass, playerIndex, state = 'normal') {
+    return SpriteSheet.getUnitContentScale(unitClass, playerIndex, state);
+}
+
+/**
  * Check if assets have been loaded
  */
 export function areAssetsLoaded() {
@@ -179,9 +196,6 @@ export function areAssetsLoaded() {
 export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSelected, playerIndex, facing = null) {
     const sprite = getUnitSprite(classType, playerIndex, status, facing);
 
-    // Sprite size - units should be smaller than hex size
-    const spriteSize = size * 1.2;
-
     // Draw the unit with subtle glow if selected
     if (isSelected) {
         ctx.save();
@@ -191,7 +205,24 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
 
     // Draw the unit
     if (sprite) {
-        ctx.drawImage(sprite, cx - spriteSize / 2, cy - spriteSize / 2, spriteSize, spriteSize);
+        // Get anchor and content scale for proper positioning and sizing
+        const anchor = SpriteSheet.getUnitAnchor(classType, playerIndex, status);
+        const contentScale = SpriteSheet.getUnitContentScale(classType, playerIndex, status);
+
+        // Base sprite size - units should be smaller than hex size
+        const baseSize = size * 1.2;
+
+        // Apply content scale to account for cropping
+        // The sprite's visual content is smaller than the original cell
+        const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
+        const spriteWidth = baseSize * avgScale * (sprite.width / sprite.height);
+        const spriteHeight = baseSize * avgScale;
+
+        // Position using anchor point (typically center-bottom for units)
+        const drawX = cx - spriteWidth * anchor.x;
+        const drawY = cy - spriteHeight * anchor.y;
+
+        ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
     } else {
         drawUnitPlaceholder(ctx, cx, cy, size, playerColor, classType, isSelected);
     }
