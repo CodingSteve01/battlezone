@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack, arePlayersAllied } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack, arePlayersAllied, getPlayerName } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -15,6 +15,7 @@ import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
 import { scrollToUnit, scrollToUnitWithZoom } from './input.js';
+import { logAI, logError } from './errorLog.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -461,18 +462,18 @@ function showAIThinking() {
     const existing = document.querySelector('.ai-thinking');
     if (existing) existing.remove();
 
-    const playerNum = state.currentPlayer + 1;
+    const playerName = getPlayerName(state.currentPlayer);
     const spectator = isSpectatorMode();
 
     const overlay = document.createElement('div');
     overlay.className = 'ai-thinking' + (spectator ? ' spectator-mode' : '');
     overlay.innerHTML = spectator ? `
         <span class="ai-icon">🎬</span>
-        <span class="ai-text">Spieler ${playerNum} (KI) analysiert...</span>
+        <span class="ai-text">${playerName} (KI) analysiert...</span>
         <span class="ai-subtext">Beobachter-Modus</span>
     ` : `
         <span class="ai-icon">🤖</span>
-        <span class="ai-text">Spieler ${playerNum} (KI) am Zug...</span>
+        <span class="ai-text">${playerName} (KI) am Zug...</span>
     `;
     document.body.appendChild(overlay);
 }
@@ -979,6 +980,8 @@ async function performAIActions() {
     // Check if we're in spectator mode (human watching AI vs AI)
     const spectatorMode = isSpectatorMode();
 
+    logAI(`KI-Zug startet`, `Spieler ${aiPlayerIndex + 1}, Spectator: ${spectatorMode}`);
+
     // Spectator mode: slow down AI to human-like speed so viewer can follow
     const unitDelay = spectatorMode ? 800 : 400;
 
@@ -988,12 +991,14 @@ async function performAIActions() {
         // When AI is playing, ensure correct visibility for rendering
         if (spectatorMode) {
             // In spectator mode, view from current AI's perspective
+            logAI('Spectator-Modus: Aktualisiere Sichtbarkeit für AI');
             updateVisibilityForPlayer(state.currentPlayer);
             render();
         } else {
             // Normal mode: human viewer's visibility
             const hasHumanViewer = !isAIPlayer(state.viewingPlayer);
             if (hasHumanViewer && state.viewingPlayer !== state.currentPlayer) {
+                logAI('Human-Viewer-Modus: Aktualisiere Sichtbarkeit');
                 updateVisibilityForPlayer(state.viewingPlayer);
                 render();
             }
@@ -1046,7 +1051,7 @@ async function performAIActions() {
         const turnDuration = Date.now() - aiTurnStartTime;
         console.log(`AI turn completed: ${unitsProcessed} units processed in ${turnDuration}ms`);
     } catch (error) {
-        console.error('AI execution error:', error);
+        logError('KI-Ausführungsfehler', error);
         // Continue to endTurn despite errors
     } finally {
         // Clear the timeout since we're ending normally
@@ -1257,7 +1262,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             shortDelay
         });
     } catch (error) {
-        console.error(`AI error for unit ${unit.id} (${unit.class}):`, error);
+        logError(`KI-Fehler für Einheit ${unit.id} (${unit.class})`, error);
         // Continue to next unit - don't let one unit's error stop the entire turn
     }
 }

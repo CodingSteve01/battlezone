@@ -13,6 +13,41 @@ import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
+import { logRender, logError } from './errorLog.js';
+
+// ===== SAFE GRADIENT HELPERS =====
+// Prevents "non-finite value" errors when coordinates are NaN/Infinity
+
+/**
+ * Check if all values are finite numbers
+ */
+function areValuesFinite(...values) {
+    return values.every(v => Number.isFinite(v));
+}
+
+/**
+ * Create a radial gradient safely, returning a fallback color if values are invalid
+ */
+function safeRadialGradient(ctx, x0, y0, r0, x1, y1, r1, fallbackColor = 'transparent') {
+    if (!areValuesFinite(x0, y0, r0, x1, y1, r1) || r1 <= 0) {
+        return fallbackColor;
+    }
+    return ctx.createRadialGradient(x0, y0, r0, x1, y1, r1);
+}
+
+/**
+ * Create a linear gradient safely, returning a fallback color if values are invalid
+ */
+function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') {
+    if (!areValuesFinite(x0, y0, x1, y1)) {
+        return fallbackColor;
+    }
+    // Prevent zero-length gradients
+    if (x0 === x1 && y0 === y1) {
+        return fallbackColor;
+    }
+    return ctx.createLinearGradient(x0, y0, x1, y1);
+}
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
@@ -97,17 +132,21 @@ function drawTerrainBlend(ctx, cx, cy, size, terrainType, neighborTerrains) {
         };
 
         // Create gradient with neighbor's color fading in
-        const gradient = ctx.createLinearGradient(
+        const gradient = safeLinearGradient(
+            ctx,
             gradientStart.x, gradientStart.y,
-            gradientEnd.x, gradientEnd.y
+            gradientEnd.x, gradientEnd.y,
+            'transparent'
         );
 
         // Use neighbor's color at edge, fading to transparent
         const blendColor = neighborTerrain.colorDark || neighborTerrain.color;
-        gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
-        gradient.addColorStop(0.4, blendColor + '55');
-        gradient.addColorStop(0.7, blendColor + '22');
-        gradient.addColorStop(1, 'transparent');
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
+            gradient.addColorStop(0.4, blendColor + '55');
+            gradient.addColorStop(0.7, blendColor + '22');
+            gradient.addColorStop(1, 'transparent');
+        }
 
         // Draw blend triangle
         ctx.beginPath();
@@ -791,10 +830,12 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
     drawHexPathToContext(context, cx, cy, hexSize);
 
     // Subtle radial gradient - darker at edges, slightly lighter in center
-    const dimGradient = context.createRadialGradient(cx, cy, 0, cx, cy, hexSize);
-    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    const dimGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(8, 12, 20, 0.6)');
+    if (typeof dimGradient !== 'string') {
+        dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+        dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+        dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    }
     context.fillStyle = dimGradient;
     context.fill();
 
@@ -871,10 +912,12 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
         context.closePath();
     } else if (terrain && terrain.colorLight && terrain.colorDark) {
         // Fallback: gradient fill
-        const gradient = context.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
+        const gradient = safeLinearGradient(context, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, terrain.colorLight);
+            gradient.addColorStop(0.5, terrain.color);
+            gradient.addColorStop(1, terrain.colorDark);
+        }
         context.fillStyle = gradient;
         context.fill();
     } else {
@@ -945,13 +988,17 @@ function drawCamouflagePattern(cx, cy, size, unit) {
     ctx.globalAlpha = 0.22;
 
     // Soft camo fill with terrain-tinted gradient
-    const baseGrad = ctx.createRadialGradient(
+    const baseGrad = safeRadialGradient(
+        ctx,
         cx, cy - size * 0.2, 0,
-        cx, cy, size * 0.9
+        cx, cy, size * 0.9,
+        `rgba(${r}, ${g}, ${b}, 0.2)`
     );
-    baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
-    baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
-    baseGrad.addColorStop(1, 'transparent');
+    if (typeof baseGrad !== 'string') {
+        baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
+        baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
+        baseGrad.addColorStop(1, 'transparent');
+    }
     ctx.fillStyle = baseGrad;
 
     // Draw subtle humanoid shape
@@ -1149,15 +1196,19 @@ function animationLoop(timestamp) {
             render();
         } catch (error) {
             // CRITICAL: Never let render errors crash the animation loop
-            // Log error and continue - a partially rendered frame is better than a black screen
-            console.error('[Renderer] RENDER ERROR (animation loop will continue):', error);
+            // Log error to our error log system so it can be viewed on mobile
+            logError('[Render] Fehler in render()', error);
+
             // Attempt to draw a simple error indicator instead of crashing
             if (canvas && ctx) {
                 ctx.fillStyle = '#1a1a3e';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff6b6b';
                 ctx.font = '16px monospace';
-                ctx.fillText('Render Error - See Console', 20, 30);
+                ctx.fillText('Renderfehler - Optionen > Debug-Log', 20, 30);
+                ctx.fillStyle = '#aaa';
+                ctx.font = '12px monospace';
+                ctx.fillText(error.message || String(error), 20, 50);
             }
         }
     }
@@ -1173,6 +1224,12 @@ function calculateHexSize() {
     if (!container) return CONFIG.BASE_HEX_SIZE;
 
     const rect = container.getBoundingClientRect();
+
+    // Validate rect dimensions
+    if (!Number.isFinite(rect.width) || !Number.isFinite(rect.height) || rect.width <= 0 || rect.height <= 0) {
+        return CONFIG.BASE_HEX_SIZE;
+    }
+
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
 
     // Calculate grid dimensions
@@ -1183,14 +1240,23 @@ function calculateHexSize() {
     const availableWidth = rect.width - padding * 2;
     const availableHeight = rect.height - padding * 2;
 
+    // Ensure we have positive available space
+    if (availableWidth <= 0 || availableHeight <= 0) {
+        return CONFIG.BASE_HEX_SIZE;
+    }
+
     // Calculate hex size to fit
     const hexSize = Math.min(availableWidth / gridWidth, availableHeight / gridHeight);
 
     // Clamp to reasonable range - doubled for better visibility at 100% zoom
     const baseSize = Math.max(60, Math.min(130, hexSize));
 
-    // Apply zoom level
-    return baseSize * state.zoomLevel;
+    // Apply zoom level (ensure zoomLevel is valid)
+    const zoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+    const result = baseSize * zoom;
+
+    // Final validation
+    return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;
 }
 
 /**
@@ -1211,18 +1277,34 @@ export function resizeCanvas() {
     state.canvasHeight = rect.height;
 
     // Set canvas resolution
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.scale(dpr, dpr);
+
+    // Ensure camera values are valid numbers
+    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
 
     // Update hex size and center offset
     state.hexSize = calculateHexSize();
-    state.offsetX = rect.width / 2 + state.cameraX;
-    state.offsetY = rect.height / 2 + state.cameraY;
+    state.offsetX = rect.width / 2 + cameraX;
+    state.offsetY = rect.height / 2 + cameraY;
+
+    // Final validation - ensure we have valid render state
+    if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        state.hexSize = CONFIG.BASE_HEX_SIZE;
+    }
+    if (!Number.isFinite(state.offsetX)) {
+        state.offsetX = rect.width / 2;
+    }
+    if (!Number.isFinite(state.offsetY)) {
+        state.offsetY = rect.height / 2;
+    }
 
     render();
 }
@@ -1279,10 +1361,12 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.closePath();
     } else if (terrain && terrain.colorLight && terrain.colorDark) {
         // Fallback: gradient fill
-        const gradient = ctx.createLinearGradient(cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7);
-        gradient.addColorStop(0, terrain.colorLight);
-        gradient.addColorStop(0.5, terrain.color);
-        gradient.addColorStop(1, terrain.colorDark);
+        const gradient = safeLinearGradient(ctx, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, terrain.colorLight);
+            gradient.addColorStop(0.5, terrain.color);
+            gradient.addColorStop(1, terrain.colorDark);
+        }
         ctx.fillStyle = gradient;
         ctx.fill();
     } else {
@@ -1817,17 +1901,22 @@ function drawStaticWaterSurface(cx, cy, hexSize, seed, isDeep = false) {
     ctx.save();
 
     // Very subtle depth variation
-    const gradient = ctx.createRadialGradient(
+    const fallbackColor = isDeep ? 'rgba(25, 55, 90, 0.12)' : 'rgba(80, 140, 180, 0.1)';
+    const gradient = safeRadialGradient(
+        ctx,
         cx + hexSize * 0.2, cy - hexSize * 0.2, 0,
-        cx, cy, hexSize * 0.8
+        cx, cy, hexSize * 0.8,
+        fallbackColor
     );
 
-    if (isDeep) {
-        gradient.addColorStop(0, 'rgba(40, 80, 120, 0.1)');
-        gradient.addColorStop(1, 'rgba(10, 30, 60, 0.15)');
-    } else {
-        gradient.addColorStop(0, 'rgba(100, 160, 200, 0.08)');
-        gradient.addColorStop(1, 'rgba(60, 120, 160, 0.12)');
+    if (typeof gradient !== 'string') {
+        if (isDeep) {
+            gradient.addColorStop(0, 'rgba(40, 80, 120, 0.1)');
+            gradient.addColorStop(1, 'rgba(10, 30, 60, 0.15)');
+        } else {
+            gradient.addColorStop(0, 'rgba(100, 160, 200, 0.08)');
+            gradient.addColorStop(1, 'rgba(60, 120, 160, 0.12)');
+        }
     }
 
     ctx.fillStyle = gradient;
@@ -2070,12 +2159,16 @@ function drawStaticHeather(cx, cy, hexSize, seed) {
  */
 function drawWaterDetails(cx, cy, s, seed) {
     // Subtle depth gradient only
-    const gradient = ctx.createRadialGradient(
+    const gradient = safeRadialGradient(
+        ctx,
         cx + s * 0.15, cy - s * 0.15, 0,
-        cx, cy, s * 0.7
+        cx, cy, s * 0.7,
+        'rgba(90, 140, 180, 0.09)'
     );
-    gradient.addColorStop(0, 'rgba(120, 180, 220, 0.08)');
-    gradient.addColorStop(1, 'rgba(60, 100, 140, 0.1)');
+    if (typeof gradient !== 'string') {
+        gradient.addColorStop(0, 'rgba(120, 180, 220, 0.08)');
+        gradient.addColorStop(1, 'rgba(60, 100, 140, 0.1)');
+    }
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
@@ -2223,10 +2316,12 @@ function drawGhostIndicator(cx, cy, ghost) {
     ctx.setLineDash([]);
 
     // Inner danger zone
-    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, size + 10);
-    gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
-    gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
-    gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    const gradient = safeRadialGradient(ctx, cx, cy, 0, cx, cy, size + 10, `rgba(239, 68, 68, ${alpha * 0.2})`);
+    if (typeof gradient !== 'string') {
+        gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
+        gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    }
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(cx, cy, size + 10, 0, Math.PI * 2);
@@ -2645,16 +2740,18 @@ function drawUnitOverlay(unit, cx, cy) {
 
     // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
     const gradientWidth = Math.max(1, barWidth * hpPct);
-    const barGradient = ctx.createLinearGradient(cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY);
-    if (hpPct > 0.5) {
-        barGradient.addColorStop(0, '#22c55e');
-        barGradient.addColorStop(1, '#16a34a');
-    } else if (hpPct > 0.25) {
-        barGradient.addColorStop(0, '#eab308');
-        barGradient.addColorStop(1, '#ca8a04');
-    } else {
-        barGradient.addColorStop(0, '#ef4444');
-        barGradient.addColorStop(1, '#dc2626');
+    const barGradient = safeLinearGradient(ctx, cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY, '#22c55e');
+    if (typeof barGradient !== 'string') {
+        if (hpPct > 0.5) {
+            barGradient.addColorStop(0, '#22c55e');
+            barGradient.addColorStop(1, '#16a34a');
+        } else if (hpPct > 0.25) {
+            barGradient.addColorStop(0, '#eab308');
+            barGradient.addColorStop(1, '#ca8a04');
+        } else {
+            barGradient.addColorStop(0, '#ef4444');
+            barGradient.addColorStop(1, '#dc2626');
+        }
     }
 
     ctx.fillStyle = barGradient;
@@ -2957,17 +3054,59 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
  * Main render function
  */
 export function render() {
-    if (!canvas || !ctx) return;
+    if (!canvas || !ctx) {
+        logRender('Canvas oder Context nicht verfügbar', `canvas: ${!!canvas}, ctx: ${!!ctx}`);
+        return;
+    }
 
     // Skip rendering if canvas has invalid dimensions (not yet sized)
-    if (canvas.width === 0 || canvas.height === 0) return;
+    if (canvas.width === 0 || canvas.height === 0) {
+        logRender('Canvas hat keine Dimensionen', `width: ${canvas.width}, height: ${canvas.height}`);
+        return;
+    }
 
-    // SAFETY: In spectator mode (AI vs AI), ensure visibility is always up-to-date
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
+    // CRITICAL: Ensure hexSize and offset are valid before rendering
+    // This prevents black screen when resizeCanvas hasn't completed yet
+    if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        console.warn('[Render] Fixing invalid hexSize:', state.hexSize);
+        state.hexSize = CONFIG.BASE_HEX_SIZE;
+    }
+    if (!Number.isFinite(state.offsetX)) {
+        console.warn('[Render] Fixing invalid offsetX:', state.offsetX);
+        state.offsetX = w / 2;
+    }
+    if (!Number.isFinite(state.offsetY)) {
+        console.warn('[Render] Fixing invalid offsetY:', state.offsetY);
+        state.offsetY = h / 2;
+    }
+
+    // Validate critical state before rendering
+    if (!state.hexes || state.hexes.length === 0) {
+        logRender('Keine Hexfelder vorhanden', `hexes: ${state.hexes?.length || 0}`);
+        // Draw a helpful message instead of black screen
+        ctx.fillStyle = '#1a1a3e';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Karte wird geladen...', w / 2, h / 2);
+        return;
+    }
+
+    // SAFETY: Ensure visibility arrays exist for current viewing player
+    const viewPlayer = state.viewingPlayer;
+    if (viewPlayer < 0 || viewPlayer >= state.settings.players) {
+        logRender('Ungültiger viewingPlayer', `viewPlayer: ${viewPlayer}, players: ${state.settings.players}`);
+        state.viewingPlayer = 0;
+    }
+
+    // SAFETY: In any AI mode, ensure visibility is always up-to-date
     // This prevents black screen issues from stale visibility data during turn transitions
-    // or when animation callbacks fire at unexpected times.
-    if (isSpectatorMode()) {
-        const viewPlayer = state.viewingPlayer;
-
+    if (isAIPlayer() || isSpectatorMode()) {
         // Ensure visibility arrays exist for this player
         if (!state.playerVisibleHexes[viewPlayer]) {
             state.playerVisibleHexes[viewPlayer] = new Set();
@@ -2979,7 +3118,7 @@ export function render() {
         const visibleHexes = state.playerVisibleHexes[viewPlayer];
         // Refresh if visibility seems stale (empty or undefined)
         if (!visibleHexes || visibleHexes.size === 0) {
-            console.log('[Render] Spectator mode: refreshing visibility for player', viewPlayer);
+            logRender('Visibility leer, aktualisiere', `viewPlayer: ${viewPlayer}, spectator: ${isSpectatorMode()}`);
             updateVisibilityForPlayer(viewPlayer);
         }
     }
@@ -2990,19 +3129,18 @@ export function render() {
     // Track performance for auto-quality adjustment
     updatePerformance();
 
-    const w = canvas.width / window.devicePixelRatio;
-    const h = canvas.height / window.devicePixelRatio;
-
     // Background - simplified on low quality
     if (state.effectiveQuality === 'low') {
         ctx.fillStyle = '#12122b';
         ctx.fillRect(0, 0, w, h);
     } else {
         // Background with modern gradient
-        const bgGradient = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8);
-        bgGradient.addColorStop(0, '#1a1a3e');
-        bgGradient.addColorStop(0.5, '#12122b');
-        bgGradient.addColorStop(1, '#0c0c1d');
+        const bgGradient = safeRadialGradient(ctx, w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8, '#12122b');
+        if (typeof bgGradient !== 'string') {
+            bgGradient.addColorStop(0, '#1a1a3e');
+            bgGradient.addColorStop(0.5, '#12122b');
+            bgGradient.addColorStop(1, '#0c0c1d');
+        }
         ctx.fillStyle = bgGradient;
         ctx.fillRect(0, 0, w, h);
 
@@ -3010,9 +3148,11 @@ export function render() {
         if (state.effectiveQuality === 'high') {
             ctx.save();
             ctx.globalAlpha = 0.1;
-            const ambientGlow = ctx.createRadialGradient(w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5);
-            ambientGlow.addColorStop(0, '#10b981');
-            ambientGlow.addColorStop(1, 'transparent');
+            const ambientGlow = safeRadialGradient(ctx, w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5, 'transparent');
+            if (typeof ambientGlow !== 'string') {
+                ambientGlow.addColorStop(0, '#10b981');
+                ambientGlow.addColorStop(1, 'transparent');
+            }
             ctx.fillStyle = ambientGlow;
             ctx.fillRect(0, 0, w, h);
             ctx.restore();
@@ -3048,7 +3188,35 @@ export function render() {
     // Collect AP cost overlay positions for drawing on top of everything
     const apCostOverlays = [];
 
+    // DIAGNOSTIC: Log render state once per second to debug black screen issue
+    const now = performance.now();
+    if (!state._lastRenderDiagnostic || now - state._lastRenderDiagnostic > 1000) {
+        state._lastRenderDiagnostic = now;
+        const diagInfo = {
+            hexCount: state.hexes.length,
+            hexSize: state.hexSize,
+            offsetX: state.offsetX,
+            offsetY: state.offsetY,
+            canvasW: w,
+            canvasH: h,
+            viewingPlayer: state.viewingPlayer,
+            visibleCount: state.playerVisibleHexes[state.viewingPlayer]?.size || 0,
+            exploredCount: state.playerExploredHexes[state.viewingPlayer]?.size || 0
+        };
+        console.log('[Render] State:', diagInfo);
+
+        // Check for NaN values that would cause invisible rendering
+        if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+            console.error('[Render] CRITICAL: hexSize is invalid:', state.hexSize);
+        }
+        if (!Number.isFinite(state.offsetX) || !Number.isFinite(state.offsetY)) {
+            console.error('[Render] CRITICAL: offset is invalid:', state.offsetX, state.offsetY);
+        }
+    }
+
     // Draw hexes (ground layer) - with tile caching for performance
+    let hexesDrawn = 0;
+    let hexesSkipped = 0;
     state.hexes.forEach(hex => {
         const pos = hexToPixel(hex.q, hex.r, state.hexSize);
         const sx = state.offsetX + pos.x;
@@ -3057,8 +3225,10 @@ export function render() {
         // Skip if off screen (with margin)
         if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
             sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+            hexesSkipped++;
             return;
         }
+        hexesDrawn++;
 
         const fogLevel = getFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
@@ -3107,10 +3277,12 @@ export function render() {
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
                 // Clean dim overlay for explored areas
-                const dimGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-                dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-                dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-                dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+                const dimGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(8, 12, 20, 0.6)');
+                if (typeof dimGradient !== 'string') {
+                    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
+                    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
+                    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+                }
                 ctx.fillStyle = dimGradient;
                 ctx.fill();
                 ctx.restore();
@@ -3154,10 +3326,12 @@ export function render() {
                 ctx.save();
                 ctx.beginPath();
                 drawHexPath(sx, sy, state.hexSize);
-                const zoneGradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, state.hexSize);
-                zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
-                zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
-                zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
+                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(220, 38, 38, 0.25)');
+                if (typeof zoneGradient !== 'string') {
+                    zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
+                    zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
+                    zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
+                }
                 ctx.fillStyle = zoneGradient;
                 ctx.fill();
 
@@ -3241,6 +3415,24 @@ export function render() {
         }
     });
 
+    // DIAGNOSTIC: Log hex draw statistics once per second
+    if (!state._lastHexDiagnostic || now - state._lastHexDiagnostic > 1000) {
+        state._lastHexDiagnostic = now;
+        console.log(`[Render] Hexes: ${hexesDrawn} drawn, ${hexesSkipped} skipped (total: ${state.hexes.length})`);
+        if (hexesDrawn === 0 && state.hexes.length > 0) {
+            console.error('[Render] CRITICAL: All hexes skipped! Check hexSize and offset values.');
+            // Log first hex position for debugging
+            const firstHex = state.hexes[0];
+            const pos = hexToPixel(firstHex.q, firstHex.r, state.hexSize);
+            console.error('[Render] First hex position:', {
+                hex: { q: firstHex.q, r: firstHex.r },
+                pixel: pos,
+                screen: { x: state.offsetX + pos.x, y: state.offsetY + pos.y },
+                canvas: { w, h }
+            });
+        }
+    }
+
     // Draw hex grid overlay only when planning movement or attack
     if (showGrid) {
         drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit);
@@ -3255,13 +3447,17 @@ export function render() {
         const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r, state.hexSize);
 
         // Gradient attack line
-        const gradient = ctx.createLinearGradient(
+        const gradient = safeLinearGradient(
+            ctx,
             state.offsetX + fromPos.x, state.offsetY + fromPos.y,
-            state.offsetX + toPos.x, state.offsetY + toPos.y
+            state.offsetX + toPos.x, state.offsetY + toPos.y,
+            'rgba(239, 68, 68, 0.6)'
         );
-        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
-        gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
-        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+        if (typeof gradient !== 'string') {
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
+        }
 
         ctx.save();
         ctx.strokeStyle = gradient;

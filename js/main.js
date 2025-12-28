@@ -1,6 +1,6 @@
 // ===== MAIN ENTRY POINT =====
 
-import { state, resetState, initZone } from './state.js';
+import { state, resetState, initZone, getPlayerName } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
@@ -17,6 +17,7 @@ import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggl
 import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
 import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial, shouldStartTutorial } from './tutorial.js';
 import { hexToPixel } from './hexMath.js';
+import { initErrorCapture, showLogViewer, getErrorCount, addLogListener, logInfo, logError } from './errorLog.js';
 
 // Map preview state
 let mapPreviewTimeout = null;
@@ -278,10 +279,11 @@ function showTeamSelectForPlayer(playerIndex) {
         badge.textContent = playerIndex + 1;
     }
     if (playerNum) {
-        playerNum.textContent = playerIndex + 1;
+        // Use player name instead of just number
+        playerNum.textContent = getPlayerName(playerIndex);
     }
     if (hint) {
-        hint.textContent = `Spieler ${playerIndex + 1}: Stelle dein Team zusammen`;
+        hint.textContent = `${getPlayerName(playerIndex)}: Stelle dein Team zusammen`;
     }
 
     // Generate unit cards
@@ -642,12 +644,13 @@ function waitForCanvasReady(callback, maxAttempts = 20) {
     function check() {
         attempts++;
         if (canvas && canvas.width > 0 && canvas.height > 0) {
+            logInfo('Canvas bereit', `${canvas.width}x${canvas.height}, hexSize: ${state.hexSize}`);
             callback();
         } else if (attempts < maxAttempts) {
             setTimeout(check, 50);
         } else {
             // Fallback: start anyway after max attempts (1 second)
-            console.warn('Canvas not ready after max attempts, starting anyway');
+            logError('Canvas nicht bereit nach max. Versuchen', `width: ${canvas?.width}, height: ${canvas?.height}`);
             callback();
         }
     }
@@ -826,6 +829,9 @@ function drawPreviewHex(ctx, x, y, size, color) {
  * Initialize the application
  */
 async function init() {
+    // Initialize error capture FIRST so we catch any loading errors
+    initErrorCapture();
+
     // Show menu first to ensure it's visible while loading
     showScreen('menu');
 
@@ -1113,6 +1119,31 @@ async function init() {
             }, 1500);
 
             playClick();
+        });
+    }
+
+    // Setup debug log button
+    const showLogBtn = document.getElementById('show-log-btn');
+    if (showLogBtn) {
+        showLogBtn.onclick = () => {
+            playClick();
+            showLogViewer();
+        };
+
+        // Update error count badge when errors occur
+        addLogListener(() => {
+            const count = getErrorCount();
+            const badge = document.getElementById('error-count-badge');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-flex';
+                    showLogBtn.classList.add('has-errors');
+                } else {
+                    badge.style.display = 'none';
+                    showLogBtn.classList.remove('has-errors');
+                }
+            }
         });
     }
 

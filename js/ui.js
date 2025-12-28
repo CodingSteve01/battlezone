@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName } from './state.js';
 import {
     calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
     canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
@@ -109,10 +109,14 @@ export function updatePlayersAlive() {
 
         const unitCount = isAlive ? ` (${units.length})` : '';
 
+        // Use player name (abbreviated if too long for display)
+        const fullName = getPlayerName(p);
+        const displayName = fullName.length > 10 ? fullName.substring(0, 8) + '..' : fullName;
+
         html += `
-            <div class="player-status ${statusClass}">
+            <div class="player-status ${statusClass}" title="${fullName}">
                 <span class="player-dot" style="background-color: ${color}"></span>
-                <span>S${p + 1}${unitCount}</span>
+                <span>${displayName}${unitCount}</span>
             </div>
         `;
     }
@@ -138,7 +142,7 @@ function updateTopBar(unit, isAiTurnHidden = false) {
 
     const nameEl = document.getElementById('current-name');
     if (nameEl) {
-        nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : `Spieler ${state.currentPlayer + 1}`;
+        nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : getPlayerName(state.currentPlayer);
     }
 
     const roundEl = document.getElementById('round-num');
@@ -1075,7 +1079,7 @@ export function displayAwards(winner) {
                 <div class="award-title">${award.title}</div>
                 <div class="award-player">
                     <span class="player-dot" style="background-color: ${award.color}"></span>
-                    Spieler ${award.player + 1}
+                    ${getPlayerName(award.player)}
                 </div>
                 <div class="award-value">${award.value}</div>
             </div>
