@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.14.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.3...shadow-squad-v3.14.4) (2025-12-28)
+
+
+### Bug Fixes
+
+* **renderer:** fix hexSize calculation and initialization ([#162](https://github.com/CodingSteve01/battlezone/issues/162)) ([7694f88](https://github.com/CodingSteve01/battlezone/commit/7694f88865368755920c69f6ecfbb9d9ff112581))
+
 ## [3.14.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.2...shadow-squad-v3.14.3) (2025-12-28)
 
 
