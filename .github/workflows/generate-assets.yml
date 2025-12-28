@@ -74,7 +74,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.branch.outputs.name }}
-          commit-message: ${{ inputs.commit_message || 'chore(assets): regenerate sprite sheets' }}
+          commit-message: "${{ inputs.commit_message || 'chore(assets): regenerate sprite sheets' }}"
           title: "chore(assets): Update generated sprite sheets"
           body: |
             ## Asset Update

@@ -1,0 +1,31 @@
+---
+# yamllint configuration for GitHub Actions workflows
+
+extends: default
+
+rules:
+  # GitHub Actions uses 'on:' which triggers truthy warning
+  truthy:
+    allowed-values: ['true', 'false', 'on']
+    check-keys: false
+
+  # Allow longer lines for workflow files
+  line-length:
+    max: 150
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # Document start marker is optional
+  document-start: disable
+
+  # Allow comments without space after # for URLs
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 1
+
+  # Standard indentation
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
