@@ -1,1128 +1,2700 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "dimensions": {
-    "width": 1024,
-    "height": 5120
+    "width": 596,
+    "height": 2913
   },
+  "features": [
+    "cropped",
+    "anchored"
+  ],
   "sprites": [
     {
       "id": "scout_normal_p0",
       "bounds": {
         "x": 0,
         "y": 0,
-        "width": 256,
-        "height": 256
+        "width": 148,
+        "height": 142
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 0,
+        "width": 80,
+        "height": 142
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "normal",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_normal_p1",
       "bounds": {
-        "x": 256,
+        "x": 148,
         "y": 0,
-        "width": 256,
-        "height": 256
+        "width": 150,
+        "height": 142
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 0,
+        "width": 80,
+        "height": 142
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "normal",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_normal_p2",
       "bounds": {
-        "x": 512,
+        "x": 298,
         "y": 0,
-        "width": 256,
-        "height": 256
+        "width": 149,
+        "height": 142
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 1,
+        "width": 80,
+        "height": 141
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "normal",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_normal_p3",
       "bounds": {
-        "x": 768,
+        "x": 447,
         "y": 0,
-        "width": 256,
-        "height": 256
+        "width": 149,
+        "height": 142
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 1,
+        "width": 80,
+        "height": 141
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "normal",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 256,
-        "width": 256,
-        "height": 256
+        "y": 142,
+        "width": 148,
+        "height": 124
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 144,
+        "width": 92,
+        "height": 122
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "cover",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_cover_p1",
       "bounds": {
-        "x": 256,
-        "y": 256,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 142,
+        "width": 150,
+        "height": 124
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 145,
+        "width": 92,
+        "height": 121
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "cover",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_cover_p2",
       "bounds": {
-        "x": 512,
-        "y": 256,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 142,
+        "width": 149,
+        "height": 124
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 142,
+        "width": 92,
+        "height": 124
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "cover",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_cover_p3",
       "bounds": {
-        "x": 768,
-        "y": 256,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 142,
+        "width": 149,
+        "height": 124
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 143,
+        "width": 92,
+        "height": 123
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "cover",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 512,
-        "width": 256,
-        "height": 256
+        "y": 266,
+        "width": 148,
+        "height": 143
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 269,
+        "width": 80,
+        "height": 140
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "attack",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_attack_p1",
       "bounds": {
-        "x": 256,
-        "y": 512,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 266,
+        "width": 150,
+        "height": 143
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 266,
+        "width": 80,
+        "height": 143
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "attack",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_attack_p2",
       "bounds": {
-        "x": 512,
-        "y": 512,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 266,
+        "width": 149,
+        "height": 143
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 267,
+        "width": 80,
+        "height": 142
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "attack",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_attack_p3",
       "bounds": {
-        "x": 768,
-        "y": 512,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 266,
+        "width": 149,
+        "height": 143
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 267,
+        "width": 80,
+        "height": 142
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "attack",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 768,
-        "width": 256,
-        "height": 256
+        "y": 409,
+        "width": 148,
+        "height": 70
+      },
+      "contentBounds": {
+        "x": 6,
+        "y": 409,
+        "width": 135,
+        "height": 70
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "dead",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_dead_p1",
       "bounds": {
-        "x": 256,
-        "y": 768,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 409,
+        "width": 150,
+        "height": 70
+      },
+      "contentBounds": {
+        "x": 156,
+        "y": 409,
+        "width": 134,
+        "height": 70
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "dead",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_dead_p2",
       "bounds": {
-        "x": 512,
-        "y": 768,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 409,
+        "width": 149,
+        "height": 70
+      },
+      "contentBounds": {
+        "x": 305,
+        "y": 409,
+        "width": 134,
+        "height": 70
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "dead",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "scout_dead_p3",
       "bounds": {
-        "x": 768,
-        "y": 768,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 409,
+        "width": 149,
+        "height": 70
+      },
+      "contentBounds": {
+        "x": 455,
+        "y": 409,
+        "width": 133,
+        "height": 70
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "scout",
         "state": "dead",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_normal_p0",
       "bounds": {
         "x": 0,
-        "y": 1024,
-        "width": 256,
-        "height": 256
+        "y": 479,
+        "width": 148,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 32,
+        "y": 480,
+        "width": 84,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "normal",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_normal_p1",
       "bounds": {
-        "x": 256,
-        "y": 1024,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 479,
+        "width": 150,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 181,
+        "y": 480,
+        "width": 84,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "normal",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_normal_p2",
       "bounds": {
-        "x": 512,
-        "y": 1024,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 479,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 330,
+        "y": 481,
+        "width": 84,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "normal",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_normal_p3",
       "bounds": {
-        "x": 768,
-        "y": 1024,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 479,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 479,
+        "y": 479,
+        "width": 84,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "normal",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 1280,
-        "width": 256,
-        "height": 256
+        "y": 616,
+        "width": 148,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 617,
+        "width": 92,
+        "height": 117
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "cover",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_cover_p1",
       "bounds": {
-        "x": 256,
-        "y": 1280,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 616,
+        "width": 150,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 618,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "cover",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_cover_p2",
       "bounds": {
-        "x": 512,
-        "y": 1280,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 616,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 616,
+        "width": 92,
+        "height": 118
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "cover",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_cover_p3",
       "bounds": {
-        "x": 768,
-        "y": 1280,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 616,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 616,
+        "width": 92,
+        "height": 118
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "cover",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 1536,
-        "width": 256,
-        "height": 256
+        "y": 734,
+        "width": 148,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 33,
+        "y": 735,
+        "width": 81,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "attack",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_attack_p1",
       "bounds": {
-        "x": 256,
-        "y": 1536,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 734,
+        "width": 150,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 182,
+        "y": 736,
+        "width": 81,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "attack",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_attack_p2",
       "bounds": {
-        "x": 512,
-        "y": 1536,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 734,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 734,
+        "width": 81,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "attack",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_attack_p3",
       "bounds": {
-        "x": 768,
-        "y": 1536,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 734,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 734,
+        "width": 81,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "attack",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 1792,
-        "width": 256,
-        "height": 256
+        "y": 871,
+        "width": 148,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 9,
+        "y": 871,
+        "width": 129,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "dead",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_dead_p1",
       "bounds": {
-        "x": 256,
-        "y": 1792,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 871,
+        "width": 150,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 158,
+        "y": 871,
+        "width": 129,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "dead",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_dead_p2",
       "bounds": {
-        "x": 512,
-        "y": 1792,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 871,
+        "width": 149,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 308,
+        "y": 871,
+        "width": 128,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "dead",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "assault_dead_p3",
       "bounds": {
-        "x": 768,
-        "y": 1792,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 871,
+        "width": 149,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 457,
+        "y": 871,
+        "width": 128,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "assault",
         "state": "dead",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_normal_p0",
       "bounds": {
         "x": 0,
-        "y": 2048,
-        "width": 256,
-        "height": 256
+        "y": 961,
+        "width": 148,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 961,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "normal",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_normal_p1",
       "bounds": {
-        "x": 256,
-        "y": 2048,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 961,
+        "width": 150,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 961,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "normal",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_normal_p2",
       "bounds": {
-        "x": 512,
-        "y": 2048,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 961,
+        "width": 149,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 961,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "normal",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_normal_p3",
       "bounds": {
-        "x": 768,
-        "y": 2048,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 961,
+        "width": 149,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 961,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "normal",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 2304,
-        "width": 256,
-        "height": 256
+        "y": 1096,
+        "width": 148,
+        "height": 116
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 1096,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "cover",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_cover_p1",
       "bounds": {
-        "x": 256,
-        "y": 2304,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1096,
+        "width": 150,
+        "height": 116
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 1096,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "cover",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_cover_p2",
       "bounds": {
-        "x": 512,
-        "y": 2304,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1096,
+        "width": 149,
+        "height": 116
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 1096,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "cover",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_cover_p3",
       "bounds": {
-        "x": 768,
-        "y": 2304,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1096,
+        "width": 149,
+        "height": 116
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 1096,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "cover",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 2560,
-        "width": 256,
-        "height": 256
+        "y": 1212,
+        "width": 148,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 1212,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "attack",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_attack_p1",
       "bounds": {
-        "x": 256,
-        "y": 2560,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1212,
+        "width": 150,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 1212,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "attack",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_attack_p2",
       "bounds": {
-        "x": 512,
-        "y": 2560,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1212,
+        "width": 149,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 1212,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "attack",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_attack_p3",
       "bounds": {
-        "x": 768,
-        "y": 2560,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1212,
+        "width": 149,
+        "height": 135
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 1212,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "attack",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 2816,
-        "width": 256,
-        "height": 256
+        "y": 1347,
+        "width": 148,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 10,
+        "y": 1347,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "dead",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_dead_p1",
       "bounds": {
-        "x": 256,
-        "y": 2816,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1347,
+        "width": 150,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 159,
+        "y": 1347,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "dead",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_dead_p2",
       "bounds": {
-        "x": 512,
-        "y": 2816,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1347,
+        "width": 149,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 309,
+        "y": 1347,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "dead",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "medic_dead_p3",
       "bounds": {
-        "x": 768,
-        "y": 2816,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1347,
+        "width": 149,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 458,
+        "y": 1347,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "medic",
         "state": "dead",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_normal_p0",
       "bounds": {
         "x": 0,
-        "y": 3072,
-        "width": 256,
-        "height": 256
+        "y": 1425,
+        "width": 148,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 1427,
+        "width": 80,
+        "height": 158
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "normal",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_normal_p1",
       "bounds": {
-        "x": 256,
-        "y": 3072,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1425,
+        "width": 150,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 1429,
+        "width": 80,
+        "height": 156
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "normal",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_normal_p2",
       "bounds": {
-        "x": 512,
-        "y": 3072,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1425,
+        "width": 149,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 1425,
+        "width": 80,
+        "height": 160
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "normal",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_normal_p3",
       "bounds": {
-        "x": 768,
-        "y": 3072,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1425,
+        "width": 149,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 1428,
+        "width": 80,
+        "height": 157
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "normal",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 3328,
-        "width": 256,
-        "height": 256
+        "y": 1585,
+        "width": 148,
+        "height": 141
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 1585,
+        "width": 92,
+        "height": 141
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "cover",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_cover_p1",
       "bounds": {
-        "x": 256,
-        "y": 3328,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1585,
+        "width": 150,
+        "height": 141
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 1595,
+        "width": 92,
+        "height": 131
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "cover",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_cover_p2",
       "bounds": {
-        "x": 512,
-        "y": 3328,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1585,
+        "width": 149,
+        "height": 141
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 1589,
+        "width": 92,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "cover",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_cover_p3",
       "bounds": {
-        "x": 768,
-        "y": 3328,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1585,
+        "width": 149,
+        "height": 141
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 1587,
+        "width": 92,
+        "height": 139
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "cover",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 3584,
-        "width": 256,
-        "height": 256
+        "y": 1726,
+        "width": 148,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 1731,
+        "width": 80,
+        "height": 155
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "attack",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_attack_p1",
       "bounds": {
-        "x": 256,
-        "y": 3584,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1726,
+        "width": 150,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 1734,
+        "width": 80,
+        "height": 152
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "attack",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_attack_p2",
       "bounds": {
-        "x": 512,
-        "y": 3584,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1726,
+        "width": 149,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 1729,
+        "width": 80,
+        "height": 157
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "attack",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_attack_p3",
       "bounds": {
-        "x": 768,
-        "y": 3584,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1726,
+        "width": 149,
+        "height": 160
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 1726,
+        "width": 80,
+        "height": 160
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "attack",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 3840,
-        "width": 256,
-        "height": 256
+        "y": 1886,
+        "width": 148,
+        "height": 76
+      },
+      "contentBounds": {
+        "x": 0,
+        "y": 1886,
+        "width": 148,
+        "height": 76
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "dead",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_dead_p1",
       "bounds": {
-        "x": 256,
-        "y": 3840,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1886,
+        "width": 150,
+        "height": 76
+      },
+      "contentBounds": {
+        "x": 148,
+        "y": 1890,
+        "width": 150,
+        "height": 72
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "dead",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_dead_p2",
       "bounds": {
-        "x": 512,
-        "y": 3840,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1886,
+        "width": 149,
+        "height": 76
+      },
+      "contentBounds": {
+        "x": 298,
+        "y": 1888,
+        "width": 149,
+        "height": 74
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "dead",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "sniper_dead_p3",
       "bounds": {
-        "x": 768,
-        "y": 3840,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1886,
+        "width": 149,
+        "height": 76
+      },
+      "contentBounds": {
+        "x": 447,
+        "y": 1889,
+        "width": 149,
+        "height": 73
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "sniper",
         "state": "dead",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_normal_p0",
       "bounds": {
         "x": 0,
-        "y": 4096,
-        "width": 256,
-        "height": 256
+        "y": 1962,
+        "width": 148,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 1964,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "normal",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_normal_p1",
       "bounds": {
-        "x": 256,
-        "y": 4096,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 1962,
+        "width": 150,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 1962,
+        "width": 80,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "normal",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_normal_p2",
       "bounds": {
-        "x": 512,
-        "y": 4096,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 1962,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 1963,
+        "width": 80,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "normal",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_normal_p3",
       "bounds": {
-        "x": 768,
-        "y": 4096,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 1962,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 1963,
+        "width": 80,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "normal",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 4352,
-        "width": 256,
-        "height": 256
+        "y": 2099,
+        "width": 148,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 2099,
+        "width": 92,
+        "height": 118
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "cover",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_cover_p1",
       "bounds": {
-        "x": 256,
-        "y": 4352,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 2099,
+        "width": 150,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 2099,
+        "width": 92,
+        "height": 118
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "cover",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_cover_p2",
       "bounds": {
-        "x": 512,
-        "y": 4352,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 2099,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 2100,
+        "width": 92,
+        "height": 117
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "cover",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_cover_p3",
       "bounds": {
-        "x": 768,
-        "y": 4352,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 2099,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 2101,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "cover",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 4608,
-        "width": 256,
-        "height": 256
+        "y": 2217,
+        "width": 148,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 34,
+        "y": 2217,
+        "width": 80,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "attack",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_attack_p1",
       "bounds": {
-        "x": 256,
-        "y": 4608,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 2217,
+        "width": 150,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 183,
+        "y": 2218,
+        "width": 80,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "attack",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_attack_p2",
       "bounds": {
-        "x": 512,
-        "y": 4608,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 2217,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 2218,
+        "width": 80,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "attack",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_attack_p3",
       "bounds": {
-        "x": 768,
-        "y": 4608,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 2217,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 2219,
+        "width": 80,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "attack",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 4864,
-        "width": 256,
-        "height": 256
+        "y": 2354,
+        "width": 148,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 10,
+        "y": 2354,
+        "width": 128,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "dead",
-        "player": 0
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_dead_p1",
       "bounds": {
-        "x": 256,
-        "y": 4864,
-        "width": 256,
-        "height": 256
+        "x": 148,
+        "y": 2354,
+        "width": 150,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 159,
+        "y": 2354,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "dead",
-        "player": 1
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_dead_p2",
       "bounds": {
-        "x": 512,
-        "y": 4864,
-        "width": 256,
-        "height": 256
+        "x": 298,
+        "y": 2354,
+        "width": 149,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 309,
+        "y": 2354,
+        "width": 127,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "dead",
-        "player": 2
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     },
     {
       "id": "commando_dead_p3",
       "bounds": {
-        "x": 768,
-        "y": 4864,
-        "width": 256,
-        "height": 256
+        "x": 447,
+        "y": 2354,
+        "width": 149,
+        "height": 78
+      },
+      "contentBounds": {
+        "x": 457,
+        "y": 2354,
+        "width": 129,
+        "height": 78
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
       },
       "metadata": {
         "unitClass": "commando",
         "state": "dead",
-        "player": 3
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_normal_p0",
+      "bounds": {
+        "x": 0,
+        "y": 2432,
+        "width": 148,
+        "height": 136
+      },
+      "contentBounds": {
+        "x": 32,
+        "y": 2432,
+        "width": 84,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "normal",
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_normal_p1",
+      "bounds": {
+        "x": 148,
+        "y": 2432,
+        "width": 150,
+        "height": 136
+      },
+      "contentBounds": {
+        "x": 181,
+        "y": 2432,
+        "width": 84,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "normal",
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_normal_p2",
+      "bounds": {
+        "x": 298,
+        "y": 2432,
+        "width": 149,
+        "height": 136
+      },
+      "contentBounds": {
+        "x": 330,
+        "y": 2432,
+        "width": 84,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "normal",
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_normal_p3",
+      "bounds": {
+        "x": 447,
+        "y": 2432,
+        "width": 149,
+        "height": 136
+      },
+      "contentBounds": {
+        "x": 479,
+        "y": 2433,
+        "width": 84,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "normal",
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_cover_p0",
+      "bounds": {
+        "x": 0,
+        "y": 2568,
+        "width": 148,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 28,
+        "y": 2569,
+        "width": 92,
+        "height": 117
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "cover",
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_cover_p1",
+      "bounds": {
+        "x": 148,
+        "y": 2568,
+        "width": 150,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 177,
+        "y": 2569,
+        "width": 92,
+        "height": 117
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "cover",
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_cover_p2",
+      "bounds": {
+        "x": 298,
+        "y": 2568,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 326,
+        "y": 2570,
+        "width": 92,
+        "height": 116
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "cover",
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_cover_p3",
+      "bounds": {
+        "x": 447,
+        "y": 2568,
+        "width": 149,
+        "height": 118
+      },
+      "contentBounds": {
+        "x": 475,
+        "y": 2568,
+        "width": 92,
+        "height": 118
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "cover",
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_attack_p0",
+      "bounds": {
+        "x": 0,
+        "y": 2686,
+        "width": 148,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 33,
+        "y": 2687,
+        "width": 81,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "attack",
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_attack_p1",
+      "bounds": {
+        "x": 148,
+        "y": 2686,
+        "width": 150,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 182,
+        "y": 2687,
+        "width": 81,
+        "height": 136
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "attack",
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_attack_p2",
+      "bounds": {
+        "x": 298,
+        "y": 2686,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 332,
+        "y": 2688,
+        "width": 81,
+        "height": 135
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "attack",
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_attack_p3",
+      "bounds": {
+        "x": 447,
+        "y": 2686,
+        "width": 149,
+        "height": 137
+      },
+      "contentBounds": {
+        "x": 481,
+        "y": 2686,
+        "width": 81,
+        "height": 137
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "attack",
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_dead_p0",
+      "bounds": {
+        "x": 0,
+        "y": 2823,
+        "width": 148,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 10,
+        "y": 2823,
+        "width": 127,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "dead",
+        "player": 0,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_dead_p1",
+      "bounds": {
+        "x": 148,
+        "y": 2823,
+        "width": 150,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 158,
+        "y": 2823,
+        "width": 129,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "dead",
+        "player": 1,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_dead_p2",
+      "bounds": {
+        "x": 298,
+        "y": 2823,
+        "width": 149,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 308,
+        "y": 2823,
+        "width": 129,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "dead",
+        "player": 2,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
+      }
+    },
+    {
+      "id": "elitesoldat_dead_p3",
+      "bounds": {
+        "x": 447,
+        "y": 2823,
+        "width": 149,
+        "height": 90
+      },
+      "contentBounds": {
+        "x": 457,
+        "y": 2823,
+        "width": 128,
+        "height": 90
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "metadata": {
+        "unitClass": "elitesoldat",
+        "state": "dead",
+        "player": 3,
+        "originalSize": {
+          "width": 256,
+          "height": 256
+        }
       }
     }
   ]

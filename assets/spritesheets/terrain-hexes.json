@@ -4,14 +4,6 @@
     "width": 1024,
     "height": 3330
   },
-  "globalSettings": {
-    "backgroundRemoval": {
-      "enabled": true,
-      "color": "auto",
-      "tolerance": 20,
-      "antiAlias": true
-    }
-  },
   "sprites": [
     {
       "id": "grass_v0",
