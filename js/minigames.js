@@ -889,14 +889,17 @@ function startAssaultMinigame(resolve, mods = {}) {
     let speed = 4 * speedMult;
     let gameActive = true;
 
+    // VARIATION: Randomize zone center position (0.35-0.65 instead of always 0.5)
+    const zoneCenter = 0.35 + Math.random() * 0.30;
+
     // Define zones - adaptiv basierend auf Kontext
     const perfectWidth = 0.05 * zoneMult;
     const goodWidth = 0.15 * zoneMult;
     const okayWidth = 0.30 * zoneMult;
 
-    const perfectZone = { start: 0.5 - perfectWidth, end: 0.5 + perfectWidth };
-    const goodZone = { start: 0.5 - goodWidth, end: 0.5 + goodWidth };
-    const okayZone = { start: 0.5 - okayWidth, end: 0.5 + okayWidth };
+    const perfectZone = { start: zoneCenter - perfectWidth, end: zoneCenter + perfectWidth };
+    const goodZone = { start: zoneCenter - goodWidth, end: zoneCenter + goodWidth };
+    const okayZone = { start: zoneCenter - okayWidth, end: zoneCenter + okayWidth };
 
     function update() {
         if (!gameActive) return;
@@ -950,7 +953,7 @@ function startAssaultMinigame(resolve, mods = {}) {
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('PERFEKT', width * 0.5, meterY + meterHeight + 20);
+        ctx.fillText('PERFEKT', width * zoneCenter, meterY + meterHeight + 20);
 
         animationFrameId = requestAnimationFrame(update);
     }
@@ -1008,23 +1011,39 @@ function startSniperMinigame(resolve, mods = {}) {
     const nearStillDuration = Math.round(300 * timeMult); // Adaptive Vorwarnung
     const wobbleIntensity = 25 * speedMult;               // Adaptive Wackelstärke
 
+    // VARIATION: Randomize cycle timing to prevent memorization
+    const baseCycleLength = 2500;
+    let currentCycleLength = baseCycleLength + (Math.random() - 0.5) * 800; // 2100-2900ms
+    let stillStartTime = 1400 + Math.random() * 400; // 1400-1800ms into cycle
+    let cycleStartTime = 0;
+
     function update() {
         if (!gameActive) return;
 
         wobbleTime += 16;
 
-        // Create wobble pattern with occasional still moments (faster cycle for more opportunities)
-        const wobbleCycle = wobbleTime % 2500;
+        // Calculate position within current cycle
+        const cycleElapsed = wobbleTime - cycleStartTime;
+
+        // Check if we need to start a new cycle with new random timing
+        if (cycleElapsed >= currentCycleLength) {
+            cycleStartTime = wobbleTime;
+            // VARIATION: New random timing for next cycle
+            currentCycleLength = baseCycleLength + (Math.random() - 0.5) * 800;
+            stillStartTime = 1400 + Math.random() * 400;
+        }
+
+        const wobbleCycle = cycleElapsed;
 
         // Pre-still warning phase (crosshair slowing down)
-        if (wobbleCycle > 1600 - nearStillDuration && wobbleCycle < 1600) {
+        if (wobbleCycle > stillStartTime - nearStillDuration && wobbleCycle < stillStartTime) {
             nearStill = true;
             stillMoment = false;
             // Slower wobble during approach (adaptiv)
-            const wobbleAmount = (wobbleIntensity * 0.6) * (1 - (wobbleCycle - (1600 - nearStillDuration)) / nearStillDuration);
+            const wobbleAmount = (wobbleIntensity * 0.6) * (1 - (wobbleCycle - (stillStartTime - nearStillDuration)) / nearStillDuration);
             crosshairX = centerX + Math.sin(wobbleTime * 0.006 * speedMult) * wobbleAmount;
             crosshairY = centerY + Math.cos(wobbleTime * 0.004 * speedMult) * wobbleAmount;
-        } else if (wobbleCycle >= 1600 && wobbleCycle < 1600 + stillDuration) {
+        } else if (wobbleCycle >= stillStartTime && wobbleCycle < stillStartTime + stillDuration) {
             // Still moment - perfect shot opportunity
             stillMoment = true;
             nearStill = false;
