@@ -120,6 +120,7 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
     const spriteWidth = size * 2;
     const spriteHeight = size * Math.sqrt(3);
+    const edgeIndexByNeighbor = [0, 5, 4, 3, 2, 1];
 
     for (let i = 0; i < 6; i++) {
         const neighborType = neighborTerrains[i];
@@ -132,8 +133,8 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
             continue;
         }
 
-        const oppositeIndex = (i + 3) % 6;
-        const detailType = `shore_${subtype}_${oppositeIndex}`;
+        const edgeIndex = edgeIndexByNeighbor[i] ?? i;
+        const detailType = `shore_${subtype}_${edgeIndex}`;
         const variantCount = getShorelineVariantCount(detailType);
         const variant = variantCount > 0
             ? Math.floor(seededRandom(baseSeed + i * 91) * variantCount)
@@ -408,7 +409,53 @@ function applyDetailLighting(cx, cy, size, seed) {
 }
 
 // Post-processing stubs
-function applyPostProcessing(ctx) { /* no-op */ }
+function applyPostProcessing(ctx, width, height) {
+    const grading = CONFIG.COLOR_GRADING;
+    if (!grading?.ENABLED) return;
+
+    ctx.save();
+
+    // Gentle warmth over midtones for a cohesive palette
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = grading.WARM_INTENSITY;
+    ctx.fillStyle = grading.WARM_TINT;
+    ctx.fillRect(0, 0, width, height);
+
+    // Subtle cool shadows to deepen contrast
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = grading.COOL_INTENSITY;
+    ctx.fillStyle = grading.COOL_SHADOW;
+    ctx.fillRect(0, 0, width, height);
+
+    // Slight saturation/contrast boost
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = grading.SATURATION_BOOST;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Vignette for focus and depth
+    const vignetteRadius = Math.max(width, height) * grading.VIGNETTE_SOFTNESS;
+    const vignette = safeRadialGradient(
+        ctx,
+        width / 2,
+        height / 2,
+        vignetteRadius * 0.1,
+        width / 2,
+        height / 2,
+        vignetteRadius,
+        'transparent'
+    );
+    if (typeof vignette !== 'string') {
+        vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        vignette.addColorStop(1, `rgba(0, 0, 0, ${grading.VIGNETTE_STRENGTH})`);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.restore();
+}
 function applyWeatherEffect() { /* no-op */ }
 export function setColorPreset() { }
 export function getCurrentPreset() { return 'default'; }
@@ -1369,7 +1416,7 @@ function calculateHexSize() {
     const zoomScale = zoomLevelToScale(zoom);
 
     // Simple calculation: base size * normalized zoom scale
-    const result = CONFIG.BASE_HEX_SIZE * zoomScale;
+    const result = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE * zoomScale;
 
     // Final validation
     return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;

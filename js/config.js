@@ -2,6 +2,7 @@
 
 export const CONFIG = {
     BASE_HEX_SIZE: 100,
+    HEX_SIZE_SCALE: 0.8,
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
 
@@ -41,6 +42,18 @@ export const CONFIG = {
         FRAME_COUNT: 4,        // Number of frames per animation (e.g., water_f0.png to water_f3.png)
         FRAME_DURATION: 250,   // Milliseconds per frame (4 FPS for subtle movement)
         ENABLED: true          // Master toggle for terrain animations
+    },
+
+    // Subtle post-processing to unify asset palette and mood
+    COLOR_GRADING: {
+        ENABLED: true,
+        WARM_TINT: '#f5d6a0',
+        WARM_INTENSITY: 0.08,
+        COOL_SHADOW: '#5b6f8a',
+        COOL_INTENSITY: 0.06,
+        SATURATION_BOOST: 0.06,
+        VIGNETTE_STRENGTH: 0.35,
+        VIGNETTE_SOFTNESS: 0.75
     }
 };
 
