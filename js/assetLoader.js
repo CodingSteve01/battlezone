@@ -227,8 +227,11 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
 
         const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
         const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-        const spriteWidth = baseSize / safeScaleX;
-        const spriteHeight = baseSize / safeScaleY;
+        const clampedScaleX = Math.min(safeScaleX, 1);
+        const clampedScaleY = Math.min(safeScaleY, 1);
+        const avgScale = (clampedScaleX + clampedScaleY) / 2;
+        const spriteWidth = baseSize * avgScale * (sprite.width / sprite.height);
+        const spriteHeight = baseSize * avgScale;
 
         // Position using anchor point (typically center-bottom)
         const drawX = cx - spriteWidth * anchor.x;

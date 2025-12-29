@@ -85,6 +85,21 @@ function getNeighborTerrains(hexMap, q, r) {
 const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
 const SWAMP_TYPES = new Set(['swamp']);
 
+function getClampedContentScale(contentScale) {
+    const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+    const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+    const clampedScaleX = Math.min(safeScaleX, 1);
+    const clampedScaleY = Math.min(safeScaleY, 1);
+    return (clampedScaleX + clampedScaleY) / 2;
+}
+
+function getSpriteDimensions(sprite, contentScale, baseHeight) {
+    const avgScale = getClampedContentScale(contentScale);
+    const spriteHeight = baseHeight * avgScale;
+    const spriteWidth = spriteHeight * (sprite.width / sprite.height);
+    return { spriteWidth, spriteHeight };
+}
+
 function isLandForWater(type) {
     if (!type) return false;
     return !WATER_TYPES.has(type) && !SWAMP_TYPES.has(type);
@@ -221,10 +236,7 @@ function drawTree2D5(x, y, size, treeType, seed) {
         // Base target size (what the sprite should be at 100% in original cell)
         const baseHeight = size * 2.8 * sizeVariation;
 
-        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-        const spriteHeight = baseHeight / safeScaleY;
-        const spriteWidth = (baseHeight / safeScaleX) * (sprite.width / sprite.height);
+        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
 
         // Random horizontal mirror (50% chance)
         const shouldMirror = seededRandom(seed * 2.2) > 0.5;
@@ -254,10 +266,7 @@ function drawBush2D5(x, y, size, seed) {
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
         const baseSize = size * 1.6 * sizeVariation;
 
-        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-        const spriteWidth = baseSize / safeScaleX;
-        const spriteHeight = baseSize / safeScaleY;
+        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
         // Random horizontal mirror
         const shouldMirror = seededRandom(seed * 2.4) > 0.5;
@@ -286,10 +295,7 @@ function drawSmallShrub(x, y, size, seed) {
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
         const baseSize = size * 1.3 * sizeVariation;
 
-        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-        const spriteWidth = baseSize / safeScaleX;
-        const spriteHeight = baseSize / safeScaleY;
+        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
 
         const anchorPoint = anchor || { x: 0.5, y: 1.0 };
@@ -316,10 +322,7 @@ function drawFlowerCluster(x, y, size, seed) {
         const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
         const baseSize = size * 0.9 * sizeVariation;
 
-        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-        const spriteWidth = baseSize / safeScaleX;
-        const spriteHeight = baseSize / safeScaleY;
+        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
         const anchorPoint = anchor || { x: 0.5, y: 1.0 };
         const drawX = x - spriteWidth * anchorPoint.x;
@@ -2503,12 +2506,6 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         return; // Don't draw the actual unit sprite
     }
 
-    // Ground shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.7, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
     // Base ring around unit - dashed normally, solid when selected
     if (isSelected) {
         // Selected: solid thick ring in player color
@@ -2537,9 +2534,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
             : 'normal');
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
-    // Size increased from 1.3 to 1.8 for better visibility at 100% zoom
     // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
