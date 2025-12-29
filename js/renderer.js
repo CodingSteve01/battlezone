@@ -3,7 +3,7 @@
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel } from './state.js';
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
-import { getReachableHexes } from './pathfinding.js';
+import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
 import { isSpectatorMode } from './ai.js';
@@ -56,6 +56,46 @@ function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') 
         return fallbackColor;
     }
     return ctx.createLinearGradient(x0, y0, x1, y1);
+}
+
+const HEIGHT_SHADE_COLORS = [
+    { color: 'rgba(30, 58, 95, 0.12)', text: '#93c5fd' },  // Level 0: cool shadow
+    { color: 'rgba(0, 0, 0, 0)', text: '#d1d5db' },        // Level 1: neutral
+    { color: 'rgba(254, 240, 200, 0.12)', text: '#fde68a' }, // Level 2: warm highlight
+    { color: 'rgba(253, 224, 160, 0.18)', text: '#fbbf24' }  // Level 3: bright highlight
+];
+
+function getHeightShadeStyle(height) {
+    const index = Math.max(0, Math.min(HEIGHT_SHADE_COLORS.length - 1, height ?? 0));
+    return HEIGHT_SHADE_COLORS[index];
+}
+
+function drawHeightShading(cx, cy, size, height) {
+    const style = getHeightShadeStyle(height);
+    if (!style || style.color === 'rgba(0, 0, 0, 0)') return;
+
+    ctx.save();
+    ctx.beginPath();
+    drawHexPath(cx, cy, size);
+    ctx.fillStyle = style.color;
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawHeightDebugOverlay(cx, cy, size, height) {
+    const style = getHeightShadeStyle(height);
+    ctx.save();
+    ctx.beginPath();
+    drawHexPath(cx, cy, size * 0.55);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+    ctx.fill();
+
+    ctx.fillStyle = style.text;
+    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${height ?? 0}`, cx, cy);
+    ctx.restore();
 }
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
@@ -489,6 +529,15 @@ let cachedQualityLevel = null;
  * This prevents cache invalidation during zoom operations
  */
 const CACHE_BASE_HEX_SIZE = 60;
+
+// Detail scaling for larger base tiles (tile ~ human size)
+const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
+const DETAIL_SPRITE_SCALE = 0.85;
+const DETAIL_CLEARANCE_EDGE = 0.2;
+
+function scaleDetailCount(count, min = 1) {
+    return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
+}
 
 /**
  * Maximum number of cached tiles to prevent memory issues
@@ -3425,6 +3474,13 @@ export function render() {
             }
         }
 
+        if (fogLevel === 'visible') {
+            drawHeightShading(sx, sy, state.hexSize, hex.height);
+            if (state.debug.showHeightOverlay) {
+                drawHeightDebugOverlay(sx, sy, state.hexSize, hex.height);
+            }
+        }
+
         // Draw animated terrain overlays (grass swaying, water ripples, etc.)
         // These are drawn on top of cached/static terrain for dynamic effects
         if (fogLevel === 'visible' && shouldRenderAnimations()) {
@@ -3729,6 +3785,7 @@ export function render() {
 
     // Draw minimap for strategic overview
     drawMinimap(w, h);
+    drawHeightOverlayToggle();
 
     // Apply post-processing effects (color grading, vignette, etc.)
     // Only on medium/high quality for performance
@@ -3924,6 +3981,10 @@ export function getMinimapBounds() { return lastMinimapBounds; }
 let toggleButtonBounds = { x: 0, y: 0, size: 24 };
 export function getToggleButtonBounds() { return toggleButtonBounds; }
 
+// Store height overlay toggle bounds for click detection
+let heightOverlayButtonBounds = { x: 0, y: 0, size: 0, hidden: true };
+export function getHeightOverlayButtonBounds() { return heightOverlayButtonBounds; }
+
 // Store close button bounds for expanded minimap
 let closeButtonBounds = { x: 0, y: 0, size: 32 };
 export function getCloseButtonBounds() { return closeButtonBounds; }
@@ -4008,6 +4069,51 @@ function drawMinimapCloseButton(mapX, mapY, mapSize) {
     ctx.moveTo(btnX + btnSize - padding, btnY + padding);
     ctx.lineTo(btnX + padding, btnY + btnSize - padding);
     ctx.stroke();
+
+    ctx.restore();
+}
+
+/**
+ * Draw height overlay toggle button (debug overlay)
+ */
+function drawHeightOverlayToggle() {
+    if (minimapExpanded) {
+        heightOverlayButtonBounds = { x: 0, y: 0, size: 0, hidden: true };
+        return;
+    }
+
+    const btnSize = 24;
+    const padding = 6;
+    const mapBounds = lastMinimapBounds;
+    const btnX = mapBounds.x;
+    const btnY = mapBounds.y + mapBounds.size + padding;
+
+    heightOverlayButtonBounds = { x: btnX, y: btnY, size: btnSize, hidden: false };
+
+    ctx.save();
+    const active = state.debug.showHeightOverlay;
+    ctx.globalAlpha = 0.85;
+
+    ctx.fillStyle = active ? 'rgba(59, 130, 246, 0.35)' : 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnSize, btnSize, 5);
+    ctx.fill();
+
+    ctx.strokeStyle = active ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = active ? '#bfdbfe' : '#e5e7eb';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⛰', btnX + btnSize / 2, btnY + btnSize / 2 + 1);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('HÖHE', btnX + btnSize / 2, btnY + btnSize + 2);
 
     ctx.restore();
 }
@@ -4294,8 +4400,10 @@ function drawPathPreviewOnTop(currentUnit) {
     const pathWithCosts = state.currentPath.map((point, index) => {
         if (index > 0) {
             const hex = getHex(point.q, point.r);
-            if (hex && TERRAIN[hex.type]) {
-                cumulativeCost += TERRAIN[hex.type].moveCost;
+            const prevPoint = state.currentPath[index - 1];
+            const prevHex = prevPoint ? getHex(prevPoint.q, prevPoint.r) : null;
+            if (hex) {
+                cumulativeCost += getMoveCost(prevHex, hex);
             }
         }
         return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };

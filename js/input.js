@@ -2,7 +2,7 @@
 
 import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel } from './state.js';
 import { pixelToHex, hexToPixel, hexDistance } from './hexMath.js';
-import { findPath } from './pathfinding.js';
+import { findPath, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
 import {
     executeAttack, executeAttackWithMinigame, useSpecialAbility, useMedicHealingWithMinigame,
@@ -15,8 +15,8 @@ import {
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
-import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, setMinimapActive, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
-import { CONFIG, TERRAIN } from './config.js';
+import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, getHeightOverlayButtonBounds, setMinimapActive, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
+import { CONFIG } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
 import { isAIPlayer } from './ai.js';
@@ -709,6 +709,31 @@ function handleMinimapCloseClick(clientX, clientY) {
 }
 
 /**
+ * Check if a click/touch is on the height overlay toggle button
+ * Returns true if click was on button (handled), false otherwise
+ */
+function handleHeightOverlayToggleClick(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const canvasX = clientX - rect.left;
+    const canvasY = clientY - rect.top;
+
+    const bounds = getHeightOverlayButtonBounds();
+    if (!bounds) return false;
+
+    if (canvasX >= bounds.x &&
+        canvasX <= bounds.x + bounds.size &&
+        canvasY >= bounds.y &&
+        canvasY <= bounds.y + bounds.size) {
+        state.debug.showHeightOverlay = !state.debug.showHeightOverlay;
+        playClick();
+        render();
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Check if a click/touch is on the minimap and handle interaction
  * - Both modes: Touch to navigate viewport
  * - Compact mode: Expand button to enlarge
@@ -818,6 +843,9 @@ function handleTapOrClick(clientX, clientY) {
 
     // Check if click is on minimap first
     if (handleMinimapClick(clientX, clientY)) {
+        return;
+    }
+    if (handleHeightOverlayToggleClick(clientX, clientY)) {
         return;
     }
 
@@ -1026,9 +1054,9 @@ function handleMoveClick(unit, hex) {
         const point = pathResult.path[i];
         const pointHex = getHex(point.q, point.r);
         if (!pointHex) break;
-
-        const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        const prevPoint = pathResult.path[i - 1];
+        const prevHex = getHex(prevPoint.q, prevPoint.r);
+        cumulativeCost += getMoveCost(prevHex, pointHex);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);
@@ -1644,9 +1672,9 @@ export function continueQueuedPath(unit) {
         const point = pathResult.path[i];
         const pointHex = getHex(point.q, point.r);
         if (!pointHex) break;
-
-        const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        const prevPoint = pathResult.path[i - 1];
+        const prevHex = getHex(prevPoint.q, prevPoint.r);
+        cumulativeCost += getMoveCost(prevHex, pointHex);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);
@@ -1749,9 +1777,9 @@ async function executeQueuedPathForUnit(unit) {
         const point = pathResult.path[i];
         const pointHex = getHex(point.q, point.r);
         if (!pointHex) break;
-
-        const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        const prevPoint = pathResult.path[i - 1];
+        const prevHex = getHex(prevPoint.q, prevPoint.r);
+        cumulativeCost += getMoveCost(prevHex, pointHex);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);

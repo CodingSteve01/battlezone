@@ -3,6 +3,8 @@
 export const CONFIG = {
     BASE_HEX_SIZE: 100,
     HEX_SIZE_SCALE: 0.8,
+    TILE_SCALE: 0.8,              // Global tile size multiplier for denser tile views
+    UNIT_SCALE: 0.6,              // Unit size relative to tile size for better proportions
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
 
@@ -15,6 +17,12 @@ export const CONFIG = {
     AP_PER_TURN: 4,
     MAX_ROUNDS: 30,
     VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
+    HEIGHT: {
+        MAX: 3,
+        VISION_BONUS_PER_LEVEL: 1,
+        DEFENSE_BONUS_PER_LEVEL: 5,
+        CLIMB_COST_PER_LEVEL: 1
+    },
 
     // Balance: Limit attacks per unit per turn to prevent one unit from dominating
     MAX_ATTACKS_PER_UNIT: 1,  // Each unit can attack max 1 time per turn
@@ -76,7 +84,7 @@ export const TERRAIN = {
         walkable: true,
         cover: true,
         canHide: true,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Wald'
     },
     hills: {
@@ -85,7 +93,7 @@ export const TERRAIN = {
         colorDark: '#5a7040',  // Hill in shadow
         walkable: true,
         cover: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Hügel',
         rangeBonus: 1,
         defenseBonus: 10
@@ -123,7 +131,7 @@ export const TERRAIN = {
         colorDark: '#3a4a30',  // Deep swamp shadow
         walkable: true,
         cover: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Sumpf'
     },
     road: {
@@ -143,7 +151,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 1,
+        moveCost: 0.5,
         name: 'Pfad'
     },
     river: {
@@ -153,7 +161,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Fluss'
     },
     // Natural enhanced terrain types
@@ -164,7 +172,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schnee',
         slippery: true
     },
@@ -198,7 +206,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Seichtes Wasser',
         animated: true
     },
@@ -209,7 +217,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schilf',
         animated: true
     },
@@ -231,7 +239,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schlamm',
         sticky: true
     },
@@ -283,7 +291,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Ruinen'
     },
     bridge: {
@@ -293,7 +301,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 1,
+        moveCost: 0.5,
         name: 'Brücke',
         elevated: true
     },
@@ -315,7 +323,7 @@ export const TERRAIN = {
         walkable: true,
         cover: true,
         canHide: true,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Nadelwald'
     },
     clearing: {

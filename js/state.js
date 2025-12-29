@@ -14,6 +14,12 @@ export function scaleToZoomLevel(scale) {
     return safeScale * ZOOM_REFERENCE;
 }
 
+export function getWorldScale() {
+    const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
+    const scale = baseSize > 0 ? state.hexSize / baseSize : 1;
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);
 const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 
@@ -175,7 +181,12 @@ export const state = {
     holdingPosition: {},            // unitId -> {rounds: number, q, r} - Wie lange auf Position gehalten
 
     // === SPIELER-STATISTIKEN (für Siegerehrung) ===
-    playerStats: []                 // Array von Statistik-Objekten pro Spieler
+    playerStats: [],                // Array von Statistik-Objekten pro Spieler
+
+    // Debug/Overlay flags
+    debug: {
+        showHeightOverlay: false
+    }
 };
 
 /**
@@ -280,6 +291,7 @@ export function resetState() {
 
     // Reset debug flags
     state._visibilityWarningLogged = false;
+    state.debug.showHeightOverlay = false;
 
     // Koordinierte Angriffe zurücksetzen
     state.coordinatedAttack = {

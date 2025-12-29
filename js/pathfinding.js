@@ -2,7 +2,9 @@
 
 import { hexDistance, getNeighbors } from './hexMath.js';
 import { getHex, state, isHexInZone } from './state.js';
-import { TERRAIN } from './config.js';
+import { CONFIG, TERRAIN } from './config.js';
+
+const roundMoveCost = (value) => Math.round(value * 2) / 2;
 
 /**
  * Priority Queue implementation for A*
@@ -59,6 +61,8 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
     while (!frontier.isEmpty()) {
         const current = frontier.dequeue();
         const currentKey = `${current.q},${current.r}`;
+        const currentHex = getHex(current.q, current.r);
+        if (!currentHex) continue;
 
         // Reached goal
         if (currentKey === goalKey) {
@@ -81,9 +85,8 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
                 if (!isHexInZone(next.q, next.r)) continue;
             }
 
-            const terrain = TERRAIN[nextHex.type];
-            const moveCost = terrain.moveCost || 1;
-            const newCost = costSoFar.get(currentKey) + moveCost;
+            const moveCost = getMoveCost(currentHex, nextHex);
+            const newCost = roundMoveCost(costSoFar.get(currentKey) + moveCost);
 
             // Skip if exceeds max cost
             if (newCost > maxCost) continue;
@@ -145,6 +148,8 @@ export function getReachableHexes(unit) {
     while (!frontier.isEmpty()) {
         const current = frontier.dequeue();
         const currentKey = `${current.q},${current.r}`;
+        const currentHex = getHex(current.q, current.r);
+        if (!currentHex) continue;
 
         const neighbors = getNeighbors(current.q, current.r);
 
@@ -160,9 +165,8 @@ export function getReachableHexes(unit) {
             // Block movement into restricted zone
             if (zoneActive && !isHexInZone(next.q, next.r)) continue;
 
-            const terrain = TERRAIN[nextHex.type];
-            const moveCost = terrain.moveCost || 1;
-            const newCost = costSoFar.get(currentKey) + moveCost;
+            const moveCost = getMoveCost(currentHex, nextHex);
+            const newCost = roundMoveCost(costSoFar.get(currentKey) + moveCost);
 
             if (newCost > maxCost) continue;
 
@@ -206,4 +210,15 @@ export function getPathToHex(reachableHexes, targetQ, targetR) {
     const key = `${targetQ},${targetR}`;
     const data = reachableHexes.get(key);
     return data ? data : null;
+}
+
+/**
+ * Get movement cost between two adjacent hexes (includes uphill penalty)
+ */
+export function getMoveCost(fromHex, toHex) {
+    if (!fromHex || !toHex) return Infinity;
+    const terrain = TERRAIN[toHex.type];
+    const baseCost = terrain?.moveCost ?? 1;
+    const heightDiff = Math.max(0, (toHex.height ?? 0) - (fromHex.height ?? 0));
+    return baseCost + heightDiff * CONFIG.HEIGHT.CLIMB_COST_PER_LEVEL;
 }

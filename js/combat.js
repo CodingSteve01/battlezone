@@ -10,7 +10,7 @@ import {
     recordKill, recordDamageDealt, recordDamageTaken, recordShot, recordHealing,
     recordSpecialUsed, recordUnitLost
 } from './state.js';
-import { UNIT_CLASSES, TERRAIN } from './config.js';
+import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
@@ -302,6 +302,12 @@ export function calculateHitChance(attacker, defender) {
     // Verteidiger auf Hügel: -5% (leicht schwerer zu treffen)
     if (defHex && defHex.type === 'hills') {
         chance -= 5;
+    }
+    if (attHex && defHex) {
+        const heightAdvantage = Math.max(0, (defHex.height ?? 0) - (attHex.height ?? 0));
+        if (heightAdvantage > 0) {
+            chance -= heightAdvantage * CONFIG.HEIGHT.DEFENSE_BONUS_PER_LEVEL;
+        }
     }
 
     // === SICHTLINIEN-HINDERNISSE ===
