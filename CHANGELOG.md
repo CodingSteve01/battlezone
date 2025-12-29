@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.16.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.4...shadow-squad-v3.16.5) (2025-12-29)
+
+
+### Bug Fixes
+
+* **render:** rebalance unit scale, painterly terrain lighting, zoom normalization and vegetation placement ([#180](https://github.com/CodingSteve01/battlezone/issues/180)) ([97753f3](https://github.com/CodingSteve01/battlezone/commit/97753f3a29d99a736a5e89288e56e9b6a9153621))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#182](https://github.com/CodingSteve01/battlezone/issues/182)) ([9f3736f](https://github.com/CodingSteve01/battlezone/commit/9f3736f854d15ca5d6f1a53b5a5fffa2b0630bbd))
+
 ## [3.16.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.3...shadow-squad-v3.16.4) (2025-12-29)
 
 
