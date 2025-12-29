@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.16.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.3...shadow-squad-v3.16.4) (2025-12-29)
+
+
+### Bug Fixes
+
+* **scaling:** clamp contentScale, unify sprite sizing and remove procedural shadow ([#178](https://github.com/CodingSteve01/battlezone/issues/178)) ([48d9f78](https://github.com/CodingSteve01/battlezone/commit/48d9f78273f3a19b099da8e8697ec174d24c555d))
+
 ## [3.16.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.2...shadow-squad-v3.16.3) (2025-12-29)
 
 
