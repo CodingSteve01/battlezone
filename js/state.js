@@ -14,8 +14,13 @@ export function scaleToZoomLevel(scale) {
     return safeScale * ZOOM_REFERENCE;
 }
 
-const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);
-const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
+const TILE_SCALE_REFERENCE = 0.8;
+const tileScale = Number.isFinite(CONFIG.TILE_SCALE)
+    ? CONFIG.TILE_SCALE
+    : (Number.isFinite(CONFIG.HEX_SIZE_SCALE) ? CONFIG.HEX_SIZE_SCALE : 1);
+const zoomCompensation = tileScale > 0 ? TILE_SCALE_REFERENCE / tileScale : 1;
+const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1 * zoomCompensation);
+const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2 * zoomCompensation);
 
 // Central game state object
 export const state = {

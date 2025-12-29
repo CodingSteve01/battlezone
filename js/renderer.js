@@ -462,6 +462,10 @@ export function getPresetList() { return ['default']; }
 let canvas, ctx;
 let texturesInitialized = false;
 
+const TILE_SCALE = Number.isFinite(CONFIG.TILE_SCALE)
+    ? CONFIG.TILE_SCALE
+    : (Number.isFinite(CONFIG.HEX_SIZE_SCALE) ? CONFIG.HEX_SIZE_SCALE : 1);
+
 // ===== HEX TILE CACHING SYSTEM =====
 // Pre-renders hex tiles with terrain details for improved performance
 
@@ -488,14 +492,14 @@ let cachedQualityLevel = null;
  * Base hex size for caching - tiles are cached at this size and scaled when drawn
  * This prevents cache invalidation during zoom operations
  */
-const CACHE_BASE_HEX_SIZE = 60;
+const CACHE_BASE_HEX_SIZE = Math.max(10, Math.round(CONFIG.BASE_HEX_SIZE * TILE_SCALE));
 
 /**
  * Maximum number of cached tiles to prevent memory issues
  */
 // Increased cache size to prevent eviction during scrolling/zoom
 // A large map with full visibility needs ~500 tiles, plus 3 fog levels = 1500
-const MAX_CACHE_SIZE = 2000;
+const MAX_CACHE_SIZE = 4000;
 
 /**
  * Clear all caches (call when map regenerates or quality changes significantly)
@@ -1414,7 +1418,7 @@ function calculateHexSize() {
     const zoomScale = zoomLevelToScale(zoom);
 
     // Simple calculation: base size * normalized zoom scale
-    const result = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE * zoomScale;
+    const result = CONFIG.BASE_HEX_SIZE * TILE_SCALE * zoomScale;
 
     // Final validation
     return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;
