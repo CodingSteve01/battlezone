@@ -340,7 +340,7 @@ const TreeGenerator = {
         const trunkHeight = height * 0.45;
         const branchStartY = baseY - trunkHeight * 0.4;
 
-        const branchCount = Math.floor(4 + config.branchiness * 8);
+        const branchCount = Math.floor(4 + config.branchiness * 6);
 
         for (let i = 0; i < branchCount; i++) {
             const t = (i + 0.5) / branchCount;
@@ -379,11 +379,18 @@ const TreeGenerator = {
 
                 ctx.beginPath();
                 ctx.moveTo(centerX + Math.cos(angle) * length * 0.6, y + Math.sin(angle) * length * 0.4);
-                ctx.lineTo(
-                    centerX + Math.cos(angle) * length * 0.6 + Math.cos(subAngle) * subLength,
-                    y + Math.sin(angle) * length * 0.4 + Math.sin(subAngle) * subLength
-                );
+                const subEndX = centerX + Math.cos(angle) * length * 0.6 + Math.cos(subAngle) * subLength;
+                const subEndY = y + Math.sin(angle) * length * 0.4 + Math.sin(subAngle) * subLength;
+                ctx.lineTo(subEndX, subEndY);
                 ctx.stroke();
+
+                if (config.foliageDensity > 0 && rand() > 0.2) {
+                    this.drawLeafCluster(ctx, subEndX, subEndY, config, rand, 10);
+                }
+            }
+
+            if (config.foliageDensity > 0) {
+                this.drawLeafCluster(ctx, centerX + Math.cos(angle) * length, y + Math.sin(angle) * length, config, rand, 14);
             }
         }
     },
@@ -399,7 +406,7 @@ const TreeGenerator = {
 
         // === MAIN STRUCTURAL BRANCHES (visible through gaps in foliage) ===
         // These are medium branches that support the foliage structure
-        const structuralCount = 5 + Math.floor(config.branchiness * 4);
+        const structuralCount = 3 + Math.floor(config.branchiness * 3);
 
         for (let i = 0; i < structuralCount; i++) {
             const angle = (i / structuralCount) * Math.PI * 2 + rand() * 0.5;
@@ -428,7 +435,7 @@ const TreeGenerator = {
             ctx.stroke();
 
             // Secondary branches off the main structural branch
-            const secondaryCount = 2 + Math.floor(rand() * 3);
+            const secondaryCount = 1 + Math.floor(rand() * 2);
             for (let j = 0; j < secondaryCount; j++) {
                 const t = 0.3 + (j / secondaryCount) * 0.5;
                 const branchX = centerX + Math.cos(branchAngle) * length * t;
@@ -448,17 +455,19 @@ const TreeGenerator = {
                 );
                 ctx.stroke();
 
-                // Tertiary twigs off secondary branches
-                this.drawTwigCluster(ctx, branchX + Math.cos(subAngle) * subLength * 0.7,
-                    branchY - subLength * 0.35, config, rand, 3);
+                if (config.foliageDensity > 0 && rand() > 0.3) {
+                    this.drawLeafCluster(ctx, branchX + Math.cos(subAngle) * subLength * 0.7,
+                        branchY - subLength * 0.35, config, rand, 6);
+                }
             }
 
-            // End twig cluster
-            this.drawTwigCluster(ctx, endX, endY, config, rand, 4 + Math.floor(rand() * 3));
+            if (config.foliageDensity > 0 && rand() > 0.2) {
+                this.drawLeafCluster(ctx, endX, endY, config, rand, 10);
+            }
         }
 
         // === FINE TWIGS throughout foliage ===
-        const twigCount = 30 + Math.floor(config.branchiness * 25);
+        const twigCount = 12 + Math.floor(config.branchiness * 10);
 
         for (let i = 0; i < twigCount; i++) {
             const angle = rand() * Math.PI * 2;
@@ -484,31 +493,10 @@ const TreeGenerator = {
             ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
             ctx.stroke();
 
-            // Mini-twigs branching off
-            if (rand() > 0.4) {
-                const midX = ctrlX;
-                const midY = ctrlY;
-                const miniLen = twigLength * 0.3;
-
-                ctx.lineWidth = 0.5;
-                ctx.globalAlpha = 0.2;
-
-                // Left mini-twig
-                ctx.beginPath();
-                ctx.moveTo(midX, midY);
-                ctx.lineTo(midX - miniLen * 0.5, midY - miniLen * 0.7);
-                ctx.stroke();
-
-                // Right mini-twig
-                ctx.beginPath();
-                ctx.moveTo(midX, midY);
-                ctx.lineTo(midX + miniLen * 0.5, midY - miniLen * 0.6);
-                ctx.stroke();
-            }
         }
 
         // === PERIPHERAL TWIGS at foliage edges ===
-        const edgeTwigCount = 15 + Math.floor(config.branchiness * 10);
+        const edgeTwigCount = 6 + Math.floor(config.branchiness * 4);
 
         for (let i = 0; i < edgeTwigCount; i++) {
             const angle = (i / edgeTwigCount) * Math.PI * 2;
@@ -530,6 +518,17 @@ const TreeGenerator = {
 
         ctx.globalAlpha = 1;
         ctx.lineWidth = 1;
+    },
+
+    drawLeafCluster(ctx, x, y, config, rand, count = 10) {
+        const radius = 10 + rand() * 6;
+        for (let i = 0; i < count; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = radius * (0.3 + rand() * 0.7);
+            const leafX = x + Math.cos(angle) * dist;
+            const leafY = y + Math.sin(angle) * dist * 0.6;
+            this.drawTinyLeaf(ctx, leafX, leafY, config, rand, 0.6 + rand() * 0.3);
+        }
     },
 
     /**

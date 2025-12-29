@@ -192,7 +192,7 @@ export function moveUnit(unit, targetHex, cost) {
  * @param {Function} onComplete - Callback when animation finishes
  * @param {Function} render - Render function to call each frame
  */
-export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
+export async function animateUnitMovement(unit, path, totalCost, onComplete, render, onStep = null) {
     if (!path || path.length < 2) {
         if (onComplete) onComplete();
         return;
@@ -207,47 +207,51 @@ export function animateUnitMovement(unit, path, totalCost, onComplete, render) {
     };
 
     const stepDelay = 150; // ms per step
-    let currentStep = 0;
+    let completedSteps = 0;
 
-    function nextStep() {
-        try {
-            currentStep++;
+    const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-            if (currentStep >= path.length) {
-                // Animation complete
-                state.animating = false;
-                state.movementAnimation = null;
-                // Deduct cost from shared pool
-                spendSharedAP(totalCost);
-                // Statistik: Bewegung tracken (path.length - 1 = Anzahl der Schritte)
-                recordMovement(unit.player, path.length - 1);
-                if (onComplete) onComplete();
-                return;
+    try {
+        for (let step = 1; step < path.length; step++) {
+            await delay(stepDelay);
+
+            if (!unit.alive) {
+                break;
             }
 
-            const nextPos = path[currentStep];
+            const nextPos = path[step];
             const nextHex = getHex(nextPos.q, nextPos.r);
 
             if (nextHex) {
                 moveUnitInstant(unit, nextHex);
-                state.movementAnimation.currentStep = currentStep;
+                state.movementAnimation.currentStep = step;
+                completedSteps = step;
                 // Update visibility after each step so fog of war is dynamically updated
                 updateVisibility();
                 render();
             }
 
-            setTimeout(nextStep, stepDelay);
-        } catch (error) {
-            // Ensure animation state is cleaned up even if an error occurs
-            console.error('[Animation] Error during movement animation:', error);
-            state.animating = false;
-            state.movementAnimation = null;
-            if (onComplete) onComplete();
+            if (onStep) {
+                const shouldContinue = await onStep({ unit, step, nextHex });
+                if (shouldContinue === false) {
+                    break;
+                }
+            }
         }
+    } catch (error) {
+        // Ensure animation state is cleaned up even if an error occurs
+        console.error('[Animation] Error during movement animation:', error);
     }
 
-    // Start animation
-    setTimeout(nextStep, stepDelay);
+    state.animating = false;
+    state.movementAnimation = null;
+
+    // Deduct cost from shared pool
+    spendSharedAP(totalCost);
+    // Statistik: Bewegung tracken (completed steps = Anzahl der Schritte)
+    recordMovement(unit.player, completedSteps);
+
+    if (onComplete) onComplete();
 }
 
 /**

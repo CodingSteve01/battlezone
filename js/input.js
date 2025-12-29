@@ -9,6 +9,7 @@ import {
     prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack,
     canUseSpecialAbility, getSpecialAbilityCost,
     canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch,
+    checkAmbushTriggers, executeAmbushAttack,
     checkOverwatchTriggers, executeOverwatchAttack, onUnitMoved
 } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
@@ -1104,20 +1105,6 @@ function handleMoveClick(unit, hex) {
             // Check for newly discovered enemies
             checkForNewEnemies(prevEnemyIds);
 
-            // === OVERWATCH TRIGGER ===
-            // Prüfe ob feindliche Einheiten im Overwatch sind und angreifen
-            const overwatchTriggers = checkOverwatchTriggers(unit);
-            for (const trigger of overwatchTriggers) {
-                if (unit.alive) {
-                    await executeOverwatchAttack(trigger.watcher, unit);
-                    render();
-                    if (!unit.alive) {
-                        checkWinCondition();
-                        break;
-                    }
-                }
-            }
-
             // Auto-take cover if on valid terrain (forest)
             if (unit.alive && canAutoTakeCover(unit)) {
                 autoTakeCover(unit);
@@ -1132,7 +1119,7 @@ function handleMoveClick(unit, hex) {
             // Check for tutorial hints after movement
             showActionHint('moved');
             checkTutorialHint();
-        }, render);
+        }, render, async () => processReactiveFire(unit));
     } else {
         // First tap - show path preview and set pending destination
         state.pendingMoveDestination = { q: finalDest.q, r: finalDest.r };
@@ -1172,6 +1159,34 @@ function checkForNewEnemies(prevEnemyIds) {
     updatePreviouslyVisibleEnemies(currentEnemies.map(e => e.id));
 }
 
+async function processReactiveFire(movedUnit) {
+    if (!movedUnit || !movedUnit.alive) return true;
+
+    const ambushTriggers = checkAmbushTriggers(movedUnit);
+    for (const trigger of ambushTriggers) {
+        if (!movedUnit.alive) break;
+        await executeAmbushAttack(trigger.ambusher, movedUnit);
+        render();
+        if (!movedUnit.alive) {
+            checkWinCondition();
+            return false;
+        }
+    }
+
+    const overwatchTriggers = checkOverwatchTriggers(movedUnit);
+    for (const trigger of overwatchTriggers) {
+        if (!movedUnit.alive) break;
+        await executeOverwatchAttack(trigger.watcher, movedUnit);
+        render();
+        if (!movedUnit.alive) {
+            checkWinCondition();
+            return false;
+        }
+    }
+
+    return movedUnit.alive;
+}
+
 /**
  * Smoothly scroll camera to center on a unit
  */
@@ -1206,6 +1221,20 @@ export function scrollToUnit(unit, duration = 500) {
     }
 
     requestAnimationFrame(animateScroll);
+}
+
+/**
+ * Instantly center the camera on a unit (used for follow-cam tracking).
+ */
+export function followUnitInstant(unit) {
+    if (!unit) return;
+
+    const targetPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    state.cameraX = -targetPos.x;
+    state.cameraY = -targetPos.y;
+
+    limitCameraBounds();
+    updateCameraOffset();
 }
 
 /**
@@ -1752,51 +1781,36 @@ async function executeQueuedPathForUnit(unit) {
     await new Promise(resolve => setTimeout(resolve, 350));
 
     // Execute the movement
-    return new Promise(resolve => {
-        playMoveStart();
+    playMoveStart();
 
-        // Reveal from cover when moving
-        if (unit.hiding) {
-            unit.hiding = false;
-        }
+    // Reveal from cover when moving
+    if (unit.hiding) {
+        unit.hiding = false;
+    }
 
-        animateUnitMovement(unit, reachablePath, totalCost, async () => {
-            playMoveEnd();
+    await animateUnitMovement(unit, reachablePath, totalCost, null, render, async () => processReactiveFire(unit));
 
-            // Bewegung beendet Stellung-halten Bonus
-            onUnitMoved(unit);
+    playMoveEnd();
 
-            // Check for power-up pickup
-            const pickup = checkPowerupPickup(unit);
-            if (pickup) {
-                showPowerupPickup(pickup.powerup, pickup.result);
-            }
+    // Bewegung beendet Stellung-halten Bonus
+    onUnitMoved(unit);
 
-            updateVisibility();
+    // Check for power-up pickup
+    const pickup = checkPowerupPickup(unit);
+    if (pickup) {
+        showPowerupPickup(pickup.powerup, pickup.result);
+    }
 
-            // === OVERWATCH TRIGGER ===
-            const overwatchTriggers = checkOverwatchTriggers(unit);
-            for (const trigger of overwatchTriggers) {
-                if (unit.alive) {
-                    await executeOverwatchAttack(trigger.watcher, unit);
-                    render();
-                    if (!unit.alive) {
-                        checkWinCondition();
-                        break;
-                    }
-                }
-            }
+    updateVisibility();
 
-            // Auto-take cover if on valid terrain
-            if (unit.alive && canAutoTakeCover(unit)) {
-                autoTakeCover(unit);
-            }
+    // Auto-take cover if on valid terrain
+    if (unit.alive && canAutoTakeCover(unit)) {
+        autoTakeCover(unit);
+    }
 
-            render();
-            updateUI();
-            resolve(true);
-        }, render);
-    });
+    render();
+    updateUI();
+    return true;
 }
 
 /**

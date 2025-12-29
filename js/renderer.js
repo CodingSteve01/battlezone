@@ -189,7 +189,7 @@ function drawRiverDetails() { }
 function drawTree2D5(x, y, size, treeType, seed) {
     const result = getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
     if (result) {
-        const { sprite, contentScale } = result;
+        const { sprite, contentScale, anchor } = result;
 
         // Size variation: 0.7x to 1.3x base size
         const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
@@ -197,23 +197,23 @@ function drawTree2D5(x, y, size, treeType, seed) {
         // Base target size (what the sprite should be at 100% in original cell)
         const baseHeight = size * 2.8 * sizeVariation;
 
-        // Apply content scale - this accounts for cropping
-        const spriteHeight = baseHeight * contentScale.scaleY;
-        const spriteWidth = spriteHeight * (sprite.width / sprite.height);
+        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+        const spriteHeight = baseHeight / safeScaleY;
+        const spriteWidth = (baseHeight / safeScaleX) * (sprite.width / sprite.height);
 
         // Random horizontal mirror (50% chance)
         const shouldMirror = seededRandom(seed * 2.2) > 0.5;
 
-        // Position: center horizontally at x, bottom at y (ground level)
-        // Trees can extend beyond tile edges - trunk is centered
-        const drawX = x - spriteWidth / 2;
-        const drawY = y - spriteHeight;
+        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+        const drawX = x - spriteWidth * anchorPoint.x;
+        const drawY = y - spriteHeight * anchorPoint.y;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteWidth / 2, -spriteHeight, spriteWidth, spriteHeight);
+            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
@@ -224,30 +224,31 @@ function drawTree2D5(x, y, size, treeType, seed) {
 function drawBush2D5(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('bush', seed * 0.001);
     if (result) {
-        const { sprite, contentScale } = result;
+        const { sprite, contentScale, anchor } = result;
 
         // Size variation: 0.6x to 1.4x
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
         const baseSize = size * 1.6 * sizeVariation;
 
-        // Apply content scale to maintain correct visual size
-        const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
-        const spriteSize = baseSize * avgScale;
+        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+        const spriteWidth = baseSize / safeScaleX;
+        const spriteHeight = baseSize / safeScaleY;
 
         // Random horizontal mirror
         const shouldMirror = seededRandom(seed * 2.4) > 0.5;
 
-        // Position: center horizontally at x, bottom at y (ground level)
-        const drawX = x - spriteSize / 2;
-        const drawY = y - spriteSize;
+        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+        const drawX = x - spriteWidth * anchorPoint.x;
+        const drawY = y - spriteHeight * anchorPoint.y;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize, spriteSize, spriteSize);
+            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
-            ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
+            ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -256,27 +257,28 @@ function drawBush2D5(x, y, size, seed) {
 function drawSmallShrub(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
     if (result) {
-        const { sprite, contentScale } = result;
+        const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
         const baseSize = size * 1.3 * sizeVariation;
 
-        // Apply content scale
-        const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
-        const spriteSize = baseSize * avgScale;
+        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+        const spriteWidth = baseSize / safeScaleX;
+        const spriteHeight = baseSize / safeScaleY;
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
 
-        // Position: center horizontally at x, bottom at y (ground level)
-        const drawX = x - spriteSize / 2;
-        const drawY = y - spriteSize;
+        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+        const drawX = x - spriteWidth * anchorPoint.x;
+        const drawY = y - spriteHeight * anchorPoint.y;
 
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteSize / 2, -spriteSize, spriteSize, spriteSize);
+            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
-            ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
+            ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -285,19 +287,20 @@ function drawSmallShrub(x, y, size, seed) {
 function drawFlowerCluster(x, y, size, seed) {
     const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
     if (result) {
-        const { sprite, contentScale } = result;
+        const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
         const baseSize = size * 0.9 * sizeVariation;
 
-        // Apply content scale
-        const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
-        const spriteSize = baseSize * avgScale;
+        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+        const spriteWidth = baseSize / safeScaleX;
+        const spriteHeight = baseSize / safeScaleY;
 
-        // Position: center horizontally at x, bottom at y (ground level)
-        const drawX = x - spriteSize / 2;
-        const drawY = y - spriteSize;
-        ctx.drawImage(sprite, drawX, drawY, spriteSize, spriteSize);
+        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+        const drawX = x - spriteWidth * anchorPoint.x;
+        const drawY = y - spriteHeight * anchorPoint.y;
+        ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
     }
 }
 
