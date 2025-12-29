@@ -1,0 +1,633 @@
+{
+  "version": "1.0",
+  "dimensions": {
+    "width": 1024,
+    "height": 2664
+  },
+  "sprites": [
+    {
+      "id": "shore_water_0_v0",
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_0",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_0_v1",
+      "bounds": {
+        "x": 256,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_0",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_0_v2",
+      "bounds": {
+        "x": 512,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_0",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_0_v3",
+      "bounds": {
+        "x": 768,
+        "y": 0,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_0",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_water_1_v0",
+      "bounds": {
+        "x": 0,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_1",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_1_v1",
+      "bounds": {
+        "x": 256,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_1",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_1_v2",
+      "bounds": {
+        "x": 512,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_1",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_1_v3",
+      "bounds": {
+        "x": 768,
+        "y": 222,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_1",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_water_2_v0",
+      "bounds": {
+        "x": 0,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_2",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_2_v1",
+      "bounds": {
+        "x": 256,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_2",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_2_v2",
+      "bounds": {
+        "x": 512,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_2",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_2_v3",
+      "bounds": {
+        "x": 768,
+        "y": 444,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_2",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_water_3_v0",
+      "bounds": {
+        "x": 0,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_3",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_3_v1",
+      "bounds": {
+        "x": 256,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_3",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_3_v2",
+      "bounds": {
+        "x": 512,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_3",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_3_v3",
+      "bounds": {
+        "x": 768,
+        "y": 666,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_3",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_water_4_v0",
+      "bounds": {
+        "x": 0,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_4",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_4_v1",
+      "bounds": {
+        "x": 256,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_4",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_4_v2",
+      "bounds": {
+        "x": 512,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_4",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_4_v3",
+      "bounds": {
+        "x": 768,
+        "y": 888,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_4",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_water_5_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_5",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_water_5_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_5",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_water_5_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_5",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_water_5_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1110,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_water_5",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_0_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_0",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_0_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_0",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_0_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_0",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_0_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1332,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_0",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_1_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_1",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_1_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_1",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_1_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_1",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_1_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1554,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_1",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_2_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_2",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_2_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_2",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_2_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_2",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_2_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1776,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_2",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_3_v0",
+      "bounds": {
+        "x": 0,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_3",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_3_v1",
+      "bounds": {
+        "x": 256,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_3",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_3_v2",
+      "bounds": {
+        "x": 512,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_3",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_3_v3",
+      "bounds": {
+        "x": 768,
+        "y": 1998,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_3",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_4_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_4",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_4_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_4",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_4_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_4",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_4_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2220,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_4",
+        "variant": 3
+      }
+    },
+    {
+      "id": "shore_swamp_5_v0",
+      "bounds": {
+        "x": 0,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_5",
+        "variant": 0
+      }
+    },
+    {
+      "id": "shore_swamp_5_v1",
+      "bounds": {
+        "x": 256,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_5",
+        "variant": 1
+      }
+    },
+    {
+      "id": "shore_swamp_5_v2",
+      "bounds": {
+        "x": 512,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_5",
+        "variant": 2
+      }
+    },
+    {
+      "id": "shore_swamp_5_v3",
+      "bounds": {
+        "x": 768,
+        "y": 2442,
+        "width": 256,
+        "height": 222
+      },
+      "metadata": {
+        "detailType": "shore_swamp_5",
+        "variant": 3
+      }
+    }
+  ]
+}
