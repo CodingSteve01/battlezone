@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.17.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.6...shadow-squad-v3.17.0) (2025-12-29)
+
+
+### Features
+
+* **renderer:** add color grading, enable hex scale, and fix shoreline variant selection ([#185](https://github.com/CodingSteve01/battlezone/issues/185)) ([4c4d509](https://github.com/CodingSteve01/battlezone/commit/4c4d50912caf6d41af1c5b11619ebe5960648581))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#187](https://github.com/CodingSteve01/battlezone/issues/187)) ([39bf8b2](https://github.com/CodingSteve01/battlezone/commit/39bf8b2a9265c6a90ba8d0045b915be15cea4ebd))
+
 ## [3.16.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.5...shadow-squad-v3.16.6) (2025-12-29)
 
 
