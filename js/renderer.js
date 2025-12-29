@@ -2537,9 +2537,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
             : 'normal');
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
-    // Size increased from 1.3 to 1.8 for better visibility at 100% zoom
     // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.8, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
