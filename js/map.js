@@ -38,6 +38,7 @@ function getActiveBiome() {
 export function generateMap() {
     state.hexes = [];
     state.hexMap.clear();
+    state.spawnPositions = null;
 
     // Resolve and set the active biome
     const biome = resolveActiveBiome();
@@ -436,6 +437,9 @@ function clampSpawnPosition(pos, radius) {
  * Get spawn positions for all players - randomized each game
  */
 export function getSpawnPositions() {
+    if (state.spawnPositions && state.spawnPositions.length > 0) {
+        return state.spawnPositions;
+    }
     const radius = CONFIG.MAP_SIZES[state.settings.size];
     // Use a smaller offset to ensure spawns are well inside the map
     const baseOffset = CONFIG.SPAWN_OFFSET[state.settings.size];
@@ -519,7 +523,8 @@ export function getSpawnPositions() {
     const shuffled = shuffleArray(validatedLocations);
 
     // Return only the number of spawns needed for active players (up to 8)
-    return shuffled.slice(0, 8);
+    state.spawnPositions = shuffled.slice(0, 8);
+    return state.spawnPositions;
 }
 
 /**
