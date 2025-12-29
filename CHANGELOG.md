@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.16.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.15.0...shadow-squad-v3.16.0) (2025-12-29)
+
+
+### Features
+
+* **assets:** add lush terrain vegetation and fix character boot alignment ([#171](https://github.com/CodingSteve01/battlezone/issues/171)) ([5511ec4](https://github.com/CodingSteve01/battlezone/commit/5511ec40080ce7ac060c93c16beee27b7b9df5dc))
+
+
+### Bug Fixes
+
+* **game:** Kamera-Follow, reaktives Feuer, Sprite-Anker & Vegetation verbessert ([#168](https://github.com/CodingSteve01/battlezone/issues/168)) ([a3a2df1](https://github.com/CodingSteve01/battlezone/commit/a3a2df1451b53c6d930c0594c4d442e16910985c))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#170](https://github.com/CodingSteve01/battlezone/issues/170)) ([07ffc4a](https://github.com/CodingSteve01/battlezone/commit/07ffc4ab8586db82c3b577667e3c677a626c8b7e))
+
 ## [3.15.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.14.5...shadow-squad-v3.15.0) (2025-12-28)
 
 
