@@ -1033,6 +1033,7 @@ button:focus:not(:focus-visible),
     flex-shrink: 0;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    position: relative;
 }
 
 .player-indicator {
