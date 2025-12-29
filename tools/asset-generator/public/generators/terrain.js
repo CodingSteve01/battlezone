@@ -471,6 +471,96 @@ const TerrainGenerator = {
         }).join('');
     },
 
+    shiftRgb(rgb, offset) {
+        return {
+            r: Math.max(0, Math.min(255, rgb.r + offset.r)),
+            g: Math.max(0, Math.min(255, rgb.g + offset.g)),
+            b: Math.max(0, Math.min(255, rgb.b + offset.b))
+        };
+    },
+
+    drawFernCluster(ctx, x, y, scale, rotation, color, mirrorX) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale((mirrorX ? -1 : 1) * scale, scale);
+
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.lineCap = 'round';
+
+        const fronds = 5;
+        for (let i = 0; i < fronds; i++) {
+            const frondAngle = (-0.6 + (i / (fronds - 1)) * 1.2);
+            const frondLength = 8 + i * 1.4;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(
+                Math.cos(frondAngle) * frondLength * 0.4,
+                -frondLength * 0.4,
+                Math.cos(frondAngle) * frondLength,
+                -frondLength
+            );
+            ctx.stroke();
+
+            const leafletCount = 4 + Math.floor(frondLength / 4);
+            for (let l = 1; l < leafletCount; l++) {
+                const t = l / leafletCount;
+                const lx = Math.cos(frondAngle) * frondLength * t;
+                const ly = -frondLength * t;
+                const leafAngle = frondAngle + (l % 2 === 0 ? 0.6 : -0.6);
+                ctx.beginPath();
+                ctx.moveTo(lx, ly);
+                ctx.lineTo(
+                    lx + Math.cos(leafAngle) * 3,
+                    ly + Math.sin(leafAngle) * 3
+                );
+                ctx.stroke();
+            }
+        }
+
+        ctx.restore();
+    },
+
+    drawFlowerCluster(ctx, x, y, scale, rotation, palette, mirrorX) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale((mirrorX ? -1 : 1) * scale, scale);
+
+        const flowers = 5 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < flowers; i++) {
+            const fx = (Math.random() - 0.5) * 8;
+            const fy = (Math.random() - 0.5) * 6;
+            const size = 1.4 + Math.random() * 1.6;
+            const petalCount = 4 + Math.floor(Math.random() * 3);
+            const color = palette[i % palette.length];
+
+            ctx.fillStyle = color;
+            for (let p = 0; p < petalCount; p++) {
+                const angle = (p / petalCount) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.ellipse(
+                    fx + Math.cos(angle) * size * 0.6,
+                    fy + Math.sin(angle) * size * 0.6,
+                    size * 0.5,
+                    size * 0.3,
+                    angle,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#e6c44a';
+            ctx.beginPath();
+            ctx.arc(fx, fy, size * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    },
+
 
     /**
      * Render base terrain with multi-octave fractal noise
@@ -826,6 +916,39 @@ const TerrainGenerator = {
             ctx.beginPath();
             ctx.arc(x, y, flowerSize * 0.35, 0, Math.PI * 2);
             ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Ferns and wildflower clusters for denser variety
+        const fernBase = this.hexToRgb(terrain.darkColor);
+        const fernHighlights = [
+            this.shiftRgb(fernBase, { r: 18, g: 24, b: 10 }),
+            this.shiftRgb(fernBase, { r: 8, g: 18, b: 6 }),
+            this.shiftRgb(fernBase, { r: 26, g: 30, b: 16 })
+        ];
+        const fernCount = 4 + Math.floor(Math.abs(noise.noise2D(variant * 5, 0)) * 4);
+        ctx.globalAlpha = 0.45;
+        for (let i = 0; i < fernCount; i++) {
+            const x = cx + (detailNoise.noise2D(i * 4, variant * 6) - 0.5) * radius * 1.3;
+            const y = cy + (detailNoise.noise2D(variant * 6, i * 4) - 0.5) * radius * 1.1;
+            const scale = 0.6 + Math.abs(microNoise.noise2D(x * 0.1, y * 0.1)) * 0.8;
+            const rotation = microNoise.noise2D(x * 0.05, y * 0.05) * 0.8;
+            const mirrorX = microNoise.noise2D(x * 0.07, y * 0.07) > 0;
+            const fernColor = fernHighlights[i % fernHighlights.length];
+            this.drawFernCluster(ctx, x, y, scale, rotation, this.rgbToHex(fernColor.r, fernColor.g, fernColor.b), mirrorX);
+        }
+        ctx.globalAlpha = 1;
+
+        const wildflowerPalette = ['#f7d77a', '#ffffff', '#f2a3c7', '#b1d2f7', '#f6c88d', '#f2a7a7'];
+        const wildflowerCount = 3 + Math.floor(Math.abs(noise.noise2D(variant * 7, 0)) * 3);
+        ctx.globalAlpha = 0.8;
+        for (let i = 0; i < wildflowerCount; i++) {
+            const x = cx + (detailNoise.noise2D(i * 8, variant * 9) - 0.5) * radius * 1.2;
+            const y = cy + (detailNoise.noise2D(variant * 9, i * 8) - 0.5) * radius * 1.0;
+            const scale = 0.7 + Math.abs(microNoise.noise2D(x * 0.12, y * 0.12)) * 0.7;
+            const rotation = microNoise.noise2D(x * 0.06, y * 0.06) * Math.PI;
+            const mirrorX = microNoise.noise2D(x * 0.09, y * 0.09) > 0;
+            this.drawFlowerCluster(ctx, x, y, scale, rotation, wildflowerPalette, mirrorX);
         }
         ctx.globalAlpha = 1;
 
@@ -1256,6 +1379,39 @@ const TerrainGenerator = {
             ctx.arc(x, y, mossSize, 0, Math.PI * 2);
             ctx.fill();
         }
+
+        // Fern clusters and woodland flowers
+        const fernBase = this.hexToRgb('#36543a');
+        const fernColors = [
+            this.shiftRgb(fernBase, { r: 12, g: 18, b: 8 }),
+            this.shiftRgb(fernBase, { r: 2, g: 10, b: 4 }),
+            this.shiftRgb(fernBase, { r: 20, g: 24, b: 12 })
+        ];
+        ctx.globalAlpha = 0.45;
+        const fernCount = 4 + Math.floor(Math.abs(noise.noise2D(variant * 9, 0)) * 4);
+        for (let i = 0; i < fernCount; i++) {
+            const x = cx + (detailNoise.noise2D(i * 5, variant * 8) - 0.5) * radius * 1.3;
+            const y = cy + (detailNoise.noise2D(variant * 8, i * 5) - 0.5) * radius * 1.1;
+            const scale = 0.6 + Math.abs(microNoise.noise2D(x * 0.09, y * 0.09)) * 0.9;
+            const rotation = microNoise.noise2D(x * 0.04, y * 0.04) * 0.9;
+            const mirrorX = microNoise.noise2D(x * 0.06, y * 0.06) > 0;
+            const fernColor = fernColors[i % fernColors.length];
+            this.drawFernCluster(ctx, x, y, scale, rotation, this.rgbToHex(fernColor.r, fernColor.g, fernColor.b), mirrorX);
+        }
+        ctx.globalAlpha = 1;
+
+        const woodlandPalette = ['#f4d97f', '#ffffff', '#f2a5c8', '#c5d9f4', '#f4c38f'];
+        const flowerPatchCount = 2 + Math.floor(Math.abs(noise.noise2D(variant * 10, 0)) * 3);
+        ctx.globalAlpha = 0.75;
+        for (let i = 0; i < flowerPatchCount; i++) {
+            const x = cx + (detailNoise.noise2D(i * 9, variant * 10) - 0.5) * radius * 1.1;
+            const y = cy + (detailNoise.noise2D(variant * 10, i * 9) - 0.5) * radius * 0.9;
+            const scale = 0.6 + Math.abs(microNoise.noise2D(x * 0.1, y * 0.1)) * 0.7;
+            const rotation = microNoise.noise2D(x * 0.05, y * 0.05) * Math.PI;
+            const mirrorX = microNoise.noise2D(x * 0.08, y * 0.08) > 0;
+            this.drawFlowerCluster(ctx, x, y, scale, rotation, woodlandPalette, mirrorX);
+        }
+        ctx.globalAlpha = 1;
 
         // Fine ground texture
         ctx.globalAlpha = 0.08;
@@ -2321,6 +2477,47 @@ const TerrainGenerator = {
             ctx.lineWidth = 0.8;
             ctx.stroke();
         }
+
+        // Lush tall grass clumps with varied scale/mirroring
+        const clumpCount = 6 + Math.floor(Math.abs(noise.noise2D(variant * 4, 0)) * 5);
+        ctx.globalAlpha = 0.5;
+        for (let i = 0; i < clumpCount; i++) {
+            const x = cx + (detailNoise.noise2D(i * 3, variant * 4) - 0.5) * radius * 1.1;
+            const y = cy + (detailNoise.noise2D(variant * 4, i * 3) - 0.5) * radius * 0.9;
+            const scale = 0.7 + Math.abs(microNoise.noise2D(x * 0.1, y * 0.1)) * 0.9;
+            const rotation = microNoise.noise2D(x * 0.06, y * 0.06) * 0.6;
+            const mirrorX = microNoise.noise2D(x * 0.08, y * 0.08) > 0;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            ctx.scale((mirrorX ? -1 : 1) * scale, scale);
+
+            const blades = 7 + Math.floor(Math.random() * 5);
+            for (let b = 0; b < blades; b++) {
+                const bladeAngle = -Math.PI / 2 + (b - blades / 2) * 0.12;
+                const bladeHeight = 10 + Math.random() * 10;
+                const bend = (Math.random() - 0.5) * 0.4;
+                const gradient = ctx.createLinearGradient(0, 0, bend * bladeHeight, -bladeHeight);
+                gradient.addColorStop(0, `rgba(${darkRGB.r}, ${darkRGB.g}, ${darkRGB.b}, 0.6)`);
+                gradient.addColorStop(1, `rgba(${lightRGB.r}, ${lightRGB.g}, ${lightRGB.b}, 0.45)`);
+
+                ctx.beginPath();
+                ctx.moveTo((b - blades / 2) * 0.6, 0);
+                ctx.quadraticCurveTo(
+                    bend * bladeHeight * 0.4,
+                    -bladeHeight * 0.5,
+                    bend * bladeHeight,
+                    -bladeHeight
+                );
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+        ctx.globalAlpha = 1;
     },
 
     /**

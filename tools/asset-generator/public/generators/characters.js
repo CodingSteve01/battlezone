@@ -208,20 +208,24 @@ const CharacterGenerator = {
         // Lower leg (calf) width
         const calfWidth = thighWidth * 0.8;
 
+        const hipY = bodyY + 12;
+        const ankleY = hipY + visibleLegLength;
+
         // Left leg (drawn first, slightly behind)
-        this.drawLegTopDown(ctx, centerX - legSpread * 0.4, bodyY + 12,
+        this.drawLegTopDown(ctx, centerX - legSpread * 0.4, hipY,
                            -legSpread * 0.5, visibleLegLength,
                            thighWidth, calfWidth, uniform, isCrouching, false);
 
         // Right leg (slightly in front due to perspective)
-        this.drawLegTopDown(ctx, centerX + legSpread * 0.4, bodyY + 12,
+        this.drawLegTopDown(ctx, centerX + legSpread * 0.4, hipY,
                            legSpread * 0.5, visibleLegLength,
                            thighWidth, calfWidth, uniform, isCrouching, true);
 
         // Boots with top-down perspective
         const bootLeftX = centerX - legSpread * 0.9;
         const bootRightX = centerX + legSpread * 0.9;
-        const bootY = groundY - 6;
+        const bootLength = isCrouching ? 12 : 14;
+        const bootY = ankleY - bootLength * 0.15;
 
         this.drawBootTopDown(ctx, bootLeftX, bootY, false, isCrouching);
         this.drawBootTopDown(ctx, bootRightX, bootY, true, isCrouching);
