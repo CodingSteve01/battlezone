@@ -6,6 +6,7 @@
 const generatedAssets = {
     terrain: [],
     trees: [],
+    shorelines: [],
     bushes: [],
     characters: []
 };
@@ -314,19 +315,62 @@ async function generateCharacters() {
     showTab('characters');
 }
 
+// Shoreline generation
+async function generateShorelines() {
+    const settings = getSettings();
+    const preview = document.getElementById('shorelinesPreview');
+    preview.innerHTML = '';
+    generatedAssets.shorelines = [];
+
+    const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
+    const subtypes = ['water', 'swamp'];
+    const directions = [0, 1, 2, 3, 4, 5];
+    const total = subtypes.length * directions.length * settings.variants;
+    let count = 0;
+
+    updateStatus('Generating shoreline overlays...');
+
+    for (const subtype of subtypes) {
+        for (const direction of directions) {
+            for (let v = 0; v < settings.variants; v++) {
+                const canvas = ShorelineGenerator.generate(subtype, direction, v, settings.terrainSize, hexHeight);
+                const label = `shore_${subtype}_${direction}_v${v}`;
+
+                addPreviewItem(preview, canvas, label);
+                generatedAssets.shorelines.push({
+                    canvas,
+                    label,
+                    detailType: `shore_${subtype}_${direction}`,
+                    variant: v
+                });
+
+                count++;
+                updateProgress((count / total) * 100);
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+    }
+
+    updateStatus(`Generated ${count} shoreline overlays`);
+    showTab('shorelines');
+}
+
 // Generate all
 async function generateAll() {
     updateStatus('Generating all assets...');
     updateProgress(0);
 
     await generateTerrain();
-    updateProgress(25);
+    updateProgress(20);
 
     await generateTrees();
-    updateProgress(50);
+    updateProgress(40);
+
+    await generateShorelines();
+    updateProgress(60);
 
     await generateBushes();
-    updateProgress(75);
+    updateProgress(80);
 
     await generateCharacters();
     updateProgress(100);
@@ -356,6 +400,14 @@ async function createSpriteSheets() {
     if (generatedAssets.trees.length > 0) {
         const sheet = createCroppedSpriteSheet(generatedAssets.trees, getSettings().variants);
         addSheetPreview(preview, sheet.canvas, 'trees.png', sheet.json);
+    }
+
+    // Shoreline overlays (fixed size, no cropping)
+    if (generatedAssets.shorelines.length > 0) {
+        const settings = getSettings();
+        const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
+        const sheet = createSpriteSheet(generatedAssets.shorelines, settings.variants, settings.terrainSize, hexHeight, false);
+        addSheetPreview(preview, sheet.canvas, 'shorelines.png', sheet.json);
     }
 
     // Vegetation sprite sheet (WITH cropping and anchor points)
@@ -402,6 +454,7 @@ function createSpriteSheet(assets, columns, spriteWidth, spriteHeight, enableCro
             metadata: {
                 type: asset.type,
                 subtype: asset.subtype,
+                detailType: asset.detailType,
                 variant: asset.variant,
                 unitClass: asset.unitClass,
                 state: asset.state,

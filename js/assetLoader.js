@@ -167,6 +167,19 @@ export function getRandomDetailSpriteWithAnchor(detailType, seed = Math.random()
 }
 
 /**
+ * Get shoreline overlay sprite for a specific edge direction
+ * @param {string} detailType - e.g. shore_water_0
+ * @param {number} variant - Variant index
+ */
+export function getShorelineSprite(detailType, variant = 0) {
+    return SpriteSheet.getOverlaySprite(detailType, variant);
+}
+
+export function getShorelineVariantCount(detailType) {
+    return SpriteSheet.getOverlayVariantCount(detailType);
+}
+
+/**
  * Get content scale for a unit sprite (for cropping compensation)
  */
 export function getUnitContentScale(unitClass, playerIndex, state = 'normal') {

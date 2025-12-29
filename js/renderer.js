@@ -7,7 +7,16 @@ import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
 import { isSpectatorMode } from './ai.js';
-import { getTexture, drawUnit as drawUnitSprite, getRandomDetailSprite, getRandomDetailSpriteWithAnchor, hasAnimatedTexture, getAnimatedTexture } from './assetLoader.js';
+import {
+    getTexture,
+    drawUnit as drawUnitSprite,
+    getRandomDetailSprite,
+    getRandomDetailSpriteWithAnchor,
+    getShorelineSprite,
+    getShorelineVariantCount,
+    hasAnimatedTexture,
+    getAnimatedTexture
+} from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
@@ -73,96 +82,102 @@ function getNeighborTerrains(hexMap, q, r) {
     });
 }
 
-/**
- * Draw terrain transition blend overlays
- * Creates smooth transitions between different terrain types
- */
-function drawTerrainBlend(ctx, cx, cy, size, terrainType, neighborTerrains) {
+const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
+const SWAMP_TYPES = new Set(['swamp']);
+
+function isLandForWater(type) {
+    if (!type) return false;
+    return !WATER_TYPES.has(type) && !SWAMP_TYPES.has(type);
+}
+
+function isLandForSwamp(type) {
+    if (!type) return false;
+    return !SWAMP_TYPES.has(type) && !WATER_TYPES.has(type);
+}
+
+function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
     if (!neighborTerrains || neighborTerrains.length !== 6) return;
 
-    const currentTerrain = TERRAIN[terrainType];
-    if (!currentTerrain) return;
+    let subtype = null;
+    let isLandNeighbor = null;
 
-    // Hex edge angles (starting from right, going clockwise)
-    const edgeAngles = [0, 60, 120, 180, 240, 300].map(a => a * Math.PI / 180);
-
-    ctx.save();
-
-    // For each neighbor, check if terrain differs and draw blend
-    for (let i = 0; i < 6; i++) {
-        const neighborType = neighborTerrains[i];
-        if (!neighborType || neighborType === terrainType) continue;
-
-        const neighborTerrain = TERRAIN[neighborType];
-        if (!neighborTerrain) continue;
-
-        // Determine blend priority - some terrains should blend "over" others
-        // Water > rock > forest > grass (lower priority terrains blend onto higher)
-        const priority = { water: 5, deepwater: 5, rock: 4, cliff: 4, forest: 3, pine: 3, swamp: 2, mud: 2 };
-        const currentPriority = priority[terrainType] || 1;
-        const neighborPriority = priority[neighborType] || 1;
-
-        // Only draw blend if neighbor has higher priority (it would blend onto us)
-        if (neighborPriority <= currentPriority) continue;
-
-        // Calculate edge center point
-        const angle1 = edgeAngles[i];
-        const angle2 = edgeAngles[(i + 1) % 6];
-        const edgeMidAngle = (angle1 + angle2) / 2;
-
-        // Create gradient from edge center toward hex center
-        const edgeDist = size * 0.95;
-        const gradientStart = {
-            x: cx + Math.cos(edgeMidAngle) * edgeDist,
-            y: cy + Math.sin(edgeMidAngle) * edgeDist
-        };
-        const gradientEnd = {
-            x: cx + Math.cos(edgeMidAngle) * size * 0.3,
-            y: cy + Math.sin(edgeMidAngle) * size * 0.3
-        };
-
-        // Draw triangular blend zone at this edge
-        const corner1 = {
-            x: cx + Math.cos(angle1) * size,
-            y: cy + Math.sin(angle1) * size
-        };
-        const corner2 = {
-            x: cx + Math.cos(angle2) * size,
-            y: cy + Math.sin(angle2) * size
-        };
-
-        // Create gradient with neighbor's color fading in
-        const gradient = safeLinearGradient(
-            ctx,
-            gradientStart.x, gradientStart.y,
-            gradientEnd.x, gradientEnd.y,
-            'transparent'
-        );
-
-        // Use neighbor's color at edge, fading to transparent
-        const blendColor = neighborTerrain.colorDark || neighborTerrain.color;
-        if (typeof gradient !== 'string') {
-            gradient.addColorStop(0, blendColor + 'aa');  // Semi-transparent at edge
-            gradient.addColorStop(0.4, blendColor + '55');
-            gradient.addColorStop(0.7, blendColor + '22');
-            gradient.addColorStop(1, 'transparent');
-        }
-
-        // Draw blend triangle
-        ctx.beginPath();
-        ctx.moveTo(corner1.x, corner1.y);
-        ctx.lineTo(corner2.x, corner2.y);
-        ctx.lineTo(cx, cy);
-        ctx.closePath();
-        ctx.fillStyle = gradient;
-        ctx.fill();
+    if (WATER_TYPES.has(terrainType)) {
+        subtype = 'water';
+        isLandNeighbor = isLandForWater;
+    } else if (SWAMP_TYPES.has(terrainType)) {
+        subtype = 'swamp';
+        isLandNeighbor = isLandForSwamp;
+    } else {
+        return;
     }
 
-    ctx.restore();
+    const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
+    const spriteWidth = size * 2;
+    const spriteHeight = size * Math.sqrt(3);
+
+    for (let i = 0; i < 6; i++) {
+        const neighborType = neighborTerrains[i];
+        if (!isLandNeighbor(neighborType)) continue;
+
+        const detailType = `shore_${subtype}_${i}`;
+        const variantCount = getShorelineVariantCount(detailType);
+        const variant = variantCount > 0
+            ? Math.floor(seededRandom(baseSeed + i * 91) * variantCount)
+            : 0;
+
+        const sprite = getShorelineSprite(detailType, variant);
+        if (!sprite) continue;
+
+        ctx.drawImage(
+            sprite,
+            cx - spriteWidth / 2,
+            cy - spriteHeight / 2,
+            spriteWidth,
+            spriteHeight
+        );
+    }
 }
 
 function initVegetationRenderer() { /* no-op */ }
 function initTerrainRenderer() { /* no-op */ }
+
+function getBiomeTreePool(terrainType) {
+    const biome = state.activeBiome || 'temperate';
+
+    if (terrainType === 'pine' || terrainType === 'snow') {
+        return ['pine', 'birch', 'dead', 'pine'];
+    }
+
+    if (terrainType === 'swamp') {
+        return ['willow', 'dead', 'oak', 'birch', 'willow'];
+    }
+
+    if (terrainType === 'sand') {
+        return ['dead', 'dead', 'oak'];
+    }
+
+    switch (biome) {
+        case 'tundra':
+            return ['pine', 'birch', 'dead', 'pine'];
+        case 'highland':
+            return ['pine', 'birch', 'oak', 'pine'];
+        case 'tropical':
+            return ['oak', 'maple', 'willow', 'oak', 'maple'];
+        case 'wetland':
+            return ['willow', 'oak', 'dead', 'birch', 'willow'];
+        case 'desert':
+            return ['dead', 'oak', 'dead'];
+        case 'temperate':
+        default:
+            return ['oak', 'birch', 'maple', 'oak', 'maple'];
+    }
+}
+
+function pickTreeTypeForBiome(seed, terrainType) {
+    const pool = getBiomeTreePool(terrainType);
+    const pick = pool[Math.floor(seededRandom(seed) * pool.length)] || 'oak';
+    return TREE_TYPE_NAMES.indexOf(pick) >= 0 ? TREE_TYPE_NAMES.indexOf(pick) : 0;
+}
 
 // Terrain detail stubs - draw nothing (use sprites instead)
 function drawAnimatedGrass() { }
@@ -186,8 +201,17 @@ function drawPathDetails() { }
 function drawRiverDetails() { }
 
 // Vegetation functions - draw sprites from sprite sheet with variation
+const TREE_TYPE_NAMES = ['oak', 'pine', 'birch', 'willow', 'maple', 'dead'];
+
+function getTreeDetailType(treeType) {
+    const typeName = TREE_TYPE_NAMES[treeType] || 'oak';
+    return `tree_${typeName}`;
+}
+
 function drawTree2D5(x, y, size, treeType, seed) {
-    const result = getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
+    const detailType = getTreeDetailType(treeType);
+    const result = getRandomDetailSpriteWithAnchor(detailType, seed * 0.001)
+        || getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
     if (result) {
         const { sprite, contentScale, anchor } = result;
 
@@ -477,7 +501,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             const baseSizeVar = 0.5 + seededRandom(baseSeed + i * 10 + 2) * 1.3;
             const sizeMultiplier = s * baseSizeVar * 1.4;
 
-            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 6);
+            const treeType = pickTreeTypeForBiome(baseSeed + i * 10 + 3, type);
 
             elements.push({
                 type: 'tree',
@@ -499,7 +523,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             const offsetX = Math.cos(edgeAngle) * edgeRadius * 0.9;
             const offsetY = Math.sin(edgeAngle) * edgeRadius * 0.7 + TREE_Y_OFFSET;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
-            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 6);
+            const treeType = pickTreeTypeForBiome(baseSeed + i * 20 + 203, type);
 
             elements.push({
                 type: 'tree-edge',
@@ -586,7 +610,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             const offsetX = (seededRandom(baseSeed + 600) - 0.5) * s * 0.4;
             const offsetY = (seededRandom(baseSeed + 601) - 0.5) * s * 0.3 + TREE_Y_OFFSET;
             const sizeMultiplier = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
-            const treeType = Math.floor(seededRandom(baseSeed + 603) * 4);
+            const treeType = pickTreeTypeForBiome(baseSeed + 603, type);
             elements.push({
                 type: 'tree-solitary',
                 offsetX,
@@ -842,10 +866,10 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
     // Pass null for strokeColor - grid overlay is drawn separately when needed
     drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
 
-    // Add terrain blending for seamless transitions between terrain types
+    // Shoreline overlays for water/swamp transitions
     if (fogLevel === 'visible' && terrainData) {
         const neighbors = getNeighborTerrains(state.hexMap, hex.q, hex.r);
-        drawTerrainBlend(tileCtx, cx, cy, hexSize, hex.type, neighbors);
+        drawShorelineOverlays(tileCtx, cx, cy, hexSize, hex.type, neighbors, hex.q, hex.r);
     }
 
     // Draw terrain details ONLY for visible hexes (not explored/hidden)
@@ -1450,9 +1474,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const treeSize = s * baseSizeVar * 1.4;
 
             // Mixed forest: use all tree types with weighted distribution
-            const treeType = type === 'pine'
-                ? 0
-                : Math.floor(seededRandom(baseSeed + i * 10 + 3) * 6);
+            const treeType = pickTreeTypeForBiome(baseSeed + i * 10 + 3, type);
 
             elements.push({
                 type: 'tree',
@@ -1475,7 +1497,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
 
             // Edge trees have varied sizes - some tall, some short
             const treeSize = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
-            const treeType = type === 'pine' ? 0 : Math.floor(seededRandom(baseSeed + i * 20 + 203) * 6);
+            const treeType = pickTreeTypeForBiome(baseSeed + i * 20 + 203, type);
 
             elements.push({
                 type: 'tree-edge',
@@ -1556,7 +1578,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             const treeX = cx + (seededRandom(baseSeed + 600) - 0.5) * s * 0.4;
             const treeY = cy + (seededRandom(baseSeed + 601) - 0.5) * s * 0.3 + TREE_Y_OFFSET;
             const treeSize = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
-            const treeType = Math.floor(seededRandom(baseSeed + 603) * 4); // Oak, birch, etc.
+            const treeType = pickTreeTypeForBiome(baseSeed + 603, type);
             elements.push({
                 type: 'tree-solitary',
                 x: treeX,
@@ -1667,7 +1689,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 x: stumpX,
                 y: stumpY,
                 sortY: stumpY + TREE_SORT_OFFSET,
-                draw: () => drawTree2D5(stumpX, stumpY, stumpSize, 5, baseSeed + 1103) // Type 5 for dead/sparse tree
+                draw: () => drawTree2D5(stumpX, stumpY, stumpSize, 5, baseSeed + 1103) // Dead tree
             });
         }
         // Reed clusters
