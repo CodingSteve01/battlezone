@@ -219,6 +219,7 @@
                 <h3>Generate Assets</h3>
                 <button class="btn" onclick="generateTerrain()">🏞️ Generate Terrain</button>
                 <button class="btn" onclick="generateTrees()">🌲 Generate Trees</button>
+                <button class="btn" onclick="generateShorelines()">🌊 Generate Shorelines</button>
                 <button class="btn" onclick="generateBushes()">🌿 Generate Bushes</button>
                 <button class="btn" onclick="generateCharacters()">🎖️ Generate Characters</button>
                 <button class="btn btn-success" onclick="generateAll()">⚡ Generate All</button>
@@ -313,6 +314,7 @@
             <div class="tabs">
                 <button class="tab active" onclick="showTab('terrain')">Terrain</button>
                 <button class="tab" onclick="showTab('trees')">Trees</button>
+                <button class="tab" onclick="showTab('shorelines')">Shorelines</button>
                 <button class="tab" onclick="showTab('bushes')">Bushes</button>
                 <button class="tab" onclick="showTab('characters')">Characters</button>
                 <button class="tab" onclick="showTab('sheets')">Sprite Sheets</button>
@@ -323,6 +325,9 @@
             </div>
             <div id="trees" class="tab-content">
                 <div class="preview-grid large" id="treesPreview"></div>
+            </div>
+            <div id="shorelines" class="tab-content">
+                <div class="preview-grid" id="shorelinesPreview"></div>
             </div>
             <div id="bushes" class="tab-content">
                 <div class="preview-grid large" id="bushesPreview"></div>
@@ -340,6 +345,7 @@
     <script src="generators/color.js"></script>
     <script src="generators/terrain.js"></script>
     <script src="generators/trees.js"></script>
+    <script src="generators/shorelines.js"></script>
     <script src="generators/bushes.js"></script>
     <script src="generators/characters.js"></script>
     <script src="app.js"></script>

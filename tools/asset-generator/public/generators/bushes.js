@@ -126,7 +126,7 @@ const BushGenerator = {
         const baseRadius = width * 0.32;
 
         // Draw small branches/stems visible through foliage
-        this.drawInnerBranches(ctx, centerX, centerY, baseRadius, config, rand);
+        const branchTips = this.drawInnerBranches(ctx, centerX, centerY, baseRadius, config, rand);
 
         // Determine blob positions for irregular bushes
         const blobs = [];
@@ -149,7 +149,7 @@ const BushGenerator = {
             const layerY = -layer * 6; // Each layer slightly higher
 
             for (const blob of blobs) {
-                const leafCount = Math.floor(25 + rand() * 20 * config.leafDensity);
+                const leafCount = Math.floor(18 + rand() * 14 * config.leafDensity);
 
                 for (let i = 0; i < leafCount; i++) {
                     const angle = rand() * Math.PI * 2;
@@ -190,12 +190,19 @@ const BushGenerator = {
             }
         }
 
+        if (branchTips.length > 0) {
+            for (const tip of branchTips) {
+                this.drawBranchLeafCluster(ctx, tip.x, tip.y, config, rand);
+            }
+        }
+
         // Add top highlight leaves
         this.addHighlightLeaves(ctx, centerX, centerY - 15, baseRadius * 0.6, config, rand);
     },
 
     drawInnerBranches(ctx, centerX, centerY, radius, config, rand) {
-        const branchCount = 5 + Math.floor(rand() * 4);
+        const branchCount = 4 + Math.floor(rand() * 3);
+        const endpoints = [];
         ctx.strokeStyle = config.stemColor;
         ctx.lineCap = 'round';
 
@@ -226,6 +233,33 @@ const BushGenerator = {
                 ctx.moveTo(midX, midY);
                 ctx.lineTo(midX + Math.cos(subAngle) * length * 0.3, midY + Math.sin(subAngle) * length * 0.3);
                 ctx.stroke();
+            }
+
+            endpoints.push({ x: endX, y: endY });
+        }
+
+        return endpoints;
+    },
+
+    drawBranchLeafCluster(ctx, x, y, config, rand) {
+        const leafCount = 8 + Math.floor(rand() * 8);
+        const radius = 10 + rand() * 8;
+
+        for (let i = 0; i < leafCount; i++) {
+            const angle = rand() * Math.PI * 2;
+            const dist = radius * (0.3 + rand() * 0.7);
+            const leafX = x + Math.cos(angle) * dist;
+            const leafY = y + Math.sin(angle) * dist * 0.4;
+
+            const leafSize = config.leafSize.min + rand() * (config.leafSize.max - config.leafSize.min);
+            const leafAngle = angle + (rand() - 0.5) * 0.6;
+            const colorIndex = Math.floor(rand() * config.leafColors.length);
+            const leafColor = config.leafColors[colorIndex];
+
+            if (config.spiky) {
+                this.drawSpikyLeaf(ctx, leafX, leafY, leafSize, leafAngle, leafColor, config, rand);
+            } else {
+                this.drawLeaf(ctx, leafX, leafY, leafSize, leafAngle, leafColor, config, rand);
             }
         }
     },

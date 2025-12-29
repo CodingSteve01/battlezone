@@ -7,14 +7,16 @@ import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
 import {
     executeAttack, useSpecialAbility, canUseSpecialAbility, getSpecialAbilityCost,
-    canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch
+    canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch,
+    checkAmbushTriggers, executeAmbushAttack,
+    checkOverwatchTriggers, executeOverwatchAttack
 } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
 import { updateUI } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
-import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom } from './input.js';
+import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
@@ -2390,6 +2392,33 @@ async function executeAIMove(unit, target, spectatorMode = false) {
 
     const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
     const wasVisible = isUnitVisibleToViewer(unit);
+    const shouldFollowVisible = hasHumanViewer && wasVisible;
+
+    const processReactiveFire = async () => {
+        if (!unit.alive) return false;
+
+        const ambushTriggers = checkAmbushTriggers(unit);
+        for (const trigger of ambushTriggers) {
+            if (!unit.alive) break;
+            await executeAmbushAttack(trigger.ambusher, unit);
+            render();
+            if (!unit.alive) {
+                return false;
+            }
+        }
+
+        const overwatchTriggers = checkOverwatchTriggers(unit);
+        for (const trigger of overwatchTriggers) {
+            if (!unit.alive) break;
+            await executeOverwatchAttack(trigger.watcher, unit);
+            render();
+            if (!unit.alive) {
+                return false;
+            }
+        }
+
+        return unit.alive;
+    };
 
     // Get the path from unit's current position to target
     const pathResult = findPath(unit.q, unit.r, target.q, target.r, target.cost + 2);
@@ -2460,10 +2489,19 @@ async function executeAIMove(unit, target, spectatorMode = false) {
             }
         }
 
+        if (spectatorMode || shouldFollowVisible || unitBecameVisible) {
+            followUnitInstant(unit);
+        }
+
         // In spectator mode or when unit is visible, render each step
         if (spectatorMode || !hasHumanViewer || isNowVisible) {
             render();
             await delay(stepDelay);
+        }
+
+        const shouldContinue = await processReactiveFire();
+        if (!shouldContinue) {
+            break;
         }
     }
 

@@ -167,6 +167,19 @@ export function getRandomDetailSpriteWithAnchor(detailType, seed = Math.random()
 }
 
 /**
+ * Get shoreline overlay sprite for a specific edge direction
+ * @param {string} detailType - e.g. shore_water_0
+ * @param {number} variant - Variant index
+ */
+export function getShorelineSprite(detailType, variant = 0) {
+    return SpriteSheet.getOverlaySprite(detailType, variant);
+}
+
+export function getShorelineVariantCount(detailType) {
+    return SpriteSheet.getOverlayVariantCount(detailType);
+}
+
+/**
  * Get content scale for a unit sprite (for cropping compensation)
  */
 export function getUnitContentScale(unitClass, playerIndex, state = 'normal') {
@@ -207,20 +220,19 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
     if (sprite) {
         // Get content scale for proper sizing
         const contentScale = SpriteSheet.getUnitContentScale(classType, playerIndex, status);
+        const anchor = SpriteSheet.getUnitAnchor(classType, playerIndex, status) || { x: 0.5, y: 1.0 };
 
         // Base sprite size - units should be smaller than hex size
         const baseSize = size * 1.2;
 
-        // Apply content scale to account for cropping
-        // The sprite's visual content is smaller than the original cell
-        const avgScale = (contentScale.scaleX + contentScale.scaleY) / 2;
-        const spriteWidth = baseSize * avgScale * (sprite.width / sprite.height);
-        const spriteHeight = baseSize * avgScale;
+        const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
+        const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
+        const spriteWidth = baseSize / safeScaleX;
+        const spriteHeight = baseSize / safeScaleY;
 
-        // Position: center horizontally, bottom at cy (ground level)
-        // The renderer passes a position that's already adjusted for ground level
-        const drawX = cx - spriteWidth / 2;
-        const drawY = cy - spriteHeight;  // Bottom of sprite at cy
+        // Position using anchor point (typically center-bottom)
+        const drawX = cx - spriteWidth * anchor.x;
+        const drawY = cy - spriteHeight * anchor.y;
 
         ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
     } else {

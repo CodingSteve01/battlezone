@@ -16,7 +16,8 @@ import { CONFIG } from './config.js';
 const spriteRegistry = {
     units: new Map(),      // unitClass_state_player -> ImageBitmap
     terrain: new Map(),    // terrainType_variant -> ImageBitmap
-    details: new Map()     // detailType_variant -> ImageBitmap
+    details: new Map(),    // detailType_variant -> ImageBitmap
+    overlays: new Map()    // overlayType_variant -> ImageBitmap
 };
 
 // Anchor point registry - stores normalized anchor points for sprites
@@ -38,7 +39,8 @@ let baseFacingDirection = 'right';
 const variantRegistry = {
     units: {},      // unitClass -> { states: [], playerCount: 4 }
     terrain: {},    // terrainType -> { variants: [] }
-    details: {}     // detailType -> { variants: [] }
+    details: {},    // detailType -> { variants: [] }
+    overlays: {}    // overlayType -> { variants: [] }
 };
 
 // JSON definitions cache
@@ -46,7 +48,8 @@ const definitions = {
     units: null,
     terrain: null,
     details: null,
-    trees: null
+    trees: null,
+    overlays: null
 };
 
 // Loading state
@@ -74,6 +77,7 @@ export async function initSpriteSheets() {
             loadDefinition('terrain', 'terrain-hexes.json'),
             loadDefinition('details', 'environment-details.json'),
             loadDefinition('trees', 'trees.json'),
+            loadDefinition('overlays', 'shorelines.json'),
             loadAdditionalUnitDefinition('sniper-sprites.json')
         ]);
 
@@ -251,7 +255,8 @@ function getSheetFilename(type, def) {
         units: 'unit-sprites.png',
         terrain: 'terrain-hexes.png',
         details: 'environment-details.png',
-        trees: 'trees.png'
+        trees: 'trees.png',
+        overlays: 'shorelines.png'
     };
     return typeToFile[type] || `${type}.png`;
 }
@@ -381,6 +386,8 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
             if (treeType) {
                 spriteRegistry.details.set(sprite.id, bitmap);
             }
+        } else if (type === 'overlays') {
+            spriteRegistry.overlays.set(sprite.id, bitmap);
         } else {
             // Terrain and details: store by id
             spriteRegistry[type].set(sprite.id, bitmap);
@@ -513,6 +520,20 @@ function buildVariantRegistries() {
             }
             variantRegistry.details[detailType].variants.push(sprite.metadata?.variant || 0);
             variantRegistry.details[detailType].ids.push(sprite.id);
+        }
+    }
+
+    // Build overlay variant registry (shorelines, etc.)
+    if (definitions.overlays?.sprites) {
+        for (const sprite of definitions.overlays.sprites) {
+            const detailType = sprite.metadata?.detailType || sprite.metadata?.type;
+            if (!detailType) continue;
+
+            if (!variantRegistry.overlays[detailType]) {
+                variantRegistry.overlays[detailType] = { variants: [], ids: [] };
+            }
+            variantRegistry.overlays[detailType].variants.push(sprite.metadata?.variant || 0);
+            variantRegistry.overlays[detailType].ids.push(sprite.id);
         }
     }
 
@@ -772,6 +793,21 @@ export function getDetailSprite(detailType, variant = 0) {
     // Find the sprite with matching variant, or use first available
     const spriteId = info.ids.find((id, i) => info.variants[i] === variant) || info.ids[0];
     return spriteRegistry.details.get(spriteId) || null;
+}
+
+/**
+ * Get an overlay sprite (shoreline, etc.)
+ */
+export function getOverlaySprite(detailType, variant = 0) {
+    const info = variantRegistry.overlays[detailType];
+    if (!info || info.ids.length === 0) return null;
+
+    const spriteId = info.ids.find((id, i) => info.variants[i] === variant) || info.ids[0];
+    return spriteRegistry.overlays.get(spriteId) || null;
+}
+
+export function getOverlayVariantCount(detailType) {
+    return variantRegistry.overlays[detailType]?.ids.length || 0;
 }
 
 /**

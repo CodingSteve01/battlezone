@@ -61,6 +61,9 @@ export const state = {
     maxSharedAP: 0,           // Maximum AP for this turn (for UI display)
     unitAttacksThisTurn: {},  // Track attacks per unit per turn: unitId -> attack count
 
+    // Cached spawn positions for the current map
+    spawnPositions: null,
+
     // Game progress
     round: 1,
     gameOver: false,
@@ -232,6 +235,7 @@ export function resetState() {
     state.sharedAP = 0;
     state.maxSharedAP = 0;
     state.unitAttacksThisTurn = {};
+    state.spawnPositions = null;
 
     // Shrinking Zone zurücksetzen
     state.zoneRadius = 0;
