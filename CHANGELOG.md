@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.16.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.2...shadow-squad-v3.16.3) (2025-12-29)
+
+
+### Bug Fixes
+
+* **assets:** clamp unit content scale and adjust draw size ([#176](https://github.com/CodingSteve01/battlezone/issues/176)) ([b2abb9f](https://github.com/CodingSteve01/battlezone/commit/b2abb9f833cd059abf9c541790dd10b5d42c906a))
+
 ## [3.16.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.1...shadow-squad-v3.16.2) (2025-12-29)
 
 
