@@ -24,6 +24,7 @@ import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, 
 
 let canvas;
 let pendingMoveAnimationId = null;
+const roundMoveCost = (value) => Math.round(value * 2) / 2;
 
 // ===== FIRST-USE EXPLANATIONS FOR TACTICAL FEATURES =====
 // Shows detailed explanation the first time a player uses a feature
@@ -1028,7 +1029,7 @@ function handleMoveClick(unit, hex) {
         if (!pointHex) break;
 
         const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        cumulativeCost = roundMoveCost(cumulativeCost + terrain.moveCost);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);
@@ -1646,7 +1647,7 @@ export function continueQueuedPath(unit) {
         if (!pointHex) break;
 
         const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        cumulativeCost = roundMoveCost(cumulativeCost + terrain.moveCost);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);
@@ -1751,7 +1752,7 @@ async function executeQueuedPathForUnit(unit) {
         if (!pointHex) break;
 
         const terrain = TERRAIN[pointHex.type];
-        cumulativeCost += terrain.moveCost;
+        cumulativeCost = roundMoveCost(cumulativeCost + terrain.moveCost);
 
         if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
             reachablePath.push(point);

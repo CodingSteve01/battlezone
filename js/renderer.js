@@ -24,6 +24,12 @@ import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
 import { logRender, logError } from './errorLog.js';
 
+const roundMoveCost = (value) => Math.round(value * 2) / 2;
+const formatAPValue = (value) => {
+    const rounded = roundMoveCost(value);
+    return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+};
+
 // ===== SAFE GRADIENT HELPERS =====
 // Prevents "non-finite value" errors when coordinates are NaN/Infinity
 
@@ -3700,6 +3706,7 @@ export function render() {
     // Draw AP cost overlays - only when a path is being planned
     if (apCostOverlays.length > 0 && state.currentPath && state.currentPath.length > 0) {
         apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
+            const costLabel = formatAPValue(cost);
             // Background pill for cost
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.beginPath();
@@ -3711,7 +3718,7 @@ export function render() {
             ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${cost}`, sx, sy + state.hexSize * 0.48);
+            ctx.fillText(costLabel, sx, sy + state.hexSize * 0.48);
         });
     }
 
@@ -4295,7 +4302,7 @@ function drawPathPreviewOnTop(currentUnit) {
         if (index > 0) {
             const hex = getHex(point.q, point.r);
             if (hex && TERRAIN[hex.type]) {
-                cumulativeCost += TERRAIN[hex.type].moveCost;
+                cumulativeCost = roundMoveCost(cumulativeCost + TERRAIN[hex.type].moveCost);
             }
         }
         return { ...point, totalCost: cumulativeCost, reachable: cumulativeCost <= maxCost };
@@ -4431,6 +4438,7 @@ function drawPathPreviewOnTop(currentUnit) {
 
             // Cost badge - larger and more visible
             const cost = pathWithCosts[lastReachableIndex].totalCost;
+            const costLabel = formatAPValue(cost);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
             ctx.beginPath();
             ctx.roundRect(endSx - 26, endSy + btnSize + 6, 52, 24, 6);
@@ -4443,7 +4451,7 @@ function drawPathPreviewOnTop(currentUnit) {
             ctx.font = 'bold 14px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`-${cost}⚡`, endSx, endSy + btnSize + 18);
+            ctx.fillText(`-${costLabel}⚡`, endSx, endSy + btnSize + 18);
 
             // Show multi-turn indicator if applicable
             if (isMultiTurnPath) {

@@ -13,6 +13,11 @@ import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 import { isAIPlayer } from './ai.js';
 
+const formatAPValue = (value) => {
+    const rounded = Math.round(value * 2) / 2;
+    return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+};
+
 // Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
 
 /**
@@ -172,8 +177,8 @@ function updateTopBar(unit, isAiTurnHidden = false) {
             poolDisplay.className = 'ap-pool-display';
             poolDisplay.innerHTML = `
                 <span class="ap-pool-label">Team AP:</span>
-                <span class="ap-pool-value">${state.sharedAP}</span>
-                <span class="ap-pool-max">/ ${state.maxSharedAP}</span>
+                <span class="ap-pool-value">${formatAPValue(state.sharedAP)}</span>
+                <span class="ap-pool-max">/ ${formatAPValue(state.maxSharedAP)}</span>
                 <span class="ap-pool-icon">⚡</span>
             `;
             apDisplay.appendChild(poolDisplay);

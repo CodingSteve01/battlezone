@@ -540,7 +540,7 @@ function clearSpawnAreas() {
             hex.type = 'grass';
             hex.walkable = true;
             hex.cover = false;
-            hex.moveCost = 1;
+            hex.moveCost = TERRAIN.grass.moveCost;
         }
     });
 
@@ -555,7 +555,7 @@ function clearSpawnAreas() {
                         hex.type = 'grass';
                         hex.walkable = true;
                         hex.cover = false;
-                        hex.moveCost = 1;
+                        hex.moveCost = TERRAIN.grass.moveCost;
                     }
                 }
             }
@@ -854,7 +854,7 @@ function createPath(from, to, visitedSet) {
             hex.type = 'grass';
             hex.walkable = true;
             hex.cover = false;
-            hex.moveCost = 1;
+            hex.moveCost = TERRAIN.grass.moveCost;
         }
 
         if (hex) {
@@ -912,7 +912,7 @@ function createWidePath(from, to, width) {
                         hex.type = 'grass';
                         hex.walkable = true;
                         hex.cover = false;
-                        hex.moveCost = 1;
+                        hex.moveCost = TERRAIN.grass.moveCost;
                     }
                 }
             }
@@ -937,7 +937,7 @@ function validateAndFixMap(radius) {
                 hex.type = 'grass';
                 hex.walkable = true;
                 hex.cover = false;
-                hex.moveCost = 1;
+            hex.moveCost = TERRAIN.grass.moveCost;
             }
 
             // Count walkable neighbors
@@ -957,7 +957,7 @@ function validateAndFixMap(radius) {
                         nHex.type = 'grass';
                         nHex.walkable = true;
                         nHex.cover = false;
-                        nHex.moveCost = 1;
+                        nHex.moveCost = TERRAIN.grass.moveCost;
                     }
                 }
             }
@@ -982,7 +982,7 @@ function validateAndFixMap(radius) {
                 hex.type = 'grass';
                 hex.walkable = true;
                 hex.cover = false;
-                hex.moveCost = 1;
+                hex.moveCost = TERRAIN.grass.moveCost;
             }
         }
     });
@@ -1006,7 +1006,7 @@ function eliminateIsolatedPools(radius) {
         centerHex.type = 'grass';
         centerHex.walkable = true;
         centerHex.cover = false;
-        centerHex.moveCost = 1;
+        centerHex.moveCost = TERRAIN.grass.moveCost;
     }
 
     if (!centerHex) return;
@@ -1065,7 +1065,7 @@ function eliminateIsolatedPools(radius) {
                     hex.type = 'grass';
                     hex.walkable = true;
                     hex.cover = false;
-                    hex.moveCost = 1;
+                    hex.moveCost = TERRAIN.grass.moveCost;
                 }
                 reachableFromCenter.add(`${q},${r}`);
             }
@@ -1114,7 +1114,7 @@ function ensureEscapeRoutes(radius) {
                         pathHex.type = 'grass';
                         pathHex.walkable = true;
                         pathHex.cover = false;
-                        pathHex.moveCost = 1;
+                        pathHex.moveCost = TERRAIN.grass.moveCost;
                     }
                 }
             }

@@ -4,6 +4,8 @@ import { hexDistance, getNeighbors } from './hexMath.js';
 import { getHex, state, isHexInZone } from './state.js';
 import { TERRAIN } from './config.js';
 
+const roundMoveCost = (value) => Math.round(value * 2) / 2;
+
 /**
  * Priority Queue implementation for A*
  */
@@ -83,7 +85,7 @@ export function findPath(startQ, startR, goalQ, goalR, maxCost = Infinity) {
 
             const terrain = TERRAIN[nextHex.type];
             const moveCost = terrain.moveCost || 1;
-            const newCost = costSoFar.get(currentKey) + moveCost;
+            const newCost = roundMoveCost(costSoFar.get(currentKey) + moveCost);
 
             // Skip if exceeds max cost
             if (newCost > maxCost) continue;
@@ -162,7 +164,7 @@ export function getReachableHexes(unit) {
 
             const terrain = TERRAIN[nextHex.type];
             const moveCost = terrain.moveCost || 1;
-            const newCost = costSoFar.get(currentKey) + moveCost;
+            const newCost = roundMoveCost(costSoFar.get(currentKey) + moveCost);
 
             if (newCost > maxCost) continue;
 

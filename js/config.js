@@ -76,7 +76,7 @@ export const TERRAIN = {
         walkable: true,
         cover: true,
         canHide: true,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Wald'
     },
     hills: {
@@ -85,7 +85,7 @@ export const TERRAIN = {
         colorDark: '#5a7040',  // Hill in shadow
         walkable: true,
         cover: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Hügel',
         rangeBonus: 1,
         defenseBonus: 10
@@ -123,7 +123,7 @@ export const TERRAIN = {
         colorDark: '#3a4a30',  // Deep swamp shadow
         walkable: true,
         cover: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Sumpf'
     },
     road: {
@@ -143,7 +143,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 1,
+        moveCost: 0.5,
         name: 'Pfad'
     },
     river: {
@@ -153,7 +153,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Fluss'
     },
     // Natural enhanced terrain types
@@ -164,7 +164,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schnee',
         slippery: true
     },
@@ -198,7 +198,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Seichtes Wasser',
         animated: true
     },
@@ -209,7 +209,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schilf',
         animated: true
     },
@@ -231,7 +231,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Schlamm',
         sticky: true
     },
@@ -283,7 +283,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Ruinen'
     },
     bridge: {
@@ -293,7 +293,7 @@ export const TERRAIN = {
         walkable: true,
         cover: false,
         canHide: false,
-        moveCost: 1,
+        moveCost: 0.5,
         name: 'Brücke',
         elevated: true
     },
@@ -315,7 +315,7 @@ export const TERRAIN = {
         walkable: true,
         cover: true,
         canHide: true,
-        moveCost: 2,
+        moveCost: 1,
         name: 'Nadelwald'
     },
     clearing: {

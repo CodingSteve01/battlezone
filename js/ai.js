@@ -19,6 +19,8 @@ import { TERRAIN } from './config.js';
 import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
 
+const roundToHalf = (value) => Math.round(value * 2) / 2;
+
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
 
@@ -502,7 +504,7 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
     if (unitCount === 0) return apBudgets;
 
     // Base AP per unit (ensure everyone gets something)
-    const baseAPPerUnit = Math.floor(totalAP / unitCount);
+    const baseAPPerUnit = roundToHalf(totalAP / unitCount);
     let remainingAP = totalAP;
 
     // Priority scoring for AP allocation
@@ -575,14 +577,17 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
             unitBudget = Math.min(remainingAP, Math.max(1, baseAPPerUnit));
         }
 
+        unitBudget = roundToHalf(unitBudget);
+
         // Ensure minimum 1 AP for each unit (for at least moving)
         unitBudget = Math.max(1, unitBudget);
 
         // Don't exceed remaining AP
         unitBudget = Math.min(unitBudget, remainingAP);
+        unitBudget = roundToHalf(unitBudget);
 
         apBudgets.set(unit.id, unitBudget);
-        remainingAP -= unitBudget;
+        remainingAP = roundToHalf(remainingAP - unitBudget);
 
         // If we're out of AP, remaining units get 0
         if (remainingAP <= 0) break;
