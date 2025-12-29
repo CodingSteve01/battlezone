@@ -2,7 +2,7 @@
 
 import { CONFIG } from './config.js';
 
-export const ZOOM_REFERENCE = 0.5;
+export const ZOOM_REFERENCE = 0.45;
 
 export function zoomLevelToScale(zoomLevel) {
     const safeZoom = Number.isFinite(zoomLevel) ? zoomLevel : ZOOM_REFERENCE;
@@ -13,6 +13,9 @@ export function scaleToZoomLevel(scale) {
     const safeScale = Number.isFinite(scale) ? scale : 1;
     return safeScale * ZOOM_REFERENCE;
 }
+
+const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);
+const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 
 // Central game state object
 export const state = {
@@ -114,8 +117,8 @@ export const state = {
 
     // Zoom
     zoomLevel: ZOOM_REFERENCE,
-    minZoom: 0.35,
-    maxZoom: 0.65,
+    minZoom: DEFAULT_MIN_ZOOM,
+    maxZoom: DEFAULT_MAX_ZOOM,
 
     // Queued path for multi-turn movement
     queuedPaths: {},  // unitId -> { path: [{q, r}, ...], targetQ, targetR }

@@ -132,7 +132,8 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
             continue;
         }
 
-        const detailType = `shore_${subtype}_${i}`;
+        const oppositeIndex = (i + 3) % 6;
+        const detailType = `shore_${subtype}_${oppositeIndex}`;
         const variantCount = getShorelineVariantCount(detailType);
         const variant = variantCount > 0
             ? Math.floor(seededRandom(baseSeed + i * 91) * variantCount)
