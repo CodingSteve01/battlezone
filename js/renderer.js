@@ -17,6 +17,7 @@ import {
     hasAnimatedTexture,
     getAnimatedTexture
 } from './assetLoader.js';
+import { getShorelineEdges } from './shoreline.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
@@ -82,9 +83,6 @@ function getNeighborTerrains(hexMap, q, r) {
     });
 }
 
-const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
-const SWAMP_TYPES = new Set(['swamp']);
-
 function getClampedContentScale(contentScale) {
     const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
     const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
@@ -100,42 +98,19 @@ function getSpriteDimensions(sprite, contentScale, baseHeight) {
     return { spriteWidth, spriteHeight };
 }
 
-function isLandForWater(type) {
-    if (!type) return false;
-    return !WATER_TYPES.has(type) && !SWAMP_TYPES.has(type);
-}
-
-function isLandForSwamp(type) {
-    if (!type) return false;
-    return !SWAMP_TYPES.has(type) && !WATER_TYPES.has(type);
-}
-
 function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
     if (!neighborTerrains || neighborTerrains.length !== 6) return;
-
-    if (WATER_TYPES.has(terrainType) || SWAMP_TYPES.has(terrainType)) {
-        return;
-    }
 
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
     const spriteWidth = size * 2;
     const spriteHeight = size * Math.sqrt(3);
 
-    for (let i = 0; i < 6; i++) {
-        const neighborType = neighborTerrains[i];
-        let subtype = null;
-        if (WATER_TYPES.has(neighborType)) {
-            subtype = 'water';
-        } else if (SWAMP_TYPES.has(neighborType)) {
-            subtype = 'swamp';
-        } else {
-            continue;
-        }
-
-        const detailType = `shore_${subtype}_${i}`;
+    const shorelineEdges = getShorelineEdges(terrainType, neighborTerrains);
+    for (const { edgeIndex, subtype } of shorelineEdges) {
+        const detailType = `shore_${subtype}_${edgeIndex}`;
         const variantCount = getShorelineVariantCount(detailType);
         const variant = variantCount > 0
-            ? Math.floor(seededRandom(baseSeed + i * 91) * variantCount)
+            ? Math.floor(seededRandom(baseSeed + edgeIndex * 91) * variantCount)
             : 0;
 
         const sprite = getShorelineSprite(detailType, variant);
