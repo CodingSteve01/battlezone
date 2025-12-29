@@ -232,7 +232,7 @@ function drawTree2D5(x, y, size, treeType, seed) {
         const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
 
         // Base target size (what the sprite should be at 100% in original cell)
-        const baseHeight = size * 2.8 * sizeVariation;
+        const baseHeight = size * 2.4 * sizeVariation * DETAIL_SPRITE_SCALE;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
 
@@ -262,7 +262,7 @@ function drawBush2D5(x, y, size, seed) {
 
         // Size variation: 0.6x to 1.4x
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-        const baseSize = size * 1.6 * sizeVariation;
+        const baseSize = size * 1.4 * sizeVariation * DETAIL_SPRITE_SCALE;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
@@ -291,7 +291,7 @@ function drawSmallShrub(x, y, size, seed) {
         const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-        const baseSize = size * 1.3 * sizeVariation;
+        const baseSize = size * 1.1 * sizeVariation * DETAIL_SPRITE_SCALE;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
@@ -318,7 +318,7 @@ function drawFlowerCluster(x, y, size, seed) {
         const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
-        const baseSize = size * 0.9 * sizeVariation;
+        const baseSize = size * 0.7 * sizeVariation * DETAIL_SPRITE_SCALE;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
@@ -332,7 +332,7 @@ function drawFlowerCluster(x, y, size, seed) {
 function drawRockFormation2D5(x, y, size, seed) {
     // Draw procedural rock since we don't have rock sprites yet
     const sizeVariation = 0.5 + seededRandom(seed) * 0.8;
-    const rockSize = size * 0.6 * sizeVariation;
+    const rockSize = size * 0.55 * sizeVariation * DETAIL_SPRITE_SCALE;
 
     ctx.save();
     ctx.translate(x, y);
@@ -506,6 +506,15 @@ export function clearRenderCaches() {
     cachedQualityLevel = null;
 }
 
+// Detail scaling for larger base tiles (tile ~ human size)
+const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
+const DETAIL_SPRITE_SCALE = 0.85;
+const DETAIL_CLEARANCE_EDGE = 0.2;
+
+function scaleDetailCount(count, min = 1) {
+    return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
+}
+
 /**
  * Get or create cached foreground elements (trees, rocks, bushes) for a hex.
  * These are deterministic based on hex position, so they can be cached.
@@ -599,10 +608,10 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const TREE_Y_OFFSET = 0;
 
     if (type === 'forest' || type === 'pine') {
-        const baseTreeCount = 4 + Math.abs(baseSeed % 3);
+        const baseTreeCount = scaleDetailCount(3 + Math.abs(baseSeed % 3), 2);
 
         for (let i = 0; i < baseTreeCount; i++) {
-            const anchorPoint = sampleHexOffset(baseSeed + i * 13);
+            const anchorPoint = sampleHexOffset(baseSeed + i * 13, DETAIL_CLEARANCE_EDGE);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
 
@@ -623,7 +632,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Edge trees
-        const edgeTreeCount = 2 + Math.abs((baseSeed + 50) % 3);
+        const edgeTreeCount = scaleDetailCount(1 + Math.abs((baseSeed + 50) % 2), 1);
         for (let i = 0; i < edgeTreeCount; i++) {
             const anchorPoint = sampleHexOffset(baseSeed + i * 19 + 200, 0.7);
             const offsetX = anchorPoint.x * positionScale;
@@ -643,9 +652,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Undergrowth
-        const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
+        const undergrowthCount = scaleDetailCount(2 + Math.abs((baseSeed + 100) % 2), 1);
         for (let i = 0; i < undergrowthCount; i++) {
-            const anchorPoint = sampleHexOffset(baseSeed + i * 15 + 101);
+            const anchorPoint = sampleHexOffset(baseSeed + i * 15 + 101, DETAIL_CLEARANCE_EDGE * 0.6);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
@@ -662,8 +671,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Occasional large bush
-        if (seededRandom(baseSeed + 300) > 0.6) {
-            const anchorPoint = sampleHexOffset(baseSeed + 301);
+        if (seededRandom(baseSeed + 300) > 0.75) {
+            const anchorPoint = sampleHexOffset(baseSeed + 301, DETAIL_CLEARANCE_EDGE);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.3);
@@ -682,7 +691,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         const grassType = Math.abs(baseSeed) % 100;
 
         if (grassType < 20) {
-            const anchorPoint = sampleHexOffset(baseSeed + 500);
+            const anchorPoint = sampleHexOffset(baseSeed + 500, DETAIL_CLEARANCE_EDGE);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.7 + seededRandom(baseSeed + 502) * 0.4);
@@ -698,9 +707,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (grassType >= 20 && grassType < 50) {
-            const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
+            const shrubCount = scaleDetailCount(1 + Math.floor(seededRandom(baseSeed + 510) * 2), 1);
             for (let i = 0; i < shrubCount; i++) {
-                const anchorPoint = sampleHexOffset(baseSeed + i * 10 + 520);
+                const anchorPoint = sampleHexOffset(baseSeed + i * 10 + 520, DETAIL_CLEARANCE_EDGE * 0.5);
                 const offsetX = anchorPoint.x * positionScale;
                 const offsetY = anchorPoint.y * positionScale;
                 const sizeMultiplier = s * (0.25 + seededRandom(baseSeed + i * 10 + 522) * 0.2);
@@ -717,7 +726,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (grassType >= 70 && grassType < 78) {
-            const anchorPoint = sampleHexOffset(baseSeed + 600);
+            const anchorPoint = sampleHexOffset(baseSeed + 600, DETAIL_CLEARANCE_EDGE);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
@@ -734,7 +743,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (type === 'heather' && grassType >= 80 && grassType < 90) {
-            const anchorPoint = sampleHexOffset(baseSeed + 700);
+            const anchorPoint = sampleHexOffset(baseSeed + 700, DETAIL_CLEARANCE_EDGE * 0.5);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -750,8 +759,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     } else if (type === 'hills') {
         const hillsType = Math.abs(baseSeed) % 100;
 
-        if (hillsType < 40) {
-            const anchorPoint = sampleHexOffset(baseSeed + 800);
+        if (hillsType < Math.round(40 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 800, DETAIL_CLEARANCE_EDGE * 0.4);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -765,8 +774,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        if (hillsType >= 60 && hillsType < 80) {
-            const anchorPoint = sampleHexOffset(baseSeed + 810);
+        if (hillsType >= Math.round(60 * DETAIL_DENSITY_SCALE) && hillsType < Math.round(80 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 810, DETAIL_CLEARANCE_EDGE * 0.4);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -781,8 +790,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'sand') {
         const sandType = Math.abs(baseSeed) % 100;
-        if (sandType < 15) {
-            const anchorPoint = sampleHexOffset(baseSeed + 900);
+        if (sandType < Math.round(15 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 900, DETAIL_CLEARANCE_EDGE * 0.3);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -807,8 +816,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         });
     } else if (type === 'ruins') {
         const ruinsType = Math.abs(baseSeed) % 100;
-        if (ruinsType < 60) {
-            const anchorPoint = sampleHexOffset(baseSeed + 1000);
+        if (ruinsType < Math.round(60 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 1000, DETAIL_CLEARANCE_EDGE * 0.4);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -821,8 +830,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
                 drawFn: (x, y, sz, params) => drawRockFormation2D5(x, y, sz, params.seed)
             });
         }
-        if (ruinsType >= 40 && ruinsType < 70) {
-            const anchorPoint = sampleHexOffset(baseSeed + 1010);
+        if (ruinsType >= Math.round(40 * DETAIL_DENSITY_SCALE) && ruinsType < Math.round(70 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 1010, DETAIL_CLEARANCE_EDGE * 0.4);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -837,8 +846,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'swamp') {
         const swampType = Math.abs(baseSeed) % 100;
-        if (swampType < 25) {
-            const anchorPoint = sampleHexOffset(baseSeed + 1100);
+        if (swampType < Math.round(25 * DETAIL_DENSITY_SCALE)) {
+            const anchorPoint = sampleHexOffset(baseSeed + 1100, DETAIL_CLEARANCE_EDGE);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 1102) * 0.4);
@@ -852,8 +861,10 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
                 drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
             });
         }
-        if (swampType >= 30 && swampType < 60) {
-            const anchorPoint = sampleHexOffset(baseSeed + 1110);
+        const swampReedMin = Math.round(30 * DETAIL_DENSITY_SCALE);
+        const swampReedMax = Math.round(60 * DETAIL_DENSITY_SCALE);
+        if (swampType >= swampReedMin && swampType < swampReedMax) {
+            const anchorPoint = sampleHexOffset(baseSeed + 1110, DETAIL_CLEARANCE_EDGE * 0.5);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
             elements.push({
@@ -1835,7 +1846,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
  * Each hex has unique appearance via seeded random (no visible tiling pattern)
  */
 function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
-    const s = size * 0.45;
+    const s = size * 0.45 * DETAIL_SPRITE_SCALE;
     ctx.save();
 
     // Create consistent seed for this hex - ensures unique but deterministic appearance
@@ -1849,13 +1860,13 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
             }
             // Add occasional small rocks (~15% of tiles)
-            if ((baseSeed % 100) >= 70 && (baseSeed % 100) < 85) {
+            if ((baseSeed % 100) >= 70 && (baseSeed % 100) < 70 + Math.round(15 * DETAIL_DENSITY_SCALE)) {
                 const rockX = cx + (seededRandom(baseSeed * 5) - 0.5) * size * 0.6;
                 const rockY = cy + (seededRandom(baseSeed * 6) - 0.5) * size * 0.4;
                 drawRockFormation2D5(rockX, rockY, s, baseSeed);
             }
             // Add occasional bushes (~10% of tiles)
-            if ((baseSeed % 100) >= 50 && (baseSeed % 100) < 60) {
+            if ((baseSeed % 100) >= 50 && (baseSeed % 100) < 50 + Math.round(10 * DETAIL_DENSITY_SCALE)) {
                 const bushX = cx + (seededRandom(baseSeed * 7) - 0.5) * size * 0.5;
                 const bushY = cy + (seededRandom(baseSeed * 8) - 0.5) * size * 0.3;
                 drawBush2D5(bushX, bushY, s * 0.7, baseSeed + 100);
@@ -1870,7 +1881,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
         case 'rock':
             // Multiple rock formations for impassable rock terrain
-            const rockCount = 3 + Math.floor(seededRandom(baseSeed * 12) * 3);
+            const rockCount = scaleDetailCount(3 + Math.floor(seededRandom(baseSeed * 12) * 3), 2);
             for (let r = 0; r < rockCount; r++) {
                 const rx = cx + (seededRandom(baseSeed * 13 + r) - 0.5) * size * 0.8;
                 const ry = cy + (seededRandom(baseSeed * 14 + r) - 0.5) * size * 0.6;
@@ -1908,7 +1919,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'hills':
             drawHillsDetails(cx, cy, s, baseSeed);
             // Add multiple rocks to hills (tactical cover!)
-            const hillRockCount = 2 + Math.floor(seededRandom(baseSeed * 9) * 3);
+            const hillRockCount = scaleDetailCount(2 + Math.floor(seededRandom(baseSeed * 9) * 3), 1);
             for (let r = 0; r < hillRockCount; r++) {
                 const rockX = cx + (seededRandom(baseSeed * 10 + r) - 0.5) * size * 0.7;
                 const rockY = cy + (seededRandom(baseSeed * 11 + r) - 0.5) * size * 0.5;
@@ -2002,7 +2013,8 @@ function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
     // Determine blade count and height based on grass type
     const isTall = grassType === 'tallgrass';
     const isHeather = grassType === 'heather';
-    const bladeCount = isTall ? 25 : (isHeather ? 20 : 18);
+    const baseBladeCount = isTall ? 25 : (isHeather ? 20 : 18);
+    const bladeCount = scaleDetailCount(baseBladeCount, 10);
     const heightMult = isTall ? 1.4 : (isHeather ? 0.8 : 1.0);
 
     // Draw grass blades
@@ -2036,7 +2048,8 @@ function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
 
     // Add subtle ground texture patches
     ctx.globalAlpha = 0.2;
-    for (let i = 0; i < 5; i++) {
+    const patchCount = scaleDetailCount(5, 3);
+    for (let i = 0; i < patchCount; i++) {
         const rand1 = seededRandom(seed + i * 7 + 100);
         const rand2 = seededRandom(seed + i * 7 + 101);
 
@@ -2359,7 +2372,8 @@ function drawWaterDetails(cx, cy, s, seed) {
  */
 function drawSandDetails(cx, cy, s, seed) {
     // Just subtle light/dark patches for natural texture variation
-    for (let i = 0; i < 3; i++) {
+    const patchCount = scaleDetailCount(3, 2);
+    for (let i = 0; i < patchCount; i++) {
         const x = cx + (seededRandom(seed + i * 5) - 0.5) * s * 0.7;
         const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * s * 0.7;
         const size = 6 + seededRandom(seed + i * 5 + 2) * 8;
@@ -2371,7 +2385,8 @@ function drawSandDetails(cx, cy, s, seed) {
     }
 
     // Just 2 small pebbles
-    for (let i = 0; i < 2; i++) {
+    const pebbleCount = scaleDetailCount(2, 1);
+    for (let i = 0; i < pebbleCount; i++) {
         const px = cx + (seededRandom(seed + i * 37) - 0.5) * s * 0.6;
         const py = cy + (seededRandom(seed + i * 37 + 1) - 0.5) * s * 0.5;
 
@@ -2394,7 +2409,8 @@ function drawSwampDetails(cx, cy, s, seed) {
 
     // Algae on water
     ctx.fillStyle = 'rgba(50, 80, 40, 0.4)';
-    for (let i = 0; i < 3; i++) {
+    const algaeCount = scaleDetailCount(3, 1);
+    for (let i = 0; i < algaeCount; i++) {
         const ax = cx + (seededRandom(seed + i * 41) - 0.5) * s * 0.8;
         const ay = cy + (seededRandom(seed + i * 41 + 1) - 0.5) * s * 0.5;
         ctx.beginPath();
@@ -2404,7 +2420,8 @@ function drawSwampDetails(cx, cy, s, seed) {
 
     // Bubbles
     ctx.fillStyle = 'rgba(60, 85, 55, 0.7)';
-    for (let i = 0; i < 4; i++) {
+    const bubbleCount = scaleDetailCount(4, 2);
+    for (let i = 0; i < bubbleCount; i++) {
         const bx = cx + (seededRandom(seed + i * 43) - 0.5) * s * 0.9;
         const by = cy + (seededRandom(seed + i * 43 + 1) - 0.5) * s * 0.7;
         const bSize = 2 + seededRandom(seed + i * 43 + 2) * 2;
@@ -2416,7 +2433,8 @@ function drawSwampDetails(cx, cy, s, seed) {
     // Dead reeds
     ctx.strokeStyle = 'rgba(90, 70, 50, 0.7)';
     ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
+    const reedCount = scaleDetailCount(3, 1);
+    for (let i = 0; i < reedCount; i++) {
         const rx = cx + (seededRandom(seed + i * 47) - 0.5) * s * 1.2;
         const ry = cy + (seededRandom(seed + i * 47 + 1) - 0.5) * s * 0.8;
         const height = s * (0.3 + seededRandom(seed + i * 47 + 2) * 0.3);
