@@ -530,6 +530,15 @@ let cachedQualityLevel = null;
  */
 const CACHE_BASE_HEX_SIZE = 60;
 
+// Detail scaling for larger base tiles (tile ~ human size)
+const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
+const DETAIL_SPRITE_SCALE = 0.85;
+const DETAIL_CLEARANCE_EDGE = 0.2;
+
+function scaleDetailCount(count, min = 1) {
+    return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
+}
+
 /**
  * Maximum number of cached tiles to prevent memory issues
  */
