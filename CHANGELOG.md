@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.16.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.1...shadow-squad-v3.16.2) (2025-12-29)
+
+
+### Bug Fixes
+
+* **ui:** anchor round/AP dropdown to top bar and revert unit sprite scaling ([#174](https://github.com/CodingSteve01/battlezone/issues/174)) ([71bac8a](https://github.com/CodingSteve01/battlezone/commit/71bac8ac1c2817e2dbf5ccfe5fd3b79ba5cb14fc))
+
 ## [3.16.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.0...shadow-squad-v3.16.1) (2025-12-29)
 
 
