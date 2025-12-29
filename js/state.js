@@ -14,6 +14,12 @@ export function scaleToZoomLevel(scale) {
     return safeScale * ZOOM_REFERENCE;
 }
 
+export function getWorldScale() {
+    const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
+    const scale = baseSize > 0 ? state.hexSize / baseSize : 1;
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
 const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);
 const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 

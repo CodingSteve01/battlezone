@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getWorldScale } from './state.js';
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -56,6 +56,16 @@ function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') 
         return fallbackColor;
     }
     return ctx.createLinearGradient(x0, y0, x1, y1);
+}
+
+function getWorldScaleForSize(size) {
+    const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
+    const scale = baseSize > 0 ? size / baseSize : 1;
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+function scaleWithWorld(value, worldScale) {
+    return value * worldScale;
 }
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
@@ -1836,6 +1846,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
  */
 function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
     const s = size * 0.45;
+    const worldScale = getWorldScaleForSize(size);
     ctx.save();
 
     // Create consistent seed for this hex - ensures unique but deterministic appearance
@@ -1843,7 +1854,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 
     switch (type) {
         case 'grass':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass');
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass', worldScale);
             // Add occasional flowers
             if ((baseSeed % 100) >= 15 && (baseSeed % 100) < 30) {
                 drawFlowerCluster(cx, cy, s, baseSeed);
@@ -1865,7 +1876,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
         case 'forest':
             drawForestFloor(cx, cy, s, baseSeed);
             // Static leaf scatter
-            drawStaticLeafScatter(cx, cy, size, baseSeed);
+            drawStaticLeafScatter(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'rock':
@@ -1893,16 +1904,16 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
 
         case 'shallows':
-            drawStaticShallowWater(cx, cy, size, baseSeed);
+            drawStaticShallowWater(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'sand':
-            drawSandDetails(cx, cy, s, baseSeed);
-            drawStaticDustMotes(cx, cy, size, baseSeed);
+            drawSandDetails(cx, cy, s, baseSeed, worldScale);
+            drawStaticDustMotes(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'swamp':
-            drawSwampDetails(cx, cy, s, baseSeed);
+            drawSwampDetails(cx, cy, s, baseSeed, worldScale);
             break;
 
         case 'hills':
@@ -1930,41 +1941,41 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
 
         case 'snow':
-            drawStaticSnowDetails(cx, cy, size, baseSeed);
+            drawStaticSnowDetails(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'ice':
-            drawStaticIceDetails(cx, cy, size, baseSeed);
+            drawStaticIceDetails(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'reeds':
-            drawStaticReeds(cx, cy, size, baseSeed);
+            drawStaticReeds(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'flowers':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass');
-            drawStaticFlowers(cx, cy, size, baseSeed);
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'grass', worldScale);
+            drawStaticFlowers(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'wheat':
-            drawStaticWheatField(cx, cy, size, baseSeed);
+            drawStaticWheatField(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'tallgrass':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'tallgrass');
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'tallgrass', worldScale);
             break;
 
         case 'clearing':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'clearing');
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'clearing', worldScale);
             break;
 
         case 'heather':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'heather');
-            drawStaticHeather(cx, cy, size, baseSeed);
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'heather', worldScale);
+            drawStaticHeather(cx, cy, size, baseSeed, worldScale);
             break;
 
         case 'moss':
-            drawStaticGrassBlades(cx, cy, size, baseSeed, 'moss');
+            drawStaticGrassBlades(cx, cy, size, baseSeed, 'moss', worldScale);
             break;
 
         case 'gravel':
@@ -1996,7 +2007,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
 /**
  * Draw grass blades and ground texture for natural looking terrain
  */
-function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
+function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType, worldScale = 1) {
     ctx.save();
 
     // Determine blade count and height based on grass type
@@ -2016,8 +2027,8 @@ function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
         const x = cx + Math.cos(angle) * dist;
         const y = cy + Math.sin(angle) * dist;
 
-        const bladeHeight = (4 + rand3 * 8) * heightMult;
-        const lean = (rand1 - 0.5) * 4;
+        const bladeHeight = scaleWithWorld((4 + rand3 * 8) * heightMult, worldScale);
+        const lean = scaleWithWorld((rand1 - 0.5) * 4, worldScale);
 
         // Color variation
         const greenShade = isHeather ?
@@ -2025,7 +2036,7 @@ function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
             `rgb(${40 + rand3 * 30}, ${100 + rand3 * 40}, ${40 + rand3 * 20})`;
 
         ctx.strokeStyle = greenShade;
-        ctx.lineWidth = 1 + rand2 * 0.5;
+        ctx.lineWidth = scaleWithWorld(1 + rand2 * 0.5, worldScale);
         ctx.lineCap = 'round';
 
         ctx.beginPath();
@@ -2097,12 +2108,12 @@ function drawStaticWaterSurface(cx, cy, hexSize, seed, isDeep = false) {
 /**
  * Draw static shallow water
  */
-function drawStaticShallowWater(cx, cy, hexSize, seed) {
+function drawStaticShallowWater(cx, cy, hexSize, seed, worldScale = 1) {
     // Bottom stones
     for (let i = 0; i < 8; i++) {
         const stoneX = cx + (seededRandom(seed + i * 2) - 0.5) * hexSize * 1.2;
         const stoneY = cy + (seededRandom(seed + i * 2 + 1) - 0.5) * hexSize * 1.2;
-        const stoneSize = 2 + seededRandom(seed + i * 3) * 4;
+        const stoneSize = scaleWithWorld(2 + seededRandom(seed + i * 3) * 4, worldScale);
 
         ctx.fillStyle = 'rgba(100, 90, 70, 0.4)';
         ctx.beginPath();
@@ -2116,12 +2127,12 @@ function drawStaticShallowWater(cx, cy, hexSize, seed) {
 /**
  * Draw subtle forest floor texture - no individual leaves, just soft patches
  */
-function drawStaticLeafScatter(cx, cy, hexSize, seed) {
+function drawStaticLeafScatter(cx, cy, hexSize, seed, worldScale = 1) {
     // Just draw 2-3 subtle dark patches on the forest floor
     for (let i = 0; i < 3; i++) {
         const x = cx + (seededRandom(seed + i * 5) - 0.5) * hexSize * 0.8;
         const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 0.8;
-        const size = 6 + seededRandom(seed + i * 5 + 2) * 8;
+        const size = scaleWithWorld(6 + seededRandom(seed + i * 5 + 2) * 8, worldScale);
 
         ctx.fillStyle = 'rgba(30, 50, 30, 0.12)';
         ctx.beginPath();
@@ -2133,12 +2144,12 @@ function drawStaticLeafScatter(cx, cy, hexSize, seed) {
 /**
  * Draw subtle sand texture variation - no floating particles
  */
-function drawStaticDustMotes(cx, cy, hexSize, seed) {
+function drawStaticDustMotes(cx, cy, hexSize, seed, worldScale = 1) {
     // Just subtle light patches to add texture variation
     for (let i = 0; i < 2; i++) {
         const x = cx + (seededRandom(seed + i * 6) - 0.5) * hexSize * 0.6;
         const y = cy + (seededRandom(seed + i * 6 + 1) - 0.5) * hexSize * 0.6;
-        const size = 8 + seededRandom(seed + i * 6 + 2) * 6;
+        const size = scaleWithWorld(8 + seededRandom(seed + i * 6 + 2) * 6, worldScale);
 
         ctx.fillStyle = 'rgba(220, 200, 160, 0.08)';
         ctx.beginPath();
@@ -2150,12 +2161,12 @@ function drawStaticDustMotes(cx, cy, hexSize, seed) {
 /**
  * Draw static snow details
  */
-function drawStaticSnowDetails(cx, cy, hexSize, seed) {
+function drawStaticSnowDetails(cx, cy, hexSize, seed, worldScale = 1) {
     // Snow mounds
     for (let i = 0; i < 5; i++) {
         const mx = cx + (seededRandom(seed + i * 5) - 0.5) * hexSize * 1.2;
         const my = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 1.2;
-        const moundSize = 4 + seededRandom(seed + i * 5 + 2) * 8;
+        const moundSize = scaleWithWorld(4 + seededRandom(seed + i * 5 + 2) * 8, worldScale);
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.beginPath();
@@ -2170,7 +2181,7 @@ function drawStaticSnowDetails(cx, cy, hexSize, seed) {
 
         ctx.fillStyle = 'rgba(180, 200, 220, 0.15)';
         ctx.beginPath();
-        ctx.ellipse(sx, sy, 6, 3, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(sx, sy, scaleWithWorld(6, worldScale), scaleWithWorld(3, worldScale), seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -2178,10 +2189,10 @@ function drawStaticSnowDetails(cx, cy, hexSize, seed) {
 /**
  * Draw static ice details
  */
-function drawStaticIceDetails(cx, cy, hexSize, seed) {
+function drawStaticIceDetails(cx, cy, hexSize, seed, worldScale = 1) {
     // Ice cracks
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = scaleWithWorld(0.5, worldScale);
 
     for (let i = 0; i < 3; i++) {
         ctx.beginPath();
@@ -2206,7 +2217,7 @@ function drawStaticIceDetails(cx, cy, hexSize, seed) {
 
             ctx.fillStyle = 'rgba(200, 230, 255, 0.25)';
             ctx.beginPath();
-            ctx.ellipse(sx, sy, 3, 1.5, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
+            ctx.ellipse(sx, sy, scaleWithWorld(3, worldScale), scaleWithWorld(1.5, worldScale), seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -2215,10 +2226,10 @@ function drawStaticIceDetails(cx, cy, hexSize, seed) {
 /**
  * Draw simple reed texture - fewer, simpler stalks
  */
-function drawStaticReeds(cx, cy, hexSize, seed) {
+function drawStaticReeds(cx, cy, hexSize, seed, worldScale = 1) {
     // Just 8 simple vertical strokes to suggest reeds
     ctx.strokeStyle = 'rgba(70, 95, 55, 0.5)';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = scaleWithWorld(1.5, worldScale);
 
     for (let i = 0; i < 8; i++) {
         const rand1 = seededRandom(seed + i * 4);
@@ -2226,7 +2237,7 @@ function drawStaticReeds(cx, cy, hexSize, seed) {
 
         const x = cx + (rand1 - 0.5) * hexSize * 0.8;
         const y = cy + (rand2 - 0.5) * hexSize * 0.6;
-        const height = 12 + seededRandom(seed + i * 4 + 2) * 8;
+        const height = scaleWithWorld(12 + seededRandom(seed + i * 4 + 2) * 8, worldScale);
         const sway = (rand1 - 0.5) * 3;
 
         ctx.beginPath();
@@ -2239,7 +2250,7 @@ function drawStaticReeds(cx, cy, hexSize, seed) {
 /**
  * Draw simple flower color spots - subtle, natural looking
  */
-function drawStaticFlowers(cx, cy, hexSize, seed) {
+function drawStaticFlowers(cx, cy, hexSize, seed, worldScale = 1) {
     // Just a few subtle color spots to suggest wildflowers
     const colors = ['rgba(255, 100, 100, 0.4)', 'rgba(255, 220, 80, 0.4)', 'rgba(255, 255, 255, 0.3)', 'rgba(180, 140, 200, 0.3)'];
 
@@ -2250,7 +2261,7 @@ function drawStaticFlowers(cx, cy, hexSize, seed) {
         const fy = cy + Math.sin(angle) * dist;
 
         const colorIdx = Math.floor(seededRandom(seed + i + 100) * colors.length);
-        const size = 2 + seededRandom(seed + i + 150) * 2;
+        const size = scaleWithWorld(2 + seededRandom(seed + i + 150) * 2, worldScale);
 
         ctx.fillStyle = colors[colorIdx];
         ctx.beginPath();
@@ -2262,7 +2273,7 @@ function drawStaticFlowers(cx, cy, hexSize, seed) {
 /**
  * Draw subtle wheat field texture - golden patches
  */
-function drawStaticWheatField(cx, cy, hexSize, seed) {
+function drawStaticWheatField(cx, cy, hexSize, seed, worldScale = 1) {
     // Draw subtle golden texture patches
     for (let i = 0; i < 4; i++) {
         const rand1 = seededRandom(seed + i * 3);
@@ -2270,7 +2281,7 @@ function drawStaticWheatField(cx, cy, hexSize, seed) {
 
         const x = cx + (rand1 - 0.5) * hexSize * 0.8;
         const y = cy + (rand2 - 0.5) * hexSize * 0.8;
-        const size = 8 + seededRandom(seed + i * 3 + 2) * 10;
+        const size = scaleWithWorld(8 + seededRandom(seed + i * 3 + 2) * 10, worldScale);
 
         // Light golden patch
         ctx.fillStyle = 'rgba(210, 180, 100, 0.15)';
@@ -2281,7 +2292,7 @@ function drawStaticWheatField(cx, cy, hexSize, seed) {
 
     // Add a few subtle darker streaks to suggest stalks
     ctx.strokeStyle = 'rgba(180, 150, 80, 0.2)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = scaleWithWorld(1, worldScale);
     for (let i = 0; i < 6; i++) {
         const rand = seededRandom(seed + i * 5);
         const x = cx + (rand - 0.5) * hexSize * 0.6;
@@ -2297,7 +2308,7 @@ function drawStaticWheatField(cx, cy, hexSize, seed) {
 /**
  * Draw subtle heather texture - purple patches
  */
-function drawStaticHeather(cx, cy, hexSize, seed) {
+function drawStaticHeather(cx, cy, hexSize, seed, worldScale = 1) {
     // Just a few subtle purple patches
     for (let i = 0; i < 4; i++) {
         const rand1 = seededRandom(seed + i * 3);
@@ -2305,7 +2316,7 @@ function drawStaticHeather(cx, cy, hexSize, seed) {
 
         const x = cx + (rand1 - 0.5) * hexSize * 0.7;
         const y = cy + (rand2 - 0.5) * hexSize * 0.7;
-        const size = 6 + seededRandom(seed + i * 3 + 2) * 8;
+        const size = scaleWithWorld(6 + seededRandom(seed + i * 3 + 2) * 8, worldScale);
 
         ctx.fillStyle = 'rgba(150, 100, 150, 0.2)';
         ctx.beginPath();
@@ -2357,12 +2368,12 @@ function drawWaterDetails(cx, cy, s, seed) {
 /**
  * Draw minimal sand details - subtle texture variation only
  */
-function drawSandDetails(cx, cy, s, seed) {
+function drawSandDetails(cx, cy, s, seed, worldScale = 1) {
     // Just subtle light/dark patches for natural texture variation
     for (let i = 0; i < 3; i++) {
         const x = cx + (seededRandom(seed + i * 5) - 0.5) * s * 0.7;
         const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * s * 0.7;
-        const size = 6 + seededRandom(seed + i * 5 + 2) * 8;
+        const size = scaleWithWorld(6 + seededRandom(seed + i * 5 + 2) * 8, worldScale);
 
         ctx.fillStyle = i % 2 === 0 ? 'rgba(200, 170, 120, 0.08)' : 'rgba(160, 130, 90, 0.06)';
         ctx.beginPath();
@@ -2377,7 +2388,7 @@ function drawSandDetails(cx, cy, s, seed) {
 
         ctx.fillStyle = 'rgba(130, 120, 110, 0.3)';
         ctx.beginPath();
-        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.arc(px, py, scaleWithWorld(2, worldScale), 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -2385,7 +2396,7 @@ function drawSandDetails(cx, cy, s, seed) {
 /**
  * Draw swamp details
  */
-function drawSwampDetails(cx, cy, s, seed) {
+function drawSwampDetails(cx, cy, s, seed, worldScale = 1) {
     // Murky water puddles
     ctx.fillStyle = 'rgba(25, 45, 30, 0.6)';
     ctx.beginPath();
@@ -2407,7 +2418,7 @@ function drawSwampDetails(cx, cy, s, seed) {
     for (let i = 0; i < 4; i++) {
         const bx = cx + (seededRandom(seed + i * 43) - 0.5) * s * 0.9;
         const by = cy + (seededRandom(seed + i * 43 + 1) - 0.5) * s * 0.7;
-        const bSize = 2 + seededRandom(seed + i * 43 + 2) * 2;
+        const bSize = scaleWithWorld(2 + seededRandom(seed + i * 43 + 2) * 2, worldScale);
         ctx.beginPath();
         ctx.arc(bx, by, bSize, 0, Math.PI * 2);
         ctx.fill();
@@ -2415,7 +2426,7 @@ function drawSwampDetails(cx, cy, s, seed) {
 
     // Dead reeds
     ctx.strokeStyle = 'rgba(90, 70, 50, 0.7)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = scaleWithWorld(2, worldScale);
     for (let i = 0; i < 3; i++) {
         const rx = cx + (seededRandom(seed + i * 47) - 0.5) * s * 1.2;
         const ry = cy + (seededRandom(seed + i * 47 + 1) - 0.5) * s * 0.8;
@@ -2430,7 +2441,7 @@ function drawSwampDetails(cx, cy, s, seed) {
         // Reed tip
         ctx.fillStyle = 'rgba(70, 50, 35, 0.8)';
         ctx.beginPath();
-        ctx.ellipse(rx + lean, ry - height - 3, 2, 4, 0, 0, Math.PI * 2);
+        ctx.ellipse(rx + lean, ry - height - scaleWithWorld(3, worldScale), scaleWithWorld(2, worldScale), scaleWithWorld(4, worldScale), 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
@@ -2445,7 +2456,8 @@ function drawSwampDetails(cx, cy, s, seed) {
  * Draw a ghost indicator showing where a cloaked unit last attacked from
  */
 function drawGhostIndicator(cx, cy, ghost) {
-    const size = state.hexSize * 0.65;
+    const worldScale = getWorldScale();
+    const size = state.hexSize * CONFIG.UNIT_SCALE;
     const now = Date.now();
     const age = now - ghost.timestamp;
     const fadeStart = ghost.fadeStart || (ghost.timestamp + 3000);
@@ -2468,15 +2480,15 @@ function drawGhostIndicator(cx, cy, ghost) {
 
     // Outer glow ring - pulsing warning
     ctx.strokeStyle = `rgba(239, 68, 68, ${alpha * 0.8})`;
-    ctx.lineWidth = 3;
-    ctx.setLineDash([6, 4]);
+    ctx.lineWidth = scaleWithWorld(3, worldScale);
+    ctx.setLineDash([scaleWithWorld(6, worldScale), scaleWithWorld(4, worldScale)]);
     ctx.beginPath();
-    ctx.arc(cx, cy, size + 15 + Math.sin(now / 150) * 3, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size + scaleWithWorld(15, worldScale) + Math.sin(now / 150) * scaleWithWorld(3, worldScale), 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
 
     // Inner danger zone
-    const gradient = safeRadialGradient(ctx, cx, cy, 0, cx, cy, size + 10, `rgba(239, 68, 68, ${alpha * 0.2})`);
+    const gradient = safeRadialGradient(ctx, cx, cy, 0, cx, cy, size + scaleWithWorld(10, worldScale), `rgba(239, 68, 68, ${alpha * 0.2})`);
     if (typeof gradient !== 'string') {
         gradient.addColorStop(0, `rgba(239, 68, 68, ${alpha * 0.3})`);
         gradient.addColorStop(0.7, `rgba(239, 68, 68, ${alpha * 0.15})`);
@@ -2484,7 +2496,7 @@ function drawGhostIndicator(cx, cy, ghost) {
     }
     ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(cx, cy, size + 10, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size + scaleWithWorld(10, worldScale), 0, Math.PI * 2);
     ctx.fill();
 
     // Ghost silhouette shape
@@ -2523,16 +2535,16 @@ function drawGhostIndicator(cx, cy, ghost) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = scaleWithWorld(15, worldScale);
     ctx.fillStyle = '#fca5a5';
-    ctx.fillText('👻', cx, cy - size - 15);
+    ctx.fillText('👻', cx, cy - size - scaleWithWorld(15, worldScale));
     ctx.shadowBlur = 0;
 
     // "Letzter Angriff" text
     ctx.globalAlpha = alpha * 0.7;
     ctx.font = `bold ${Math.round(size * 0.22)}px sans-serif`;
     ctx.fillStyle = '#fca5a5';
-    ctx.fillText('LETZTER ANGRIFF', cx, cy + size + 20);
+    ctx.fillText('LETZTER ANGRIFF', cx, cy + size + scaleWithWorld(20, worldScale));
 
     ctx.restore();
 }
@@ -2543,6 +2555,7 @@ function drawGhostIndicator(cx, cy, ghost) {
 function drawSpeechBubble(ctx, x, y, text, color, size) {
     ctx.save();
 
+    const worldScale = getWorldScale();
     const padding = size * 0.15;
     const fontSize = Math.round(size * 0.28);
     ctx.font = `bold ${fontSize}px sans-serif`;
@@ -2553,30 +2566,30 @@ function drawSpeechBubble(ctx, x, y, text, color, size) {
     // Bubble background with rounded corners
     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(x - bubbleWidth / 2, y - bubbleHeight / 2, bubbleWidth, bubbleHeight, 6);
+    ctx.roundRect(x - bubbleWidth / 2, y - bubbleHeight / 2, bubbleWidth, bubbleHeight, scaleWithWorld(6, worldScale));
     ctx.fill();
 
     // Border
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = scaleWithWorld(2, worldScale);
     ctx.stroke();
 
     // Speech bubble pointer (triangle pointing down)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
+    ctx.moveTo(x - scaleWithWorld(8, worldScale), y + bubbleHeight / 2);
+    ctx.lineTo(x, y + bubbleHeight / 2 + scaleWithWorld(10, worldScale));
+    ctx.lineTo(x + scaleWithWorld(8, worldScale), y + bubbleHeight / 2);
     ctx.closePath();
     ctx.fill();
 
     // Pointer border
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = scaleWithWorld(2, worldScale);
     ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
+    ctx.moveTo(x - scaleWithWorld(8, worldScale), y + bubbleHeight / 2);
+    ctx.lineTo(x, y + bubbleHeight / 2 + scaleWithWorld(10, worldScale));
+    ctx.lineTo(x + scaleWithWorld(8, worldScale), y + bubbleHeight / 2);
     ctx.stroke();
 
     // Text
@@ -2592,7 +2605,8 @@ function drawSpeechBubble(ctx, x, y, text, color, size) {
  * Draw a human unit with equipment
  */
 function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
-    const size = state.hexSize * 0.65;
+    const worldScale = getWorldScale();
+    const size = state.hexSize * CONFIG.UNIT_SCALE;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
@@ -2628,14 +2642,14 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     if (isSelected) {
         // Selected: solid thick ring in player color
         ctx.strokeStyle = playerColor;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = scaleWithWorld(4, worldScale);
         ctx.setLineDash([]);
     } else {
         // Normal: thin dashed ring in player color
         ctx.strokeStyle = playerColor;
         ctx.globalAlpha = 0.6;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = scaleWithWorld(2, worldScale);
+        ctx.setLineDash([scaleWithWorld(6, worldScale), scaleWithWorld(4, worldScale)]);
     }
     ctx.beginPath();
     ctx.arc(cx, cy, size * 0.9, 0, Math.PI * 2);
@@ -2661,38 +2675,38 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     // Attackable indicator
     if (isAttackable && !isSelected) {
         ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 5]);
+        ctx.lineWidth = scaleWithWorld(3, worldScale);
+        ctx.setLineDash([scaleWithWorld(8, worldScale), scaleWithWorld(5, worldScale)]);
         ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size + scaleWithWorld(15, worldScale), 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
         // "Target" icon
         ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
         ctx.beginPath();
-        ctx.arc(cx, cy - size - 10, 8, 0, Math.PI * 2);
+        ctx.arc(cx, cy - size - scaleWithWorld(10, worldScale), scaleWithWorld(8, worldScale), 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px sans-serif';
-        ctx.fillText('!', cx, cy - size - 10);
+        ctx.font = `bold ${Math.round(scaleWithWorld(10, worldScale))}px sans-serif`;
+        ctx.fillText('!', cx, cy - size - scaleWithWorld(10, worldScale));
     }
 
     // Targeted crosshair animation
     if (isTargeted) {
         ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        const crossSize = size + 25;
+        ctx.lineWidth = scaleWithWorld(3, worldScale);
+        const crossSize = size + scaleWithWorld(25, worldScale);
 
         // Crosshair lines
         ctx.beginPath();
         ctx.moveTo(cx - crossSize, cy);
-        ctx.lineTo(cx - size - 10, cy);
-        ctx.moveTo(cx + size + 10, cy);
+        ctx.lineTo(cx - size - scaleWithWorld(10, worldScale), cy);
+        ctx.moveTo(cx + size + scaleWithWorld(10, worldScale), cy);
         ctx.lineTo(cx + crossSize, cy);
         ctx.moveTo(cx, cy - crossSize);
-        ctx.lineTo(cx, cy - size - 10);
-        ctx.moveTo(cx, cy + size + 10);
+        ctx.lineTo(cx, cy - size - scaleWithWorld(10, worldScale));
+        ctx.moveTo(cx, cy + size + scaleWithWorld(10, worldScale));
         ctx.lineTo(cx, cy + crossSize);
         ctx.stroke();
 
@@ -2703,9 +2717,9 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
         // Inner pulsing ring
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = scaleWithWorld(2, worldScale);
         ctx.beginPath();
-        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size + scaleWithWorld(5, worldScale), 0, Math.PI * 2);
         ctx.stroke();
     }
 
@@ -2713,18 +2727,18 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     if (isBlocked && !isSelected) {
         // Dimmed ring
         ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = scaleWithWorld(2, worldScale);
+        ctx.setLineDash([scaleWithWorld(4, worldScale), scaleWithWorld(4, worldScale)]);
         ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
+        ctx.arc(cx, cy, size + scaleWithWorld(15, worldScale), 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
         // "No LOS" indicator with crossed lines
         ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
-        ctx.lineWidth = 3;
-        const xSize = 8;
-        const xY = cy - size - 15;
+        ctx.lineWidth = scaleWithWorld(3, worldScale);
+        const xSize = scaleWithWorld(8, worldScale);
+        const xY = cy - size - scaleWithWorld(15, worldScale);
         ctx.beginPath();
         ctx.moveTo(cx - xSize, xY - xSize);
         ctx.lineTo(cx + xSize, xY + xSize);
@@ -2737,7 +2751,7 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const blockIcon = blockedInfo && blockedInfo.blockedBy === 'rock' ? '🪨' : '🌲';
-        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - 15);
+        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - scaleWithWorld(15, worldScale));
     }
 
     ctx.restore();
@@ -2753,7 +2767,8 @@ function drawUnitOverlay(unit, cx, cy) {
         return;
     }
 
-    const size = state.hexSize * 0.65;
+    const worldScale = getWorldScale();
+    const size = state.hexSize * CONFIG.UNIT_SCALE;
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
@@ -2765,7 +2780,7 @@ function drawUnitOverlay(unit, cx, cy) {
     ctx.fill();
 
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = scaleWithWorld(2, worldScale);
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
@@ -2786,7 +2801,7 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.fill();
 
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = scaleWithWorld(1, worldScale);
         ctx.stroke();
 
         ctx.fillStyle = '#ffffff';
@@ -2798,9 +2813,9 @@ function drawUnitOverlay(unit, cx, cy) {
     if (unit.shield) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = scaleWithWorld(10, worldScale);
         ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
-        ctx.fillText('🛡️', cx, cy - size - 5);
+        ctx.fillText('🛡️', cx, cy - size - scaleWithWorld(5, worldScale));
         ctx.shadowBlur = 0;
     }
 
@@ -2813,7 +2828,7 @@ function drawUnitOverlay(unit, cx, cy) {
     if (unit.cloaked && unit.player === state.viewingPlayer) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = scaleWithWorld(15, worldScale);
 
         // Draw speech bubble for stealth status
         drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'Getarnt!', '#a855f7', size);
@@ -2821,7 +2836,7 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
+        ctx.fillText('👁️‍🗨️', cx, cy - size - scaleWithWorld(5, worldScale));
         ctx.shadowBlur = 0;
     }
 
@@ -2829,7 +2844,7 @@ function drawUnitOverlay(unit, cx, cy) {
     if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
         ctx.globalAlpha = 0.9;
         ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = scaleWithWorld(8, worldScale);
         ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -2841,7 +2856,7 @@ function drawUnitOverlay(unit, cx, cy) {
     if (unit.usedSpecial && unit.class === 'scout') {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = scaleWithWorld(10, worldScale);
         ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -2853,7 +2868,7 @@ function drawUnitOverlay(unit, cx, cy) {
     if (unit.usedSpecial && unit.class === 'assault' && unit.damage > UNIT_CLASSES.assault.damage) {
         ctx.globalAlpha = 1;
         ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = scaleWithWorld(10, worldScale);
         ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -2883,13 +2898,19 @@ function drawUnitOverlay(unit, cx, cy) {
     const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
     const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
     const barWidth = size * 1.6;
-    const barHeight = 8;
+    const barHeight = scaleWithWorld(8, worldScale);
     const barY = cy + size * 0.65;
 
     // Bar background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
+    ctx.roundRect(
+        cx - barWidth / 2 - scaleWithWorld(2, worldScale),
+        barY - scaleWithWorld(2, worldScale),
+        barWidth + scaleWithWorld(4, worldScale),
+        barHeight + scaleWithWorld(4, worldScale),
+        scaleWithWorld(4, worldScale)
+    );
     ctx.fill();
 
     // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)

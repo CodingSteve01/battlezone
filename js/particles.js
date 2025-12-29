@@ -2,7 +2,7 @@
 // Modular particle effects for Shadow Squad
 // Designed for performance (object pooling) and flexibility
 
-import { state } from './state.js';
+import { state, getWorldScale } from './state.js';
 import { hexToPixel } from './hexMath.js';
 
 // ===== CONFIGURATION =====
@@ -306,7 +306,8 @@ class Particle {
         this.y = y;
 
         // Größe
-        this.size = randomRange(config.size.min, config.size.max);
+        const worldScale = getWorldScale();
+        this.size = randomRange(config.size.min, config.size.max) * worldScale;
         this.startSize = this.size;
 
         // Farbe
@@ -317,7 +318,7 @@ class Particle {
         }
 
         // Geschwindigkeit
-        const speed = randomRange(config.speed.min, config.speed.max);
+        const speed = randomRange(config.speed.min, config.speed.max) * worldScale;
         let angle;
         if (direction !== null) {
             // Richtung mit Streuung
@@ -364,13 +365,13 @@ class Particle {
 
         // Schwerkraft
         if (config.gravity) {
-            this.vy += config.gravity * dt;
+            this.vy += config.gravity * getWorldScale() * dt;
         }
 
         // Drift (seitliches Schwingen)
         if (config.drift) {
             this.driftPhase += dt * 2;
-            this.x += Math.sin(this.driftPhase) * 20 * dt;
+            this.x += Math.sin(this.driftPhase) * 20 * getWorldScale() * dt;
         }
 
         // Rotation
@@ -380,7 +381,7 @@ class Particle {
 
         // Ring-Expansion
         if (config.expandRate) {
-            this.size += config.expandRate * dt;
+            this.size += config.expandRate * getWorldScale() * dt;
         }
 
         // Scale Animation
@@ -440,7 +441,7 @@ class Particle {
         if (config.expandRate) {
             // Ring
             ctx.strokeStyle = this.color;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 * getWorldScale();
             ctx.beginPath();
             ctx.arc(0, 0, this.size, 0, Math.PI * 2);
             ctx.stroke();
@@ -486,7 +487,7 @@ class Particle {
 
         // Blattader
         ctx.strokeStyle = 'rgba(0, 50, 0, 0.3)';
-        ctx.lineWidth = 0.5;
+        ctx.lineWidth = 0.5 * getWorldScale();
         ctx.beginPath();
         ctx.moveTo(cx, cy - size);
         ctx.lineTo(cx, cy + size);
