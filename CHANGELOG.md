@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.16.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.5...shadow-squad-v3.16.6) (2025-12-29)
+
+
+### Bug Fixes
+
+* **rendering:** adjust global zoom defaults and correct shoreline orientation ([#183](https://github.com/CodingSteve01/battlezone/issues/183)) ([1ae0f5b](https://github.com/CodingSteve01/battlezone/commit/1ae0f5bf7db13f77cf22fe0439e28ae02914f9e6))
+
 ## [3.16.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.4...shadow-squad-v3.16.5) (2025-12-29)
 
 
