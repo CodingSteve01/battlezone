@@ -367,7 +367,6 @@ function drawRockFormation2D5(x, y, size, seed) {
     ctx.ellipse(rockSize * 0.1, rockSize * 0.1, rockSize * 0.4, rockSize * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    applyDetailLighting(cx, cy, size, baseSeed);
     ctx.restore();
 }
 
@@ -1944,6 +1943,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             break;
     }
 
+    applyDetailLighting(cx, cy, size, baseSeed);
     ctx.restore();
 }
 
