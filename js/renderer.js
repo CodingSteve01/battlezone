@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel } from './state.js';
 import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -113,16 +113,7 @@ function isLandForSwamp(type) {
 function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
     if (!neighborTerrains || neighborTerrains.length !== 6) return;
 
-    let subtype = null;
-    let isLandNeighbor = null;
-
-    if (WATER_TYPES.has(terrainType)) {
-        subtype = 'water';
-        isLandNeighbor = isLandForWater;
-    } else if (SWAMP_TYPES.has(terrainType)) {
-        subtype = 'swamp';
-        isLandNeighbor = isLandForSwamp;
-    } else {
+    if (WATER_TYPES.has(terrainType) || SWAMP_TYPES.has(terrainType)) {
         return;
     }
 
@@ -132,7 +123,14 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
 
     for (let i = 0; i < 6; i++) {
         const neighborType = neighborTerrains[i];
-        if (!isLandNeighbor(neighborType)) continue;
+        let subtype = null;
+        if (WATER_TYPES.has(neighborType)) {
+            subtype = 'water';
+        } else if (SWAMP_TYPES.has(neighborType)) {
+            subtype = 'swamp';
+        } else {
+            continue;
+        }
 
         const detailType = `shore_${subtype}_${i}`;
         const variantCount = getShorelineVariantCount(detailType);
@@ -369,6 +367,43 @@ function drawRockFormation2D5(x, y, size, seed) {
     ctx.ellipse(rockSize * 0.1, rockSize * 0.1, rockSize * 0.4, rockSize * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    applyDetailLighting(cx, cy, size, baseSeed);
+    ctx.restore();
+}
+
+function applyDetailLighting(cx, cy, size, seed) {
+    ctx.save();
+    ctx.beginPath();
+    drawHexPathToContext(ctx, cx, cy, size * 0.98);
+    ctx.clip();
+
+    const lightJitter = (seededRandom(seed + 911) - 0.5) * size * 0.15;
+    const startX = cx - size * 0.6 + lightJitter;
+    const startY = cy - size * 0.6 + lightJitter;
+    const endX = cx + size * 0.6 + lightJitter;
+    const endY = cy + size * 0.6 + lightJitter;
+
+    const gradient = safeLinearGradient(
+        ctx,
+        startX,
+        startY,
+        endX,
+        endY,
+        'rgba(255, 255, 255, 0.05)'
+    );
+
+    if (typeof gradient !== 'string') {
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.16)');
+        gradient.addColorStop(0.45, 'rgba(255, 255, 255, 0.02)');
+        gradient.addColorStop(0.7, 'rgba(40, 40, 40, 0.08)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.18)');
+    }
+
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+
     ctx.restore();
 }
 
@@ -473,6 +508,34 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
     });
 }
 
+const HEX_HALF_HEIGHT = Math.sqrt(3) / 2;
+
+function isPointInHexNormalized(x, y) {
+    const absX = Math.abs(x);
+    const absY = Math.abs(y);
+    if (absX > 1 || absY > HEX_HALF_HEIGHT) return false;
+    if (absX <= 0.5) return true;
+    return absY <= HEX_HALF_HEIGHT - (absX - 0.5) * Math.sqrt(3);
+}
+
+function hexEdgeFactorNormalized(x, y) {
+    const absX = Math.abs(x);
+    const absY = Math.abs(y) / HEX_HALF_HEIGHT;
+    return Math.max(absX, absY);
+}
+
+function sampleHexOffset(seed, minEdgeFactor = 0) {
+    for (let i = 0; i < 12; i++) {
+        const attemptSeed = seed + i * 17;
+        const x = seededRandom(attemptSeed) * 2 - 1;
+        const y = (seededRandom(attemptSeed + 7) * 2 - 1) * HEX_HALF_HEIGHT;
+        if (!isPointInHexNormalized(x, y)) continue;
+        if (hexEdgeFactorNormalized(x, y) < minEdgeFactor) continue;
+        return { x, y };
+    }
+    return { x: 0, y: 0 };
+}
+
 /**
  * Collect foreground element DEFINITIONS for caching.
  * Returns normalized positions/offsets that can be scaled for any hex size.
@@ -480,6 +543,7 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
 function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const elements = [];
     const s = 0.45; // Normalized size multiplier
+    const positionScale = 0.95;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
 
     // Consistent sort offsets (normalized)
@@ -487,19 +551,15 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const BG_TREE_SORT_OFFSET = 0.25;
     const SHRUB_SORT_OFFSET = 0.35;
     const BUSH_SORT_OFFSET = 0.38;
-    const TREE_Y_OFFSET = 0.25;
+    const TREE_Y_OFFSET = 0;
 
     if (type === 'forest' || type === 'pine') {
         const baseTreeCount = 4 + Math.abs(baseSeed % 3);
-        const hexRadius = s * 1.1;
 
         for (let i = 0; i < baseTreeCount; i++) {
-            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-            const angle = i * goldenAngle + seededRandom(baseSeed + i) * 0.8;
-            const radius = hexRadius * (0.2 + seededRandom(baseSeed + i * 7) * 0.8);
-
-            const offsetX = Math.cos(angle) * radius * 0.85;
-            const offsetY = Math.sin(angle) * radius * 0.7 + TREE_Y_OFFSET;
+            const anchorPoint = sampleHexOffset(baseSeed + i * 13);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
 
             const baseSizeVar = 0.5 + seededRandom(baseSeed + i * 10 + 2) * 1.3;
             const sizeMultiplier = s * baseSizeVar * 1.4;
@@ -520,11 +580,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         // Edge trees
         const edgeTreeCount = 2 + Math.abs((baseSeed + 50) % 3);
         for (let i = 0; i < edgeTreeCount; i++) {
-            const edgeAngle = (i / edgeTreeCount) * Math.PI * 2 + seededRandom(baseSeed + i * 20 + 200) * 0.6;
-            const edgeRadius = hexRadius * (0.85 + seededRandom(baseSeed + i * 20 + 201) * 0.3);
-
-            const offsetX = Math.cos(edgeAngle) * edgeRadius * 0.9;
-            const offsetY = Math.sin(edgeAngle) * edgeRadius * 0.7 + TREE_Y_OFFSET;
+            const anchorPoint = sampleHexOffset(baseSeed + i * 19 + 200, 0.7);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
             const treeType = pickTreeTypeForBiome(baseSeed + i * 20 + 203, type);
 
@@ -542,8 +600,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         // Undergrowth
         const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
         for (let i = 0; i < undergrowthCount; i++) {
-            const offsetX = (seededRandom(baseSeed + i * 15 + 101) - 0.5) * s * 1.4;
-            const offsetY = (seededRandom(baseSeed + i * 15 + 102) - 0.5) * s * 0.9;
+            const anchorPoint = sampleHexOffset(baseSeed + i * 15 + 101);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
 
             elements.push({
@@ -559,8 +618,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
 
         // Occasional large bush
         if (seededRandom(baseSeed + 300) > 0.6) {
-            const offsetX = (seededRandom(baseSeed + 301) - 0.5) * s * 0.8;
-            const offsetY = (seededRandom(baseSeed + 302) - 0.5) * s * 0.6;
+            const anchorPoint = sampleHexOffset(baseSeed + 301);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.3);
 
             elements.push({
@@ -577,8 +637,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         const grassType = Math.abs(baseSeed) % 100;
 
         if (grassType < 20) {
-            const offsetX = (seededRandom(baseSeed + 500) - 0.5) * s * 0.6;
-            const offsetY = (seededRandom(baseSeed + 501) - 0.5) * s * 0.4;
+            const anchorPoint = sampleHexOffset(baseSeed + 500);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             const sizeMultiplier = s * (0.7 + seededRandom(baseSeed + 502) * 0.4);
             elements.push({
                 type: 'bush',
@@ -594,8 +655,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         if (grassType >= 20 && grassType < 50) {
             const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
             for (let i = 0; i < shrubCount; i++) {
-                const offsetX = (seededRandom(baseSeed + i * 10 + 520) - 0.5) * s * 1.2;
-                const offsetY = (seededRandom(baseSeed + i * 10 + 521) - 0.5) * s * 0.8;
+                const anchorPoint = sampleHexOffset(baseSeed + i * 10 + 520);
+                const offsetX = anchorPoint.x * positionScale;
+                const offsetY = anchorPoint.y * positionScale;
                 const sizeMultiplier = s * (0.25 + seededRandom(baseSeed + i * 10 + 522) * 0.2);
                 elements.push({
                     type: 'shrub',
@@ -610,8 +672,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (grassType >= 70 && grassType < 78) {
-            const offsetX = (seededRandom(baseSeed + 600) - 0.5) * s * 0.4;
-            const offsetY = (seededRandom(baseSeed + 601) - 0.5) * s * 0.3 + TREE_Y_OFFSET;
+            const anchorPoint = sampleHexOffset(baseSeed + 600);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (1.0 + seededRandom(baseSeed + 602) * 0.6);
             const treeType = pickTreeTypeForBiome(baseSeed + 603, type);
             elements.push({
@@ -626,8 +689,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (type === 'heather' && grassType >= 80 && grassType < 90) {
-            const offsetX = (seededRandom(baseSeed + 700) - 0.5) * s * 0.5;
-            const offsetY = (seededRandom(baseSeed + 701) - 0.5) * s * 0.4;
+            const anchorPoint = sampleHexOffset(baseSeed + 700);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'rock-small',
                 offsetX,
@@ -642,8 +706,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         const hillsType = Math.abs(baseSeed) % 100;
 
         if (hillsType < 40) {
-            const offsetX = (seededRandom(baseSeed + 800) - 0.5) * s * 0.6;
-            const offsetY = (seededRandom(baseSeed + 801) - 0.5) * s * 0.4;
+            const anchorPoint = sampleHexOffset(baseSeed + 800);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'rock-hills',
                 offsetX,
@@ -656,8 +721,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         if (hillsType >= 60 && hillsType < 80) {
-            const offsetX = (seededRandom(baseSeed + 810) - 0.5) * s * 0.8;
-            const offsetY = (seededRandom(baseSeed + 811) - 0.5) * s * 0.6;
+            const anchorPoint = sampleHexOffset(baseSeed + 810);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'shrub-hills',
                 offsetX,
@@ -671,8 +737,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     } else if (type === 'sand') {
         const sandType = Math.abs(baseSeed) % 100;
         if (sandType < 15) {
-            const offsetX = (seededRandom(baseSeed + 900) - 0.5) * s * 0.8;
-            const offsetY = (seededRandom(baseSeed + 901) - 0.5) * s * 0.6;
+            const anchorPoint = sampleHexOffset(baseSeed + 900);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'rock-sand',
                 offsetX,
@@ -696,8 +763,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     } else if (type === 'ruins') {
         const ruinsType = Math.abs(baseSeed) % 100;
         if (ruinsType < 60) {
-            const offsetX = (seededRandom(baseSeed + 1000) - 0.5) * s * 0.5;
-            const offsetY = (seededRandom(baseSeed + 1001) - 0.5) * s * 0.4;
+            const anchorPoint = sampleHexOffset(baseSeed + 1000);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'rock',
                 offsetX,
@@ -709,8 +777,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
         if (ruinsType >= 40 && ruinsType < 70) {
-            const offsetX = (seededRandom(baseSeed + 1010) - 0.5) * s * 0.8;
-            const offsetY = (seededRandom(baseSeed + 1011) - 0.5) * s * 0.6;
+            const anchorPoint = sampleHexOffset(baseSeed + 1010);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'shrub-ruins',
                 offsetX,
@@ -724,8 +793,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     } else if (type === 'swamp') {
         const swampType = Math.abs(baseSeed) % 100;
         if (swampType < 25) {
-            const offsetX = (seededRandom(baseSeed + 1100) - 0.5) * s * 0.6;
-            const offsetY = (seededRandom(baseSeed + 1101) - 0.5) * s * 0.4 + TREE_Y_OFFSET;
+            const anchorPoint = sampleHexOffset(baseSeed + 1100);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 1102) * 0.4);
             elements.push({
                 type: 'dead-tree',
@@ -738,8 +808,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
         if (swampType >= 30 && swampType < 60) {
-            const offsetX = (seededRandom(baseSeed + 1110) - 0.5) * s * 0.9;
-            const offsetY = (seededRandom(baseSeed + 1111) - 0.5) * s * 0.7;
+            const anchorPoint = sampleHexOffset(baseSeed + 1110);
+            const offsetX = anchorPoint.x * positionScale;
+            const offsetY = anchorPoint.y * positionScale;
             elements.push({
                 type: 'reeds',
                 offsetX,
@@ -1294,10 +1365,11 @@ function animationLoop(timestamp) {
  */
 function calculateHexSize() {
     // Ensure zoomLevel is valid
-    const zoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+    const zoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
+    const zoomScale = zoomLevelToScale(zoom);
 
-    // Simple calculation: base size * zoom level
-    const result = CONFIG.BASE_HEX_SIZE * zoom;
+    // Simple calculation: base size * normalized zoom scale
+    const result = CONFIG.BASE_HEX_SIZE * zoomScale;
 
     // Final validation
     return Number.isFinite(result) && result > 0 ? result : CONFIG.BASE_HEX_SIZE;
@@ -3109,11 +3181,11 @@ export function render() {
     // This prevents black screen and NaN display when resizeCanvas hasn't completed yet
     if (!Number.isFinite(state.zoomLevel) || state.zoomLevel <= 0) {
         console.warn('[Render] Fixing invalid zoomLevel:', state.zoomLevel);
-        state.zoomLevel = 1.0;
+        state.zoomLevel = scaleToZoomLevel(1.0);
     }
     if (!Number.isFinite(state.hexSize) || state.hexSize <= 0) {
         console.warn('[Render] Fixing invalid hexSize:', state.hexSize);
-        state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+        state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
     }
     if (!Number.isFinite(state.offsetX)) {
         console.warn('[Render] Fixing invalid offsetX:', state.offsetX);
@@ -3748,8 +3820,9 @@ function drawEventIndicator(w, h) {
  * Draw zoom indicator
  */
 function drawZoomIndicator(w, h) {
+    const zoomScale = zoomLevelToScale(state.zoomLevel);
     // Only show if zoom is not at default
-    if (Math.abs(state.zoomLevel - 1.0) < 0.05) return;
+    if (Math.abs(zoomScale - 1.0) < 0.05) return;
 
     ctx.save();
 
@@ -3768,7 +3841,7 @@ function drawZoomIndicator(w, h) {
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const zoomPercent = Math.round(state.zoomLevel * 100);
+    const zoomPercent = Math.round(zoomScale * 100);
     ctx.fillText(`🔍 ${zoomPercent}%`, x + 35, y + 15);
 
     ctx.restore();
