@@ -1,7 +1,7 @@
 {
   "version": "2.0",
   "dimensions": {
-    "width": 965,
+    "width": 953,
     "height": 1738
   },
   "features": [
@@ -14,14 +14,14 @@
       "bounds": {
         "x": 0,
         "y": 0,
-        "width": 240,
-        "height": 305
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 0,
-        "y": 0,
-        "width": 240,
-        "height": 305
+        "x": 3,
+        "y": 6,
+        "width": 228,
+        "height": 301
       },
       "anchor": {
         "x": 0.5,
@@ -39,16 +39,16 @@
     {
       "id": "tree_oak_1",
       "bounds": {
-        "x": 240,
+        "x": 235,
         "y": 0,
-        "width": 248,
-        "height": 305
+        "width": 244,
+        "height": 307
       },
       "contentBounds": {
-        "x": 248,
-        "y": 1,
-        "width": 232,
-        "height": 304
+        "x": 238,
+        "y": 13,
+        "width": 238,
+        "height": 294
       },
       "anchor": {
         "x": 0.5,
@@ -66,16 +66,16 @@
     {
       "id": "tree_oak_2",
       "bounds": {
-        "x": 488,
+        "x": 479,
         "y": 0,
-        "width": 238,
-        "height": 305
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 492,
-        "y": 4,
-        "width": 230,
-        "height": 301
+        "x": 485,
+        "y": 7,
+        "width": 223,
+        "height": 300
       },
       "anchor": {
         "x": 0.5,
@@ -93,16 +93,16 @@
     {
       "id": "tree_oak_3",
       "bounds": {
-        "x": 726,
+        "x": 714,
         "y": 0,
         "width": 239,
-        "height": 305
+        "height": 307
       },
       "contentBounds": {
-        "x": 726,
-        "y": 4,
-        "width": 239,
-        "height": 301
+        "x": 718,
+        "y": 0,
+        "width": 231,
+        "height": 307
       },
       "anchor": {
         "x": 0.5,
@@ -121,15 +121,15 @@
       "id": "tree_pine_0",
       "bounds": {
         "x": 0,
-        "y": 305,
-        "width": 240,
-        "height": 304
+        "y": 307,
+        "width": 235,
+        "height": 310
       },
       "contentBounds": {
-        "x": 2,
-        "y": 308,
-        "width": 236,
-        "height": 301
+        "x": 6,
+        "y": 307,
+        "width": 222,
+        "height": 310
       },
       "anchor": {
         "x": 0.5,
@@ -147,16 +147,16 @@
     {
       "id": "tree_pine_1",
       "bounds": {
-        "x": 240,
-        "y": 305,
-        "width": 248,
-        "height": 304
+        "x": 235,
+        "y": 307,
+        "width": 244,
+        "height": 310
       },
       "contentBounds": {
-        "x": 240,
-        "y": 305,
-        "width": 248,
-        "height": 304
+        "x": 247,
+        "y": 325,
+        "width": 219,
+        "height": 292
       },
       "anchor": {
         "x": 0.5,
@@ -174,16 +174,16 @@
     {
       "id": "tree_pine_2",
       "bounds": {
-        "x": 488,
-        "y": 305,
-        "width": 238,
-        "height": 304
+        "x": 479,
+        "y": 307,
+        "width": 235,
+        "height": 310
       },
       "contentBounds": {
-        "x": 490,
-        "y": 313,
-        "width": 234,
-        "height": 296
+        "x": 483,
+        "y": 316,
+        "width": 227,
+        "height": 301
       },
       "anchor": {
         "x": 0.5,
@@ -201,16 +201,16 @@
     {
       "id": "tree_pine_3",
       "bounds": {
-        "x": 726,
-        "y": 305,
+        "x": 714,
+        "y": 307,
         "width": 239,
-        "height": 304
+        "height": 310
       },
       "contentBounds": {
-        "x": 726,
+        "x": 716,
         "y": 309,
-        "width": 239,
-        "height": 300
+        "width": 235,
+        "height": 308
       },
       "anchor": {
         "x": 0.5,
@@ -229,15 +229,15 @@
       "id": "tree_birch_0",
       "bounds": {
         "x": 0,
-        "y": 609,
-        "width": 240,
-        "height": 306
+        "y": 617,
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 1,
-        "y": 616,
-        "width": 238,
-        "height": 299
+        "x": 0,
+        "y": 618,
+        "width": 234,
+        "height": 306
       },
       "anchor": {
         "x": 0.5,
@@ -255,16 +255,16 @@
     {
       "id": "tree_birch_1",
       "bounds": {
-        "x": 240,
-        "y": 609,
-        "width": 248,
-        "height": 306
+        "x": 235,
+        "y": 617,
+        "width": 244,
+        "height": 307
       },
       "contentBounds": {
-        "x": 245,
-        "y": 610,
-        "width": 237,
-        "height": 305
+        "x": 241,
+        "y": 627,
+        "width": 232,
+        "height": 297
       },
       "anchor": {
         "x": 0.5,
@@ -282,16 +282,16 @@
     {
       "id": "tree_birch_2",
       "bounds": {
-        "x": 488,
-        "y": 609,
-        "width": 238,
-        "height": 306
+        "x": 479,
+        "y": 617,
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 488,
-        "y": 611,
-        "width": 238,
-        "height": 304
+        "x": 479,
+        "y": 622,
+        "width": 234,
+        "height": 302
       },
       "anchor": {
         "x": 0.5,
@@ -309,16 +309,16 @@
     {
       "id": "tree_birch_3",
       "bounds": {
-        "x": 726,
-        "y": 609,
+        "x": 714,
+        "y": 617,
         "width": 239,
-        "height": 306
+        "height": 307
       },
       "contentBounds": {
-        "x": 726,
-        "y": 609,
-        "width": 239,
-        "height": 306
+        "x": 714,
+        "y": 617,
+        "width": 238,
+        "height": 307
       },
       "anchor": {
         "x": 0.5,
@@ -337,15 +337,15 @@
       "id": "tree_willow_0",
       "bounds": {
         "x": 0,
-        "y": 915,
-        "width": 240,
-        "height": 306
+        "y": 924,
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 1,
-        "y": 915,
-        "width": 237,
-        "height": 306
+        "x": 6,
+        "y": 940,
+        "width": 223,
+        "height": 291
       },
       "anchor": {
         "x": 0.5,
@@ -363,16 +363,16 @@
     {
       "id": "tree_willow_1",
       "bounds": {
-        "x": 240,
-        "y": 915,
-        "width": 248,
-        "height": 306
+        "x": 235,
+        "y": 924,
+        "width": 244,
+        "height": 307
       },
       "contentBounds": {
-        "x": 244,
-        "y": 923,
-        "width": 239,
-        "height": 298
+        "x": 241,
+        "y": 932,
+        "width": 231,
+        "height": 299
       },
       "anchor": {
         "x": 0.5,
@@ -390,16 +390,16 @@
     {
       "id": "tree_willow_2",
       "bounds": {
-        "x": 488,
-        "y": 915,
-        "width": 238,
-        "height": 306
+        "x": 479,
+        "y": 924,
+        "width": 235,
+        "height": 307
       },
       "contentBounds": {
-        "x": 489,
-        "y": 916,
+        "x": 479,
+        "y": 924,
         "width": 235,
-        "height": 305
+        "height": 307
       },
       "anchor": {
         "x": 0.5,
@@ -417,16 +417,16 @@
     {
       "id": "tree_willow_3",
       "bounds": {
-        "x": 726,
-        "y": 915,
+        "x": 714,
+        "y": 924,
         "width": 239,
-        "height": 306
+        "height": 307
       },
       "contentBounds": {
-        "x": 733,
-        "y": 922,
-        "width": 225,
-        "height": 299
+        "x": 714,
+        "y": 928,
+        "width": 239,
+        "height": 303
       },
       "anchor": {
         "x": 0.5,
@@ -445,15 +445,15 @@
       "id": "tree_maple_0",
       "bounds": {
         "x": 0,
-        "y": 1221,
-        "width": 240,
-        "height": 306
+        "y": 1231,
+        "width": 235,
+        "height": 296
       },
       "contentBounds": {
-        "x": 3,
-        "y": 1223,
-        "width": 234,
-        "height": 304
+        "x": 0,
+        "y": 1235,
+        "width": 235,
+        "height": 292
       },
       "anchor": {
         "x": 0.5,
@@ -471,16 +471,16 @@
     {
       "id": "tree_maple_1",
       "bounds": {
-        "x": 240,
-        "y": 1221,
-        "width": 248,
-        "height": 306
+        "x": 235,
+        "y": 1231,
+        "width": 244,
+        "height": 296
       },
       "contentBounds": {
-        "x": 245,
-        "y": 1223,
-        "width": 237,
-        "height": 304
+        "x": 235,
+        "y": 1231,
+        "width": 244,
+        "height": 296
       },
       "anchor": {
         "x": 0.5,
@@ -498,16 +498,16 @@
     {
       "id": "tree_maple_2",
       "bounds": {
-        "x": 488,
-        "y": 1221,
-        "width": 238,
-        "height": 306
+        "x": 479,
+        "y": 1231,
+        "width": 235,
+        "height": 296
       },
       "contentBounds": {
-        "x": 489,
-        "y": 1222,
-        "width": 236,
-        "height": 305
+        "x": 481,
+        "y": 1232,
+        "width": 230,
+        "height": 295
       },
       "anchor": {
         "x": 0.5,
@@ -525,16 +525,16 @@
     {
       "id": "tree_maple_3",
       "bounds": {
-        "x": 726,
-        "y": 1221,
+        "x": 714,
+        "y": 1231,
         "width": 239,
-        "height": 306
+        "height": 296
       },
       "contentBounds": {
-        "x": 729,
-        "y": 1221,
-        "width": 232,
-        "height": 306
+        "x": 718,
+        "y": 1233,
+        "width": 231,
+        "height": 294
       },
       "anchor": {
         "x": 0.5,
@@ -554,11 +554,11 @@
       "bounds": {
         "x": 0,
         "y": 1527,
-        "width": 240,
+        "width": 235,
         "height": 211
       },
       "contentBounds": {
-        "x": 16,
+        "x": 13,
         "y": 1531,
         "width": 208,
         "height": 207
@@ -579,13 +579,13 @@
     {
       "id": "tree_dead_1",
       "bounds": {
-        "x": 240,
+        "x": 235,
         "y": 1527,
-        "width": 248,
+        "width": 244,
         "height": 211
       },
       "contentBounds": {
-        "x": 260,
+        "x": 253,
         "y": 1530,
         "width": 208,
         "height": 208
@@ -606,13 +606,13 @@
     {
       "id": "tree_dead_2",
       "bounds": {
-        "x": 488,
+        "x": 479,
         "y": 1527,
-        "width": 238,
+        "width": 235,
         "height": 211
       },
       "contentBounds": {
-        "x": 503,
+        "x": 492,
         "y": 1527,
         "width": 208,
         "height": 211
@@ -633,13 +633,13 @@
     {
       "id": "tree_dead_3",
       "bounds": {
-        "x": 726,
+        "x": 714,
         "y": 1527,
         "width": 239,
         "height": 211
       },
       "contentBounds": {
-        "x": 741,
+        "x": 729,
         "y": 1532,
         "width": 208,
         "height": 206
