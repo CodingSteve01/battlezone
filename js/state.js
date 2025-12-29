@@ -175,7 +175,12 @@ export const state = {
     holdingPosition: {},            // unitId -> {rounds: number, q, r} - Wie lange auf Position gehalten
 
     // === SPIELER-STATISTIKEN (für Siegerehrung) ===
-    playerStats: []                 // Array von Statistik-Objekten pro Spieler
+    playerStats: [],                // Array von Statistik-Objekten pro Spieler
+
+    // Debug/Overlay flags
+    debug: {
+        showHeightOverlay: false
+    }
 };
 
 /**
@@ -280,6 +285,7 @@ export function resetState() {
 
     // Reset debug flags
     state._visibilityWarningLogged = false;
+    state.debug.showHeightOverlay = false;
 
     // Koordinierte Angriffe zurücksetzen
     state.coordinatedAttack = {

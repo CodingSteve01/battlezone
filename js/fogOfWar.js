@@ -14,7 +14,9 @@ function getUnitVisibleHexes(unit) {
     const visible = new Set();
     // Apply event modifier to vision range
     const eventModifier = getFogEventModifier();
-    const visionRange = Math.max(1, (unit.vision || CONFIG.VISION_RANGE) + eventModifier);
+    const unitHex = getHex(unit.q, unit.r);
+    const heightBonus = Math.max(0, (unitHex?.height ?? 0) - 1) * CONFIG.HEIGHT.VISION_BONUS_PER_LEVEL;
+    const visionRange = Math.max(1, (unit.vision || CONFIG.VISION_RANGE) + eventModifier + heightBonus);
 
     // Get all hexes in vision range
     const hexesInRange = getHexesInRange(unit.q, unit.r, visionRange);

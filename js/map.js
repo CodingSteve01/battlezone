@@ -132,6 +132,7 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
     const moist = biome.moistureThresholds;
 
     let type = biome.baseType || 'grass';
+    const height = getHeightFromElevation(elevationNoise, biome.elevationThresholds);
 
     // Water at edges or low elevation
     if (edgeFactor > 0.85 || (elevationNoise < elev.water && !biome.noWaterEdge)) {
@@ -150,7 +151,8 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
         q,
         r,
         type,
-        walkable: TERRAIN[type]?.walkable ?? true
+        walkable: TERRAIN[type]?.walkable ?? true,
+        height
     };
 }
 
@@ -179,6 +181,22 @@ function simpleFractalNoise(q, r, baseScale, octaves, seed) {
 function simpleNoise(x, y, seed) {
     const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 43.758) * 43758.5453;
     return n - Math.floor(n);
+}
+
+/**
+ * Convert elevation noise into a discrete height level
+ */
+function getHeightFromElevation(elevationNoise, thresholds) {
+    if (elevationNoise < thresholds.water) {
+        return 0;
+    }
+    if (elevationNoise < thresholds.hills) {
+        return 1;
+    }
+    if (elevationNoise < thresholds.rock) {
+        return 2;
+    }
+    return CONFIG.HEIGHT.MAX;
 }
 
 /**
@@ -250,6 +268,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
     const weights = biome.weights;
 
     let type = 'grass';
+    const height = getHeightFromElevation(elevationNoise, elev);
 
     // Determine terrain based on noise values using biome thresholds
     if (elevationNoise > elev.rock || (elevationNoise > elev.rock - 0.08 && roughnessNoise > 0.6)) {
@@ -365,6 +384,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
         walkable: terrain.walkable,
         cover: terrain.cover,
         moveCost: terrain.moveCost,
+        height,
         unit: null
     };
 }

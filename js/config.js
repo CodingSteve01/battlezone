@@ -15,6 +15,12 @@ export const CONFIG = {
     AP_PER_TURN: 4,
     MAX_ROUNDS: 30,
     VISION_RANGE: 6,  // Fog of War vision range (increased from 5)
+    HEIGHT: {
+        MAX: 3,
+        VISION_BONUS_PER_LEVEL: 1,
+        DEFENSE_BONUS_PER_LEVEL: 5,
+        CLIMB_COST_PER_LEVEL: 1
+    },
 
     // Balance: Limit attacks per unit per turn to prevent one unit from dominating
     MAX_ATTACKS_PER_UNIT: 1,  // Each unit can attack max 1 time per turn
