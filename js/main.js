@@ -1,6 +1,6 @@
 // ===== MAIN ENTRY POINT =====
 
-import { state, resetState, initZone, getPlayerName } from './state.js';
+import { state, resetState, initZone, getPlayerName, ZOOM_REFERENCE } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
@@ -590,7 +590,7 @@ function startGameWithTeams() {
     // Reset camera and zoom to defaults
     state.cameraX = 0;
     state.cameraY = 0;
-    state.zoomLevel = 1.0;
+    state.zoomLevel = ZOOM_REFERENCE;
     state.hexSize = CONFIG.BASE_HEX_SIZE;  // Reset to base size (will be recalculated by resizeCanvas)
 
     // Generate map and units

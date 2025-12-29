@@ -2,6 +2,18 @@
 
 import { CONFIG } from './config.js';
 
+export const ZOOM_REFERENCE = 0.5;
+
+export function zoomLevelToScale(zoomLevel) {
+    const safeZoom = Number.isFinite(zoomLevel) ? zoomLevel : ZOOM_REFERENCE;
+    return safeZoom / ZOOM_REFERENCE;
+}
+
+export function scaleToZoomLevel(scale) {
+    const safeScale = Number.isFinite(scale) ? scale : 1;
+    return safeScale * ZOOM_REFERENCE;
+}
+
 // Central game state object
 export const state = {
     screen: 'menu',
@@ -101,9 +113,9 @@ export const state = {
     cameraY: 0,
 
     // Zoom
-    zoomLevel: 1.0,
-    minZoom: 0.5,
-    maxZoom: 2.0,
+    zoomLevel: ZOOM_REFERENCE,
+    minZoom: 0.35,
+    maxZoom: 0.65,
 
     // Queued path for multi-turn movement
     queuedPaths: {},  // unitId -> { path: [{q, r}, ...], targetQ, targetR }
@@ -220,7 +232,7 @@ export function resetState() {
     state.ghostIndicators = [];
     state.cameraX = 0;
     state.cameraY = 0;
-    state.zoomLevel = 1.0;
+    state.zoomLevel = ZOOM_REFERENCE;
     state.queuedPaths = {};
 
     // Initialize per-player tracking arrays

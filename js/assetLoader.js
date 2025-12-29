@@ -223,7 +223,7 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
         const anchor = SpriteSheet.getUnitAnchor(classType, playerIndex, status) || { x: 0.5, y: 1.0 };
 
         // Base sprite size - units should be smaller than hex size
-        const baseSize = size * 1.2;
+        const baseSize = size * 1.35;
 
         const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
         const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;

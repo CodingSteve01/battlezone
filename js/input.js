@@ -1,6 +1,6 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel } from './state.js';
 import { pixelToHex, hexToPixel, hexDistance } from './hexMath.js';
 import { findPath } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
@@ -263,7 +263,7 @@ function handleTouchStart(e) {
         isDragging = false;
         initialPinchDistance = getPinchDistance(e.touches);
         // Ensure valid zoom level before pinch
-        initialZoomLevel = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+        initialZoomLevel = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
         initialCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
         initialCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
         // Store initial pinch center for consistent zoom point
@@ -514,10 +514,12 @@ export function centerOnTeam(playerIndex, duration = 600) {
         const referenceUnit = playerUnits[0];
         const allRelevantUnits = [...playerUnits.slice(1), ...visibleEnemies];
         const situationalZoom = calculateSituationalZoom(referenceUnit, allRelevantUnits);
+        const situationalScale = zoomLevelToScale(situationalZoom);
 
         // Clamp between 0.7 and 0.95 for turn start overview
-        const targetZoom = Math.max(0.7, Math.min(0.95, situationalZoom));
-        const targetHexSize = CONFIG.BASE_HEX_SIZE * targetZoom;
+        const targetZoomScale = Math.max(0.7, Math.min(0.95, situationalScale));
+        const targetZoom = scaleToZoomLevel(targetZoomScale);
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(targetZoom);
 
         // Calculate center of units at target zoom level
         let minX = Infinity, maxX = -Infinity;
@@ -537,7 +539,7 @@ export function centerOnTeam(playerIndex, duration = 600) {
         // Animate to position and zoom
         const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
         const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
         const startTime = Date.now();
 
         function animate() {
@@ -551,7 +553,7 @@ export function centerOnTeam(playerIndex, duration = 600) {
 
             // Animate zoom to 100%
             state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
-            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
 
             // Recalculate center at current zoom level for smooth animation
             let newMinX = Infinity, newMaxX = -Infinity;
@@ -616,7 +618,7 @@ function handleWheel(e) {
  */
 function applyZoom(zoomDelta, screenX, screenY) {
     // Ensure valid starting zoom level
-    const oldZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+    const oldZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
     const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, oldZoom + zoomDelta));
 
     if (newZoom === oldZoom) return;
@@ -1245,14 +1247,14 @@ export function followUnitInstant(unit) {
  * @returns {number} Optimal zoom level (0.5 to 1.2 range)
  */
 export function calculateSituationalZoom(focusUnit, relevantUnits = []) {
-    if (!focusUnit || !canvas) return 0.85; // Default zoom
+    if (!focusUnit || !canvas) return scaleToZoomLevel(0.85); // Default zoom
 
     // Gather all units that should be visible
     const unitsToShow = [focusUnit, ...relevantUnits].filter(u => u && u.hp > 0);
 
     if (unitsToShow.length <= 1) {
         // Single unit - use moderate zoom for context
-        return 0.9;
+        return scaleToZoomLevel(0.9);
     }
 
     // Calculate bounding box of all relevant units
@@ -1287,10 +1289,11 @@ export function calculateSituationalZoom(focusUnit, relevantUnits = []) {
     // Clamp to reasonable range:
     // - Minimum 0.6 for complex situations (many units spread out)
     // - Maximum 1.0 for close combat (don't zoom in too much)
-    const minZoom = state.minZoom || 0.5;
-    const maxZoom = Math.min(state.maxZoom || 2.0, 1.0); // Cap at 1.0 for situational
+    const minZoom = zoomLevelToScale(state.minZoom || 0.5);
+    const maxZoom = Math.min(zoomLevelToScale(state.maxZoom || 2.0), 1.0); // Cap at 1.0 for situational
 
-    return Math.max(minZoom, Math.min(maxZoom, zoomToFit * 0.8)); // 0.8 factor for extra padding
+    const clampedScale = Math.max(minZoom, Math.min(maxZoom, zoomToFit * 0.8)); // 0.8 factor for extra padding
+    return scaleToZoomLevel(clampedScale);
 }
 
 /**
@@ -1345,7 +1348,7 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
         }
 
         // Ensure valid starting zoom level
-        const safeCurrentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+        const safeCurrentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
 
         // Determine ideal zoom level:
         // 1. If explicit targetZoom is provided, use it
@@ -1368,7 +1371,7 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
         const clampedZoom = Math.min(Math.max(idealZoom, minZoom), maxZoom);
 
         // Calculate target position at the target zoom level
-        const targetHexSize = CONFIG.BASE_HEX_SIZE * clampedZoom;
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(clampedZoom);
         const targetPos = hexToPixel(unit.q, unit.r, targetHexSize);
         const targetCameraX = -targetPos.x;
         const targetCameraY = -targetPos.y;
@@ -1389,7 +1392,7 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
 
             // Animate zoom
             state.zoomLevel = startZoom + (clampedZoom - startZoom) * ease;
-            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
 
             // Recalculate target position at current zoom level for smooth tracking
             const currentTargetPos = hexToPixel(unit.q, unit.r, state.hexSize);
@@ -1422,7 +1425,7 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
 function animateZoom(targetZoom, duration = 500) {
     return new Promise(resolve => {
         // Ensure valid starting zoom level
-        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : 1.0;
+        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
         const startTime = Date.now();
 
         function animate() {
@@ -1435,7 +1438,7 @@ function animateZoom(targetZoom, duration = 500) {
                 : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
             state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
-            state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
 
             render();
 
@@ -1525,11 +1528,11 @@ export async function playGameIntro() {
         const mapExtent = mapRadius * CONFIG.BASE_HEX_SIZE * 1.5;
 
         // Step 1: Start with a wide overview of the entire map
-        const overviewZoom = 0.4;
+        const overviewZoom = scaleToZoomLevel(0.4);
         state.cameraX = 0;
         state.cameraY = 0;
         state.zoomLevel = overviewZoom;
-        state.hexSize = CONFIG.BASE_HEX_SIZE * state.zoomLevel;
+        state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
         limitCameraBounds();
         updateCameraOffset();
         render();
@@ -1553,7 +1556,7 @@ export async function playGameIntro() {
         await delay(400);
 
         // Step 4: Zoom in while panning to each unit
-        const intermediateZoom = 0.7;
+        const intermediateZoom = scaleToZoomLevel(0.7);
         await animateZoom(intermediateZoom, 500);
 
         // Step 5: Show each unit briefly
@@ -1569,7 +1572,7 @@ export async function playGameIntro() {
 
         await Promise.all([
             animateCameraTo(-firstPos.x, -firstPos.y, 700),
-            animateZoom(1.0, 700)
+            animateZoom(scaleToZoomLevel(1.0), 700)
         ]);
 
         // Start tutorial if this is the first game
