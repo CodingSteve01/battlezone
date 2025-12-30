@@ -109,6 +109,7 @@ function drawHeightExtrusion(cx, cy, size, height) {
 /**
  * Draw cliff/slope faces between tiles of different heights
  * Creates realistic earth/ground appearance when looking at height differences
+ * Optimized to reduce rendering overhead
  */
 function drawCliffFaces(cx, cy, size, hex) {
     if (!hex || hex.height === undefined) return;
@@ -118,6 +119,10 @@ function drawCliffFaces(cx, cy, size, hex) {
     
     const neighbors = getNeighbors(hex.q, hex.r);
     const light = getLightVector();
+    
+    // Pre-calculate earth color for this height level
+    const earthBase = myHeight >= 3 ? 60 : (myHeight >= 2 ? 75 : 90);
+    const earthColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
     
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
@@ -150,7 +155,14 @@ function drawCliffFaces(cx, cy, size, hex) {
         const bottomX2 = topX2;
         const bottomY2 = topY2 + faceHeight;
         
-        // Draw the cliff face as a trapezoid
+        // Calculate lighting once per face
+        const faceAngle = angle1 + Math.PI / 6; // Mid-angle of this edge
+        const faceDirX = Math.cos(faceAngle);
+        const faceDirY = Math.sin(faceAngle);
+        const lightDot = -(faceDirX * light.x + faceDirY * light.y);
+        const lightFactor = Math.max(0.4, 0.7 + lightDot * 0.3);
+        
+        // Draw the cliff face as a simple trapezoid (no gradient for performance)
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(topX1, topY1);
@@ -159,30 +171,8 @@ function drawCliffFaces(cx, cy, size, hex) {
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
         
-        // Earth/rock color based on height - deeper heights are darker
-        const earthBase = myHeight >= 3 ? 60 : (myHeight >= 2 ? 75 : 90);
-        const earthColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
-        
-        // Apply lighting - faces facing light are brighter
-        const faceAngle = angle1 + Math.PI / 6; // Mid-angle of this edge
-        const faceDirX = Math.cos(faceAngle);
-        const faceDirY = Math.sin(faceAngle);
-        const lightDot = -(faceDirX * light.x + faceDirY * light.y);
-        const lightFactor = Math.max(0.4, 0.7 + lightDot * 0.3);
-        
         ctx.fillStyle = earthColor;
-        ctx.globalAlpha = lightFactor;
-        ctx.fill();
-        
-        // Add subtle darker edge at bottom for depth
-        const gradient = ctx.createLinearGradient(
-            (topX1 + topX2) / 2, (topY1 + topY2) / 2,
-            (bottomX1 + bottomX2) / 2, (bottomY1 + bottomY2) / 2
-        );
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
-        ctx.fillStyle = gradient;
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = lightFactor * 0.85; // Slight transparency for depth
         ctx.fill();
         
         ctx.restore();

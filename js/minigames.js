@@ -150,10 +150,39 @@ export function calculateDifficultyModifiers(unitClass, context) {
                 mods.description = 'Feind in Deckung!';
             }
             break;
+        
+        case 'elitesoldat':
+            // Kommando-Soldat: Vielseitig - passt sich an Situation an
+            // Im Nahkampf (distance = 1): wie Commando
+            // Im Fernkampf: wie Assault aber stabiler
+            if (context.distance === 1) {
+                // Nahkampf: Wie Commando
+                if (context.isAmbush) {
+                    mods.extraChance = 0.15;     // Elite ist gut, aber nicht ganz so stark wie Commando
+                    mods.timeMultiplier = 1.2;
+                    mods.description = 'Nahkampf-Überraschung!';
+                }
+                if (context.alliesInRange > 0) {
+                    mods.extraChance += context.alliesInRange * 0.08;
+                    mods.description = `Taktische Unterstützung (+${context.alliesInRange * 8}% Chance)`;
+                }
+            } else {
+                // Fernkampf: Wie Assault aber mit Elite-Bonus
+                mods.zoneMultiplier = 1.1;       // Elite ist präziser
+                if (context.alliesInRange > 0) {
+                    mods.zoneMultiplier += context.alliesInRange * 0.05;
+                    mods.description = `Koordinierter Angriff (+${context.alliesInRange * 5}%)`;
+                }
+                if (context.attackerHP < 0.3) {
+                    mods.speedMultiplier = 1.2;  // Auch Eliten geraten unter Druck
+                    mods.description = 'Kritischer Zustand!';
+                }
+            }
+            break;
     }
 
     // === TERRAIN-EFFEKTE ===
-    if (context.targetTerrain === 'forest' && unitClass !== 'commando') {
+    if (context.targetTerrain === 'forest' && unitClass !== 'commando' && unitClass !== 'elitesoldat') {
         mods.zoneMultiplier *= 0.85;  // Wald versteckt das Ziel leicht
     }
 
@@ -675,6 +704,18 @@ export async function startMinigame(unitClass, context = null) {
                 break;
             case 'commando':
                 startCommandoDuelMinigame(resolve, currentModifiers);
+                break;
+            case 'elitesoldat':
+                // Kommando-Soldat: Dual-Mode basierend auf Distanz
+                // Nahkampf (Distanz 1): Commando-Duell-Minigame
+                // Fernkampf (Distanz > 1): Assault-Minigame
+                if (context && context.distance === 1) {
+                    // Nahkampf-Modus
+                    startCommandoDuelMinigame(resolve, currentModifiers);
+                } else {
+                    // Fernkampf-Modus
+                    startAssaultMinigame(resolve, currentModifiers);
+                }
                 break;
             default:
                 // Unknown class - auto-resolve with GOOD
