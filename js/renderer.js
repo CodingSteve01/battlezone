@@ -106,6 +106,89 @@ function drawHeightExtrusion(cx, cy, size, height) {
     ctx.restore();
 }
 
+/**
+ * Draw cliff/slope faces between tiles of different heights
+ * Creates realistic earth/ground appearance when looking at height differences
+ */
+function drawCliffFaces(cx, cy, size, hex) {
+    if (!hex || hex.height === undefined) return;
+    
+    const myHeight = hex.height ?? 0;
+    if (myHeight === 0) return; // No cliff faces for ground-level tiles
+    
+    const neighbors = getNeighbors(hex.q, hex.r);
+    const light = getLightVector();
+    
+    // Draw cliff face for each neighbor that's lower than this hex
+    neighbors.forEach((neighbor, direction) => {
+        const neighborHex = getHex(neighbor.q, neighbor.r);
+        if (!neighborHex) return;
+        
+        const neighborHeight = neighborHex.height ?? 0;
+        const heightDiff = myHeight - neighborHeight;
+        
+        if (heightDiff <= 0) return; // Only draw cliff if we're higher
+        
+        // Calculate the cliff face positions
+        // Direction 0 = right, incrementing clockwise
+        const angle1 = (Math.PI / 3) * direction;
+        const angle2 = (Math.PI / 3) * ((direction + 1) % 6);
+        
+        const myOffset = getTileZOffset(myHeight, size);
+        const neighborOffset = getTileZOffset(neighborHeight, size);
+        const faceHeight = myOffset - neighborOffset;
+        
+        // Points on this hex's edge (top of cliff)
+        const topX1 = cx + size * Math.cos(angle1);
+        const topY1 = cy + size * Math.sin(angle1);
+        const topX2 = cx + size * Math.cos(angle2);
+        const topY2 = cy + size * Math.sin(angle2);
+        
+        // Points at bottom of cliff (aligned with lower neighbor)
+        const bottomX1 = topX1;
+        const bottomY1 = topY1 + faceHeight;
+        const bottomX2 = topX2;
+        const bottomY2 = topY2 + faceHeight;
+        
+        // Draw the cliff face as a trapezoid
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(topX1, topY1);
+        ctx.lineTo(topX2, topY2);
+        ctx.lineTo(bottomX2, bottomY2);
+        ctx.lineTo(bottomX1, bottomY1);
+        ctx.closePath();
+        
+        // Earth/rock color based on height - deeper heights are darker
+        const earthBase = myHeight >= 3 ? 60 : (myHeight >= 2 ? 75 : 90);
+        const earthColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
+        
+        // Apply lighting - faces facing light are brighter
+        const faceAngle = angle1 + Math.PI / 6; // Mid-angle of this edge
+        const faceDirX = Math.cos(faceAngle);
+        const faceDirY = Math.sin(faceAngle);
+        const lightDot = -(faceDirX * light.x + faceDirY * light.y);
+        const lightFactor = Math.max(0.4, 0.7 + lightDot * 0.3);
+        
+        ctx.fillStyle = earthColor;
+        ctx.globalAlpha = lightFactor;
+        ctx.fill();
+        
+        // Add subtle darker edge at bottom for depth
+        const gradient = ctx.createLinearGradient(
+            (topX1 + topX2) / 2, (topY1 + topY2) / 2,
+            (bottomX1 + bottomX2) / 2, (bottomY1 + bottomY2) / 2
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
+        ctx.fillStyle = gradient;
+        ctx.globalAlpha = 1;
+        ctx.fill();
+        
+        ctx.restore();
+    });
+}
+
 function drawHeightShadow(cx, cy, size, height) {
     const offset = getShadowOffset(height, size);
     if (offset <= 0) return;
@@ -181,11 +264,13 @@ function drawSpriteShadow(x, y, width, height, heightLevel = 1) {
     ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
     ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
     ctx.beginPath();
+    // Draw shadow as an ellipse at the base of the sprite
+    // Width scaled down to match base of tree/object, not full sprite width
     ctx.ellipse(
         x + light.x * shadowOffset * 0.6,
-        y + light.y * shadowOffset * 0.6 + height * 0.1,
-        width * 0.25,
-        height * 0.12,
+        y + light.y * shadowOffset * 0.6 + height * 0.05,  // Closer to ground
+        width * 0.2,   // Narrower shadow for more realistic base
+        height * 0.08, // Shorter shadow height
         0,
         0,
         Math.PI * 2
@@ -3544,6 +3629,7 @@ export function render() {
             }
             if (fogLevel !== 'hidden') {
                 drawHeightExtrusion(sx, sy, tileSize, hex.height);
+                drawCliffFaces(sx, sy, tileSize, hex);
             }
             ctx.drawImage(
                 cachedTile,
@@ -3571,6 +3657,7 @@ export function render() {
             }
             if (fogLevel !== 'hidden') {
                 drawHeightExtrusion(sx, sy, tileSize, hex.height);
+                drawCliffFaces(sx, sy, tileSize, hex);
             }
             drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
