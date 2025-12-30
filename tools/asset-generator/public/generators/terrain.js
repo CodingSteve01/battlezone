@@ -523,7 +523,7 @@ const TerrainGenerator = {
      * @param {number} height - Canvas height for hex top surface (default 192)
      * @param {number} earthHeight - Height of the earth layer below hex (default 40)
      */
-    generateIsometric(type, variant = 0, width = 256, height = 192, earthHeight = 40) {
+    generateIsometric(type, variant = 0, width = 256, height = 192, earthHeight = 80) {
         const terrain = this.types[type] || this.types.grass;
         const totalHeight = height + earthHeight;
 
@@ -574,18 +574,20 @@ const TerrainGenerator = {
             this.renderGrassOverhang(ctx, hexCenterX, hexCenterY, radius, earthHeight, terrain, noise, variant);
         }
 
+        // Add waterfall for water terrain
+        if (type === 'water' || type === 'river' || type.startsWith('stream')) {
+            this.renderWaterfall(ctx, hexCenterX, hexCenterY, radius, earthHeight, noise, variant);
+        }
+
         return canvas;
     },
 
     /**
      * Render the earth/cliff layer below the hex surface
-     * Creates a 3D platform effect visible on the bottom edges
+     * Creates a 3D isometric platform with proper trapezoid-rectangle-trapezoid geometry
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
-        // For flat-top hex, bottom edges are at angles 60°, 120°, 180° (SE, S, SW)
-        // Vertices: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
-
-        // Get hex vertices
+        // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
         const vertices = [];
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i;
@@ -595,94 +597,164 @@ const TerrainGenerator = {
             });
         }
 
-        // Draw earth faces for bottom-facing edges
-        // Edge 0-1: E to SE (bottom-right diagonal)
-        this.renderEarthFace(ctx, vertices[0], vertices[1], earthHeight, earthPalette, 'right', noise, variant);
+        // Find the lowest point of the hex (vertices 1 and 2 are at the bottom)
+        const bottomY = Math.max(vertices[1].y, vertices[2].y);
+        // All cliff faces extend down to the same level
+        const cliffBottomY = bottomY + earthHeight;
 
-        // Edge 1-2: SE to SW (bottom flat edge)
-        this.renderEarthFace(ctx, vertices[1], vertices[2], earthHeight, earthPalette, 'front', noise, variant);
-
-        // Edge 2-3: SW to W (bottom-left diagonal)
-        this.renderEarthFace(ctx, vertices[2], vertices[3], earthHeight, earthPalette, 'left', noise, variant);
+        // Draw 3 cliff faces in back-to-front order for proper layering
+        // 1. Left face (trapezoid)
+        this.renderCliffFace(ctx, vertices[2], vertices[3], cliffBottomY, earthPalette, 'left', noise, variant);
+        // 2. Front face (rectangle)
+        this.renderCliffFace(ctx, vertices[1], vertices[2], cliffBottomY, earthPalette, 'front', noise, variant);
+        // 3. Right face (trapezoid)
+        this.renderCliffFace(ctx, vertices[0], vertices[1], cliffBottomY, earthPalette, 'right', noise, variant);
     },
 
     /**
-     * Render a single earth face (cliff side)
+     * Render a single cliff face with realistic rock/earth texture
      */
-    renderEarthFace(ctx, v1, v2, earthHeight, earthPalette, facing, noise, variant) {
+    renderCliffFace(ctx, v1, v2, cliffBottomY, earthPalette, facing, noise, variant) {
         ctx.save();
 
-        // Create quadrilateral path for this face
+        // Create trapezoid/rectangle path - bottom at same Y level
         ctx.beginPath();
         ctx.moveTo(v1.x, v1.y);
         ctx.lineTo(v2.x, v2.y);
-        ctx.lineTo(v2.x, v2.y + earthHeight);
-        ctx.lineTo(v1.x, v1.y + earthHeight);
+        ctx.lineTo(v2.x, cliffBottomY);
+        ctx.lineTo(v1.x, cliffBottomY);
         ctx.closePath();
 
-        // Create gradient based on facing direction
-        let gradient;
-        const midX = (v1.x + v2.x) / 2;
-        const topY = (v1.y + v2.y) / 2;
-        const bottomY = topY + earthHeight;
+        const faceWidth = Math.abs(v2.x - v1.x);
+        const faceHeight = cliffBottomY - Math.min(v1.y, v2.y);
+        const topY = Math.min(v1.y, v2.y);
 
+        // Color based on facing direction
+        let baseColor, shadowColor, highlightColor;
         if (facing === 'front') {
-            // Front face gets darkest gradient (bottom-center)
-            gradient = ctx.createLinearGradient(midX, topY, midX, bottomY);
-            gradient.addColorStop(0, earthPalette.light);
-            gradient.addColorStop(0.3, earthPalette.mid);
-            gradient.addColorStop(1, earthPalette.dark);
+            baseColor = earthPalette.mid;
+            shadowColor = earthPalette.dark;
+            highlightColor = earthPalette.light;
         } else if (facing === 'right') {
-            // Right face gets medium-light gradient
-            gradient = ctx.createLinearGradient(v1.x, topY, v2.x, bottomY);
-            gradient.addColorStop(0, earthPalette.light);
-            gradient.addColorStop(0.5, earthPalette.mid);
-            gradient.addColorStop(1, this.darkenColor(earthPalette.dark, 0.9));
+            baseColor = earthPalette.light;
+            shadowColor = earthPalette.mid;
+            highlightColor = this.lightenColor(earthPalette.light, 1.1);
         } else {
-            // Left face gets darkest (in shadow)
-            gradient = ctx.createLinearGradient(v2.x, topY, v1.x, bottomY);
-            gradient.addColorStop(0, this.darkenColor(earthPalette.light, 0.85));
-            gradient.addColorStop(0.4, this.darkenColor(earthPalette.mid, 0.8));
-            gradient.addColorStop(1, this.darkenColor(earthPalette.dark, 0.7));
+            baseColor = this.darkenColor(earthPalette.mid, 0.7);
+            shadowColor = this.darkenColor(earthPalette.dark, 0.6);
+            highlightColor = earthPalette.mid;
         }
 
+        // Fill with gradient
+        const gradient = ctx.createLinearGradient(
+            (v1.x + v2.x) / 2, topY,
+            (v1.x + v2.x) / 2, cliffBottomY
+        );
+        gradient.addColorStop(0, highlightColor);
+        gradient.addColorStop(0.3, baseColor);
+        gradient.addColorStop(0.7, baseColor);
+        gradient.addColorStop(1, shadowColor);
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Add texture noise to earth
-        const noiseScale = 0.08;
-        for (let i = 0; i < 30; i++) {
-            const t = Math.random();
-            const s = Math.random();
-            const px = v1.x + (v2.x - v1.x) * t;
-            const py = v1.y + (v2.y - v1.y) * t + earthHeight * s;
+        ctx.clip();
 
-            const noiseVal = noise.noise2D(px * noiseScale + variant, py * noiseScale);
-            if (noiseVal > 0.3) {
-                const size = 1 + Math.random() * 2;
-                const alpha = 0.1 + Math.random() * 0.15;
-                ctx.fillStyle = noiseVal > 0.5
-                    ? `rgba(255,255,255,${alpha})`
-                    : `rgba(0,0,0,${alpha})`;
+        // Add horizontal earth strata (layers)
+        const strataCount = 4 + Math.floor(variant % 3);
+        for (let i = 0; i < strataCount; i++) {
+            const strataY = topY + (faceHeight * (i + 0.5)) / strataCount;
+            const strataThickness = 2 + noise.noise2D(i * 7 + variant, 0) * 3;
+
+            ctx.beginPath();
+            const segments = 8;
+            for (let s = 0; s <= segments; s++) {
+                const t = s / segments;
+                const x = v1.x + (v2.x - v1.x) * t;
+                const waveOffset = noise.noise2D(x * 0.05, i * 10 + variant) * 4;
+                const y = strataY + waveOffset;
+                if (s === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = `rgba(0,0,0,${0.1 + (i % 2) * 0.05})`;
+            ctx.lineWidth = strataThickness;
+            ctx.stroke();
+        }
+
+        // Add rock texture
+        const rockCount = 15 + Math.floor(faceWidth / 10);
+        for (let i = 0; i < rockCount; i++) {
+            const rx = v1.x + Math.random() * (v2.x - v1.x);
+            const ry = topY + Math.random() * faceHeight;
+            const noiseVal = noise.noise2D(rx * 0.1 + variant, ry * 0.1);
+            if (noiseVal > 0.2) {
+                const rockSize = 3 + Math.random() * 8;
                 ctx.beginPath();
-                ctx.arc(px, py, size, 0, Math.PI * 2);
+                const points = 5 + Math.floor(Math.random() * 3);
+                for (let p = 0; p < points; p++) {
+                    const angle = (Math.PI * 2 * p) / points;
+                    const dist = rockSize * (0.5 + Math.random() * 0.5);
+                    const px = rx + Math.cos(angle) * dist;
+                    const py = ry + Math.sin(angle) * dist * 0.7;
+                    if (p === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fillStyle = noiseVal > 0.5
+                    ? `rgba(255,255,255,${0.05 * (0.8 + noiseVal * 0.4)})`
+                    : `rgba(0,0,0,${0.08 * (1.2 - noiseVal * 0.4)})`;
                 ctx.fill();
             }
         }
 
-        // Add horizontal striations for rock texture
-        ctx.strokeStyle = `rgba(0,0,0,0.08)`;
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i < 5; i++) {
-            const y = topY + (earthHeight * (i + 0.5) / 5);
-            const wobble = noise.noise2D(i * 10 + variant, 0) * 3;
+        // Add vertical cracks
+        const crackCount = 2 + Math.floor(variant % 3);
+        for (let i = 0; i < crackCount; i++) {
+            const crackX = v1.x + (v2.x - v1.x) * (0.2 + Math.random() * 0.6);
+            const crackStartY = topY + Math.random() * faceHeight * 0.3;
+            const crackEndY = crackStartY + faceHeight * (0.3 + Math.random() * 0.5);
+
             ctx.beginPath();
-            ctx.moveTo(v1.x + wobble, y + v1.y - topY);
-            ctx.lineTo(v2.x - wobble, y + v2.y - topY);
+            ctx.moveTo(crackX, crackStartY);
+            let currentY = crackStartY;
+            while (currentY < crackEndY) {
+                currentY += 5 + Math.random() * 10;
+                const offsetX = (Math.random() - 0.5) * 6;
+                ctx.lineTo(crackX + offsetX, Math.min(currentY, crackEndY));
+            }
+            ctx.strokeStyle = `rgba(0,0,0,${0.15 + Math.random() * 0.1})`;
+            ctx.lineWidth = 0.5 + Math.random() * 1;
             ctx.stroke();
         }
 
+        // Add dirt spots
+        for (let i = 0; i < 20; i++) {
+            const dx = v1.x + Math.random() * (v2.x - v1.x);
+            const dy = topY + Math.random() * faceHeight;
+            ctx.beginPath();
+            ctx.arc(dx, dy, 0.5 + Math.random() * 1.5, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${60 + Math.random() * 40}, ${40 + Math.random() * 30}, ${20 + Math.random() * 20}, ${0.3 + Math.random() * 0.3})`;
+            ctx.fill();
+        }
+
+        // Edge highlight at top
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.strokeStyle = `rgba(255,255,255,0.2)`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
         ctx.restore();
+    },
+
+    /**
+     * Helper to lighten a hex color
+     */
+    lightenColor(hex, factor) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgb(${Math.min(255, Math.floor(r * factor))}, ${Math.min(255, Math.floor(g * factor))}, ${Math.min(255, Math.floor(b * factor))})`;
     },
 
     /**
@@ -717,53 +789,153 @@ const TerrainGenerator = {
     },
 
     /**
-     * Render grass tufts along a hex edge
+     * Render grass tufts along a hex edge - grass grows UPWARD
      */
     renderEdgeGrass(ctx, v1, v2, facing, darkColor, midColor, lightColor, noise, variant) {
         const edgeLength = Math.sqrt((v2.x - v1.x) ** 2 + (v2.y - v1.y) ** 2);
-        const tuftCount = Math.floor(edgeLength / 8);
+        const tuftCount = Math.floor(edgeLength / 6); // More grass
         const edgeAngle = Math.atan2(v2.y - v1.y, v2.x - v1.x);
+        const outwardAngle = edgeAngle + Math.PI / 2;
 
         for (let i = 0; i < tuftCount; i++) {
             const t = (i + 0.5) / tuftCount;
             const baseX = v1.x + (v2.x - v1.x) * t;
             const baseY = v1.y + (v2.y - v1.y) * t;
 
-            // Add randomness to position along edge
-            const offset = (noise.noise2D(i * 5 + variant, variant * 2) - 0.5) * 6;
-            const perpX = Math.cos(edgeAngle + Math.PI / 2) * offset;
-            const perpY = Math.sin(edgeAngle + Math.PI / 2) * offset;
+            // Position grass slightly over the edge (outward)
+            const overhang = 2 + noise.noise2D(i * 3 + variant, variant) * 3;
+            const tuftX = baseX + Math.cos(outwardAngle) * overhang;
+            const tuftY = baseY + Math.sin(outwardAngle) * overhang;
 
-            const tuftX = baseX + perpX;
-            const tuftY = baseY + perpY;
-
-            // Draw grass tuft hanging over the edge
-            const bladeCount = 3 + Math.floor(Math.random() * 3);
+            // Draw grass tuft growing UPWARD
+            const bladeCount = 4 + Math.floor(Math.random() * 4);
             for (let b = 0; b < bladeCount; b++) {
-                const bladeAngle = edgeAngle + Math.PI / 2 + (Math.random() - 0.5) * 0.8;
-                const bladeLength = 4 + Math.random() * 6;
-                const bend = (Math.random() - 0.5) * 0.5;
+                // Base angle is straight up (-PI/2) with slight lean
+                const leanFactor = (facing === 'se') ? 0.3 : (facing === 'sw') ? -0.3 : 0;
+                const bladeAngle = -Math.PI / 2 + leanFactor + (Math.random() - 0.5) * 0.6;
+                const bladeLength = 6 + Math.random() * 10;
+                const tipBend = (Math.random() - 0.5) * 0.4;
 
-                const endX = tuftX + Math.cos(bladeAngle + bend) * bladeLength;
-                const endY = tuftY + Math.sin(bladeAngle + bend) * bladeLength;
-                const ctrlX = tuftX + Math.cos(bladeAngle) * bladeLength * 0.5;
-                const ctrlY = tuftY + Math.sin(bladeAngle) * bladeLength * 0.5 + 2;
+                const endX = tuftX + Math.cos(bladeAngle + tipBend) * bladeLength;
+                const endY = tuftY + Math.sin(bladeAngle + tipBend) * bladeLength;
+                const ctrlX = tuftX + Math.cos(bladeAngle) * bladeLength * 0.6 + (Math.random() - 0.5) * 4;
+                const ctrlY = tuftY + Math.sin(bladeAngle) * bladeLength * 0.5;
 
                 // Gradient from dark base to light tip
                 const gradient = ctx.createLinearGradient(tuftX, tuftY, endX, endY);
                 gradient.addColorStop(0, darkColor);
-                gradient.addColorStop(0.5, midColor);
-                gradient.addColorStop(1, lightColor);
+                gradient.addColorStop(0.4, midColor);
+                gradient.addColorStop(0.8, lightColor);
+                gradient.addColorStop(1, this.lightenColor(lightColor, 1.2));
 
                 ctx.beginPath();
                 ctx.moveTo(tuftX, tuftY);
                 ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
                 ctx.strokeStyle = gradient;
-                ctx.lineWidth = 0.8 + Math.random() * 0.4;
+                ctx.lineWidth = 1.2 - (b / bladeCount) * 0.6;
                 ctx.lineCap = 'round';
                 ctx.stroke();
             }
         }
+    },
+
+    /**
+     * Render waterfall effect on water terrain cliff faces
+     */
+    renderWaterfall(ctx, cx, cy, radius, earthHeight, noise, variant) {
+        const vertices = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            vertices.push({
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle)
+            });
+        }
+
+        const bottomY = Math.max(vertices[1].y, vertices[2].y);
+        const cliffBottomY = bottomY + earthHeight;
+
+        const waterLight = '#7dd3fc';
+        const waterMid = '#38bdf8';
+        const waterDark = '#0284c7';
+        const foamWhite = '#f0f9ff';
+
+        const v1 = vertices[1];
+        const v2 = vertices[2];
+
+        ctx.save();
+
+        // Draw water streams
+        const streamCount = 5 + Math.floor(variant % 4);
+        for (let s = 0; s < streamCount; s++) {
+            const streamT = (s + 0.5) / streamCount;
+            const streamX = v1.x + (v2.x - v1.x) * streamT;
+            const streamStartY = v1.y + (v2.y - v1.y) * streamT;
+            const streamWidth = 8 + noise.noise2D(s * 5, variant) * 6;
+
+            const gradient = ctx.createLinearGradient(streamX, streamStartY, streamX, cliffBottomY);
+            gradient.addColorStop(0, waterLight);
+            gradient.addColorStop(0.3, waterMid);
+            gradient.addColorStop(0.7, waterDark);
+            gradient.addColorStop(1, waterMid);
+
+            ctx.beginPath();
+            ctx.moveTo(streamX - streamWidth / 2, streamStartY);
+            const segments = 10;
+            for (let i = 1; i <= segments; i++) {
+                const t = i / segments;
+                const y = streamStartY + (cliffBottomY - streamStartY) * t;
+                const waveX = streamX + Math.sin(t * Math.PI * 3 + variant + s) * 3;
+                const waveWidth = streamWidth * (0.8 + Math.sin(t * Math.PI * 2) * 0.2);
+                ctx.lineTo(waveX - waveWidth / 2, y);
+            }
+            for (let i = segments; i >= 0; i--) {
+                const t = i / segments;
+                const y = streamStartY + (cliffBottomY - streamStartY) * t;
+                const waveX = streamX + Math.sin(t * Math.PI * 3 + variant + s) * 3;
+                const waveWidth = streamWidth * (0.8 + Math.sin(t * Math.PI * 2) * 0.2);
+                ctx.lineTo(waveX + waveWidth / 2, y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Foam highlights
+            ctx.strokeStyle = foamWhite;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.6;
+            for (let f = 0; f < 3; f++) {
+                const foamY = streamStartY + (cliffBottomY - streamStartY) * (0.2 + f * 0.3);
+                const foamWidth = streamWidth * 0.6;
+                ctx.beginPath();
+                ctx.moveTo(streamX - foamWidth / 2, foamY);
+                ctx.quadraticCurveTo(streamX, foamY - 5, streamX + foamWidth / 2, foamY);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        // Splash at bottom
+        for (let i = 0; i < 15; i++) {
+            const splashX = v1.x + (v2.x - v1.x) * Math.random();
+            const splashY = cliffBottomY - 5 + Math.random() * 10;
+            ctx.beginPath();
+            ctx.arc(splashX, splashY, 2 + Math.random() * 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(240, 249, 255, ${0.3 + Math.random() * 0.4})`;
+            ctx.fill();
+        }
+
+        // Mist effect
+        const mistGradient = ctx.createLinearGradient(
+            (v1.x + v2.x) / 2, cliffBottomY - 20,
+            (v1.x + v2.x) / 2, cliffBottomY
+        );
+        mistGradient.addColorStop(0, 'rgba(255,255,255,0)');
+        mistGradient.addColorStop(1, 'rgba(255,255,255,0.3)');
+        ctx.fillStyle = mistGradient;
+        ctx.fillRect(v1.x, cliffBottomY - 20, v2.x - v1.x, 20);
+
+        ctx.restore();
     },
 
     /**
