@@ -1,7 +1,7 @@
 // ===== AI OPPONENT =====
 // Advanced tactical AI with memory, planning, and unit coordination
 
-import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, getVisibleGhosts, canUnitAttack, arePlayersAllied, getPlayerName } from './state.js';
+import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, canUnitAttack, arePlayersAllied, getPlayerName } from './state.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -15,7 +15,7 @@ import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisib
 import { updateUI, showPowerupPickup } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
-import { TERRAIN } from './config.js';
+import { TERRAIN, CONFIG } from './config.js';
 import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
 import { checkPowerupPickup } from './powerups.js';
@@ -577,7 +577,7 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
     priorities.sort((a, b) => b.priority - a.priority);
 
     // Allocate AP based on priority
-    for (const { unit, priority, canAttack, canReachAndAttack } of priorities) {
+    for (const { unit, priority: _priority, canAttack, canReachAndAttack } of priorities) {
         // Calculate unit's AP budget
         let unitBudget;
 
@@ -1015,7 +1015,7 @@ async function performAIActions() {
     // Check if we're in spectator mode (human watching AI vs AI)
     const spectatorMode = isSpectatorMode();
 
-    logAI(`KI-Zug startet`, `Spieler ${aiPlayerIndex + 1}, Spectator: ${spectatorMode}`);
+    logAI('KI-Zug startet', `Spieler ${aiPlayerIndex + 1}, Spectator: ${spectatorMode}`);
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
     const unitDelay = spectatorMode ? 800 : 400;
