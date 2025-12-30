@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.21.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.20.0...shadow-squad-v3.21.0) (2025-12-30)
+
+
+### Features
+
+* **renderer:** visibility-based foliage clearing, textured cliffs, and unit silhouettes ([#211](https://github.com/CodingSteve01/battlezone/issues/211)) ([37da720](https://github.com/CodingSteve01/battlezone/commit/37da720b40566b2c924b92a8713d0e0c1e97140c))
+
 ## [3.20.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.19.0...shadow-squad-v3.20.0) (2025-12-30)
 
 
