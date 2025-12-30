@@ -3518,6 +3518,7 @@ export function render() {
         const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
+        const cullMargin = tileSize * 2 + pos.zOffset;
 
         // Skip if off screen (with margin)
         if (sx < -cullMargin || sx > w + cullMargin ||
