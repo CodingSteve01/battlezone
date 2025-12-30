@@ -22,7 +22,8 @@ import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
-import { logRender, logError } from './errorLog.js';
+import { logRender, logError, logEntry } from './errorLog.js';
+import { initWebGLRenderer, renderWebGL, isWebGLAvailable, markMeshDirty } from './rendererWebGL.js';
 
 // ===== SAFE GRADIENT HELPERS =====
 // Prevents "non-finite value" errors when coordinates are NaN/Infinity
@@ -893,6 +894,7 @@ export function getPresetList() { return ['default']; }
 
 let canvas, ctx;
 let texturesInitialized = false;
+let webglActive = false; // Track which renderer is currently active
 
 // ===== HEX TILE CACHING SYSTEM =====
 // Pre-renders hex tiles with terrain details for improved performance
@@ -1779,8 +1781,47 @@ function detectMobileDevice() {
     };
 }
 
-export function initRenderer() {
+export async function initRenderer() {
     canvas = document.getElementById('game-canvas');
+    
+    // Check if WebGL should be used
+    const useWebGL = CONFIG.RENDERER.PREFER_WEBGL || CONFIG.RENDERER.TYPE === 'webgl';
+    
+    if (useWebGL && isWebGLAvailable()) {
+        logEntry('info', '[Renderer] Attempting to initialize WebGL renderer', 
+            `Type: ${CONFIG.RENDERER.TYPE}, Prefer: ${CONFIG.RENDERER.PREFER_WEBGL}`);
+        try {
+            const success = await initWebGLRenderer(canvas);
+            if (success) {
+                webglActive = true;
+                logEntry('info', '[Renderer] Using WebGL renderer', 'Initialization successful');
+                
+                // Still need 2D context for UI elements
+                ctx = canvas.getContext('2d');
+                
+                // Skip rest of Canvas 2D initialization
+                resizeCanvas();
+                return;
+            } else if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
+                const error = new Error('WebGL initialization failed and fallback disabled');
+                logError('[Renderer] Cannot initialize renderer', error);
+                throw error;
+            }
+            logEntry('warn', '[Renderer] WebGL initialization failed, falling back to Canvas 2D', 
+                'Check previous logs for WebGL errors');
+        } catch (err) {
+            logError('[Renderer] WebGL initialization error', err);
+            if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
+                throw err;
+            }
+            logEntry('warn', '[Renderer] Falling back to Canvas 2D', 'WebGL error occurred');
+        }
+    }
+    
+    // Canvas 2D fallback or default
+    webglActive = false;
+    logEntry('info', '[Renderer] Using Canvas 2D renderer', 
+        `Reason: ${useWebGL ? 'WebGL fallback' : 'Canvas 2D configured'}`);
     ctx = canvas.getContext('2d');
 
     // Detect mobile/tablet and set initial quality
@@ -3657,6 +3698,12 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 export function render() {
     if (!canvas || !ctx) {
         logRender('Canvas oder Context nicht verfügbar', `canvas: ${!!canvas}, ctx: ${!!ctx}`);
+        return;
+    }
+    
+    // If WebGL renderer is active, use it instead of Canvas 2D
+    if (webglActive) {
+        renderWebGL();
         return;
     }
 
