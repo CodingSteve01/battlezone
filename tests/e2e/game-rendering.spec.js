@@ -374,7 +374,6 @@ test.describe('Game Rendering', () => {
     const errors = [];
     page.on('pageerror', error => {
       errors.push({ message: error.message, stack: error.stack });
-      console.log(`[PAGE ERROR] ${error.message}`);
     });
 
     // Navigate and start game
@@ -403,6 +402,6 @@ test.describe('Game Rendering', () => {
     );
 
     expect(setTransformErrors).toEqual([]);
-    expect(pageErrors).toEqual([]);
+    expect(errors).toEqual([]);
   });
 });
