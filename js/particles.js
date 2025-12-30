@@ -2,8 +2,7 @@
 // Modular particle effects for Shadow Squad
 // Designed for performance (object pooling) and flexibility
 
-import { state } from './state.js';
-import { hexToPixel } from './hexMath.js';
+import { state, getHex, getTileScreenPosition } from './state.js';
 
 // ===== CONFIGURATION =====
 
@@ -584,7 +583,8 @@ class ParticleManager {
      * Spawnt Partikel auf einem Hex-Feld
      */
     spawnAtHex(type, q, r, count = 1, direction = null) {
-        const pos = hexToPixel(q, r, state.hexSize);
+        const hex = getHex(q, r);
+        const pos = getTileScreenPosition(q, r, hex?.height ?? 0);
         if (count === 1) {
             this.spawn(type, pos.x, pos.y, direction);
         } else {

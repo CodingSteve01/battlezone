@@ -26,8 +26,9 @@ function resolveActiveBiome() {
 
 /**
  * Get the current active biome configuration
+ * @returns {Object} The active biome configuration
  */
-function getActiveBiome() {
+export function getActiveBiome() {
     return BIOMES[state.activeBiome] || BIOMES.temperate;
 }
 
@@ -60,7 +61,7 @@ export function generateMap() {
     }
 
     // Apply biome-specific post-processing
-    applyBiomePostProcessing(biome, radius);
+    applyBiomePostProcessing(biome);
 
     // Clear spawn areas first
     clearSpawnAreas();
@@ -69,10 +70,13 @@ export function generateMap() {
     addMapFeatures(radius, biome);
 
     // Ensure all walkable areas are connected
-    ensureMapConnectivity(radius);
+    ensureMapConnectivity();
 
     // Final validation pass
     validateAndFixMap(radius);
+
+    // Sync height values with biome-derived terrain
+    applyTerrainHeights();
 }
 
 /**
@@ -132,7 +136,6 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
     const moist = biome.moistureThresholds;
 
     let type = biome.baseType || 'grass';
-    const height = getHeightFromElevation(elevationNoise, biome.elevationThresholds);
 
     // Water at edges or low elevation
     if (edgeFactor > 0.85 || (elevationNoise < elev.water && !biome.noWaterEdge)) {
@@ -152,7 +155,7 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
         r,
         type,
         walkable: TERRAIN[type]?.walkable ?? true,
-        height
+        height: getHeightForTerrain(type)
     };
 }
 
@@ -183,20 +186,22 @@ function simpleNoise(x, y, seed) {
     return n - Math.floor(n);
 }
 
-/**
- * Convert elevation noise into a discrete height level
- */
-function getHeightFromElevation(elevationNoise, thresholds) {
-    if (elevationNoise < thresholds.water) {
+export function getHeightForTerrain(type) {
+    if (!type) return 1;
+
+    if (['water', 'river', 'deepwater', 'shallows', 'swamp', 'reeds', 'mud', 'ice'].includes(type)) {
         return 0;
     }
-    if (elevationNoise < thresholds.hills) {
-        return 1;
-    }
-    if (elevationNoise < thresholds.rock) {
+
+    if (['hills', 'gravel'].includes(type)) {
         return 2;
     }
-    return CONFIG.HEIGHT.MAX;
+
+    if (['rock', 'cliff'].includes(type)) {
+        return CONFIG.HEIGHT.MAX;
+    }
+
+    return 1;
 }
 
 /**
@@ -268,7 +273,6 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
     const weights = biome.weights;
 
     let type = 'grass';
-    const height = getHeightFromElevation(elevationNoise, elev);
 
     // Determine terrain based on noise values using biome thresholds
     if (elevationNoise > elev.rock || (elevationNoise > elev.rock - 0.08 && roughnessNoise > 0.6)) {
@@ -384,7 +388,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
         walkable: terrain.walkable,
         cover: terrain.cover,
         moveCost: terrain.moveCost,
-        height,
+        height: getHeightForTerrain(type),
         unit: null
     };
 }
@@ -392,7 +396,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
 /**
  * Apply biome-specific post-processing (e.g., replace water with ice in tundra)
  */
-function applyBiomePostProcessing(biome, radius) {
+function applyBiomePostProcessing(biome) {
     if (!biome.specialTerrain) return;
 
     state.hexes.forEach(hex => {
@@ -406,6 +410,12 @@ function applyBiomePostProcessing(biome, radius) {
                 hex.moveCost = TERRAIN[replacementType].moveCost;
             }
         }
+    });
+}
+
+function applyTerrainHeights() {
+    state.hexes.forEach(hex => {
+        hex.height = getHeightForTerrain(hex.type);
     });
 }
 
@@ -735,9 +745,6 @@ function addRivers(count, radius) {
  * Add roads connecting spawn areas through center
  */
 function addRoads(radius) {
-    const spawns = getSpawnPositions();
-    const center = { q: 0, r: 0 };
-
     // Create road from center outward in several directions
     const roadAngles = [0, Math.PI / 3, 2 * Math.PI / 3, Math.PI, 4 * Math.PI / 3, 5 * Math.PI / 3];
 
@@ -797,7 +804,7 @@ function addPaths(count, radius) {
 /**
  * Ensure all walkable areas are connected using flood fill
  */
-function ensureMapConnectivity(radius) {
+function ensureMapConnectivity() {
     // Find all walkable hexes
     const walkableHexes = state.hexes.filter(h => h.walkable);
     if (walkableHexes.length === 0) return;
@@ -853,7 +860,7 @@ function ensureMapConnectivity(radius) {
     }
 
     // Also ensure spawn points are connected to each other
-    ensureSpawnConnectivity(spawns, radius);
+    ensureSpawnConnectivity(spawns);
 }
 
 /**
@@ -886,7 +893,7 @@ function createPath(from, to, visitedSet) {
 /**
  * Ensure all spawn points are connected to each other
  */
-function ensureSpawnConnectivity(spawns, radius) {
+function ensureSpawnConnectivity(spawns) {
     const activePlayers = state.settings.players;
 
     // Get first spawn of each active player

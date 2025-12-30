@@ -1,6 +1,7 @@
 // ===== GAME STATE =====
 
 import { CONFIG } from './config.js';
+import { hexToPixel } from './hexMath.js';
 
 export const ZOOM_REFERENCE = 0.45;
 
@@ -18,6 +19,31 @@ export function getWorldScale() {
     const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
     const scale = baseSize > 0 ? state.hexSize / baseSize : 1;
     return Number.isFinite(scale) && scale > 0 ? scale : 1;
+}
+
+export function getTileScale() {
+    const scale = Number.isFinite(CONFIG.TILE_SCALE) && CONFIG.TILE_SCALE > 0 ? CONFIG.TILE_SCALE : 1;
+    return scale;
+}
+
+export function getTileSize() {
+    return state.hexSize * getTileScale();
+}
+
+export function getTileSizeForHexSize(hexSize) {
+    const baseSize = Number.isFinite(hexSize) && hexSize > 0 ? hexSize : CONFIG.BASE_HEX_SIZE;
+    return baseSize * getTileScale();
+}
+
+export function getTileZOffset(height, hexSize = getTileSize()) {
+    const level = Math.max(0, height ?? 0);
+    return level * hexSize * 0.18;
+}
+
+export function getTileScreenPosition(q, r, height, hexSize = getTileSize()) {
+    const pos = hexToPixel(q, r, hexSize);
+    const zOffset = getTileZOffset(height, hexSize);
+    return { x: pos.x, y: pos.y - zOffset, zOffset };
 }
 
 const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);

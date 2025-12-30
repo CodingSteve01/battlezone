@@ -1,7 +1,7 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel } from './state.js';
-import { pixelToHex, hexToPixel, hexDistance } from './hexMath.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileSizeForHexSize, getTileZOffset, getTileScreenPosition } from './state.js';
+import { pixelToHex, hexDistance } from './hexMath.js';
 import { findPath, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
 import {
@@ -24,6 +24,21 @@ import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, 
 
 let canvas;
 let pendingMoveAnimationId = null;
+
+function pixelToHexWithHeight(x, y) {
+    const tileSize = getTileSize();
+    const rough = pixelToHex(x, y, tileSize);
+    const roughHex = getHex(rough.q, rough.r);
+    if (!roughHex) return rough;
+
+    const adjustedY = y + getTileZOffset(roughHex.height, tileSize);
+    return pixelToHex(x, adjustedY, tileSize);
+}
+
+function getUnitTilePosition(unit, tileSize = getTileSize()) {
+    const hex = getHex(unit.q, unit.r);
+    return getTileScreenPosition(unit.q, unit.r, hex?.height ?? 0, tileSize);
+}
 
 // ===== FIRST-USE EXPLANATIONS FOR TACTICAL FEATURES =====
 // Shows detailed explanation the first time a player uses a feature
@@ -430,8 +445,9 @@ function limitCameraBounds() {
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
 
     // Ensure hexSize is valid before calculating bounds
-    const hexSize = Number.isFinite(state.hexSize) && state.hexSize > 0 ? state.hexSize : CONFIG.BASE_HEX_SIZE;
-    const maxOffset = radius * hexSize * 2.5;
+    const hexSize = getTileSizeForHexSize(Number.isFinite(state.hexSize) && state.hexSize > 0 ? state.hexSize : CONFIG.BASE_HEX_SIZE);
+    const heightMargin = getTileZOffset(CONFIG.HEIGHT.MAX, hexSize);
+    const maxOffset = radius * hexSize * 2.5 + heightMargin;
 
     // Ensure camera values are valid before clamping
     const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
@@ -474,7 +490,7 @@ export function centerOnCurrentUnit() {
     }
 
     // Calculate unit position in pixels
-    const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const pos = getUnitTilePosition(unit);
 
     // Set camera to center on unit
     state.cameraX = -pos.x;
@@ -520,13 +536,14 @@ export function centerOnTeam(playerIndex, duration = 600) {
         const targetZoomScale = Math.max(0.7, Math.min(0.95, situationalScale));
         const targetZoom = scaleToZoomLevel(targetZoomScale);
         const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(targetZoom);
+        const targetTileSize = getTileSizeForHexSize(targetHexSize);
 
         // Calculate center of units at target zoom level
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
 
         for (const unit of playerUnits) {
-            const pos = hexToPixel(unit.q, unit.r, targetHexSize);
+            const pos = getUnitTilePosition(unit, targetTileSize);
             minX = Math.min(minX, pos.x);
             maxX = Math.max(maxX, pos.x);
             minY = Math.min(minY, pos.y);
@@ -560,7 +577,7 @@ export function centerOnTeam(playerIndex, duration = 600) {
             let newMinY = Infinity, newMaxY = -Infinity;
 
             for (const unit of playerUnits) {
-                const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+                const pos = getUnitTilePosition(unit);
                 newMinX = Math.min(newMinX, pos.x);
                 newMaxX = Math.max(newMaxX, pos.x);
                 newMinY = Math.min(newMinY, pos.y);
@@ -781,8 +798,9 @@ function handleMinimapClick(clientX, clientY) {
         const r = (relY / (bounds.hexSize * Math.sqrt(3))) - q * 0.5;
 
         // Convert to world pixel position
-        const worldX = q * state.hexSize * 1.5;
-        const worldY = (r + q * 0.5) * state.hexSize * Math.sqrt(3);
+        const tileSize = getTileSize();
+        const worldX = q * tileSize * 1.5;
+        const worldY = (r + q * 0.5) * tileSize * Math.sqrt(3);
 
         // Smooth scroll to position
         scrollToPosition(-worldX, -worldY);
@@ -854,7 +872,7 @@ function handleTapOrClick(clientX, clientY) {
     const x = clientX - rect.left - state.offsetX;
     const y = clientY - rect.top - state.offsetY;
 
-    const hexCoord = pixelToHex(x, y, state.hexSize);
+    const hexCoord = pixelToHexWithHeight(x, y);
     const hex = getHex(hexCoord.q, hexCoord.r);
     if (!hex) return;
 
@@ -1012,7 +1030,7 @@ function handlePathPreview(clientX, clientY) {
     const x = clientX - rect.left - state.offsetX;
     const y = clientY - rect.top - state.offsetY;
 
-    const hexCoord = pixelToHex(x, y, state.hexSize);
+    const hexCoord = pixelToHexWithHeight(x, y);
     const hex = getHex(hexCoord.q, hexCoord.r);
 
     state.hoveredHex = hex;
@@ -1223,7 +1241,7 @@ async function processReactiveFire(movedUnit) {
 export function scrollToUnit(unit, duration = 500) {
     if (!unit) return;
 
-    const targetPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const targetPos = getUnitTilePosition(unit);
     const targetCameraX = -targetPos.x;
     const targetCameraY = -targetPos.y;
 
@@ -1259,7 +1277,7 @@ export function scrollToUnit(unit, duration = 500) {
 export function followUnitInstant(unit) {
     if (!unit) return;
 
-    const targetPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const targetPos = getUnitTilePosition(unit);
     state.cameraX = -targetPos.x;
     state.cameraY = -targetPos.y;
 
@@ -1308,7 +1326,7 @@ export function calculateSituationalZoom(focusUnit, relevantUnits = []) {
     const minViewportDim = Math.min(viewportWidth, viewportHeight);
 
     // Each hex at zoom=1.0 is BASE_HEX_SIZE * 2 pixels wide approximately
-    const hexPixelSize = CONFIG.BASE_HEX_SIZE * 2;
+    const hexPixelSize = getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE) * 2;
     const requiredPixels = (maxSpread + 2) * hexPixelSize; // +2 for padding
 
     // Calculate zoom that would fit all units
@@ -1400,7 +1418,8 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
 
         // Calculate target position at the target zoom level
         const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(clampedZoom);
-        const targetPos = hexToPixel(unit.q, unit.r, targetHexSize);
+        const targetTileSize = getTileSizeForHexSize(targetHexSize);
+        const targetPos = getUnitTilePosition(unit, targetTileSize);
         const targetCameraX = -targetPos.x;
         const targetCameraY = -targetPos.y;
 
@@ -1423,7 +1442,7 @@ export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, re
             state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
 
             // Recalculate target position at current zoom level for smooth tracking
-            const currentTargetPos = hexToPixel(unit.q, unit.r, state.hexSize);
+            const currentTargetPos = getUnitTilePosition(unit);
             const currentTargetCameraX = -currentTargetPos.x;
             const currentTargetCameraY = -currentTargetPos.y;
 
@@ -1540,7 +1559,7 @@ export async function playGameIntro() {
         let minY = Infinity, maxY = -Infinity;
 
         for (const unit of playerUnits) {
-            const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+            const pos = getUnitTilePosition(unit, getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE));
             minX = Math.min(minX, pos.x);
             maxX = Math.max(maxX, pos.x);
             minY = Math.min(minY, pos.y);
@@ -1553,7 +1572,7 @@ export async function playGameIntro() {
 
         // Get map size for overview
         const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-        const mapExtent = mapRadius * CONFIG.BASE_HEX_SIZE * 1.5;
+        const mapExtent = mapRadius * getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE) * 1.5;
 
         // Step 1: Start with a wide overview of the entire map
         const overviewZoom = scaleToZoomLevel(0.4);
@@ -1589,14 +1608,14 @@ export async function playGameIntro() {
 
         // Step 5: Show each unit briefly
         for (const unit of playerUnits.slice(0, 3)) {
-            const pos = hexToPixel(unit.q, unit.r, CONFIG.BASE_HEX_SIZE);
+            const pos = getUnitTilePosition(unit, getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE));
             await animateCameraTo(-pos.x, -pos.y, 500);
             await delay(350);
         }
 
         // Step 6: Final zoom to first unit
         const firstUnit = playerUnits[0];
-        const firstPos = hexToPixel(firstUnit.q, firstUnit.r, CONFIG.BASE_HEX_SIZE);
+        const firstPos = getUnitTilePosition(firstUnit, getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE));
 
         await Promise.all([
             animateCameraTo(-firstPos.x, -firstPos.y, 700),
