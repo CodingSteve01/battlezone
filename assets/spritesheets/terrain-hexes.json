@@ -2,13 +2,13 @@
   "version": "2.0",
   "dimensions": {
     "width": 1024,
-    "height": 4020
+    "height": 4515
   },
   "tileInfo": {
     "spriteWidth": 256,
-    "totalHeight": 268,
+    "totalHeight": 301,
     "hexHeight": 222,
-    "earthLayerHeight": 46
+    "earthLayerHeight": 79
   },
   "features": [
     "isometric",
@@ -22,7 +22,7 @@
         "x": 0,
         "y": 0,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -32,9 +32,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "grass",
         "variant": 0
@@ -46,7 +46,7 @@
         "x": 256,
         "y": 0,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -56,9 +56,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "grass",
         "variant": 1
@@ -70,7 +70,7 @@
         "x": 512,
         "y": 0,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -80,9 +80,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "grass",
         "variant": 2
@@ -94,7 +94,7 @@
         "x": 768,
         "y": 0,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -104,9 +104,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "grass",
         "variant": 3
@@ -116,9 +116,9 @@
       "id": "forest_v0",
       "bounds": {
         "x": 0,
-        "y": 268,
+        "y": 301,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -128,9 +128,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "forest",
         "variant": 0
@@ -140,9 +140,9 @@
       "id": "forest_v1",
       "bounds": {
         "x": 256,
-        "y": 268,
+        "y": 301,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -152,9 +152,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "forest",
         "variant": 1
@@ -164,9 +164,9 @@
       "id": "forest_v2",
       "bounds": {
         "x": 512,
-        "y": 268,
+        "y": 301,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -176,9 +176,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "forest",
         "variant": 2
@@ -188,9 +188,9 @@
       "id": "forest_v3",
       "bounds": {
         "x": 768,
-        "y": 268,
+        "y": 301,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -200,9 +200,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "forest",
         "variant": 3
@@ -212,9 +212,9 @@
       "id": "hills_v0",
       "bounds": {
         "x": 0,
-        "y": 536,
+        "y": 602,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -224,9 +224,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "hills",
         "variant": 0
@@ -236,9 +236,9 @@
       "id": "hills_v1",
       "bounds": {
         "x": 256,
-        "y": 536,
+        "y": 602,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -248,9 +248,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "hills",
         "variant": 1
@@ -260,9 +260,9 @@
       "id": "hills_v2",
       "bounds": {
         "x": 512,
-        "y": 536,
+        "y": 602,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -272,9 +272,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "hills",
         "variant": 2
@@ -284,9 +284,9 @@
       "id": "hills_v3",
       "bounds": {
         "x": 768,
-        "y": 536,
+        "y": 602,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -296,9 +296,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "hills",
         "variant": 3
@@ -308,9 +308,9 @@
       "id": "rock_v0",
       "bounds": {
         "x": 0,
-        "y": 804,
+        "y": 903,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -320,9 +320,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "rock",
         "variant": 0
@@ -332,9 +332,9 @@
       "id": "rock_v1",
       "bounds": {
         "x": 256,
-        "y": 804,
+        "y": 903,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -344,9 +344,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "rock",
         "variant": 1
@@ -356,9 +356,9 @@
       "id": "rock_v2",
       "bounds": {
         "x": 512,
-        "y": 804,
+        "y": 903,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -368,9 +368,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "rock",
         "variant": 2
@@ -380,9 +380,9 @@
       "id": "rock_v3",
       "bounds": {
         "x": 768,
-        "y": 804,
+        "y": 903,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -392,9 +392,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "rock",
         "variant": 3
@@ -404,9 +404,9 @@
       "id": "water_v0",
       "bounds": {
         "x": 0,
-        "y": 1072,
+        "y": 1204,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -416,9 +416,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "water",
         "variant": 0
@@ -428,9 +428,9 @@
       "id": "water_v1",
       "bounds": {
         "x": 256,
-        "y": 1072,
+        "y": 1204,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -440,9 +440,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "water",
         "variant": 1
@@ -452,9 +452,9 @@
       "id": "water_v2",
       "bounds": {
         "x": 512,
-        "y": 1072,
+        "y": 1204,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -464,9 +464,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "water",
         "variant": 2
@@ -476,9 +476,9 @@
       "id": "water_v3",
       "bounds": {
         "x": 768,
-        "y": 1072,
+        "y": 1204,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -488,9 +488,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "water",
         "variant": 3
@@ -500,9 +500,9 @@
       "id": "sand_v0",
       "bounds": {
         "x": 0,
-        "y": 1340,
+        "y": 1505,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -512,9 +512,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "sand",
         "variant": 0
@@ -524,9 +524,9 @@
       "id": "sand_v1",
       "bounds": {
         "x": 256,
-        "y": 1340,
+        "y": 1505,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -536,9 +536,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "sand",
         "variant": 1
@@ -548,9 +548,9 @@
       "id": "sand_v2",
       "bounds": {
         "x": 512,
-        "y": 1340,
+        "y": 1505,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -560,9 +560,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "sand",
         "variant": 2
@@ -572,9 +572,9 @@
       "id": "sand_v3",
       "bounds": {
         "x": 768,
-        "y": 1340,
+        "y": 1505,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -584,9 +584,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "sand",
         "variant": 3
@@ -596,9 +596,9 @@
       "id": "swamp_v0",
       "bounds": {
         "x": 0,
-        "y": 1608,
+        "y": 1806,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -608,9 +608,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "swamp",
         "variant": 0
@@ -620,9 +620,9 @@
       "id": "swamp_v1",
       "bounds": {
         "x": 256,
-        "y": 1608,
+        "y": 1806,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -632,9 +632,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "swamp",
         "variant": 1
@@ -644,9 +644,9 @@
       "id": "swamp_v2",
       "bounds": {
         "x": 512,
-        "y": 1608,
+        "y": 1806,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -656,9 +656,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "swamp",
         "variant": 2
@@ -668,9 +668,9 @@
       "id": "swamp_v3",
       "bounds": {
         "x": 768,
-        "y": 1608,
+        "y": 1806,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -680,9 +680,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "swamp",
         "variant": 3
@@ -692,9 +692,9 @@
       "id": "river_v0",
       "bounds": {
         "x": 0,
-        "y": 1876,
+        "y": 2107,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -704,9 +704,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "river",
         "variant": 0
@@ -716,9 +716,9 @@
       "id": "river_v1",
       "bounds": {
         "x": 256,
-        "y": 1876,
+        "y": 2107,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -728,9 +728,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "river",
         "variant": 1
@@ -740,9 +740,9 @@
       "id": "river_v2",
       "bounds": {
         "x": 512,
-        "y": 1876,
+        "y": 2107,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -752,9 +752,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "river",
         "variant": 2
@@ -764,9 +764,9 @@
       "id": "river_v3",
       "bounds": {
         "x": 768,
-        "y": 1876,
+        "y": 2107,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -776,9 +776,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "river",
         "variant": 3
@@ -788,9 +788,9 @@
       "id": "road_v0",
       "bounds": {
         "x": 0,
-        "y": 2144,
+        "y": 2408,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -800,9 +800,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "road",
         "variant": 0
@@ -812,9 +812,9 @@
       "id": "road_v1",
       "bounds": {
         "x": 256,
-        "y": 2144,
+        "y": 2408,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -824,9 +824,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "road",
         "variant": 1
@@ -836,9 +836,9 @@
       "id": "road_v2",
       "bounds": {
         "x": 512,
-        "y": 2144,
+        "y": 2408,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -848,9 +848,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "road",
         "variant": 2
@@ -860,9 +860,9 @@
       "id": "road_v3",
       "bounds": {
         "x": 768,
-        "y": 2144,
+        "y": 2408,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -872,9 +872,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "road",
         "variant": 3
@@ -884,9 +884,9 @@
       "id": "path_v0",
       "bounds": {
         "x": 0,
-        "y": 2412,
+        "y": 2709,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -896,9 +896,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "path",
         "variant": 0
@@ -908,9 +908,9 @@
       "id": "path_v1",
       "bounds": {
         "x": 256,
-        "y": 2412,
+        "y": 2709,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -920,9 +920,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "path",
         "variant": 1
@@ -932,9 +932,9 @@
       "id": "path_v2",
       "bounds": {
         "x": 512,
-        "y": 2412,
+        "y": 2709,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -944,9 +944,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "path",
         "variant": 2
@@ -956,9 +956,9 @@
       "id": "path_v3",
       "bounds": {
         "x": 768,
-        "y": 2412,
+        "y": 2709,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -968,9 +968,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "path",
         "variant": 3
@@ -980,9 +980,9 @@
       "id": "snow_v0",
       "bounds": {
         "x": 0,
-        "y": 2680,
+        "y": 3010,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -992,9 +992,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "snow",
         "variant": 0
@@ -1004,9 +1004,9 @@
       "id": "snow_v1",
       "bounds": {
         "x": 256,
-        "y": 2680,
+        "y": 3010,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1016,9 +1016,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "snow",
         "variant": 1
@@ -1028,9 +1028,9 @@
       "id": "snow_v2",
       "bounds": {
         "x": 512,
-        "y": 2680,
+        "y": 3010,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1040,9 +1040,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "snow",
         "variant": 2
@@ -1052,9 +1052,9 @@
       "id": "snow_v3",
       "bounds": {
         "x": 768,
-        "y": 2680,
+        "y": 3010,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1064,9 +1064,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "snow",
         "variant": 3
@@ -1076,9 +1076,9 @@
       "id": "pine_v0",
       "bounds": {
         "x": 0,
-        "y": 2948,
+        "y": 3311,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1088,9 +1088,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "pine",
         "variant": 0
@@ -1100,9 +1100,9 @@
       "id": "pine_v1",
       "bounds": {
         "x": 256,
-        "y": 2948,
+        "y": 3311,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1112,9 +1112,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "pine",
         "variant": 1
@@ -1124,9 +1124,9 @@
       "id": "pine_v2",
       "bounds": {
         "x": 512,
-        "y": 2948,
+        "y": 3311,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1136,9 +1136,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "pine",
         "variant": 2
@@ -1148,9 +1148,9 @@
       "id": "pine_v3",
       "bounds": {
         "x": 768,
-        "y": 2948,
+        "y": 3311,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1160,9 +1160,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "pine",
         "variant": 3
@@ -1172,9 +1172,9 @@
       "id": "tallgrass_v0",
       "bounds": {
         "x": 0,
-        "y": 3216,
+        "y": 3612,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1184,9 +1184,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "tallgrass",
         "variant": 0
@@ -1196,9 +1196,9 @@
       "id": "tallgrass_v1",
       "bounds": {
         "x": 256,
-        "y": 3216,
+        "y": 3612,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1208,9 +1208,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "tallgrass",
         "variant": 1
@@ -1220,9 +1220,9 @@
       "id": "tallgrass_v2",
       "bounds": {
         "x": 512,
-        "y": 3216,
+        "y": 3612,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1232,9 +1232,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "tallgrass",
         "variant": 2
@@ -1244,9 +1244,9 @@
       "id": "tallgrass_v3",
       "bounds": {
         "x": 768,
-        "y": 3216,
+        "y": 3612,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1256,9 +1256,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "tallgrass",
         "variant": 3
@@ -1268,9 +1268,9 @@
       "id": "mud_v0",
       "bounds": {
         "x": 0,
-        "y": 3484,
+        "y": 3913,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1280,9 +1280,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "mud",
         "variant": 0
@@ -1292,9 +1292,9 @@
       "id": "mud_v1",
       "bounds": {
         "x": 256,
-        "y": 3484,
+        "y": 3913,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1304,9 +1304,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "mud",
         "variant": 1
@@ -1316,9 +1316,9 @@
       "id": "mud_v2",
       "bounds": {
         "x": 512,
-        "y": 3484,
+        "y": 3913,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1328,9 +1328,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "mud",
         "variant": 2
@@ -1340,9 +1340,9 @@
       "id": "mud_v3",
       "bounds": {
         "x": 768,
-        "y": 3484,
+        "y": 3913,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1352,9 +1352,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "mud",
         "variant": 3
@@ -1364,9 +1364,9 @@
       "id": "clearing_v0",
       "bounds": {
         "x": 0,
-        "y": 3752,
+        "y": 4214,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1376,9 +1376,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "clearing",
         "variant": 0
@@ -1388,9 +1388,9 @@
       "id": "clearing_v1",
       "bounds": {
         "x": 256,
-        "y": 3752,
+        "y": 4214,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1400,9 +1400,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "clearing",
         "variant": 1
@@ -1412,9 +1412,9 @@
       "id": "clearing_v2",
       "bounds": {
         "x": 512,
-        "y": 3752,
+        "y": 4214,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1424,9 +1424,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "clearing",
         "variant": 2
@@ -1436,9 +1436,9 @@
       "id": "clearing_v3",
       "bounds": {
         "x": 768,
-        "y": 3752,
+        "y": 4214,
         "width": 256,
-        "height": 268
+        "height": 301
       },
       "contentBounds": {
         "x": 0,
@@ -1448,9 +1448,9 @@
       },
       "anchor": {
         "x": 0.5,
-        "y": 0.8283582089552238
+        "y": 0.7375415282392026
       },
-      "earthLayerHeight": 46,
+      "earthLayerHeight": 79,
       "metadata": {
         "type": "clearing",
         "variant": 3
