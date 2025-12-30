@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.20.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.19.0...shadow-squad-v3.20.0) (2025-12-30)
+
+
+### Features
+
+* **ux:** fade obstructing vegetation for important units, add palms to asset generator, clamp minimap size ([#207](https://github.com/CodingSteve01/battlezone/issues/207)) ([b92978a](https://github.com/CodingSteve01/battlezone/commit/b92978a377a2086a2687764b065ba0e0bd484f00))
+* **ux:** fade obstructing vegetation for important units, add palms to asset generator, clamp minimap size ([#208](https://github.com/CodingSteve01/battlezone/issues/208)) ([dde8d0d](https://github.com/CodingSteve01/battlezone/commit/dde8d0dbd0555a416c5d6855788057622e0b4867))
+
 ## [3.19.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.18.1...shadow-squad-v3.19.0) (2025-12-30)
 
 
