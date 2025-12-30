@@ -12,12 +12,14 @@ import {
     checkOverwatchTriggers, executeOverwatchAttack
 } from './combat.js';
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer } from './fogOfWar.js';
-import { updateUI } from './ui.js';
+import { updateUI, showPowerupPickup } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN } from './config.js';
 import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
+import { checkPowerupPickup } from './powerups.js';
+import { getSpawnPositions } from './map.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -148,6 +150,21 @@ const aiMemory = {
     ambushUnits: [],                 // Units waiting to ambush
     decoyActive: false,              // Is decoy strategy currently active
 };
+
+function getEnemySpawnCenters() {
+    const spawns = getSpawnPositions();
+    if (!spawns || spawns.length === 0) return [];
+
+    return spawns
+        .map((playerSpawns, playerIndex) => ({
+            playerIndex,
+            center: playerSpawns[0]
+        }))
+        .filter(({ playerIndex }) => playerIndex < state.settings.players)
+        .filter(({ playerIndex }) => !arePlayersAllied(state.currentPlayer, playerIndex))
+        .map(({ center }) => center)
+        .filter(Boolean);
+}
 
 /**
  * Reset AI memory for new game
@@ -841,13 +858,29 @@ function estimatePlayerPosition() {
     const positions = Array.from(aiMemory.lastKnownPositions.values());
 
     if (positions.length === 0) {
+        const enemySpawnCenters = getEnemySpawnCenters();
+        if (enemySpawnCenters.length > 0) {
+            const avgQ = enemySpawnCenters.reduce((sum, pos) => sum + pos.q, 0) / enemySpawnCenters.length;
+            const avgR = enemySpawnCenters.reduce((sum, pos) => sum + pos.r, 0) / enemySpawnCenters.length;
+            const driftTowardCenter = Math.min(0.6, 0.2 + state.round * 0.05);
+            aiMemory.playerCenterEstimate = {
+                q: avgQ * (1 - driftTowardCenter),
+                r: avgR * (1 - driftTowardCenter)
+            };
+            return;
+        }
+
         // No information - estimate based on spawn area (opposite side of map)
         const aiUnits = getPlayerUnits(state.currentPlayer);
         if (aiUnits.length > 0) {
             const avgQ = aiUnits.reduce((sum, u) => sum + u.q, 0) / aiUnits.length;
             const avgR = aiUnits.reduce((sum, u) => sum + u.r, 0) / aiUnits.length;
             // Player is likely on opposite side
-            aiMemory.playerCenterEstimate = { q: -avgQ * 0.8, r: -avgR * 0.8 };
+            const driftTowardCenter = Math.min(0.6, 0.2 + state.round * 0.05);
+            aiMemory.playerCenterEstimate = {
+                q: -avgQ * 0.8 * (1 - driftTowardCenter),
+                r: -avgR * 0.8 * (1 - driftTowardCenter)
+            };
         }
         return;
     }
@@ -2316,6 +2349,16 @@ function scoreSearchPosition(unit, q, r, plan) {
         score -= 30;
     }
 
+    const enemySpawnCenters = getEnemySpawnCenters();
+    if (enemySpawnCenters.length > 0) {
+        const radius = CONFIG.MAP_SIZES[state.settings.size];
+        const minSpawnDist = Math.min(...enemySpawnCenters.map(pos =>
+            hexDistance({ q, r }, pos)
+        ));
+        const spawnWeight = Math.max(0, radius - minSpawnDist);
+        score += spawnWeight * (plan.inHuntMode ? 3 : 2);
+    }
+
     // Search pattern specific scoring
     switch (plan.searchPattern) {
         case 'expand': {
@@ -2361,7 +2404,7 @@ function scoreSearchPosition(unit, q, r, plan) {
 
     // Move towards map center (higher chance of finding enemies)
     const distToCenter = Math.sqrt(q * q + r * r);
-    score -= distToCenter * 2;
+    score -= distToCenter * (plan.inHuntMode ? 3 : 2);
 
     // Hills for vision
     const hex = getHex(q, r);
@@ -2375,6 +2418,14 @@ function scoreSearchPosition(unit, q, r, plan) {
     score += Math.random() * 8;
 
     return score;
+}
+
+function handleAIPowerupPickup(unit, hasHumanViewer) {
+    const pickup = checkPowerupPickup(unit);
+    if (pickup && hasHumanViewer) {
+        showPowerupPickup(pickup.powerup, pickup.result);
+    }
+    return pickup;
 }
 
 // ===== MOVEMENT EXECUTION =====
@@ -2432,6 +2483,7 @@ async function executeAIMove(unit, target, spectatorMode = false) {
         unit.r = target.r;
         targetHex.unit = unit;
 
+        handleAIPowerupPickup(unit, hasHumanViewer);
         spendSharedAP(target.cost);
         updateVisibility();
         if (hasHumanViewer) {
@@ -2467,6 +2519,8 @@ async function executeAIMove(unit, target, spectatorMode = false) {
 
         // Move unit one step
         moveUnitInstant(unit, nextHex);
+
+        handleAIPowerupPickup(unit, hasHumanViewer);
 
         // Update visibility after each step
         updateVisibility();

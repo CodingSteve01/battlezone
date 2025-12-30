@@ -130,20 +130,7 @@ function addTerrainDetail(ctx, x, y, size, terrainType, terrain) {
     ctx.globalAlpha = 0.15;
     
     // Add different detail patterns based on terrain
-    if (terrainType === 'grass' || terrainType === 'forest') {
-        // Grass texture - small dots and lines
-        ctx.strokeStyle = terrain.colorDark;
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 200; i++) {
-            const px = x + seededRandom() * size;
-            const py = y + seededRandom() * size;
-            const length = 3 + seededRandom() * 5;
-            ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(px + seededRandom() * length - length / 2, py + length);
-            ctx.stroke();
-        }
-    } else if (terrainType === 'water' || terrainType === 'river') {
+    if (terrainType === 'water' || terrainType === 'river') {
         // Water texture - horizontal waves
         ctx.strokeStyle = terrain.colorLight;
         ctx.lineWidth = 2;
