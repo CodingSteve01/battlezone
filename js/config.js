@@ -69,6 +69,16 @@ export const CONFIG = {
         HEIGHT: 1.2,
         SHADOW_STRENGTH: 0.25,
         HIGHLIGHT_STRENGTH: 0.18
+    },
+
+    VISIBILITY_CLEARING: {
+        ENABLED: true,
+        CLEAR_RADIUS: 0,
+        FADE_RADIUS: 1,
+        TREE_KEEP_CHANCE: 0.25,
+        SHRUB_KEEP_CHANCE: 0.55,
+        CLEAR_ALPHA: 0.35,
+        FADE_ALPHA: 0.65
     }
 };
 
