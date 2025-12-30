@@ -1,8 +1,8 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel } from './state.js';
-import { hexToPixel, hexDistance, getNeighbors } from './hexMath.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition } from './state.js';
+import { hexDistance, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
@@ -78,6 +78,118 @@ function drawHeightShading(cx, cy, size, height) {
     ctx.beginPath();
     drawHexPath(cx, cy, size);
     ctx.fillStyle = style.color;
+    ctx.fill();
+    ctx.restore();
+}
+
+function getLightVector() {
+    const dir = CONFIG.LIGHTING?.DIRECTION || { x: -0.6, y: -1.0 };
+    const length = Math.hypot(dir.x, dir.y) || 1;
+    return { x: dir.x / length, y: dir.y / length };
+}
+
+function getShadowOffset(height, size) {
+    const lightHeight = CONFIG.LIGHTING?.HEIGHT ?? 1.2;
+    const zOffset = getTileZOffset(height, size);
+    return zOffset * (0.6 + lightHeight * 0.4);
+}
+
+function drawHeightExtrusion(cx, cy, size, height) {
+    const offset = getTileZOffset(height, size);
+    if (offset <= 0) return;
+
+    ctx.save();
+    ctx.beginPath();
+    drawHexPath(cx, cy + offset, size);
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.35)';
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawHeightShadow(cx, cy, size, height) {
+    const offset = getShadowOffset(height, size);
+    if (offset <= 0) return;
+
+    const light = getLightVector();
+    ctx.save();
+    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
+    ctx.beginPath();
+    drawHexPath(cx + light.x * offset, cy + light.y * offset + offset * 0.35, size * 0.98);
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
+    ctx.fill();
+    ctx.restore();
+}
+
+function applyTileLighting(cx, cy, size, height) {
+    if (!height) return;
+    const light = getLightVector();
+    const strength = CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18;
+
+    ctx.save();
+    ctx.beginPath();
+    drawHexPath(cx, cy, size);
+    ctx.clip();
+
+    const grad = safeLinearGradient(
+        ctx,
+        cx - light.x * size,
+        cy - light.y * size,
+        cx + light.x * size,
+        cy + light.y * size,
+        'transparent'
+    );
+
+    if (typeof grad !== 'string') {
+        grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
+        grad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.18)');
+    }
+
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = grad;
+    ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+    ctx.restore();
+}
+
+function applySpriteLighting(drawX, drawY, width, height) {
+    const light = getLightVector();
+    const strength = CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18;
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    const grad = safeLinearGradient(
+        ctx,
+        drawX - light.x * width * 0.3,
+        drawY - light.y * height * 0.3,
+        drawX + width + light.x * width * 0.3,
+        drawY + height + light.y * height * 0.3,
+        'transparent'
+    );
+    if (typeof grad !== 'string') {
+        grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
+        grad.addColorStop(0.6, 'rgba(255, 255, 255, 0)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0.28)');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(drawX, drawY, width, height);
+    ctx.restore();
+}
+
+function drawSpriteShadow(x, y, width, height, heightLevel = 1) {
+    const light = getLightVector();
+    const shadowOffset = getShadowOffset(heightLevel, width * 0.25);
+    ctx.save();
+    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(
+        x + light.x * shadowOffset * 0.6,
+        y + light.y * shadowOffset * 0.6 + height * 0.1,
+        width * 0.25,
+        height * 0.12,
+        0,
+        0,
+        Math.PI * 2
+    );
     ctx.fill();
     ctx.restore();
 }
@@ -283,13 +395,16 @@ function drawTree2D5(x, y, size, treeType, seed) {
         const drawX = x - spriteWidth * anchorPoint.x;
         const drawY = y - spriteHeight * anchorPoint.y;
 
+        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 2);
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
+            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
+            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -313,13 +428,16 @@ function drawBush2D5(x, y, size, seed) {
         const drawX = x - spriteWidth * anchorPoint.x;
         const drawY = y - spriteHeight * anchorPoint.y;
 
+        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 1);
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
+            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
+            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -340,13 +458,16 @@ function drawSmallShrub(x, y, size, seed) {
         const drawX = x - spriteWidth * anchorPoint.x;
         const drawY = y - spriteHeight * anchorPoint.y;
 
+        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 1);
         ctx.save();
         if (shouldMirror) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
+            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
+            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -366,6 +487,7 @@ function drawFlowerCluster(x, y, size, seed) {
         const drawX = x - spriteWidth * anchorPoint.x;
         const drawY = y - spriteHeight * anchorPoint.y;
         ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
+        applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
     }
 }
 
@@ -1034,16 +1156,7 @@ function createHexTileCanvas(hex, fogLevel, hexSize) {
     // Pass null for strokeColor - grid overlay is drawn separately when needed
     drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r);
 
-    // Shoreline overlays for water/swamp transitions
-    if (fogLevel === 'visible' && terrainData) {
-        const neighbors = getNeighborTerrains(state.hexMap, hex.q, hex.r);
-        drawShorelineOverlays(tileCtx, cx, cy, hexSize, hex.type, neighbors, hex.q, hex.r);
-    }
-
-    // Draw terrain details ONLY for visible hexes (not explored/hidden)
-    if (fogLevel === 'visible' && shouldRenderDetails()) {
-        drawTerrainDetailsToContext(tileCtx, cx, cy, hexSize, hex.type, hex.q, hex.r);
-    }
+    // Terrain details are drawn in the main render pass to keep asset sizing consistent
 
     // Add fog overlays AFTER terrain (so they cover everything properly)
     if (fogLevel === 'explored') {
@@ -3199,6 +3312,7 @@ function shouldShowHexGrid() {
  */
 function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) {
     ctx.save();
+    const tileSize = getTileSize();
 
     // Collect all hexes that should show grid (movement range + attack range)
     const gridHexKeys = new Set();
@@ -3223,13 +3337,14 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
         const hex = state.hexMap.get(key);
         if (!hex) return;
 
-        const pos = hexToPixel(hex.q, hex.r, state.hexSize);
+        const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
+        const cullMargin = tileSize * 2 + pos.zOffset;
 
         // Skip if off screen
-        if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
-            sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+        if (sx < -cullMargin || sx > w + cullMargin ||
+            sy < -cullMargin || sy > h + cullMargin) {
             return;
         }
 
@@ -3237,7 +3352,7 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 
         // Draw grid lines - more visible for better gameplay clarity
         ctx.beginPath();
-        drawHexPath(sx, sy, state.hexSize);
+        drawHexPath(sx, sy, tileSize);
 
         if (fogLevel === 'visible') {
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
@@ -3290,6 +3405,9 @@ export function render() {
         console.warn('[Render] Fixing invalid offsetY:', state.offsetY);
         state.offsetY = h / 2;
     }
+
+    const tileSize = getTileSize();
+    const assetSize = state.hexSize;
 
     // Validate critical state before rendering
     if (!state.hexes || state.hexes.length === 0) {
@@ -3397,13 +3515,13 @@ export function render() {
 
     // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
-        const pos = hexToPixel(hex.q, hex.r, state.hexSize);
+        const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
 
         // Skip if off screen (with margin)
-        if (sx < -state.hexSize * 2 || sx > w + state.hexSize * 2 ||
-            sy < -state.hexSize * 2 || sy > h + state.hexSize * 2) {
+        if (sx < -cullMargin || sx > w + cullMargin ||
+            sy < -cullMargin || sy > h + cullMargin) {
             return;
         }
 
@@ -3416,10 +3534,16 @@ export function render() {
         if (cacheEntry) {
             // Draw cached tile with scaling - prevents cache invalidation during zoom
             const { canvas: cachedTile, baseSize } = cacheEntry;
-            const scale = state.hexSize / baseSize;
-            const tileSize = cachedTile.width;
-            const scaledSize = tileSize * scale;
+            const scale = tileSize / baseSize;
+            const cachedTileSize = cachedTile.width;
+            const scaledSize = cachedTileSize * scale;
 
+            if (fogLevel === 'visible') {
+                drawHeightShadow(sx, sy, tileSize, hex.height);
+            }
+            if (fogLevel !== 'hidden') {
+                drawHeightExtrusion(sx, sy, tileSize, hex.height);
+            }
             ctx.drawImage(
                 cachedTile,
                 sx - scaledSize / 2,
@@ -3441,20 +3565,21 @@ export function render() {
             // No grid lines on base hex - grid overlay is drawn separately only for relevant hexes
             // This matches cached tile behavior for seamless terrain
             const terrainData = fogLevel === 'visible' ? terrain : null;
-            drawHex(sx, sy, state.hexSize, fillColor, null, 1, texture, terrainData);
-
-            // Draw terrain details for visible hexes (same as cached tiles)
-            if (fogLevel === 'visible' && shouldRenderDetails()) {
-                drawStaticTerrainDetails(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            if (fogLevel === 'visible') {
+                drawHeightShadow(sx, sy, tileSize, hex.height);
             }
+            if (fogLevel !== 'hidden') {
+                drawHeightExtrusion(sx, sy, tileSize, hex.height);
+            }
+            drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
             // Fog overlays for non-cached rendering (match cached version)
             if (fogLevel === 'explored') {
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize);
+                drawHexPath(sx, sy, tileSize);
                 // Clean dim overlay for explored areas
-                const dimGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(8, 12, 20, 0.6)');
+                const dimGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, tileSize, 'rgba(8, 12, 20, 0.6)');
                 if (typeof dimGradient !== 'string') {
                     dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
                     dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
@@ -3466,7 +3591,7 @@ export function render() {
             } else if (fogLevel === 'hidden') {
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize);
+                drawHexPath(sx, sy, tileSize);
                 // Solid dark fog for hidden areas
                 ctx.fillStyle = '#050810';
                 ctx.fill();
@@ -3474,23 +3599,28 @@ export function render() {
             }
         }
 
+        if (fogLevel === 'visible' && shouldRenderDetails()) {
+            drawStaticTerrainDetails(sx, sy, assetSize, hex.type, hex.q, hex.r);
+        }
+
         if (fogLevel === 'visible') {
-            drawHeightShading(sx, sy, state.hexSize, hex.height);
+            applyTileLighting(sx, sy, tileSize, hex.height);
+            drawHeightShading(sx, sy, tileSize, hex.height);
             if (state.debug.showHeightOverlay) {
-                drawHeightDebugOverlay(sx, sy, state.hexSize, hex.height);
+                drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
             }
         }
 
         // Draw animated terrain overlays (grass swaying, water ripples, etc.)
         // These are drawn on top of cached/static terrain for dynamic effects
         if (fogLevel === 'visible' && shouldRenderAnimations()) {
-            drawAnimatedTerrainOverlay(sx, sy, state.hexSize, hex.type, hex.q, hex.r);
+            drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
         }
 
         // Collect foreground elements for 2.5D sorting (always needed for depth sorting)
         // Use cached foreground element definitions for better performance
         if (fogLevel === 'visible' && shouldRenderForeground()) {
-            const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, state.hexSize, hex.type);
+            const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
             foregroundElements.push(...elements);
         }
 
@@ -3509,8 +3639,8 @@ export function render() {
                 // Red danger zone overlay
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize);
-                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, state.hexSize, 'rgba(220, 38, 38, 0.25)');
+                drawHexPath(sx, sy, tileSize);
+                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, tileSize, 'rgba(220, 38, 38, 0.25)');
                 if (typeof zoneGradient !== 'string') {
                     zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
                     zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
@@ -3535,7 +3665,7 @@ export function render() {
             if (hexDist > state.zoneRadius - 2 && hexDist <= state.zoneRadius) {
                 ctx.save();
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize);
+                drawHexPath(sx, sy, tileSize);
                 const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
                 ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.4})`;
                 ctx.lineWidth = 2.5;
@@ -3577,7 +3707,7 @@ export function render() {
 
                 // Draw movement range highlight with traffic light colors
                 ctx.beginPath();
-                drawHexPath(sx, sy, state.hexSize * 0.88);
+                drawHexPath(sx, sy, tileSize * 0.88);
                 ctx.fillStyle = fillColor;
                 ctx.fill();
 
@@ -3609,8 +3739,10 @@ export function render() {
 
     // Draw attack line when targeting an enemy
     if (currentUnit && state.targetedUnit) {
-        const fromPos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
-        const toPos = hexToPixel(state.targetedUnit.q, state.targetedUnit.r, state.hexSize);
+        const fromHex = getHex(currentUnit.q, currentUnit.r);
+        const toHex = getHex(state.targetedUnit.q, state.targetedUnit.r);
+        const fromPos = getTileScreenPosition(currentUnit.q, currentUnit.r, fromHex?.height ?? 0, tileSize);
+        const toPos = getTileScreenPosition(state.targetedUnit.q, state.targetedUnit.r, toHex?.height ?? 0, tileSize);
 
         // Gradient attack line
         const gradient = safeLinearGradient(
@@ -3640,7 +3772,8 @@ export function render() {
     // Draw ghost indicators for cloaked enemy attacks
     const ghosts = getVisibleGhosts();
     ghosts.forEach(ghost => {
-        const pos = hexToPixel(ghost.q, ghost.r, state.hexSize);
+        const ghostHex = getHex(ghost.q, ghost.r);
+        const pos = getTileScreenPosition(ghost.q, ghost.r, ghostHex?.height ?? 0, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
         drawGhostIndicator(sx, sy, ghost);
@@ -3653,7 +3786,8 @@ export function render() {
 
     // Convert units to drawable objects with sortY
     const unitDrawables = visibleUnits.map(unit => {
-        const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+        const unitHex = getHex(unit.q, unit.r);
+        const pos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
 
@@ -3670,7 +3804,7 @@ export function render() {
             // Sort units at their "feet" position for proper depth between trees
             // Trees sort at their base (y + 0.4) with extra Y offset (0.25)
             // Units should sort between background trees (0.25) and foreground trees (0.65)
-            sortY: sy + state.hexSize * 0.5,
+            sortY: sy + assetSize * 0.5,
             draw: () => drawUnit(unit, sx, sy, isSelected, isTargeted, isAttackable, isBlocked, blockedInfo),
             unit: unit
         };
@@ -3692,7 +3826,7 @@ export function render() {
 
     // Draw powerups on top of all terrain and foreground elements
     powerupPositions.forEach(({ sx, sy, powerup }) => {
-        drawPowerup(sx, sy, powerup, state.hexSize);
+        drawPowerup(sx, sy, powerup, assetSize);
     });
 
     // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
@@ -3707,10 +3841,10 @@ export function render() {
             ctx.shadowBlur = 6;
             ctx.shadowOffsetX = 1;
             ctx.shadowOffsetY = 1;
-            ctx.font = `${Math.round(state.hexSize * 0.5)}px sans-serif`;
+            ctx.font = `${Math.round(assetSize * 0.5)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('🛡️', sx, sy - state.hexSize * 0.25);
+            ctx.fillText('🛡️', sx, sy - assetSize * 0.25);
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
@@ -3725,10 +3859,11 @@ export function render() {
 
     // Draw attack range indicator when targeting an enemy
     if (currentUnit && state.targetedUnit) {
-        const pos = hexToPixel(currentUnit.q, currentUnit.r, state.hexSize);
+        const currentHex = getHex(currentUnit.q, currentUnit.r);
+        const pos = getTileScreenPosition(currentUnit.q, currentUnit.r, currentHex?.height ?? 0, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
-        const rangeRadius = getEffectiveRange(currentUnit) * state.hexSize * 1.75;
+        const rangeRadius = getEffectiveRange(currentUnit) * tileSize * 1.75;
 
         // Fill area for better visibility
         ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
@@ -3759,15 +3894,15 @@ export function render() {
             // Background pill for cost
             ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.beginPath();
-            ctx.roundRect(sx - state.hexSize * 0.2, sy + state.hexSize * 0.35, state.hexSize * 0.4, state.hexSize * 0.26, 5);
+            ctx.roundRect(sx - tileSize * 0.2, sy + tileSize * 0.35, tileSize * 0.4, tileSize * 0.26, 5);
             ctx.fill();
 
             // Cost number
             ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
-            ctx.font = `bold ${Math.round(state.hexSize * 0.22)}px sans-serif`;
+            ctx.font = `bold ${Math.round(tileSize * 0.22)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${cost}`, sx, sy + state.hexSize * 0.48);
+            ctx.fillText(`${cost}`, sx, sy + tileSize * 0.48);
         });
     }
 
@@ -3823,7 +3958,8 @@ function drawScrollHint(w, h) {
 
     // Check if map extends beyond viewport
     const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    const mapPixelRadius = radius * state.hexSize * 1.8;
+    const tileSize = getTileSize();
+    const mapPixelRadius = radius * tileSize * 1.8 + getTileZOffset(CONFIG.HEIGHT.MAX, tileSize);
 
     const leftEdge = state.offsetX - mapPixelRadius;
     const rightEdge = state.offsetX + mapPixelRadius;
@@ -4320,7 +4456,7 @@ function drawMinimap(w, h) {
 
     // Draw current viewport indicator
     // Scale factor from main view to minimap coordinates
-    const scale = hexSize / state.hexSize;
+    const scale = hexSize / getTileSize();
 
     // Viewport center position on minimap
     const viewX = centerX - state.cameraX * scale;
@@ -4392,6 +4528,8 @@ function drawMinimap(w, h) {
 function drawPathPreviewOnTop(currentUnit) {
     if (!state.currentPath || state.currentPath.length < 2 || !currentUnit) return;
 
+    const tileSize = getTileSize();
+
     // Use same budget as movement logic: shared AP pool
     const maxCost = state.sharedAP;
 
@@ -4434,7 +4572,8 @@ function drawPathPreviewOnTop(currentUnit) {
 
         // Start from where reachable path ends
         const startPoint = pathWithCosts[lastReachableIndex];
-        const startPos = hexToPixel(startPoint.q, startPoint.r, state.hexSize);
+        const startHex = getHex(startPoint.q, startPoint.r);
+        const startPos = getTileScreenPosition(startPoint.q, startPoint.r, startHex?.height ?? 0, tileSize);
         ctx.moveTo(state.offsetX + startPos.x, state.offsetY + startPos.y);
 
         // Draw to final destination
@@ -4442,7 +4581,8 @@ function drawPathPreviewOnTop(currentUnit) {
             const pathHex = getHex(pathWithCosts[i].q, pathWithCosts[i].r);
             if (pathHex && pathHex.unit && pathHex.unit.id !== currentUnit.id) break;
             const point = pathWithCosts[i];
-            const pos = hexToPixel(point.q, point.r, state.hexSize);
+            const pointHex = getHex(point.q, point.r);
+            const pos = getTileScreenPosition(point.q, point.r, pointHex?.height ?? 0, tileSize);
             ctx.lineTo(state.offsetX + pos.x, state.offsetY + pos.y);
         }
         ctx.stroke();
@@ -4451,26 +4591,27 @@ function drawPathPreviewOnTop(currentUnit) {
 
         // Draw final destination marker (orange)
         const finalPoint = pathWithCosts[pathWithCosts.length - 1];
-        const finalPos = hexToPixel(finalPoint.q, finalPoint.r, state.hexSize);
+        const finalHex = getHex(finalPoint.q, finalPoint.r);
+        const finalPos = getTileScreenPosition(finalPoint.q, finalPoint.r, finalHex?.height ?? 0, tileSize);
         const finalSx = state.offsetX + finalPos.x;
         const finalSy = state.offsetY + finalPos.y;
 
         ctx.save();
         ctx.fillStyle = 'rgba(251, 146, 60, 0.3)';
         ctx.beginPath();
-        ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
+        ctx.arc(finalSx, finalSy, tileSize * 0.4, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.strokeStyle = 'rgba(251, 146, 60, 0.8)';
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
-        ctx.arc(finalSx, finalSy, state.hexSize * 0.4, 0, Math.PI * 2);
+        ctx.arc(finalSx, finalSy, tileSize * 0.4, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
         // Flag icon for future destination
-        ctx.font = `${Math.round(state.hexSize * 0.35)}px sans-serif`;
+        ctx.font = `${Math.round(tileSize * 0.35)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🚩', finalSx, finalSy);
@@ -4490,7 +4631,8 @@ function drawPathPreviewOnTop(currentUnit) {
 
         for (let i = 0; i <= lastReachableIndex; i++) {
             const point = pathWithCosts[i];
-            const pos = hexToPixel(point.q, point.r, state.hexSize);
+            const pointHex = getHex(point.q, point.r);
+            const pos = getTileScreenPosition(point.q, point.r, pointHex?.height ?? 0, tileSize);
             const sx = state.offsetX + pos.x;
             const sy = state.offsetY + pos.y;
             if (i === 0) ctx.moveTo(sx, sy);
@@ -4501,7 +4643,8 @@ function drawPathPreviewOnTop(currentUnit) {
 
         // Destination marker for this turn
         const endPoint = pathWithCosts[lastReachableIndex];
-        const endPos = hexToPixel(endPoint.q, endPoint.r, state.hexSize);
+        const endHex = getHex(endPoint.q, endPoint.r);
+        const endPos = getTileScreenPosition(endPoint.q, endPoint.r, endHex?.height ?? 0, tileSize);
         const endSx = state.offsetX + endPos.x;
         const endSy = state.offsetY + endPos.y;
 
@@ -4516,11 +4659,11 @@ function drawPathPreviewOnTop(currentUnit) {
 
             ctx.fillStyle = `rgba(34, 197, 94, ${0.2 * pulse})`;
             ctx.beginPath();
-            ctx.arc(endSx, endSy, state.hexSize * 0.6 * pulse, 0, Math.PI * 2);
+            ctx.arc(endSx, endSy, tileSize * 0.6 * pulse, 0, Math.PI * 2);
             ctx.fill();
 
             // Confirm button
-            const btnSize = state.hexSize * 0.45;
+            const btnSize = tileSize * 0.45;
             ctx.fillStyle = `rgba(22, 163, 74, ${0.85 + 0.15 * pulse})`;
             ctx.beginPath();
             ctx.arc(endSx, endSy, btnSize, 0, Math.PI * 2);
@@ -4579,7 +4722,8 @@ function drawPathPreviewOnTop(currentUnit) {
     const queuedPath = getQueuedPath(currentUnit.id);
     if (queuedPath && queuedPath.path && !state.currentPath) {
         // Draw indicator showing there's a queued destination
-        const targetPos = hexToPixel(queuedPath.targetQ, queuedPath.targetR, state.hexSize);
+        const targetHex = getHex(queuedPath.targetQ, queuedPath.targetR);
+        const targetPos = getTileScreenPosition(queuedPath.targetQ, queuedPath.targetR, targetHex?.height ?? 0, tileSize);
         const targetSx = state.offsetX + targetPos.x;
         const targetSy = state.offsetY + targetPos.y;
 
@@ -4587,18 +4731,18 @@ function drawPathPreviewOnTop(currentUnit) {
         const pulse = 0.6 + Math.sin(Date.now() / 300) * 0.4;
         ctx.fillStyle = `rgba(251, 146, 60, ${0.2 * pulse})`;
         ctx.beginPath();
-        ctx.arc(targetSx, targetSy, state.hexSize * 0.5 * pulse, 0, Math.PI * 2);
+        ctx.arc(targetSx, targetSy, tileSize * 0.5 * pulse, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.strokeStyle = 'rgba(251, 146, 60, 0.7)';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        ctx.arc(targetSx, targetSy, state.hexSize * 0.5, 0, Math.PI * 2);
+        ctx.arc(targetSx, targetSy, tileSize * 0.5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.font = `${Math.round(state.hexSize * 0.4)}px sans-serif`;
+        ctx.font = `${Math.round(tileSize * 0.4)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🚩', targetSx, targetSy);

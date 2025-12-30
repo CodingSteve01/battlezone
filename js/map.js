@@ -73,6 +73,9 @@ export function generateMap() {
 
     // Final validation pass
     validateAndFixMap(radius);
+
+    // Sync height values with biome-derived terrain
+    applyTerrainHeights();
 }
 
 /**
@@ -132,7 +135,6 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
     const moist = biome.moistureThresholds;
 
     let type = biome.baseType || 'grass';
-    const height = getHeightFromElevation(elevationNoise, biome.elevationThresholds);
 
     // Water at edges or low elevation
     if (edgeFactor > 0.85 || (elevationNoise < elev.water && !biome.noWaterEdge)) {
@@ -152,7 +154,7 @@ function createPreviewHex(q, r, distFromCenter, radius, biome, mapSeed) {
         r,
         type,
         walkable: TERRAIN[type]?.walkable ?? true,
-        height
+        height: getHeightForTerrain(type)
     };
 }
 
@@ -183,20 +185,22 @@ function simpleNoise(x, y, seed) {
     return n - Math.floor(n);
 }
 
-/**
- * Convert elevation noise into a discrete height level
- */
-function getHeightFromElevation(elevationNoise, thresholds) {
-    if (elevationNoise < thresholds.water) {
+export function getHeightForTerrain(type) {
+    if (!type) return 1;
+
+    if (['water', 'river', 'deepwater', 'shallows', 'swamp', 'reeds', 'mud', 'ice'].includes(type)) {
         return 0;
     }
-    if (elevationNoise < thresholds.hills) {
-        return 1;
-    }
-    if (elevationNoise < thresholds.rock) {
+
+    if (['hills', 'gravel'].includes(type)) {
         return 2;
     }
-    return CONFIG.HEIGHT.MAX;
+
+    if (['rock', 'cliff'].includes(type)) {
+        return CONFIG.HEIGHT.MAX;
+    }
+
+    return 1;
 }
 
 /**
@@ -268,7 +272,6 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
     const weights = biome.weights;
 
     let type = 'grass';
-    const height = getHeightFromElevation(elevationNoise, elev);
 
     // Determine terrain based on noise values using biome thresholds
     if (elevationNoise > elev.rock || (elevationNoise > elev.rock - 0.08 && roughnessNoise > 0.6)) {
@@ -384,7 +387,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
         walkable: terrain.walkable,
         cover: terrain.cover,
         moveCost: terrain.moveCost,
-        height,
+        height: getHeightForTerrain(type),
         unit: null
     };
 }
@@ -406,6 +409,12 @@ function applyBiomePostProcessing(biome, radius) {
                 hex.moveCost = TERRAIN[replacementType].moveCost;
             }
         }
+    });
+}
+
+function applyTerrainHeights() {
+    state.hexes.forEach(hex => {
+        hex.height = getHeightForTerrain(hex.type);
     });
 }
 

@@ -3,7 +3,7 @@
 export const CONFIG = {
     BASE_HEX_SIZE: 100,
     HEX_SIZE_SCALE: 0.8,
-    TILE_SCALE: 0.8,              // Global tile size multiplier for denser tile views
+    TILE_SCALE: 0.5,              // Tile size multiplier (hexes only)
     UNIT_SCALE: 0.6,              // Unit size relative to tile size for better proportions
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
@@ -62,6 +62,13 @@ export const CONFIG = {
         SATURATION_BOOST: 0.06,
         VIGNETTE_STRENGTH: 0.35,
         VIGNETTE_SOFTNESS: 0.75
+    },
+
+    LIGHTING: {
+        DIRECTION: { x: -0.6, y: -1.0 },
+        HEIGHT: 1.2,
+        SHADOW_STRENGTH: 0.25,
+        HIGHLIGHT_STRENGTH: 0.18
     }
 };
 

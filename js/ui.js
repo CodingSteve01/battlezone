@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName, getTileScreenPosition } from './state.js';
 import {
     calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
     canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
@@ -9,7 +9,6 @@ import {
 import { isUnitOnOverwatch } from './state.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
-import { hexToPixel } from './hexMath.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 import { isAIPlayer } from './ai.js';
 
@@ -22,7 +21,8 @@ function centerOnUnit(unit, duration = 400) {
     if (!unit) return;
 
     // Calculate unit position in pixels
-    const pos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const pos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     const targetCameraX = -pos.x;
     const targetCameraY = -pos.y;
 

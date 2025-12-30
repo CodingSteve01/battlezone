@@ -8,10 +8,10 @@ import {
     getHoldPositionBonus, clearHoldPosition, updateHoldPosition,
     areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances,
     recordKill, recordDamageDealt, recordDamageTaken, recordShot, recordHealing,
-    recordSpecialUsed, recordUnitLost
+    recordSpecialUsed, recordUnitLost, getTileScreenPosition
 } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { hexDistance, hexToPixel, hexLine } from './hexMath.js';
+import { hexDistance, hexLine } from './hexMath.js';
 import { killUnit } from './units.js';
 import { showToast, showFloatingDamage } from './ui.js';
 import { calculateCritical, getEffectiveDamage, trackDamage, awardKillXP, XP_REWARDS, awardXP } from './progression.js';
@@ -581,8 +581,10 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     playWeaponSound(attacker.class);
 
     // Calculate positions for particle effects
-    const attackerPos = hexToPixel(attacker.q, attacker.r, state.hexSize);
-    const defenderPos = hexToPixel(defender.q, defender.r, state.hexSize);
+    const attackerHex = getHex(attacker.q, attacker.r);
+    const defenderHex = getHex(defender.q, defender.r);
+    const attackerPos = getTileScreenPosition(attacker.q, attacker.r, attackerHex?.height ?? 0);
+    const defenderPos = getTileScreenPosition(defender.q, defender.r, defenderHex?.height ?? 0);
 
     // Calculate direction from attacker to defender
     const dx = defenderPos.x - attackerPos.x;
@@ -753,7 +755,7 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     trackDamage(attacker, defender, damage);
 
     // Calculate screen position for floating damage
-    const defenderPosScreen = hexToPixel(defender.q, defender.r, state.hexSize);
+    const defenderPosScreen = getTileScreenPosition(defender.q, defender.r, defenderHex?.height ?? 0);
     const canvas = document.getElementById('game-canvas');
     if (canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -912,7 +914,8 @@ function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
     playHeal();
 
     // Healing aura at medic position
-    const medicPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const medicHex = getHex(unit.q, unit.r);
+    const medicPos = getTileScreenPosition(unit.q, unit.r, medicHex?.height ?? 0);
     particles.healEffect(medicPos.x, medicPos.y - 10);
 
     // Verwende verbesserte Werte aus config, skaliert mit Minigame-Ergebnis
@@ -933,7 +936,8 @@ function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
                 totalHealed += actualHeal;
 
                 // Healing particles at ally position
-                const allyPos = hexToPixel(ally.q, ally.r, state.hexSize);
+                const allyHex = getHex(ally.q, ally.r);
+                const allyPos = getTileScreenPosition(ally.q, ally.r, allyHex?.height ?? 0);
                 particles.burst('heal', allyPos.x, allyPos.y - 10, 8);
 
                 // Show floating heal number
@@ -1016,7 +1020,8 @@ function useScoutSpecial(unit) {
     playSprint();
 
     // Sprint dust cloud effect
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.sprintEffect(unitPos.x, unitPos.y);
 
     showToast('🎯 Sprint aktiviert!', 'special');
@@ -1031,7 +1036,8 @@ function useAssaultSpecial(unit) {
     playPowershot();
 
     // Powershot charging effect
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.powershotEffect(unitPos.x, unitPos.y - 10, 0); // Direction 0 = right, will spread
 
     showToast('💥 Powershot bereit! (+25 Schaden)', 'special');
@@ -1046,7 +1052,8 @@ function useSniperSpecial(unit) {
     playCloak();
 
     // Cloak shimmer effect
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.cloakEffect(unitPos.x, unitPos.y - 10);
 
     showToast('🔫 Getarnt!', 'special');
@@ -1062,7 +1069,8 @@ function useNinjaSpecial(unit) {
     playCloak();
 
     // Cloak + sprint effect for commando
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.cloakEffect(unitPos.x, unitPos.y - 10);
     particles.sprintEffect(unitPos.x, unitPos.y);
 
@@ -1081,7 +1089,8 @@ function useEliteSpecial(unit) {
     unit.tacticalMode = true;
 
     // Visual effect
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.powershotEffect(unitPos.x, unitPos.y - 10, 0);
     particles.sprintEffect(unitPos.x, unitPos.y);
 
@@ -1171,7 +1180,8 @@ export function prepareAmbush(unit) {
     showToast('🎯 Hinterhalt vorbereitet!', 'special');
 
     // Visueller Effekt
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.burst('warning', unitPos.x, unitPos.y - 10, 5);
 
     return true;
@@ -1400,7 +1410,8 @@ export function useSuppression(unit, targetQ, targetR) {
     addSuppressedHex(targetQ, targetR, unit.id, 2);
 
     // Visueller Effekt
-    const targetPos = hexToPixel(targetQ, targetR, state.hexSize);
+    const targetHex = getHex(targetQ, targetR);
+    const targetPos = getTileScreenPosition(targetQ, targetR, targetHex?.height ?? 0);
     particles.burst('warning', targetPos.x, targetPos.y - 10, 12);
 
     // Sound und Toast
@@ -1467,7 +1478,8 @@ export function activateOverwatch(unit) {
     setOverwatch(unit.id);
 
     // Visuelles Feedback
-    const unitPos = hexToPixel(unit.q, unit.r, state.hexSize);
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
     particles.burst('shield', unitPos.x, unitPos.y - 10, 8);
 
     showToast('👁️ Overwatch aktiviert! Feinde werden beim Bewegen angegriffen.', 'special');
