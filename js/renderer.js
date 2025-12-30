@@ -1799,6 +1799,13 @@ export async function initRenderer() {
                 // Still need 2D context for UI elements
                 ctx = canvas.getContext('2d');
                 
+                // If 2D context failed (can happen when WebGL is already active on canvas),
+                // we need to create a separate canvas for 2D overlay or handle gracefully
+                if (!ctx) {
+                    logEntry('warn', '[Renderer] Cannot get 2D context after WebGL init', 
+                        'UI overlay may not work correctly');
+                }
+                
                 // Skip rest of Canvas 2D initialization
                 resizeCanvas();
                 return;
@@ -1962,8 +1969,12 @@ export function resizeCanvas() {
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
 
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
+    // Only apply transforms if we have a 2D context
+    // (WebGL mode may not have 2D context for overlay)
+    if (ctx) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+    }
 
     // Ensure camera values are valid numbers
     const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
@@ -3696,14 +3707,21 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
  * Main render function
  */
 export function render() {
-    if (!canvas || !ctx) {
-        logRender('Canvas oder Context nicht verfügbar', `canvas: ${!!canvas}, ctx: ${!!ctx}`);
+    // Check canvas availability
+    if (!canvas) {
+        logRender('Canvas nicht verfügbar', `canvas: ${!!canvas}`);
         return;
     }
     
     // If WebGL renderer is active, use it instead of Canvas 2D
     if (webglActive) {
         renderWebGL();
+        return;
+    }
+    
+    // For Canvas 2D rendering, we need the 2D context
+    if (!ctx) {
+        logRender('Context nicht verfügbar für Canvas 2D', `ctx: ${!!ctx}`);
         return;
     }
 

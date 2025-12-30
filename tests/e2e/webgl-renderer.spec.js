@@ -109,6 +109,48 @@ test.describe('WebGL Renderer', () => {
         expect(criticalErrors.length).toBe(0);
     });
 
+    test('should handle 2D context failure after WebGL init', async ({ page }) => {
+        // Simulate WebGL succeeding but 2D context failing (the actual bug scenario)
+        await page.addInitScript(() => {
+            const originalGetContext = HTMLCanvasElement.prototype.getContext;
+            let webglCallCount = 0;
+            let canvas2dCallCount = 0;
+            
+            HTMLCanvasElement.prototype.getContext = function(contextType, ...args) {
+                if (contextType === 'webgl' || contextType === 'experimental-webgl') {
+                    webglCallCount++;
+                    // WebGL succeeds on first call (initialization)
+                    return originalGetContext.call(this, contextType, ...args);
+                }
+                if (contextType === '2d') {
+                    canvas2dCallCount++;
+                    // 2D context fails after WebGL init (simulating the bug)
+                    if (webglCallCount > 0 && canvas2dCallCount === 1) {
+                        return null;
+                    }
+                }
+                return originalGetContext.call(this, contextType, ...args);
+            };
+        });
+        
+        const errors = [];
+        page.on('pageerror', error => {
+            errors.push(error.message);
+            console.log('Page error:', error.message);
+        });
+        
+        // Start a game
+        await page.click('text=Einzelspieler');
+        await page.waitForSelector('.wizard-container', { timeout: 5000 });
+        await page.waitForTimeout(2000);
+        
+        // Should not have setTransform errors
+        const setTransformErrors = errors.filter(e => 
+            e.includes('setTransform') || e.includes('null is not an object')
+        );
+        expect(setTransformErrors.length).toBe(0);
+    });
+
     test('should render hex tiles using WebGL mesh', async ({ page }) => {
         // Start a game
         await page.click('text=Einzelspieler');

@@ -340,4 +340,44 @@ test.describe('Game Rendering', () => {
     expect(uiChecks.canvas?.visible, 'Canvas should be visible').toBe(true);
     expect(pageErrors).toEqual([]);
   });
+
+  test('canvas resize should not throw setTransform errors', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const errors = [];
+    page.on('pageerror', error => {
+      errors.push({ message: error.message, stack: error.stack });
+      console.log(`[PAGE ERROR] ${error.message}`);
+    });
+
+    // Navigate and start game
+    await navigateToGame(page, { mapSize: 'small' });
+    await completeTeamSelection(page);
+
+    // Wait for initial render
+    await page.waitForTimeout(1000);
+
+    // Resize viewport multiple times to trigger resizeCanvas
+    await page.setViewportSize({ width: 800, height: 600 });
+    await page.waitForTimeout(500);
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.waitForTimeout(500);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.waitForTimeout(500);
+
+    // Screenshot after resize
+    await page.screenshot({ path: 'test-results/resize-test.png', fullPage: true });
+
+    // Check for setTransform errors
+    const setTransformErrors = errors.filter(e => 
+      e.message.includes('setTransform') || 
+      e.message.includes('null is not an object') ||
+      e.message.includes('Cannot read property')
+    );
+
+    console.log('Resize test errors:', JSON.stringify(errors, null, 2));
+    expect(setTransformErrors).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
 });
