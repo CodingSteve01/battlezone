@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.18.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.17.0...shadow-squad-v3.18.0) (2025-12-30)
+
+
+### Features
+
+* **render:** height-aware tiles and directional lighting/shadows ([#197](https://github.com/CodingSteve01/battlezone/issues/197)) ([c40cb85](https://github.com/CodingSteve01/battlezone/commit/c40cb85576d45cc970930641c7e1bde39d7c6392))
+
 ## [3.17.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.16.6...shadow-squad-v3.17.0) (2025-12-29)
 
 
