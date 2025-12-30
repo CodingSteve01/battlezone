@@ -145,6 +145,20 @@ function getLightVector() {
     return { x: dir.x / length, y: dir.y / length };
 }
 
+function getViewVector() {
+    const light = getLightVector();
+    const length = Math.hypot(light.x, light.y) || 1;
+    return { x: -light.x / length, y: -light.y / length };
+}
+
+function isEdgeFacingViewer(direction, viewDir) {
+    const faceAngle = (Math.PI / 3) * direction + Math.PI / 6;
+    const faceDirX = Math.cos(faceAngle);
+    const faceDirY = Math.sin(faceAngle);
+    const dot = faceDirX * viewDir.x + faceDirY * viewDir.y;
+    return dot > 0;
+}
+
 function getShadowOffset(height, size) {
     const lightHeight = CONFIG.LIGHTING?.HEIGHT ?? 1.2;
     const zOffset = getTileZOffset(height, size);
@@ -227,21 +241,20 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
     
     const neighbors = getNeighbors(hex.q, hex.r);
     const light = getLightVector();
+    const viewDir = getViewVector();
+    const terrain = TERRAIN[hex.type];
     
-    // Pre-calculate earth color for this height level
-    const earthBase = myHeight >= 3 ? 60 : (myHeight >= 2 ? 75 : 90);
-    const baseColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
-    const earthColor = fogLevel === 'hidden'
+    const baseColor = terrain?.color || '#6a9a58';
+    const sidewallColor = fogLevel === 'hidden'
         ? '#050810'
-        : baseColor;
-    const cliffTexture = fogLevel === 'hidden' ? null : getCliffTextureCanvas(hex.type);
+        : desaturateAndDarken(baseColor, 0.6, 0.55);
     
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
+        if (!isEdgeFacingViewer(direction, viewDir)) return;
         const neighborHex = getHex(neighbor.q, neighbor.r);
-        if (!neighborHex) return;
         
-        const neighborHeight = neighborHex.height ?? 0;
+        const neighborHeight = neighborHex?.height ?? 0;
         const heightDiff = myHeight - neighborHeight;
         
         if (heightDiff <= 0) return; // Only draw cliff if we're higher
@@ -283,11 +296,7 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
         
-        if (cliffTexture) {
-            ctx.fillStyle = ctx.createPattern(cliffTexture, 'repeat') || earthColor;
-        } else {
-            ctx.fillStyle = earthColor;
-        }
+        ctx.fillStyle = sidewallColor;
         ctx.globalAlpha = fogLevel === 'hidden' ? 1 : lightFactor * 0.85; // Slight transparency for depth
         ctx.fill();
         
