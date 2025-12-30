@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.22.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.2...shadow-squad-v3.22.3) (2025-12-30)
+
+
+### Bug Fixes
+
+* **renderer:** default to canvas2d ([#221](https://github.com/CodingSteve01/battlezone/issues/221)) ([6e6391b](https://github.com/CodingSteve01/battlezone/commit/6e6391b57658f463f0541f786cd76b30b3219505))
+
 ## [3.22.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.1...shadow-squad-v3.22.2) (2025-12-30)
 
 
