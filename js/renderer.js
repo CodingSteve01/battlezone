@@ -23,7 +23,6 @@ import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
 import { logRender, logError, logEntry } from './errorLog.js';
-import { initWebGLRenderer, renderWebGL, isWebGLAvailable, markMeshDirty } from './rendererWebGL.js';
 
 // ===== SAFE GRADIENT HELPERS =====
 // Prevents "non-finite value" errors when coordinates are NaN/Infinity
@@ -595,7 +594,8 @@ function getTreeSpriteBounds(x, y, size, treeType, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
-    const baseHeight = size * 2.8 * sizeVariation;
+    // Reduced from 2.8x to 1.6x for better unit visibility
+    const baseHeight = size * 1.6 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -607,7 +607,8 @@ function getBushSpriteBounds(x, y, size, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-    const baseSize = size * 1.6 * sizeVariation;
+    // Reduced from 1.6x to 1.1x for better visual balance with smaller trees
+    const baseSize = size * 1.1 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -619,7 +620,8 @@ function getShrubSpriteBounds(x, y, size, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-    const baseSize = size * 1.3 * sizeVariation;
+    // Reduced from 1.3x to 0.9x for better visual balance
+    const baseSize = size * 0.9 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -671,7 +673,8 @@ function drawTree2D5(x, y, size, treeType, seed) {
         const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
 
         // Base target size (what the sprite should be at 100% in original cell)
-        const baseHeight = size * 2.8 * sizeVariation;
+        // Reduced from 2.8x to 1.6x for better unit visibility and visual balance
+        const baseHeight = size * 1.6 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
 
@@ -702,7 +705,8 @@ function drawBush2D5(x, y, size, seed) {
 
         // Size variation: 0.6x to 1.4x
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-        const baseSize = size * 1.6 * sizeVariation;
+        // Reduced from 1.6x to 1.1x for better visual balance
+        const baseSize = size * 1.1 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
@@ -732,7 +736,8 @@ function drawSmallShrub(x, y, size, seed) {
         const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-        const baseSize = size * 1.3 * sizeVariation;
+        // Reduced from 1.3x to 0.9x for better visual balance
+        const baseSize = size * 0.9 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
@@ -903,7 +908,6 @@ export function getPresetList() { return ['default']; }
 
 let canvas, ctx;
 let texturesInitialized = false;
-let webglActive = false; // Track which renderer is currently active
 
 // ===== HEX TILE CACHING SYSTEM =====
 // Pre-renders hex tiles with terrain details for improved performance
@@ -1792,52 +1796,9 @@ function detectMobileDevice() {
 
 export async function initRenderer() {
     canvas = document.getElementById('game-canvas');
-    
-    // Check if WebGL should be used
-    const useWebGL = CONFIG.RENDERER.PREFER_WEBGL || CONFIG.RENDERER.TYPE === 'webgl';
-    
-    if (useWebGL && isWebGLAvailable()) {
-        logEntry('info', '[Renderer] Attempting to initialize WebGL renderer', 
-            `Type: ${CONFIG.RENDERER.TYPE}, Prefer: ${CONFIG.RENDERER.PREFER_WEBGL}`);
-        try {
-            const success = await initWebGLRenderer(canvas);
-            if (success) {
-                webglActive = true;
-                logEntry('info', '[Renderer] Using WebGL renderer', 'Initialization successful');
-                
-                // Still need 2D context for UI elements
-                ctx = canvas.getContext('2d');
-                
-                // If 2D context failed (can happen when WebGL is already active on canvas),
-                // we need to create a separate canvas for 2D overlay or handle gracefully
-                if (!ctx) {
-                    logEntry('warn', '[Renderer] Cannot get 2D context after WebGL init', 
-                        'UI overlay may not work correctly. Consider using a separate canvas for 2D UI elements.');
-                }
-                
-                // Skip rest of Canvas 2D initialization
-                resizeCanvas();
-                return;
-            } else if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
-                const error = new Error('WebGL initialization failed and fallback disabled');
-                logError('[Renderer] Cannot initialize renderer', error);
-                throw error;
-            }
-            logEntry('warn', '[Renderer] WebGL initialization failed, falling back to Canvas 2D', 
-                'Check previous logs for WebGL errors');
-        } catch (err) {
-            logError('[Renderer] WebGL initialization error', err);
-            if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
-                throw err;
-            }
-            logEntry('warn', '[Renderer] Falling back to Canvas 2D', 'WebGL error occurred');
-        }
-    }
-    
-    // Canvas 2D fallback or default
-    webglActive = false;
-    logEntry('info', '[Renderer] Using Canvas 2D renderer', 
-        `Reason: ${useWebGL ? 'WebGL fallback' : 'Canvas 2D configured'}`);
+
+    // Canvas 2D renderer
+    logEntry('info', '[Renderer] Using Canvas 2D renderer', 'Initializing...');
     ctx = canvas.getContext('2d');
 
     // Detect mobile/tablet and set initial quality
@@ -2667,64 +2628,19 @@ function drawStaticSnowDetails(cx, cy, hexSize, seed) {
 }
 
 /**
- * Draw static ice details
+ * Draw static ice details - simplified for performance
  */
 function drawStaticIceDetails(cx, cy, hexSize, seed) {
-    // Ice cracks
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 0.5;
-
-    for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        let x = cx + (seededRandom(seed + i * 3) - 0.5) * hexSize * 1.1;
-        let y = cy + (seededRandom(seed + i * 3 + 1) - 0.5) * hexSize * 1.1;
-        ctx.moveTo(x, y);
-
-        for (let j = 0; j < 3; j++) {
-            x += (seededRandom(seed + i * 10 + j) - 0.5) * hexSize * 0.35;
-            y += (seededRandom(seed + i * 10 + j + 5) - 0.5) * hexSize * 0.35;
-            ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    }
-
-    // Shimmer spots
-    for (let i = 0; i < 3; i++) {
-        const shimmerVisible = seededRandom(seed + i * 30) > 0.4;
-        if (shimmerVisible) {
-            const sx = cx + (seededRandom(seed + i * 20) - 0.5) * hexSize * 1.3;
-            const sy = cy + (seededRandom(seed + i * 20 + 10) - 0.5) * hexSize * 1.3;
-
-            ctx.fillStyle = 'rgba(200, 230, 255, 0.25)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 3, 1.5, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
+    // Disabled ice cracks for performance - terrain texture is sufficient
+    return;
 }
 
 /**
  * Draw simple reed texture - fewer, simpler stalks
  */
 function drawStaticReeds(cx, cy, hexSize, seed) {
-    // Just 8 simple vertical strokes to suggest reeds
-    ctx.strokeStyle = 'rgba(70, 95, 55, 0.5)';
-    ctx.lineWidth = 1.5;
-
-    for (let i = 0; i < 8; i++) {
-        const rand1 = seededRandom(seed + i * 4);
-        const rand2 = seededRandom(seed + i * 4 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.8;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.6;
-        const height = 12 + seededRandom(seed + i * 4 + 2) * 8;
-        const sway = (rand1 - 0.5) * 3;
-
-        ctx.beginPath();
-        ctx.moveTo(x, y + 4);
-        ctx.lineTo(x + sway, y - height);
-        ctx.stroke();
-    }
+    // Disabled for performance - vegetation is handled by sprites
+    return;
 }
 
 /**
@@ -2754,55 +2670,16 @@ function drawStaticFlowers(cx, cy, hexSize, seed) {
  * Draw subtle wheat field texture - golden patches
  */
 function drawStaticWheatField(cx, cy, hexSize, seed) {
-    // Draw subtle golden texture patches
-    for (let i = 0; i < 4; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.8;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.8;
-        const size = 8 + seededRandom(seed + i * 3 + 2) * 10;
-
-        // Light golden patch
-        ctx.fillStyle = 'rgba(210, 180, 100, 0.15)';
-        ctx.beginPath();
-        ctx.ellipse(x, y, size, size * 0.6, rand1 * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Add a few subtle darker streaks to suggest stalks
-    ctx.strokeStyle = 'rgba(180, 150, 80, 0.2)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
-        const rand = seededRandom(seed + i * 5);
-        const x = cx + (rand - 0.5) * hexSize * 0.6;
-        const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 0.6;
-
-        ctx.beginPath();
-        ctx.moveTo(x, y + 6);
-        ctx.lineTo(x + (rand - 0.5) * 4, y - 6);
-        ctx.stroke();
-    }
+    // Disabled for performance - terrain texture provides base color
+    return;
 }
 
 /**
  * Draw subtle heather texture - purple patches
  */
 function drawStaticHeather(cx, cy, hexSize, seed) {
-    // Just a few subtle purple patches
-    for (let i = 0; i < 4; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.7;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.7;
-        const size = 6 + seededRandom(seed + i * 3 + 2) * 8;
-
-        ctx.fillStyle = 'rgba(150, 100, 150, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(x, y, size, size * 0.7, rand1 * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
+    // Disabled for performance - terrain texture provides base color
+    return;
 }
 
 /**
@@ -2874,61 +2751,13 @@ function drawSandDetails(cx, cy, s, seed) {
 }
 
 /**
- * Draw swamp details
+ * Draw swamp details - simplified for performance
  */
 function drawSwampDetails(cx, cy, s, seed) {
-    // Murky water puddles
-    ctx.fillStyle = 'rgba(25, 45, 30, 0.6)';
+    // Just a simple murky water puddle overlay - no strokes
+    ctx.fillStyle = 'rgba(25, 45, 30, 0.4)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + s * 0.1, s * 0.65, s * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Algae on water
-    ctx.fillStyle = 'rgba(50, 80, 40, 0.4)';
-    for (let i = 0; i < 3; i++) {
-        const ax = cx + (seededRandom(seed + i * 41) - 0.5) * s * 0.8;
-        const ay = cy + (seededRandom(seed + i * 41 + 1) - 0.5) * s * 0.5;
-        ctx.beginPath();
-        ctx.ellipse(ax, ay, s * 0.15, s * 0.1, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Bubbles
-    ctx.fillStyle = 'rgba(60, 85, 55, 0.7)';
-    for (let i = 0; i < 4; i++) {
-        const bx = cx + (seededRandom(seed + i * 43) - 0.5) * s * 0.9;
-        const by = cy + (seededRandom(seed + i * 43 + 1) - 0.5) * s * 0.7;
-        const bSize = 2 + seededRandom(seed + i * 43 + 2) * 2;
-        ctx.beginPath();
-        ctx.arc(bx, by, bSize, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Dead reeds
-    ctx.strokeStyle = 'rgba(90, 70, 50, 0.7)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-        const rx = cx + (seededRandom(seed + i * 47) - 0.5) * s * 1.2;
-        const ry = cy + (seededRandom(seed + i * 47 + 1) - 0.5) * s * 0.8;
-        const height = s * (0.3 + seededRandom(seed + i * 47 + 2) * 0.3);
-        const lean = (seededRandom(seed + i * 47 + 3) - 0.5) * s * 0.15;
-
-        ctx.beginPath();
-        ctx.moveTo(rx, ry + s * 0.2);
-        ctx.lineTo(rx + lean, ry - height);
-        ctx.stroke();
-
-        // Reed tip
-        ctx.fillStyle = 'rgba(70, 50, 35, 0.8)';
-        ctx.beginPath();
-        ctx.ellipse(rx + lean, ry - height - 3, 2, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Moss on edges
-    ctx.fillStyle = 'rgba(45, 70, 35, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(cx - s * 0.5, cy - s * 0.2, s * 0.2, s * 0.1, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + s * 0.1, s * 0.5, s * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
 }
 
@@ -3159,7 +2988,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
     // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    // Size increased from 1.3x to 1.7x for better visibility against trees
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.7, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
@@ -3721,13 +3551,7 @@ export function render() {
         logRender('Canvas nicht verfügbar', `canvas: ${!!canvas}`);
         return;
     }
-    
-    // If WebGL renderer is active, use it instead of Canvas 2D
-    if (webglActive) {
-        renderWebGL();
-        return;
-    }
-    
+
     // For Canvas 2D rendering, we need the 2D context
     if (!ctx) {
         logRender('Context nicht verfügbar für Canvas 2D', `ctx: ${!!ctx}`);
@@ -4218,6 +4042,7 @@ export function render() {
     };
 
     // Collect all tiles that might have obscuring assets for important units
+    // Extended range for better visibility in dense forests
     const obscuringTiles = new Set();
     importantUnitDrawables.forEach(drawable => {
         const unit = drawable.unit;
@@ -4226,14 +4051,30 @@ export function render() {
         // Add the unit's own tile
         obscuringTiles.add(`${unit.q},${unit.r}`);
 
-        // Add tiles "below" the unit (screen space: tiles with higher Y)
-        const tilesBelow = [
-            { q: unit.q, r: unit.r + 1 },     // Directly below
-            { q: unit.q + 1, r: unit.r },     // Southeast
+        // Add all 6 neighboring tiles for comprehensive occlusion detection
+        const neighbors = [
+            { q: unit.q + 1, r: unit.r },     // East
+            { q: unit.q - 1, r: unit.r },     // West
+            { q: unit.q, r: unit.r + 1 },     // Southeast
+            { q: unit.q, r: unit.r - 1 },     // Northwest
+            { q: unit.q + 1, r: unit.r - 1 }, // Northeast
             { q: unit.q - 1, r: unit.r + 1 }  // Southwest
         ];
 
-        tilesBelow.forEach(tile => {
+        neighbors.forEach(tile => {
+            obscuringTiles.add(`${tile.q},${tile.r}`);
+        });
+
+        // Add second ring of tiles "below" the unit for better visibility in dense areas
+        const tilesBelow2 = [
+            { q: unit.q, r: unit.r + 2 },     // 2 tiles below
+            { q: unit.q + 1, r: unit.r + 1 }, // SE diagonal
+            { q: unit.q - 1, r: unit.r + 2 }, // SW diagonal
+            { q: unit.q + 2, r: unit.r },     // 2 tiles east
+            { q: unit.q - 2, r: unit.r + 2 }  // 2 tiles southwest
+        ];
+
+        tilesBelow2.forEach(tile => {
             obscuringTiles.add(`${tile.q},${tile.r}`);
         });
     });
@@ -4251,7 +4092,8 @@ export function render() {
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
-        const finalAlpha = needsTransparency ? visibilityAlpha * 0.35 : visibilityAlpha;
+        // Reduced transparency alpha from 0.35 to 0.2 for much better unit visibility
+        const finalAlpha = needsTransparency ? visibilityAlpha * 0.2 : visibilityAlpha;
 
         if (finalAlpha < 0.99) {
             ctx.save();
@@ -4717,13 +4559,16 @@ function drawMinimap(w, h) {
     // Determine size and position based on mode
     let size, x, y;
     if (isExpanded) {
-        // Expanded mode: centered on screen, nearly full screen
+        // Expanded mode: centered on screen, accounting for top bar (55px) and bottom UI (~300px)
+        const topBarHeight = 55;
+        const bottomUIHeight = 300;
         const availableWidth = Math.max(0, w - config.PADDING * 2);
-        const availableHeight = Math.max(0, h - config.PADDING * 2 - 40);
+        const availableHeight = Math.max(0, h - topBarHeight - bottomUIHeight - config.PADDING * 2);
         size = Math.min(config.EXPANDED_SIZE, availableWidth, availableHeight);
         if (size <= 0) return;
         x = (w - size) / 2;
-        y = (h - size) / 2;
+        // Center vertically in the available space between top bar and bottom UI
+        y = topBarHeight + config.PADDING + (availableHeight - size) / 2;
     } else {
         // Compact mode: top-left corner
         size = config.SIZE;
