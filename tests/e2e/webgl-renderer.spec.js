@@ -136,7 +136,6 @@ test.describe('WebGL Renderer', () => {
         const errors = [];
         page.on('pageerror', error => {
             errors.push(error.message);
-            console.log('Page error:', error.message);
         });
         
         // Start a game

@@ -402,7 +402,6 @@ test.describe('Game Rendering', () => {
       e.message.includes('Cannot read property')
     );
 
-    console.log('Resize test errors:', JSON.stringify(errors, null, 2));
     expect(setTransformErrors).toEqual([]);
     expect(pageErrors).toEqual([]);
   });
