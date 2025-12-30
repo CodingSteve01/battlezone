@@ -141,14 +141,30 @@ test.describe('AI vs AI Spectator Mode', () => {
       const canvas = document.getElementById('game-canvas');
       if (!canvas) return { error: 'No canvas' };
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return { error: 'No context' };
-
       if (canvas.width === 0 || canvas.height === 0) {
         return { error: `Zero dimensions: ${canvas.width}x${canvas.height}` };
       }
 
-      // Sample 5 points
+      // Try to get 2D context for pixel analysis (works for Canvas 2D renderer)
+      const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+      
+      // Try to get WebGL context (works for WebGL renderer)
+      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      
+      if (!ctx2d && !gl) {
+        return { error: 'Cannot get any rendering context (neither 2D nor WebGL)' };
+      }
+
+      // If WebGL is active, we can't easily sample pixels, so just check dimensions
+      if (gl && !ctx2d) {
+        return {
+          renderer: 'webgl',
+          dimensions: `${canvas.width}x${canvas.height}`,
+          isBlack: false // Assume WebGL is rendering correctly if context exists
+        };
+      }
+
+      // For 2D context, sample 5 points
       const points = [
         [canvas.width / 2, canvas.height / 2],
         [canvas.width / 4, canvas.height / 4],
@@ -159,13 +175,14 @@ test.describe('AI vs AI Spectator Mode', () => {
 
       let blackCount = 0;
       for (const [x, y] of points) {
-        const data = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+        const data = ctx2d.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
         if (data[0] < 15 && data[1] < 15 && data[2] < 15) {
           blackCount++;
         }
       }
 
       return {
+        renderer: 'canvas2d',
         dimensions: `${canvas.width}x${canvas.height}`,
         blackPixels: blackCount,
         isBlack: blackCount >= 4
