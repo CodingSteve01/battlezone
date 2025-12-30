@@ -229,64 +229,60 @@ function shouldRenderBaseSkirt(hex) {
 
 /**
  * Draw cliff/slope faces between tiles of different heights
- * Creates realistic earth/ground appearance when looking at height differences
- * Optimized to reduce rendering overhead
+ * Creates realistic earth/ground appearance with gradient shading
+ * for natural-looking height transitions
  */
 function drawCliffFaces(cx, cy, size, hex, fogLevel) {
     if (!hex || hex.height === undefined) return;
-    
+
     const myHeight = hex.height ?? 0;
     if (myHeight === 0) return; // No cliff faces for ground-level tiles
-    
+
     const neighbors = getNeighbors(hex.q, hex.r);
     const light = getLightVector();
     const viewDir = getViewVector();
     const terrain = TERRAIN[hex.type];
-    
+
     const baseColor = terrain?.color || '#6a9a58';
-    const sidewallColor = fogLevel === 'hidden'
-        ? '#050810'
-        : desaturateAndDarken(baseColor, 0.6, 0.55);
-    
+
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
         if (!isEdgeFacingViewer(direction, viewDir)) return;
         const neighborHex = getHex(neighbor.q, neighbor.r);
-        
+
         const neighborHeight = neighborHex?.height ?? 0;
         const heightDiff = myHeight - neighborHeight;
-        
+
         if (heightDiff <= 0) return; // Only draw cliff if we're higher
-        
+
         // Calculate the cliff face positions
         // Direction 0 = right, incrementing clockwise
         const angle1 = (Math.PI / 3) * direction;
         const angle2 = (Math.PI / 3) * ((direction + 1) % 6);
-        
+
         const myOffset = getTileZOffset(myHeight, size);
         const neighborOffset = getTileZOffset(neighborHeight, size);
         const faceHeight = myOffset - neighborOffset;
-        
+
         // Points on this hex's edge (top of cliff)
         const topX1 = cx + size * Math.cos(angle1);
         const topY1 = cy + size * Math.sin(angle1);
         const topX2 = cx + size * Math.cos(angle2);
         const topY2 = cy + size * Math.sin(angle2);
-        
+
         // Points at bottom of cliff (aligned with lower neighbor)
         const bottomX1 = topX1;
         const bottomY1 = topY1 + faceHeight;
         const bottomX2 = topX2;
         const bottomY2 = topY2 + faceHeight;
-        
-        // Calculate lighting once per face
-        const faceAngle = angle1 + Math.PI / 6; // Mid-angle of this edge
+
+        // Calculate lighting based on face direction
+        const faceAngle = angle1 + Math.PI / 6;
         const faceDirX = Math.cos(faceAngle);
         const faceDirY = Math.sin(faceAngle);
         const lightDot = -(faceDirX * light.x + faceDirY * light.y);
-        const lightFactor = Math.max(0.4, 0.7 + lightDot * 0.3);
-        
-        // Draw the cliff face as a simple trapezoid (no gradient for performance)
+        const lightFactor = Math.max(0.3, 0.6 + lightDot * 0.4);
+
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(topX1, topY1);
@@ -294,11 +290,39 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.lineTo(bottomX2, bottomY2);
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
-        
-        ctx.fillStyle = sidewallColor;
-        ctx.globalAlpha = fogLevel === 'hidden' ? 1 : lightFactor * 0.85; // Slight transparency for depth
-        ctx.fill();
-        
+
+        if (fogLevel === 'hidden') {
+            // Hidden hexes show dark cliff faces
+            ctx.fillStyle = '#050810';
+            ctx.fill();
+        } else {
+            // Create gradient from top (lighter) to bottom (darker) for depth
+            const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
+            const topY = Math.min(topY1, topY2);
+            const bottomY = Math.max(bottomY1, bottomY2);
+
+            const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5));
+            if (typeof gradient !== 'string') {
+                // Top edge: slightly lighter (edge highlight)
+                gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor));
+                // Middle: earth tone
+                gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor));
+                // Bottom: darker shadow
+                gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor));
+            }
+
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Add subtle top edge highlight for definition
+            ctx.beginPath();
+            ctx.moveTo(topX1, topY1);
+            ctx.lineTo(topX2, topY2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
         ctx.restore();
     });
 }
@@ -1569,12 +1593,12 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        // Draw sprite texture - scale to fit hex with slight overlap to prevent seams
+        // Draw sprite texture - scale to fit hex with generous overlap to eliminate seams
         context.save();
         context.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
-        const buffer = Math.max(6, size * 0.06);
+        // Increased buffer to completely eliminate anti-aliasing seams between tiles
+        const buffer = Math.max(12, size * 0.12);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
@@ -2002,8 +2026,8 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
         ctx.save();
         ctx.clip();
         // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
-        const buffer = Math.max(6, size * 0.06);
+        // Increased buffer to completely eliminate anti-aliasing seams between tiles
+        const buffer = Math.max(12, size * 0.12);
         const spriteWidth = size * 2 + buffer;
         const spriteHeight = size * Math.sqrt(3) + buffer;
         ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
