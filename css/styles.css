@@ -4132,6 +4132,210 @@ button:focus:not(:focus-visible),
     }
 }
 
+/* ===== TEAM SELECT - SMALL SCREEN OPTIMIZATION (iPhone Mini, etc.) ===== */
+/* For screens with limited height like iPhone Mini (667px) */
+@media (max-height: 700px) {
+    #team-select.wizard-screen {
+        padding: 8px;
+        padding-top: max(8px, env(safe-area-inset-top));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    /* Compact wizard progress for small screens */
+    #team-select .wizard-header {
+        padding: 4px 0;
+    }
+
+    #team-select .wizard-progress {
+        margin-bottom: 8px;
+    }
+
+    #team-select .wizard-step {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+
+    #team-select .wizard-step-line {
+        width: 20px;
+    }
+
+    /* Compact header */
+    #team-select .team-select-header {
+        margin-top: 0;
+        padding: 4px 0;
+        gap: 8px;
+    }
+
+    #team-select .team-select-badge {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    #team-select .team-select-title {
+        font-size: 16px;
+    }
+
+    /* Make unit grid scrollable with more space */
+    #team-select .team-select-grid {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        margin: 6px 0;
+        padding-right: 4px;
+        max-height: none;
+        /* Scroll indicators */
+        scrollbar-width: thin;
+        scrollbar-color: var(--green) var(--bg-tertiary);
+    }
+
+    #team-select .team-select-grid::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    #team-select .team-select-grid::-webkit-scrollbar-track {
+        background: var(--bg-tertiary);
+        border-radius: 2px;
+    }
+
+    #team-select .team-select-grid::-webkit-scrollbar-thumb {
+        background: var(--green);
+        border-radius: 2px;
+    }
+
+    /* Smaller unit cards */
+    #team-select .unit-card {
+        padding: 8px;
+    }
+
+    #team-select .unit-card .unit-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+    }
+
+    #team-select .unit-card .unit-name {
+        font-size: 12px;
+        margin-bottom: 2px;
+    }
+
+    #team-select .unit-card .unit-stats {
+        font-size: 9px;
+        line-height: 1.3;
+    }
+
+    #team-select .unit-card .unit-special {
+        margin-top: 4px;
+        padding: 2px 6px;
+        font-size: 8px;
+    }
+
+    #team-select .unit-card .select-count {
+        width: 20px;
+        height: 20px;
+        font-size: 10px;
+        top: -4px;
+        right: -4px;
+    }
+
+    /* Compact preview area */
+    #team-select .team-select-preview {
+        padding: 8px;
+        margin: 4px 0;
+    }
+
+    #team-select .team-slot {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+
+    /* Compact footer with smaller buttons */
+    #team-select .wizard-footer {
+        padding: 8px 0;
+        gap: 8px;
+    }
+
+    #team-select .wizard-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+        border-radius: 10px;
+    }
+
+    /* Budget display compact */
+    #team-select .budget-display {
+        padding: 6px;
+        margin-bottom: 6px;
+    }
+
+    #team-select .budget-bar {
+        height: 6px;
+        margin-bottom: 4px;
+    }
+}
+
+/* Extra small screens - even more compact */
+@media (max-height: 600px) {
+    #team-select.wizard-screen {
+        padding: 4px;
+        padding-top: max(4px, env(safe-area-inset-top));
+    }
+
+    #team-select .wizard-progress {
+        display: none;  /* Hide progress on very small screens */
+    }
+
+    #team-select .team-select-badge {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+
+    #team-select .team-select-title {
+        font-size: 14px;
+    }
+
+    /* 3 columns for very small screens to show more units */
+    #team-select .team-select-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+    }
+
+    #team-select .unit-card {
+        padding: 6px;
+    }
+
+    #team-select .unit-card .unit-icon {
+        font-size: 20px;
+        margin-bottom: 2px;
+    }
+
+    #team-select .unit-card .unit-name {
+        font-size: 10px;
+    }
+
+    #team-select .unit-card .unit-stats {
+        display: none;  /* Hide stats on very small screens */
+    }
+
+    #team-select .unit-card .unit-special {
+        font-size: 7px;
+        padding: 2px 4px;
+    }
+
+    #team-select .team-slot {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+
+    #team-select .wizard-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
 /* ===== ERROR LOG VIEWER ===== */
 .error-log-viewer {
     position: fixed;
