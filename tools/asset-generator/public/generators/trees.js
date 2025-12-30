@@ -75,6 +75,43 @@ const TreeGenerator = {
             foliageDensity: 0.95,
             trunkTaper: 0.65,
             branchiness: 0.55
+        },
+        palm: {
+            trunkColor: '#8a6a48',
+            trunkHighlight: '#aa8a68',
+            trunkShadow: '#6a4a28',
+            leafColors: ['#2a6a30', '#3a7a40', '#4a8a50', '#2a5a28', '#3a6a38'],
+            leafHighlight: '#5a9a60',
+            leafShadow: '#1a4a20',
+            shape: 'palm',
+            foliageDensity: 0.85,
+            trunkTaper: 0.95,
+            branchiness: 0.1
+        },
+        datepalm: {
+            trunkColor: '#9a7a58',
+            trunkHighlight: '#ba9a78',
+            trunkShadow: '#7a5a38',
+            leafColors: ['#4a7a35', '#5a8a45', '#3a6a30', '#4a7a38', '#5a8a48'],
+            leafHighlight: '#6a9a55',
+            leafShadow: '#2a5a20',
+            shape: 'datepalm',
+            foliageDensity: 0.9,
+            trunkTaper: 0.92,
+            branchiness: 0.05,
+            dates: true  // Date palms have date clusters
+        },
+        fanpalm: {
+            trunkColor: '#7a6a50',
+            trunkHighlight: '#9a8a70',
+            trunkShadow: '#5a4a30',
+            leafColors: ['#3a7a40', '#4a8a50', '#2a6a35', '#3a7a38', '#4a8a48'],
+            leafHighlight: '#5a9a60',
+            leafShadow: '#2a5a25',
+            shape: 'fanpalm',
+            foliageDensity: 0.8,
+            trunkTaper: 0.88,
+            branchiness: 0.0
         }
     },
 
@@ -589,6 +626,15 @@ const TreeGenerator = {
             case 'weeping':
                 this.drawWeepingFoliage(ctx, centerX, foliageY, width, height, config, rand);
                 break;
+            case 'palm':
+                this.drawPalmFoliage(ctx, centerX, foliageY, width, height, config, rand);
+                break;
+            case 'datepalm':
+                this.drawDatePalmFoliage(ctx, centerX, foliageY, width, height, config, rand);
+                break;
+            case 'fanpalm':
+                this.drawFanPalmFoliage(ctx, centerX, foliageY, width, height, config, rand);
+                break;
         }
     },
 
@@ -821,6 +867,181 @@ const TreeGenerator = {
             // Simple circle
             ctx.beginPath();
             ctx.arc(x, y, size * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    },
+
+    // ===== PALM TREE FOLIAGE METHODS =====
+    
+    drawPalmFoliage(ctx, centerX, foliageY, width, height, config, rand) {
+        // Coconut palm - curved fronds radiating from center
+        const frondCount = 8 + Math.floor(rand() * 4);
+        const trunkTop = height * 0.55;
+        
+        for (let i = 0; i < frondCount; i++) {
+            const angle = (i / frondCount) * Math.PI * 2 + rand() * 0.3;
+            this.drawPalmFrond(ctx, centerX, trunkTop, angle, config, rand, 60, 15);
+        }
+    },
+
+    drawDatePalmFoliage(ctx, centerX, foliageY, width, height, config, rand) {
+        // Date palm - more upright fronds with date clusters
+        const frondCount = 10 + Math.floor(rand() * 4);
+        const trunkTop = height * 0.55;
+        
+        for (let i = 0; i < frondCount; i++) {
+            const angle = (i / frondCount) * Math.PI * 2 + rand() * 0.2;
+            // More upright fronds
+            const upAngle = angle - Math.PI / 2 + rand() * 0.4 - 0.2;
+            this.drawPalmFrond(ctx, centerX, trunkTop, upAngle, config, rand, 55, 12);
+        }
+        
+        // Draw date clusters if configured
+        if (config.dates) {
+            for (let i = 0; i < 3; i++) {
+                const angle = rand() * Math.PI * 2;
+                const dist = 15 + rand() * 10;
+                const x = centerX + Math.cos(angle) * dist;
+                const y = trunkTop + Math.sin(angle) * dist * 0.5 + 10;
+                this.drawDateCluster(ctx, x, y, config, rand);
+            }
+        }
+    },
+
+    drawFanPalmFoliage(ctx, centerX, foliageY, width, height, config, rand) {
+        // Fan palm - fan-shaped fronds
+        const frondCount = 6 + Math.floor(rand() * 3);
+        const trunkTop = height * 0.55;
+        
+        for (let i = 0; i < frondCount; i++) {
+            const angle = (i / frondCount) * Math.PI * 2 + rand() * 0.4;
+            this.drawFanPalmFrond(ctx, centerX, trunkTop, angle, config, rand);
+        }
+    },
+
+    drawPalmFrond(ctx, x, y, angle, config, rand, length, width) {
+        // Draw a curved palm frond with leaflets
+        const segments = 12;
+        const curve = 0.6; // Frond curves downward
+        
+        // Main stem
+        ctx.strokeStyle = config.trunkColor;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        
+        for (let i = 1; i <= segments; i++) {
+            const t = i / segments;
+            const segX = x + Math.cos(angle) * length * t;
+            const segY = y + Math.sin(angle) * length * t + Math.sin(t * Math.PI) * curve * 20;
+            ctx.lineTo(segX, segY);
+        }
+        ctx.stroke();
+        
+        // Draw leaflets along the frond
+        const leafletCount = 20;
+        for (let i = 0; i < leafletCount; i++) {
+            const t = i / leafletCount;
+            const stemX = x + Math.cos(angle) * length * t;
+            const stemY = y + Math.sin(angle) * length * t + Math.sin(t * Math.PI) * curve * 20;
+            
+            const leafletAngle = angle + Math.PI / 2;
+            const leafletLength = width * (1 - t * 0.3);
+            const side = i % 2 === 0 ? 1 : -1;
+            
+            const colorIdx = Math.floor(rand() * config.leafColors.length);
+            ctx.strokeStyle = config.leafColors[colorIdx];
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(stemX, stemY);
+            ctx.lineTo(
+                stemX + Math.cos(leafletAngle) * leafletLength * side,
+                stemY + Math.sin(leafletAngle) * leafletLength * side * 0.5
+            );
+            ctx.stroke();
+        }
+    },
+
+    drawFanPalmFrond(ctx, x, y, angle, config, rand) {
+        // Draw a fan-shaped palm frond
+        const fanRadius = 50;
+        const fanSpread = Math.PI / 3;
+        
+        // Draw stem
+        ctx.strokeStyle = config.trunkColor;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        
+        const stemLength = 25;
+        const stemX = x + Math.cos(angle) * stemLength;
+        const stemY = y + Math.sin(angle) * stemLength;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(stemX, stemY);
+        ctx.stroke();
+        
+        // Draw fan segments
+        const segmentCount = 12;
+        for (let i = 0; i < segmentCount; i++) {
+            const segAngle = angle + (i / (segmentCount - 1) - 0.5) * fanSpread;
+            const colorIdx = Math.floor(rand() * config.leafColors.length);
+            ctx.strokeStyle = config.leafColors[colorIdx];
+            ctx.lineWidth = 4;
+            
+            ctx.beginPath();
+            ctx.moveTo(stemX, stemY);
+            ctx.lineTo(
+                stemX + Math.cos(segAngle) * fanRadius,
+                stemY + Math.sin(segAngle) * fanRadius
+            );
+            ctx.stroke();
+        }
+        
+        // Fill the fan with gradient
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        const gradient = ctx.createRadialGradient(stemX, stemY, 0, stemX, stemY, fanRadius);
+        gradient.addColorStop(0, config.leafHighlight);
+        gradient.addColorStop(1, config.leafColors[0]);
+        ctx.fillStyle = gradient;
+        
+        ctx.beginPath();
+        ctx.moveTo(stemX, stemY);
+        for (let i = 0; i <= segmentCount; i++) {
+            const segAngle = angle + (i / segmentCount - 0.5) * fanSpread;
+            ctx.lineTo(
+                stemX + Math.cos(segAngle) * fanRadius,
+                stemY + Math.sin(segAngle) * fanRadius
+            );
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    },
+
+    drawDateCluster(ctx, x, y, config, rand) {
+        // Draw a cluster of dates hanging from the palm
+        const dateCount = 8 + Math.floor(rand() * 6);
+        
+        // Draw stem
+        ctx.strokeStyle = config.trunkColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y + 10);
+        ctx.stroke();
+        
+        // Draw dates
+        ctx.fillStyle = '#8a5a28'; // Brown dates
+        for (let i = 0; i < dateCount; i++) {
+            const dateX = x + (rand() - 0.5) * 12;
+            const dateY = y + 10 + rand() * 8;
+            ctx.beginPath();
+            ctx.ellipse(dateX, dateY, 3, 4, 0, 0, Math.PI * 2);
             ctx.fill();
         }
     }

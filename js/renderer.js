@@ -433,11 +433,11 @@ function getBiomeTreePool(terrainType) {
         case 'highland':
             return ['pine', 'birch', 'oak', 'pine'];
         case 'tropical':
-            return ['willow', 'maple', 'oak', 'maple', 'willow', 'oak'];
+            return ['palm', 'datepalm', 'fanpalm', 'willow', 'maple', 'palm', 'fanpalm'];
         case 'wetland':
             return ['willow', 'oak', 'dead', 'birch', 'willow'];
         case 'desert':
-            return ['dead', 'oak', 'dead'];
+            return ['dead', 'palm', 'datepalm', 'dead', 'fanpalm'];
         case 'temperate':
         default:
             return ['oak', 'birch', 'maple', 'oak', 'maple'];
@@ -472,7 +472,7 @@ function drawPathDetails() { }
 function drawRiverDetails() { }
 
 // Vegetation functions - draw sprites from sprite sheet with variation
-const TREE_TYPE_NAMES = ['oak', 'pine', 'birch', 'willow', 'maple', 'dead'];
+const TREE_TYPE_NAMES = ['oak', 'pine', 'birch', 'willow', 'maple', 'dead', 'palm', 'datepalm', 'fanpalm'];
 
 function getTreeDetailType(treeType) {
     const typeName = TREE_TYPE_NAMES[treeType] || 'oak';
@@ -2092,6 +2092,12 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             });
         }
     }
+
+    // Add hex coordinates to all elements for transparency detection
+    elements.forEach(element => {
+        element.hexQ = hexQ;
+        element.hexR = hexR;
+    });
 
     return elements;
 }
@@ -3865,13 +3871,64 @@ export function render() {
         };
     });
 
+    // === DETECT ASSETS THAT OBSCURE IMPORTANT UNITS ===
+    // Find units that need clear visibility (selected unit, targeted unit)
+    const importantUnits = [];
+    if (currentUnit) {
+        importantUnits.push(currentUnit);
+    }
+    if (state.targetedUnit) {
+        importantUnits.push(state.targetedUnit);
+    }
+
+    // Helper function to check if a foreground element might obscure a unit
+    // Returns true if the element is on or near tiles that could obscure the unit
+    const shouldBeTransparent = (element, unitTiles) => {
+        // Handle case where hexQ is 0 (valid coordinate)
+        if (element.hexQ === undefined || element.hexQ === null) return false;
+        
+        // Check if this element's hex is in the obscuring tiles set
+        const elementKey = `${element.hexQ},${element.hexR}`;
+        return unitTiles.has(elementKey);
+    };
+
+    // Collect all tiles that might have obscuring assets for important units
+    const obscuringTiles = new Set();
+    importantUnits.forEach(unit => {
+        if (!unit || !unit.alive) return;
+        
+        // Add the unit's own tile
+        obscuringTiles.add(`${unit.q},${unit.r}`);
+        
+        // Add tiles "below" the unit (in screen space, these are tiles with higher Y screen position)
+        // In hex coordinates, this means tiles to the south and southeast
+        const tilesBelow = [
+            { q: unit.q, r: unit.r + 1 },     // Directly below
+            { q: unit.q + 1, r: unit.r },     // Southeast
+            { q: unit.q + 1, r: unit.r + 1 }, // South-southeast
+            { q: unit.q - 1, r: unit.r + 1 }, // Southwest
+        ];
+        
+        tilesBelow.forEach(tile => {
+            obscuringTiles.add(`${tile.q},${tile.r}`);
+        });
+    });
+
     // Combine all drawable elements and sort by Y position (bottom-to-top)
     const allDrawables = [...foregroundElements, ...unitDrawables];
     allDrawables.sort((a, b) => a.sortY - b.sortY);
 
-    // Draw all elements in sorted order
+    // Draw all elements in sorted order, with transparency for obscuring assets
     allDrawables.forEach(drawable => {
-        drawable.draw();
+        // Check if this foreground element should be semi-transparent
+        if (drawable.type !== 'unit' && obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles)) {
+            ctx.save();
+            ctx.globalAlpha = 0.35; // 35% opacity for obscuring trees/assets
+            drawable.draw();
+            ctx.restore();
+        } else {
+            drawable.draw();
+        }
     });
 
     // Second pass: Draw all unit overlays (badges, indicators, HP bars) on top of everything

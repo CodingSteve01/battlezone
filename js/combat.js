@@ -718,6 +718,40 @@ export function executeAttack(attacker, defender, minigameResult = null) {
         // (already handled by armorPiercing property)
     }
 
+    // === SNIPER PRECISION BONUS: One-shot potential under optimal conditions ===
+    // Optimal conditions: medium range (2-4), clear line of sight, no cover, possible elevation
+    if (attacker.class === 'sniper') {
+        const attHex = getHex(attacker.q, attacker.r);
+        const defHex = getHex(defender.q, defender.r);
+        const losInfo = calculateLineOfSightCover(attacker, defender);
+        
+        // Check for optimal conditions
+        const isOptimalRange = dist >= 2 && dist <= 4; // Sweet spot range
+        const hasClearLOS = !losInfo.hasObstruction;
+        const hasElevation = attHex && attHex.type === 'hills';
+        const targetInOpen = defHex && !defHex.cover && !defender.hiding;
+        
+        // Count how many optimal conditions are met
+        let optimalConditions = 0;
+        if (isOptimalRange) optimalConditions++;
+        if (hasClearLOS) optimalConditions++;
+        if (hasElevation) optimalConditions++;
+        if (targetInOpen) optimalConditions++;
+        
+        // Apply precision bonus based on optimal conditions (up to +20 damage with all 4 conditions)
+        if (optimalConditions >= 3) {
+            // 3-4 optimal conditions: significant bonus (perfect shot potential)
+            const precisionBonus = optimalConditions === 4 ? 20 : 12;
+            damage += precisionBonus;
+            setTimeout(() => {
+                showToast('🎯 Präzisionsschuss! Optimale Bedingungen!', 'special');
+            }, 150);
+        } else if (optimalConditions === 2) {
+            // 2 optimal conditions: moderate bonus
+            damage += 8;
+        }
+    }
+
     // === NEUES SYSTEM: Deckung reduziert Schaden ===
     const coverReduction = calculateCoverDamageReduction(attacker, defender);
     if (coverReduction > 0) {

@@ -27,7 +27,7 @@ Shadow Squad can be installed as a Progressive Web App and runs offline:
 ## Features
 
 - **Hex-grid tactical combat** - Strategic positioning on procedurally generated maps
-- **5 unique unit classes** - Scout, Assault, Medic, Sniper, and Ninja with special abilities
+- **6 unique unit classes** - Scout, Assault, Medic, Sniper, Commando, and Elite Soldier with special abilities
 - **Fog of War** - Limited visibility based on unit positions
 - **Single-player vs AI** - Challenge an intelligent AI opponent
 - **Local multiplayer** - 2-4 players on the same device (hot-seat)
@@ -42,7 +42,8 @@ Shadow Squad can be installed as a Progressive Web App and runs offline:
 | Assault | Heavy damage | Powershot - Bonus damage |
 | Medic | Team support | Heal - Restore team HP |
 | Sniper | Long range | Cloak - Turn invisible |
-| Ninja | Stealth melee | Stealth + bonus movement |
+| Commando | Stealth melee | Stealth + bonus movement |
+| Elite Soldier | Versatile tactical | Mode switch - Melee/ranged combat |
 
 ## Controls
 
