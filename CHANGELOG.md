@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.22.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.3...shadow-squad-v3.22.4) (2025-12-30)
+
+
+### Bug Fixes
+
+* **game:** halve power-up size, remove grass atlas noise, enable AI pickups and improve search ([#225](https://github.com/CodingSteve01/battlezone/issues/225)) ([59645b5](https://github.com/CodingSteve01/battlezone/commit/59645b55184651b73730181d8c2a6160e803a552))
+* **renderer:** korrigiere sidewall-rendering ([#223](https://github.com/CodingSteve01/battlezone/issues/223)) ([1bf14bf](https://github.com/CodingSteve01/battlezone/commit/1bf14bf3c78ef3d9fa05f382aa55ba917da6af86))
+
 ## [3.22.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.2...shadow-squad-v3.22.3) (2025-12-30)
 
 
