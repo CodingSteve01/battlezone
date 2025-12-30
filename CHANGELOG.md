@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.18.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.18.0...shadow-squad-v3.18.1) (2025-12-30)
+
+
+### Bug Fixes
+
+* **renderer:** add cliff faces for height transitions and improve sprite shadows ([#200](https://github.com/CodingSteve01/battlezone/issues/200)) ([be204b4](https://github.com/CodingSteve01/battlezone/commit/be204b45368ce2135977c317fbc35de3def41ad1))
+
 ## [3.18.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.17.0...shadow-squad-v3.18.0) (2025-12-30)
 
 
