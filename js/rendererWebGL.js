@@ -463,6 +463,10 @@ export function renderWebGL() {
             return;
         }
         
+        // Set viewport to match canvas dimensions
+        // This is critical - without it, WebGL renders to a tiny default viewport (often 1x1)
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        
         // Rebuild mesh if needed (e.g., after map generation or fog of war update)
         if (state.meshDirty !== false) {
             logEntry('debug', '[WebGL] Rebuilding mesh', 'Mesh marked as dirty');
