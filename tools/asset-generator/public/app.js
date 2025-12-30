@@ -176,7 +176,7 @@ async function generateTerrain() {
     // For flat-top hex: width = 2*r, height = sqrt(3)*r
     // So height/width = sqrt(3)/2 ≈ 0.866
     const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
-    const earthLayerHeight = Math.round(settings.terrainSize * 0.18);  // ~18% of tile width for earth layer
+    const earthLayerHeight = Math.round(settings.terrainSize * 0.31);  // ~31% of tile width for deep earth layer
     const total = types.length * settings.variants;
     let count = 0;
 
@@ -394,7 +394,7 @@ async function createSpriteSheets() {
     if (generatedAssets.terrain.length > 0) {
         const settings = getSettings();
         const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
-        const earthLayerHeight = Math.round(settings.terrainSize * 0.18);
+        const earthLayerHeight = Math.round(settings.terrainSize * 0.31);  // Match generateTerrain
         const totalHeight = hexHeight + earthLayerHeight;
         const sheet = createTerrainSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, totalHeight, hexHeight, earthLayerHeight);
         addSheetPreview(preview, sheet.canvas, 'terrain-hexes.png', sheet.json);
