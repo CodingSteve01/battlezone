@@ -584,7 +584,8 @@ const TerrainGenerator = {
 
     /**
      * Render the earth/cliff layer below the hex surface
-     * Creates a 3D isometric platform with proper trapezoid-rectangle-trapezoid geometry
+     * Creates a 3D isometric platform with corners at left (v3) and right (v0) hex vertices
+     * Bottom edge is flat/horizontal for proper isometric appearance
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -597,28 +598,37 @@ const TerrainGenerator = {
             });
         }
 
+        // v0 = E (right point), v1 = SE, v2 = SW, v3 = W (left point)
+        // Bottom Y is at the lowest hex vertex (v1/v2) plus earthHeight
+        const bottomY = vertices[1].y + earthHeight;
+
+        // Calculate bottom corner positions - extend to left (v3.x) and right (v0.x) hex corners
+        const leftCorner = { x: vertices[3].x, y: bottomY };
+        const rightCorner = { x: vertices[0].x, y: bottomY };
+
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // Each face is a parallelogram with bottom vertices directly below top vertices
-        // 1. Left face (parallelogram)
-        this.renderCliffFace(ctx, vertices[2], vertices[3], earthHeight, earthPalette, 'left', noise, variant);
-        // 2. Front face (rectangle - since v1.y == v2.y)
-        this.renderCliffFace(ctx, vertices[1], vertices[2], earthHeight, earthPalette, 'front', noise, variant);
-        // 3. Right face (parallelogram)
-        this.renderCliffFace(ctx, vertices[0], vertices[1], earthHeight, earthPalette, 'right', noise, variant);
+        // 1. Left face (trapezoid: v2-v3 at top, extends to leftCorner at bottom)
+        this.renderCliffFaceIsometric(ctx, vertices[2], vertices[3],
+            { x: vertices[2].x, y: bottomY }, leftCorner,
+            earthPalette, 'left', noise, variant);
+        // 2. Front face (rectangle: v1-v2 at top, same width at bottom)
+        this.renderCliffFaceIsometric(ctx, vertices[1], vertices[2],
+            { x: vertices[1].x, y: bottomY }, { x: vertices[2].x, y: bottomY },
+            earthPalette, 'front', noise, variant);
+        // 3. Right face (trapezoid: v0-v1 at top, extends to rightCorner at bottom)
+        this.renderCliffFaceIsometric(ctx, vertices[0], vertices[1],
+            rightCorner, { x: vertices[1].x, y: bottomY },
+            earthPalette, 'right', noise, variant);
     },
 
     /**
      * Render a single cliff face with realistic rock/earth texture
-     * Creates a parallelogram where bottom vertices are directly below top vertices
+     * Uses custom bottom vertices for proper isometric cliff geometry
      */
-    renderCliffFace(ctx, v1, v2, earthHeight, earthPalette, facing, noise, variant) {
+    renderCliffFaceIsometric(ctx, v1, v2, v1Bottom, v2Bottom, earthPalette, facing, noise, variant) {
         ctx.save();
 
-        // Bottom vertices are directly below top vertices (parallelogram shape)
-        const v1Bottom = { x: v1.x, y: v1.y + earthHeight };
-        const v2Bottom = { x: v2.x, y: v2.y + earthHeight };
-
-        // Create parallelogram path
+        // Create quadrilateral path (may be trapezoid or parallelogram depending on vertices)
         ctx.beginPath();
         ctx.moveTo(v1.x, v1.y);
         ctx.lineTo(v2.x, v2.y);
@@ -626,10 +636,11 @@ const TerrainGenerator = {
         ctx.lineTo(v1Bottom.x, v1Bottom.y);
         ctx.closePath();
 
-        const faceWidth = Math.abs(v2.x - v1.x);
-        const faceHeight = earthHeight;
+        // Calculate dimensions from actual vertices
+        const faceWidth = Math.max(Math.abs(v2.x - v1.x), Math.abs(v2Bottom.x - v1Bottom.x));
         const topY = Math.min(v1.y, v2.y);
         const bottomY = Math.max(v1Bottom.y, v2Bottom.y);
+        const faceHeight = bottomY - topY;
 
         // Color based on facing direction
         let baseColor, shadowColor, highlightColor;
