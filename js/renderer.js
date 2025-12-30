@@ -346,31 +346,36 @@ function drawHeightShadow(cx, cy, size, height) {
 function applyTileLighting(cx, cy, size, height) {
     if (!height) return;
     const light = getLightVector();
-    const strength = CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18;
+    // Reduced strength for subtler lighting that doesn't create harsh triangular artifacts
+    const strength = (CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18) * 0.5;
 
     ctx.save();
     ctx.beginPath();
     drawHexPath(cx, cy, size);
     ctx.clip();
 
-    const grad = safeLinearGradient(
+    // Use radial gradient centered on hex for smoother appearance
+    const grad = safeRadialGradient(
         ctx,
-        cx - light.x * size,
-        cy - light.y * size,
-        cx + light.x * size,
-        cy + light.y * size,
+        cx - light.x * size * 0.3,
+        cy - light.y * size * 0.3,
+        0,
+        cx,
+        cy,
+        size,
         'transparent'
     );
 
     if (typeof grad !== 'string') {
         grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
-        grad.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0.18)');
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${strength * 0.3})`);
+        grad.addColorStop(1, 'transparent');
     }
 
-    ctx.globalCompositeOperation = 'overlay';
+    // Use soft-light for gentler blending that doesn't create harsh edges
+    ctx.globalCompositeOperation = 'soft-light';
     ctx.fillStyle = grad;
-    ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
+    ctx.fill();
     ctx.restore();
 }
 
@@ -3279,18 +3284,20 @@ function drawUnitOverlay(unit, cx, cy) {
 
     ctx.restore();
 
-    // HP bar with gradient
+    // HP bar with gradient - positioned ABOVE the unit
     // Ensure hpPct is a valid number between 0 and 1
     const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
     const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
-    const barWidth = size * 1.6;
-    const barHeight = 8;
-    const barY = cy + size * 0.65;
+    // Compact, proportional bar sizing
+    const barWidth = size * 1.2;
+    const barHeight = 6;
+    // Position above unit (negative offset from center)
+    const barY = cy - size * 1.15;
 
-    // Bar background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    // Bar background - subtle with slight shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2 - 2, barY - 2, barWidth + 4, barHeight + 4, 4);
+    ctx.roundRect(cx - barWidth / 2 - 1, barY - 1, barWidth + 2, barHeight + 2, 3);
     ctx.fill();
 
     // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
@@ -3311,12 +3318,12 @@ function drawUnitOverlay(unit, cx, cy) {
 
     ctx.fillStyle = barGradient;
     ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 3);
+    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 2);
     ctx.fill();
 
-    // HP text
+    // HP text - smaller, cleaner font
     ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(barHeight * 0.9)}px sans-serif`;
+    ctx.font = `bold ${Math.round(barHeight * 0.85)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
@@ -3795,7 +3802,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            drawHeightExtrusion(sx, sy, tileSize, hex.height, hex.type, fogLevel);
+            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
             drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
             ctx.drawImage(
                 cachedTile,
@@ -3821,7 +3828,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            drawHeightExtrusion(sx, sy, tileSize, hex.height, hex.type, fogLevel);
+            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
             drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
             drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
