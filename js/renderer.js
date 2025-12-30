@@ -4437,6 +4437,7 @@ function drawPowerup(cx, cy, powerup, size) {
     if (!powerupType) return;
 
     ctx.save();
+    const powerupSize = size * 0.5;
 
     // Floating animation offset
     const floatOffset = Math.sin(Date.now() / 400 + powerup.q + powerup.r) * 3;
@@ -4448,7 +4449,7 @@ function drawPowerup(cx, cy, powerup, size) {
     // Background circle
     ctx.fillStyle = powerupType.color + '40';
     ctx.beginPath();
-    ctx.arc(cx, cy + floatOffset, size * 0.4, 0, Math.PI * 2);
+    ctx.arc(cx, cy + floatOffset, powerupSize * 0.4, 0, Math.PI * 2);
     ctx.fill();
 
     // Border
@@ -4458,7 +4459,7 @@ function drawPowerup(cx, cy, powerup, size) {
 
     // Icon
     ctx.shadowBlur = 0;
-    ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
+    ctx.font = `${Math.round(powerupSize * 0.45)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(powerupType.icon, cx, cy + floatOffset);
