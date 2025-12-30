@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.19.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.18.1...shadow-squad-v3.19.0) (2025-12-30)
+
+
+### Features
+
+* sniper precision bonus, transparent obscuring assets, palm trees, fix README classes ([#205](https://github.com/CodingSteve01/battlezone/issues/205)) ([6cdf5b6](https://github.com/CodingSteve01/battlezone/commit/6cdf5b6b8d7068fe23051dd5fde18409bae5b68a))
+
+
+### Bug Fixes
+
+* **renderer:** skip procedural grass blades and conditional base skirts ([#203](https://github.com/CodingSteve01/battlezone/issues/203)) ([505575a](https://github.com/CodingSteve01/battlezone/commit/505575a7de60784d905a93a3f77a839267f1067c))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#206](https://github.com/CodingSteve01/battlezone/issues/206)) ([af2fbe3](https://github.com/CodingSteve01/battlezone/commit/af2fbe3f2cbe0ba498e1d429700b9e8116ae04dd))
+
 ## [3.18.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.18.0...shadow-squad-v3.18.1) (2025-12-30)
 
 
