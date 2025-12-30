@@ -3801,8 +3801,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
-            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
+            // Note: drawHeightExtrusion and drawCliffFaces removed - isometric terrain sprites include earth layer
             ctx.drawImage(
                 cachedTile,
                 sx - scaledSize / 2,
@@ -3827,8 +3826,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
-            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
+            // Note: drawHeightExtrusion and drawCliffFaces removed - isometric terrain sprites include earth layer
             drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
             // Fog overlays for non-cached rendering (match cached version)
