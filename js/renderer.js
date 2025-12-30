@@ -22,7 +22,7 @@ import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
-import { logRender, logError } from './errorLog.js';
+import { logRender, logError, logEntry } from './errorLog.js';
 import { initWebGLRenderer, renderWebGL, isWebGLAvailable, markMeshDirty } from './rendererWebGL.js';
 
 // ===== SAFE GRADIENT HELPERS =====

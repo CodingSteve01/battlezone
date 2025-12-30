@@ -529,8 +529,14 @@ export function renderWebGL() {
 export function isWebGLAvailable() {
     try {
         const testCanvas = document.createElement('canvas');
-        return !!(testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl'));
+        // Check if getContext method exists (not available in some test environments)
+        if (typeof testCanvas.getContext !== 'function') {
+            return false;
+        }
+        const gl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+        return !!gl;
     } catch (e) {
+        // Canvas/WebGL not available (e.g., in test environment or unsupported browser)
         return false;
     }
 }
