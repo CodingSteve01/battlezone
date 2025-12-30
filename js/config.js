@@ -10,8 +10,8 @@ export const CONFIG = {
     
     // Renderer configuration
     RENDERER: {
-        TYPE: 'webgl',              // 'canvas2d' or 'webgl'
-        PREFER_WEBGL: true,         // Auto-switch to WebGL if available
+        TYPE: 'canvas2d',           // 'canvas2d' or 'webgl'
+        PREFER_WEBGL: false,        // Auto-switch to WebGL if available
         ALLOW_FALLBACK: true        // Fallback to Canvas 2D if WebGL fails
     },
 
