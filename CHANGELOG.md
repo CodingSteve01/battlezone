@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.22.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.1...shadow-squad-v3.22.2) (2025-12-30)
+
+
+### Bug Fixes
+
+* Add missing gl.viewport() call in WebGL renderer ([#219](https://github.com/CodingSteve01/battlezone/issues/219)) ([3877698](https://github.com/CodingSteve01/battlezone/commit/387769805d83379096d33231aedd732b0be909a2))
+
 ## [3.22.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.0...shadow-squad-v3.22.1) (2025-12-30)
 
 
