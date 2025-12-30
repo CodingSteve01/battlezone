@@ -26,8 +26,9 @@ function resolveActiveBiome() {
 
 /**
  * Get the current active biome configuration
+ * @returns {Object} The active biome configuration
  */
-function getActiveBiome() {
+export function getActiveBiome() {
     return BIOMES[state.activeBiome] || BIOMES.temperate;
 }
 
@@ -60,7 +61,7 @@ export function generateMap() {
     }
 
     // Apply biome-specific post-processing
-    applyBiomePostProcessing(biome, radius);
+    applyBiomePostProcessing(biome);
 
     // Clear spawn areas first
     clearSpawnAreas();
@@ -69,7 +70,7 @@ export function generateMap() {
     addMapFeatures(radius, biome);
 
     // Ensure all walkable areas are connected
-    ensureMapConnectivity(radius);
+    ensureMapConnectivity();
 
     // Final validation pass
     validateAndFixMap(radius);
@@ -395,7 +396,7 @@ function createHex(q, r, distFromCenter, radius, biome, baseSeed = 0) {
 /**
  * Apply biome-specific post-processing (e.g., replace water with ice in tundra)
  */
-function applyBiomePostProcessing(biome, radius) {
+function applyBiomePostProcessing(biome) {
     if (!biome.specialTerrain) return;
 
     state.hexes.forEach(hex => {
@@ -744,9 +745,6 @@ function addRivers(count, radius) {
  * Add roads connecting spawn areas through center
  */
 function addRoads(radius) {
-    const spawns = getSpawnPositions();
-    const center = { q: 0, r: 0 };
-
     // Create road from center outward in several directions
     const roadAngles = [0, Math.PI / 3, 2 * Math.PI / 3, Math.PI, 4 * Math.PI / 3, 5 * Math.PI / 3];
 
@@ -806,7 +804,7 @@ function addPaths(count, radius) {
 /**
  * Ensure all walkable areas are connected using flood fill
  */
-function ensureMapConnectivity(radius) {
+function ensureMapConnectivity() {
     // Find all walkable hexes
     const walkableHexes = state.hexes.filter(h => h.walkable);
     if (walkableHexes.length === 0) return;
@@ -862,7 +860,7 @@ function ensureMapConnectivity(radius) {
     }
 
     // Also ensure spawn points are connected to each other
-    ensureSpawnConnectivity(spawns, radius);
+    ensureSpawnConnectivity(spawns);
 }
 
 /**
@@ -895,7 +893,7 @@ function createPath(from, to, visitedSet) {
 /**
  * Ensure all spawn points are connected to each other
  */
-function ensureSpawnConnectivity(spawns, radius) {
+function ensureSpawnConnectivity(spawns) {
     const activePlayers = state.settings.players;
 
     // Get first spawn of each active player
