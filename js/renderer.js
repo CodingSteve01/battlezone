@@ -2,7 +2,7 @@
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
 import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition } from './state.js';
-import { hexDistance, getNeighbors } from './hexMath.js';
+import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
@@ -56,6 +56,62 @@ function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') 
         return fallbackColor;
     }
     return ctx.createLinearGradient(x0, y0, x1, y1);
+}
+
+function getHexColorLuminance(color) {
+    if (!color || color[0] !== '#' || color.length < 7) return 0.5;
+    const r = parseInt(color.slice(1, 3), 16) / 255;
+    const g = parseInt(color.slice(3, 5), 16) / 255;
+    const b = parseInt(color.slice(5, 7), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function getUnitOutlineColor(terrainColor) {
+    const luminance = getHexColorLuminance(terrainColor);
+    return luminance > 0.5 ? 'rgba(20, 25, 30, 0.8)' : 'rgba(240, 245, 250, 0.85)';
+}
+
+function getCliffTextureCanvas(terrainType) {
+    if (cliffTextureCache.has(terrainType)) {
+        return cliffTextureCache.get(terrainType);
+    }
+
+    const terrain = TERRAIN[terrainType];
+    const baseColor = terrain?.colorDark || '#5a4a3b';
+    const midColor = terrain?.color || '#6b5a45';
+    const highlight = terrain?.colorLight || '#7a6a55';
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const textureCtx = canvas.getContext('2d');
+
+    textureCtx.fillStyle = baseColor;
+    textureCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+    textureCtx.strokeStyle = midColor;
+    textureCtx.lineWidth = 3;
+    textureCtx.globalAlpha = 0.6;
+    textureCtx.beginPath();
+    textureCtx.moveTo(-2, 6);
+    textureCtx.lineTo(18, 2);
+    textureCtx.moveTo(-2, 12);
+    textureCtx.lineTo(18, 8);
+    textureCtx.stroke();
+
+    textureCtx.strokeStyle = highlight;
+    textureCtx.lineWidth = 1.5;
+    textureCtx.globalAlpha = 0.4;
+    textureCtx.beginPath();
+    textureCtx.moveTo(-2, 9);
+    textureCtx.lineTo(18, 5);
+    textureCtx.moveTo(-2, 15);
+    textureCtx.lineTo(18, 11);
+    textureCtx.stroke();
+
+    textureCtx.globalAlpha = 1;
+    cliffTextureCache.set(terrainType, canvas);
+    return canvas;
 }
 
 const HEIGHT_SHADE_COLORS = [
@@ -177,6 +233,7 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
     const earthColor = fogLevel === 'hidden'
         ? '#050810'
         : baseColor;
+    const cliffTexture = fogLevel === 'hidden' ? null : getCliffTextureCanvas(hex.type);
     
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
@@ -225,7 +282,11 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
         
-        ctx.fillStyle = earthColor;
+        if (cliffTexture) {
+            ctx.fillStyle = ctx.createPattern(cliffTexture, 'repeat') || earthColor;
+        } else {
+            ctx.fillStyle = earthColor;
+        }
         ctx.globalAlpha = fogLevel === 'hidden' ? 1 : lightFactor * 0.85; // Slight transparency for depth
         ctx.fill();
         
@@ -338,6 +399,32 @@ function getNeighborTerrains(hexMap, q, r) {
         const hex = hexMap.get(key);
         return hex ? hex.type : null;
     });
+}
+
+function buildVisibilityClearingMap(visibleUnits) {
+    const clearing = CONFIG.VISIBILITY_CLEARING;
+    if (!clearing?.ENABLED) return new Map();
+
+    const clearRadius = clearing.CLEAR_RADIUS ?? 0;
+    const fadeRadius = clearing.FADE_RADIUS ?? 1;
+    const radius = Math.max(clearRadius, fadeRadius);
+    const result = new Map();
+
+    visibleUnits.forEach(unit => {
+        if (!unit?.alive) return;
+        const tiles = getHexesInRange(unit.q, unit.r, radius);
+        tiles.forEach(tile => {
+            const distance = hexDistance({ q: unit.q, r: unit.r }, tile);
+            const key = `${tile.q},${tile.r}`;
+            if (distance <= clearRadius) {
+                result.set(key, 'clear');
+            } else if (distance <= fadeRadius && result.get(key) !== 'clear') {
+                result.set(key, 'fade');
+            }
+        });
+    });
+
+    return result;
 }
 
 const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
@@ -839,6 +926,7 @@ const CACHE_BASE_HEX_SIZE = 60;
 const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
 const DETAIL_SPRITE_SCALE = 0.85;
 const DETAIL_CLEARANCE_EDGE = 0.2;
+const cliffTextureCache = new Map();
 
 function scaleDetailCount(count, min = 1) {
     return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
@@ -898,6 +986,7 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
         const actualSize = def.sizeMultiplier * size;
         const extraParams = def.extraParams || {};
         const bounds = getElementBounds(def.type, actualX, actualY, actualSize, extraParams);
+        const elementSeed = (extraParams.seed ?? 0) + q * 97 + r * 193;
 
         return {
             type: def.type,
@@ -906,9 +995,41 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
             sortY: actualSortY,
             hexQ: q,
             hexR: r,
+            seed: elementSeed,
             bounds,
             draw: () => def.drawFn(actualX, actualY, actualSize, extraParams)
         };
+    });
+}
+
+function applyVisibilityClearing(elements, clearingMap) {
+    const clearing = CONFIG.VISIBILITY_CLEARING;
+    if (!clearing?.ENABLED || !clearingMap || clearingMap.size === 0) {
+        return elements;
+    }
+
+    return elements.flatMap(element => {
+        const key = `${element.hexQ},${element.hexR}`;
+        const level = clearingMap.get(key);
+        if (!level) return [element];
+
+        const isTall = element.type.includes('tree');
+        const isShrub = element.type.includes('shrub') || element.type === 'bush';
+        const seed = element.seed ?? 0;
+
+        if (level === 'clear') {
+            if (isTall && seededRandom(seed + 11) > clearing.TREE_KEEP_CHANCE) {
+                return [];
+            }
+            if (isShrub && seededRandom(seed + 31) > clearing.SHRUB_KEEP_CHANCE) {
+                return [];
+            }
+            element.visibilityAlpha = clearing.CLEAR_ALPHA;
+        } else if (level === 'fade') {
+            element.visibilityAlpha = clearing.FADE_ALPHA;
+        }
+
+        return [element];
     });
 }
 
@@ -950,8 +1071,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const positionScale = 0.95;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
     const biome = state.activeBiome || 'temperate';
-    const vegetationBoost = biome === 'tropical' || biome === 'wetland' ? 1.35 : 1;
-    const shrubBoost = biome === 'tropical' ? 1.4 : (biome === 'wetland' ? 1.25 : 1);
+    const vegetationBoost = biome === 'tropical' ? 1.2 : (biome === 'wetland' ? 1.3 : 1);
+    const shrubBoost = biome === 'tropical' ? 1.2 : (biome === 'wetland' ? 1.2 : 1);
 
     // Consistent sort offsets (normalized)
     const TREE_SORT_OFFSET = 0.4;
@@ -1042,9 +1163,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
         const grassType = Math.abs(baseSeed) % 100;
-        const bushThreshold = biome === 'tropical' ? 40 : 28;
-        const shrubThreshold = biome === 'tropical' ? 70 : 55;
-        const treeThreshold = biome === 'tropical' ? 85 : 78;
+        const bushThreshold = biome === 'tropical' ? 32 : 28;
+        const shrubThreshold = biome === 'tropical' ? 62 : 55;
+        const treeThreshold = biome === 'tropical' ? 80 : 78;
 
         if (grassType < bushThreshold) {
             const anchorPoint = sampleHexOffset(baseSeed + 500);
@@ -2933,6 +3054,21 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
         return; // Don't draw the actual unit sprite
     }
 
+    const unitHex = getHex(unit.q, unit.r);
+    const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
+    const outlineColor = getUnitOutlineColor(terrainColor);
+
+    // Soft silhouette halo to separate units from dense terrain
+    ctx.save();
+    ctx.globalAlpha *= 0.35;
+    ctx.fillStyle = outlineColor;
+    ctx.shadowColor = outlineColor;
+    ctx.shadowBlur = size * 0.35;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - size * 0.1, size * 0.55, size * 0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
     // Base ring around unit - dashed normally, solid when selected
     if (isSelected) {
         // Selected: solid thick ring in player color
@@ -3644,6 +3780,9 @@ export function render() {
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
     const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
+    const visibleUnits = state.units
+        .filter(unit => unit.alive && isUnitVisibleToViewer(unit));
+    const visibilityClearingMap = buildVisibilityClearingMap(visibleUnits);
 
     // Only show hex grid borders when planning movement or attacking
     const showGrid = !isAiTurnHidden && shouldShowHexGrid();
@@ -3771,7 +3910,8 @@ export function render() {
         // Use cached foreground element definitions for better performance
         if (fogLevel === 'visible' && shouldRenderForeground()) {
             const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
-            foregroundElements.push(...elements);
+            const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
+            foregroundElements.push(...adjusted);
         }
 
         // Collect power-up positions for drawing on top of foreground elements
@@ -3931,10 +4071,6 @@ export function render() {
 
     // Combine units and foreground elements for 2.5D depth sorting
     // Use isUnitVisibleToViewer for proper fog of war from human player's perspective
-    const visibleUnits = state.units
-        .filter(unit => unit.alive && isUnitVisibleToViewer(unit));
-
-    // Convert units to drawable objects with sortY
     const unitDrawables = visibleUnits.map(unit => {
         const unitHex = getHex(unit.q, unit.r);
         const pos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0, tileSize);
@@ -4034,10 +4170,18 @@ export function render() {
 
     // Draw all elements in sorted order, with transparency for obscuring assets
     allDrawables.forEach(drawable => {
-        // Check if this foreground element should be semi-transparent
-        if (drawable.type !== 'unit' && obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles)) {
+        if (drawable.type === 'unit') {
+            drawable.draw();
+            return;
+        }
+
+        const visibilityAlpha = drawable.visibilityAlpha ?? 1;
+        const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
+        const finalAlpha = needsTransparency ? visibilityAlpha * 0.35 : visibilityAlpha;
+
+        if (finalAlpha < 0.99) {
             ctx.save();
-            ctx.globalAlpha = 0.35; // 35% opacity for obscuring trees/assets
+            ctx.globalAlpha = finalAlpha;
             drawable.draw();
             ctx.restore();
         } else {
