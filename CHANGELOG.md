@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.22.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.4...shadow-squad-v3.22.5) (2025-12-30)
+
+
+### Bug Fixes
+
+* **assets:** correct isometric cliff geometry with parallelogram sides ([#231](https://github.com/CodingSteve01/battlezone/issues/231)) ([0887336](https://github.com/CodingSteve01/battlezone/commit/0887336422b1e770de060eb5aaf23385857338fb))
+* **assets:** improve isometric terrain tiles with proper cliff geometry ([#229](https://github.com/CodingSteve01/battlezone/issues/229)) ([7659c78](https://github.com/CodingSteve01/battlezone/commit/7659c789295d0dec1df2f05b567968df94906709))
+
+
+### Performance Improvements
+
+* **renderer:** optimize rendering for better unit visibility ([#226](https://github.com/CodingSteve01/battlezone/issues/226)) ([68263d0](https://github.com/CodingSteve01/battlezone/commit/68263d0a6a2fb10df53e1357941104dab919ca6d))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#228](https://github.com/CodingSteve01/battlezone/issues/228)) ([fcd6675](https://github.com/CodingSteve01/battlezone/commit/fcd6675699fff28df19c9cabbc7af2da00f2218b))
+
 ## [3.22.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.3...shadow-squad-v3.22.4) (2025-12-30)
 
 
