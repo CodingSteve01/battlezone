@@ -521,9 +521,9 @@ const TerrainGenerator = {
      * @param {number} variant - Variant for randomization
      * @param {number} width - Canvas width (default 256)
      * @param {number} height - Canvas height for hex top surface (default 192)
-     * @param {number} earthHeight - Height of the earth layer below hex (default 40)
+     * @param {number} earthHeight - Height of the earth layer below hex (default 160)
      */
-    generateIsometric(type, variant = 0, width = 256, height = 192, earthHeight = 80) {
+    generateIsometric(type, variant = 0, width = 256, height = 192, earthHeight = 160) {
         const terrain = this.types[type] || this.types.grass;
         const totalHeight = height + earthHeight;
 
@@ -597,37 +597,39 @@ const TerrainGenerator = {
             });
         }
 
-        // Find the lowest point of the hex (vertices 1 and 2 are at the bottom)
-        const bottomY = Math.max(vertices[1].y, vertices[2].y);
-        // All cliff faces extend down to the same level
-        const cliffBottomY = bottomY + earthHeight;
-
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // 1. Left face (trapezoid)
-        this.renderCliffFace(ctx, vertices[2], vertices[3], cliffBottomY, earthPalette, 'left', noise, variant);
-        // 2. Front face (rectangle)
-        this.renderCliffFace(ctx, vertices[1], vertices[2], cliffBottomY, earthPalette, 'front', noise, variant);
-        // 3. Right face (trapezoid)
-        this.renderCliffFace(ctx, vertices[0], vertices[1], cliffBottomY, earthPalette, 'right', noise, variant);
+        // Each face is a parallelogram with bottom vertices directly below top vertices
+        // 1. Left face (parallelogram)
+        this.renderCliffFace(ctx, vertices[2], vertices[3], earthHeight, earthPalette, 'left', noise, variant);
+        // 2. Front face (rectangle - since v1.y == v2.y)
+        this.renderCliffFace(ctx, vertices[1], vertices[2], earthHeight, earthPalette, 'front', noise, variant);
+        // 3. Right face (parallelogram)
+        this.renderCliffFace(ctx, vertices[0], vertices[1], earthHeight, earthPalette, 'right', noise, variant);
     },
 
     /**
      * Render a single cliff face with realistic rock/earth texture
+     * Creates a parallelogram where bottom vertices are directly below top vertices
      */
-    renderCliffFace(ctx, v1, v2, cliffBottomY, earthPalette, facing, noise, variant) {
+    renderCliffFace(ctx, v1, v2, earthHeight, earthPalette, facing, noise, variant) {
         ctx.save();
 
-        // Create trapezoid/rectangle path - bottom at same Y level
+        // Bottom vertices are directly below top vertices (parallelogram shape)
+        const v1Bottom = { x: v1.x, y: v1.y + earthHeight };
+        const v2Bottom = { x: v2.x, y: v2.y + earthHeight };
+
+        // Create parallelogram path
         ctx.beginPath();
         ctx.moveTo(v1.x, v1.y);
         ctx.lineTo(v2.x, v2.y);
-        ctx.lineTo(v2.x, cliffBottomY);
-        ctx.lineTo(v1.x, cliffBottomY);
+        ctx.lineTo(v2Bottom.x, v2Bottom.y);
+        ctx.lineTo(v1Bottom.x, v1Bottom.y);
         ctx.closePath();
 
         const faceWidth = Math.abs(v2.x - v1.x);
-        const faceHeight = cliffBottomY - Math.min(v1.y, v2.y);
+        const faceHeight = earthHeight;
         const topY = Math.min(v1.y, v2.y);
+        const bottomY = Math.max(v1Bottom.y, v2Bottom.y);
 
         // Color based on facing direction
         let baseColor, shadowColor, highlightColor;
@@ -648,7 +650,7 @@ const TerrainGenerator = {
         // Fill with gradient
         const gradient = ctx.createLinearGradient(
             (v1.x + v2.x) / 2, topY,
-            (v1.x + v2.x) / 2, cliffBottomY
+            (v1.x + v2.x) / 2, bottomY
         );
         gradient.addColorStop(0, highlightColor);
         gradient.addColorStop(0.3, baseColor);
