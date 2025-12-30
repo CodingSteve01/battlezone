@@ -497,21 +497,25 @@ export function hideTutorialOverlay() {
 /**
  * Dismiss current hint (global function for onclick)
  */
-window.dismissTutorialHint = function () {
-    hideTutorialOverlay();
+if (typeof window !== 'undefined') {
+    window.dismissTutorialHint = function () {
+        hideTutorialOverlay();
 
-    // After a short delay, check for the next hint
-    setTimeout(() => {
-        checkTutorialHint();
-    }, 500);
-};
+        // After a short delay, check for the next hint
+        setTimeout(() => {
+            checkTutorialHint();
+        }, 500);
+    };
+}
 
 /**
  * Dismiss tutorial entirely (global function for onclick)
  */
-window.dismissTutorial = function () {
-    dismissTutorial();
-};
+if (typeof window !== 'undefined') {
+    window.dismissTutorial = function () {
+        dismissTutorial();
+    };
+}
 
 /**
  * Show hint for a specific action (can be called externally)
@@ -633,37 +637,41 @@ export function hideTeamSelectTutorial() {
 /**
  * Dismiss current team select hint (global function)
  */
-window.dismissTeamSelectHint = function() {
-    hideTeamSelectTutorial();
-};
+if (typeof window !== 'undefined') {
+    window.dismissTeamSelectHint = function() {
+        hideTeamSelectTutorial();
+    };
+}
 
 /**
  * Show next team tip (cycles through synergies and tactics)
  */
-window.showNextTeamTip = function() {
-    const allTips = [
-        'budgetTip', 'synergy_balanced', 'synergy_stealth', 'synergy_defensive',
-        'synergy_elite', 'synergy_swarm',
-        'tactical_ambush', 'tactical_coordinated', 'tactical_flanking', 'tactical_cover'
-    ];
+if (typeof window !== 'undefined') {
+    window.showNextTeamTip = function() {
+        const allTips = [
+            'budgetTip', 'synergy_balanced', 'synergy_stealth', 'synergy_defensive',
+            'synergy_elite', 'synergy_swarm',
+            'tactical_ambush', 'tactical_coordinated', 'tactical_flanking', 'tactical_cover'
+        ];
 
-    // Find next unshown tip
-    let nextTip = null;
-    for (const tip of allTips) {
-        if (!teamSelectHintsShown.has(tip)) {
-            nextTip = tip;
-            break;
+        // Find next unshown tip
+        let nextTip = null;
+        for (const tip of allTips) {
+            if (!teamSelectHintsShown.has(tip)) {
+                nextTip = tip;
+                break;
+            }
         }
-    }
 
-    // If all shown, cycle through
-    if (!nextTip) {
-        currentTeamHintIndex = (currentTeamHintIndex + 1) % allTips.length;
-        nextTip = allTips[currentTeamHintIndex];
-    }
+        // If all shown, cycle through
+        if (!nextTip) {
+            currentTeamHintIndex = (currentTeamHintIndex + 1) % allTips.length;
+            nextTip = allTips[currentTeamHintIndex];
+        }
 
-    showTeamSelectHint(nextTip);
-};
+        showTeamSelectHint(nextTip);
+    };
+}
 
 /**
  * Reset team selection tutorial hints
@@ -1050,29 +1058,35 @@ function hideFloatingTutorialHint() {
 /**
  * Advance to next guided tutorial step
  */
-window.nextGuidedStep = function() {
-    // Remove any highlights
-    document.querySelectorAll('.tutorial-highlight').forEach(el => {
-        el.classList.remove('tutorial-highlight');
-    });
+if (typeof window !== 'undefined') {
+    window.nextGuidedStep = function() {
+        // Remove any highlights
+        document.querySelectorAll('.tutorial-highlight').forEach(el => {
+            el.classList.remove('tutorial-highlight');
+        });
 
-    showGuidedStep(tutorialState.guidedStep + 1);
-};
+        showGuidedStep(tutorialState.guidedStep + 1);
+    };
+}
 
 /**
  * Skip the guided tutorial
  */
-window.skipGuidedTutorial = function() {
-    finishGuidedTutorial();
-    showToast('💡 Tutorial übersprungen - Du kannst es in den Optionen neu starten', 'info');
-};
+if (typeof window !== 'undefined') {
+    window.skipGuidedTutorial = function() {
+        finishGuidedTutorial();
+        showToast('💡 Tutorial übersprungen - Du kannst es in den Optionen neu starten', 'info');
+    };
+}
 
 /**
  * Finish the guided tutorial
  */
-window.finishGuidedTutorial = function() {
-    finishGuidedTutorial();
-};
+if (typeof window !== 'undefined') {
+    window.finishGuidedTutorial = function() {
+        finishGuidedTutorial();
+    };
+}
 
 /**
  * Complete the guided tutorial
