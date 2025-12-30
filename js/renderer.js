@@ -15,7 +15,9 @@ import {
     getShorelineSprite,
     getShorelineVariantCount,
     hasAnimatedTexture,
-    getAnimatedTexture
+    getAnimatedTexture,
+    getTerrainTileInfo,
+    hasIsometricTiles
 } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -23,7 +25,6 @@ import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
 import { logRender, logError, logEntry } from './errorLog.js';
-import { initWebGLRenderer, renderWebGL, isWebGLAvailable, markMeshDirty } from './rendererWebGL.js';
 
 // ===== SAFE GRADIENT HELPERS =====
 // Prevents "non-finite value" errors when coordinates are NaN/Infinity
@@ -230,64 +231,60 @@ function shouldRenderBaseSkirt(hex) {
 
 /**
  * Draw cliff/slope faces between tiles of different heights
- * Creates realistic earth/ground appearance when looking at height differences
- * Optimized to reduce rendering overhead
+ * Creates realistic earth/ground appearance with gradient shading
+ * for natural-looking height transitions
  */
 function drawCliffFaces(cx, cy, size, hex, fogLevel) {
     if (!hex || hex.height === undefined) return;
-    
+
     const myHeight = hex.height ?? 0;
     if (myHeight === 0) return; // No cliff faces for ground-level tiles
-    
+
     const neighbors = getNeighbors(hex.q, hex.r);
     const light = getLightVector();
     const viewDir = getViewVector();
     const terrain = TERRAIN[hex.type];
-    
+
     const baseColor = terrain?.color || '#6a9a58';
-    const sidewallColor = fogLevel === 'hidden'
-        ? '#050810'
-        : desaturateAndDarken(baseColor, 0.6, 0.55);
-    
+
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
         if (!isEdgeFacingViewer(direction, viewDir)) return;
         const neighborHex = getHex(neighbor.q, neighbor.r);
-        
+
         const neighborHeight = neighborHex?.height ?? 0;
         const heightDiff = myHeight - neighborHeight;
-        
+
         if (heightDiff <= 0) return; // Only draw cliff if we're higher
-        
+
         // Calculate the cliff face positions
         // Direction 0 = right, incrementing clockwise
         const angle1 = (Math.PI / 3) * direction;
         const angle2 = (Math.PI / 3) * ((direction + 1) % 6);
-        
+
         const myOffset = getTileZOffset(myHeight, size);
         const neighborOffset = getTileZOffset(neighborHeight, size);
         const faceHeight = myOffset - neighborOffset;
-        
+
         // Points on this hex's edge (top of cliff)
         const topX1 = cx + size * Math.cos(angle1);
         const topY1 = cy + size * Math.sin(angle1);
         const topX2 = cx + size * Math.cos(angle2);
         const topY2 = cy + size * Math.sin(angle2);
-        
+
         // Points at bottom of cliff (aligned with lower neighbor)
         const bottomX1 = topX1;
         const bottomY1 = topY1 + faceHeight;
         const bottomX2 = topX2;
         const bottomY2 = topY2 + faceHeight;
-        
-        // Calculate lighting once per face
-        const faceAngle = angle1 + Math.PI / 6; // Mid-angle of this edge
+
+        // Calculate lighting based on face direction
+        const faceAngle = angle1 + Math.PI / 6;
         const faceDirX = Math.cos(faceAngle);
         const faceDirY = Math.sin(faceAngle);
         const lightDot = -(faceDirX * light.x + faceDirY * light.y);
-        const lightFactor = Math.max(0.4, 0.7 + lightDot * 0.3);
-        
-        // Draw the cliff face as a simple trapezoid (no gradient for performance)
+        const lightFactor = Math.max(0.3, 0.6 + lightDot * 0.4);
+
         ctx.save();
         ctx.beginPath();
         ctx.moveTo(topX1, topY1);
@@ -295,11 +292,39 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.lineTo(bottomX2, bottomY2);
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
-        
-        ctx.fillStyle = sidewallColor;
-        ctx.globalAlpha = fogLevel === 'hidden' ? 1 : lightFactor * 0.85; // Slight transparency for depth
-        ctx.fill();
-        
+
+        if (fogLevel === 'hidden') {
+            // Hidden hexes show dark cliff faces
+            ctx.fillStyle = '#050810';
+            ctx.fill();
+        } else {
+            // Create gradient from top (lighter) to bottom (darker) for depth
+            const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
+            const topY = Math.min(topY1, topY2);
+            const bottomY = Math.max(bottomY1, bottomY2);
+
+            const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5));
+            if (typeof gradient !== 'string') {
+                // Top edge: slightly lighter (edge highlight)
+                gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor));
+                // Middle: earth tone
+                gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor));
+                // Bottom: darker shadow
+                gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor));
+            }
+
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Add subtle top edge highlight for definition
+            ctx.beginPath();
+            ctx.moveTo(topX1, topY1);
+            ctx.lineTo(topX2, topY2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
         ctx.restore();
     });
 }
@@ -595,7 +620,8 @@ function getTreeSpriteBounds(x, y, size, treeType, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
-    const baseHeight = size * 2.8 * sizeVariation;
+    // Reduced from 2.8x to 1.6x for better unit visibility
+    const baseHeight = size * 1.6 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -607,7 +633,8 @@ function getBushSpriteBounds(x, y, size, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-    const baseSize = size * 1.6 * sizeVariation;
+    // Reduced from 1.6x to 1.1x for better visual balance with smaller trees
+    const baseSize = size * 1.1 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -619,7 +646,8 @@ function getShrubSpriteBounds(x, y, size, seed) {
 
     const { sprite, contentScale, anchor } = result;
     const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-    const baseSize = size * 1.3 * sizeVariation;
+    // Reduced from 1.3x to 0.9x for better visual balance
+    const baseSize = size * 0.9 * sizeVariation;
     const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
     const anchorPoint = anchor || { x: 0.5, y: 1.0 };
     return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
@@ -671,7 +699,8 @@ function drawTree2D5(x, y, size, treeType, seed) {
         const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
 
         // Base target size (what the sprite should be at 100% in original cell)
-        const baseHeight = size * 2.8 * sizeVariation;
+        // Reduced from 2.8x to 1.6x for better unit visibility and visual balance
+        const baseHeight = size * 1.6 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
 
@@ -702,7 +731,8 @@ function drawBush2D5(x, y, size, seed) {
 
         // Size variation: 0.6x to 1.4x
         const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-        const baseSize = size * 1.6 * sizeVariation;
+        // Reduced from 1.6x to 1.1x for better visual balance
+        const baseSize = size * 1.1 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
 
@@ -732,7 +762,8 @@ function drawSmallShrub(x, y, size, seed) {
         const { sprite, contentScale, anchor } = result;
 
         const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-        const baseSize = size * 1.3 * sizeVariation;
+        // Reduced from 1.3x to 0.9x for better visual balance
+        const baseSize = size * 0.9 * sizeVariation;
 
         const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
         const shouldMirror = seededRandom(seed * 2.6) > 0.5;
@@ -903,7 +934,6 @@ export function getPresetList() { return ['default']; }
 
 let canvas, ctx;
 let texturesInitialized = false;
-let webglActive = false; // Track which renderer is currently active
 
 // ===== HEX TILE CACHING SYSTEM =====
 // Pre-renders hex tiles with terrain details for improved performance
@@ -1565,16 +1595,38 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        // Draw sprite texture - scale to fit hex with slight overlap to prevent seams
-        context.save();
-        context.clip();
-        // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
-        const buffer = Math.max(6, size * 0.06);
-        const spriteWidth = size * 2 + buffer;
-        const spriteHeight = size * Math.sqrt(3) + buffer;
-        context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-        context.restore();
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // Isometric tiles: draw full tile without clipping
+            // Position so hex surface center aligns with (cx, cy)
+            const buffer = Math.max(6, size * 0.06);
+            const spriteWidth = size * 2 + buffer;
+            // Scale the total height proportionally
+            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
+            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
+            const earthLayerScaled = tileInfo.earthLayerHeight * scaleRatio;
+
+            // Don't clip - draw full isometric tile
+            // Position: center hex surface at (cx, cy), earth layer extends below
+            const drawX = cx - spriteWidth / 2;
+            const drawY = cy - hexSurfaceHeight / 2;  // Hex surface starts here
+
+            context.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
+        } else {
+            // Non-isometric tiles: clip to hex shape as before
+            context.save();
+            context.clip();
+            // Hex dimensions: width = 2*size, height = sqrt(3)*size
+            // Increased buffer to completely eliminate anti-aliasing seams between tiles
+            const buffer = Math.max(12, size * 0.12);
+            const spriteWidth = size * 2 + buffer;
+            const spriteHeight = size * Math.sqrt(3) + buffer;
+            context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
+            context.restore();
+        }
 
         // Restore hex path for border drawing
         context.beginPath();
@@ -1792,52 +1844,9 @@ function detectMobileDevice() {
 
 export async function initRenderer() {
     canvas = document.getElementById('game-canvas');
-    
-    // Check if WebGL should be used
-    const useWebGL = CONFIG.RENDERER.PREFER_WEBGL || CONFIG.RENDERER.TYPE === 'webgl';
-    
-    if (useWebGL && isWebGLAvailable()) {
-        logEntry('info', '[Renderer] Attempting to initialize WebGL renderer', 
-            `Type: ${CONFIG.RENDERER.TYPE}, Prefer: ${CONFIG.RENDERER.PREFER_WEBGL}`);
-        try {
-            const success = await initWebGLRenderer(canvas);
-            if (success) {
-                webglActive = true;
-                logEntry('info', '[Renderer] Using WebGL renderer', 'Initialization successful');
-                
-                // Still need 2D context for UI elements
-                ctx = canvas.getContext('2d');
-                
-                // If 2D context failed (can happen when WebGL is already active on canvas),
-                // we need to create a separate canvas for 2D overlay or handle gracefully
-                if (!ctx) {
-                    logEntry('warn', '[Renderer] Cannot get 2D context after WebGL init', 
-                        'UI overlay may not work correctly. Consider using a separate canvas for 2D UI elements.');
-                }
-                
-                // Skip rest of Canvas 2D initialization
-                resizeCanvas();
-                return;
-            } else if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
-                const error = new Error('WebGL initialization failed and fallback disabled');
-                logError('[Renderer] Cannot initialize renderer', error);
-                throw error;
-            }
-            logEntry('warn', '[Renderer] WebGL initialization failed, falling back to Canvas 2D', 
-                'Check previous logs for WebGL errors');
-        } catch (err) {
-            logError('[Renderer] WebGL initialization error', err);
-            if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
-                throw err;
-            }
-            logEntry('warn', '[Renderer] Falling back to Canvas 2D', 'WebGL error occurred');
-        }
-    }
-    
-    // Canvas 2D fallback or default
-    webglActive = false;
-    logEntry('info', '[Renderer] Using Canvas 2D renderer', 
-        `Reason: ${useWebGL ? 'WebGL fallback' : 'Canvas 2D configured'}`);
+
+    // Canvas 2D renderer
+    logEntry('info', '[Renderer] Using Canvas 2D renderer', 'Initializing...');
     ctx = canvas.getContext('2d');
 
     // Detect mobile/tablet and set initial quality
@@ -2038,15 +2047,32 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        ctx.save();
-        ctx.clip();
-        // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Buffer to prevent anti-aliasing seams between tiles (1-2px overlap)
-        const buffer = Math.max(6, size * 0.06);
-        const spriteWidth = size * 2 + buffer;
-        const spriteHeight = size * Math.sqrt(3) + buffer;
-        ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-        ctx.restore();
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // Isometric tiles: draw full tile without clipping
+            const buffer = Math.max(6, size * 0.06);
+            const spriteWidth = size * 2 + buffer;
+            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
+            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
+
+            // Position: center hex surface at (cx, cy), earth layer extends below
+            const drawX = cx - spriteWidth / 2;
+            const drawY = cy - hexSurfaceHeight / 2;
+
+            ctx.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
+        } else {
+            // Non-isometric tiles: clip to hex shape
+            ctx.save();
+            ctx.clip();
+            const buffer = Math.max(12, size * 0.12);
+            const spriteWidth = size * 2 + buffer;
+            const spriteHeight = size * Math.sqrt(3) + buffer;
+            ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
+            ctx.restore();
+        }
 
         // Draw hex shape again for stroke
         ctx.beginPath();
@@ -2667,64 +2693,19 @@ function drawStaticSnowDetails(cx, cy, hexSize, seed) {
 }
 
 /**
- * Draw static ice details
+ * Draw static ice details - simplified for performance
  */
 function drawStaticIceDetails(cx, cy, hexSize, seed) {
-    // Ice cracks
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 0.5;
-
-    for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        let x = cx + (seededRandom(seed + i * 3) - 0.5) * hexSize * 1.1;
-        let y = cy + (seededRandom(seed + i * 3 + 1) - 0.5) * hexSize * 1.1;
-        ctx.moveTo(x, y);
-
-        for (let j = 0; j < 3; j++) {
-            x += (seededRandom(seed + i * 10 + j) - 0.5) * hexSize * 0.35;
-            y += (seededRandom(seed + i * 10 + j + 5) - 0.5) * hexSize * 0.35;
-            ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-    }
-
-    // Shimmer spots
-    for (let i = 0; i < 3; i++) {
-        const shimmerVisible = seededRandom(seed + i * 30) > 0.4;
-        if (shimmerVisible) {
-            const sx = cx + (seededRandom(seed + i * 20) - 0.5) * hexSize * 1.3;
-            const sy = cy + (seededRandom(seed + i * 20 + 10) - 0.5) * hexSize * 1.3;
-
-            ctx.fillStyle = 'rgba(200, 230, 255, 0.25)';
-            ctx.beginPath();
-            ctx.ellipse(sx, sy, 3, 1.5, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
+    // Disabled ice cracks for performance - terrain texture is sufficient
+    return;
 }
 
 /**
  * Draw simple reed texture - fewer, simpler stalks
  */
 function drawStaticReeds(cx, cy, hexSize, seed) {
-    // Just 8 simple vertical strokes to suggest reeds
-    ctx.strokeStyle = 'rgba(70, 95, 55, 0.5)';
-    ctx.lineWidth = 1.5;
-
-    for (let i = 0; i < 8; i++) {
-        const rand1 = seededRandom(seed + i * 4);
-        const rand2 = seededRandom(seed + i * 4 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.8;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.6;
-        const height = 12 + seededRandom(seed + i * 4 + 2) * 8;
-        const sway = (rand1 - 0.5) * 3;
-
-        ctx.beginPath();
-        ctx.moveTo(x, y + 4);
-        ctx.lineTo(x + sway, y - height);
-        ctx.stroke();
-    }
+    // Disabled for performance - vegetation is handled by sprites
+    return;
 }
 
 /**
@@ -2754,55 +2735,16 @@ function drawStaticFlowers(cx, cy, hexSize, seed) {
  * Draw subtle wheat field texture - golden patches
  */
 function drawStaticWheatField(cx, cy, hexSize, seed) {
-    // Draw subtle golden texture patches
-    for (let i = 0; i < 4; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.8;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.8;
-        const size = 8 + seededRandom(seed + i * 3 + 2) * 10;
-
-        // Light golden patch
-        ctx.fillStyle = 'rgba(210, 180, 100, 0.15)';
-        ctx.beginPath();
-        ctx.ellipse(x, y, size, size * 0.6, rand1 * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Add a few subtle darker streaks to suggest stalks
-    ctx.strokeStyle = 'rgba(180, 150, 80, 0.2)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
-        const rand = seededRandom(seed + i * 5);
-        const x = cx + (rand - 0.5) * hexSize * 0.6;
-        const y = cy + (seededRandom(seed + i * 5 + 1) - 0.5) * hexSize * 0.6;
-
-        ctx.beginPath();
-        ctx.moveTo(x, y + 6);
-        ctx.lineTo(x + (rand - 0.5) * 4, y - 6);
-        ctx.stroke();
-    }
+    // Disabled for performance - terrain texture provides base color
+    return;
 }
 
 /**
  * Draw subtle heather texture - purple patches
  */
 function drawStaticHeather(cx, cy, hexSize, seed) {
-    // Just a few subtle purple patches
-    for (let i = 0; i < 4; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-
-        const x = cx + (rand1 - 0.5) * hexSize * 0.7;
-        const y = cy + (rand2 - 0.5) * hexSize * 0.7;
-        const size = 6 + seededRandom(seed + i * 3 + 2) * 8;
-
-        ctx.fillStyle = 'rgba(150, 100, 150, 0.2)';
-        ctx.beginPath();
-        ctx.ellipse(x, y, size, size * 0.7, rand1 * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
+    // Disabled for performance - terrain texture provides base color
+    return;
 }
 
 /**
@@ -2874,61 +2816,13 @@ function drawSandDetails(cx, cy, s, seed) {
 }
 
 /**
- * Draw swamp details
+ * Draw swamp details - simplified for performance
  */
 function drawSwampDetails(cx, cy, s, seed) {
-    // Murky water puddles
-    ctx.fillStyle = 'rgba(25, 45, 30, 0.6)';
+    // Just a simple murky water puddle overlay - no strokes
+    ctx.fillStyle = 'rgba(25, 45, 30, 0.4)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + s * 0.1, s * 0.65, s * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Algae on water
-    ctx.fillStyle = 'rgba(50, 80, 40, 0.4)';
-    for (let i = 0; i < 3; i++) {
-        const ax = cx + (seededRandom(seed + i * 41) - 0.5) * s * 0.8;
-        const ay = cy + (seededRandom(seed + i * 41 + 1) - 0.5) * s * 0.5;
-        ctx.beginPath();
-        ctx.ellipse(ax, ay, s * 0.15, s * 0.1, seededRandom(seed + i) * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Bubbles
-    ctx.fillStyle = 'rgba(60, 85, 55, 0.7)';
-    for (let i = 0; i < 4; i++) {
-        const bx = cx + (seededRandom(seed + i * 43) - 0.5) * s * 0.9;
-        const by = cy + (seededRandom(seed + i * 43 + 1) - 0.5) * s * 0.7;
-        const bSize = 2 + seededRandom(seed + i * 43 + 2) * 2;
-        ctx.beginPath();
-        ctx.arc(bx, by, bSize, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Dead reeds
-    ctx.strokeStyle = 'rgba(90, 70, 50, 0.7)';
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-        const rx = cx + (seededRandom(seed + i * 47) - 0.5) * s * 1.2;
-        const ry = cy + (seededRandom(seed + i * 47 + 1) - 0.5) * s * 0.8;
-        const height = s * (0.3 + seededRandom(seed + i * 47 + 2) * 0.3);
-        const lean = (seededRandom(seed + i * 47 + 3) - 0.5) * s * 0.15;
-
-        ctx.beginPath();
-        ctx.moveTo(rx, ry + s * 0.2);
-        ctx.lineTo(rx + lean, ry - height);
-        ctx.stroke();
-
-        // Reed tip
-        ctx.fillStyle = 'rgba(70, 50, 35, 0.8)';
-        ctx.beginPath();
-        ctx.ellipse(rx + lean, ry - height - 3, 2, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Moss on edges
-    ctx.fillStyle = 'rgba(45, 70, 35, 0.5)';
-    ctx.beginPath();
-    ctx.ellipse(cx - s * 0.5, cy - s * 0.2, s * 0.2, s * 0.1, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + s * 0.1, s * 0.5, s * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
 }
 
@@ -3159,7 +3053,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
     // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.3, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    // Size increased from 1.3x to 1.7x for better visibility against trees
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.7, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
@@ -3721,13 +3616,7 @@ export function render() {
         logRender('Canvas nicht verfügbar', `canvas: ${!!canvas}`);
         return;
     }
-    
-    // If WebGL renderer is active, use it instead of Canvas 2D
-    if (webglActive) {
-        renderWebGL();
-        return;
-    }
-    
+
     // For Canvas 2D rendering, we need the 2D context
     if (!ctx) {
         logRender('Context nicht verfügbar für Canvas 2D', `ctx: ${!!ctx}`);
@@ -4218,6 +4107,7 @@ export function render() {
     };
 
     // Collect all tiles that might have obscuring assets for important units
+    // Extended range for better visibility in dense forests
     const obscuringTiles = new Set();
     importantUnitDrawables.forEach(drawable => {
         const unit = drawable.unit;
@@ -4226,14 +4116,30 @@ export function render() {
         // Add the unit's own tile
         obscuringTiles.add(`${unit.q},${unit.r}`);
 
-        // Add tiles "below" the unit (screen space: tiles with higher Y)
-        const tilesBelow = [
-            { q: unit.q, r: unit.r + 1 },     // Directly below
-            { q: unit.q + 1, r: unit.r },     // Southeast
+        // Add all 6 neighboring tiles for comprehensive occlusion detection
+        const neighbors = [
+            { q: unit.q + 1, r: unit.r },     // East
+            { q: unit.q - 1, r: unit.r },     // West
+            { q: unit.q, r: unit.r + 1 },     // Southeast
+            { q: unit.q, r: unit.r - 1 },     // Northwest
+            { q: unit.q + 1, r: unit.r - 1 }, // Northeast
             { q: unit.q - 1, r: unit.r + 1 }  // Southwest
         ];
 
-        tilesBelow.forEach(tile => {
+        neighbors.forEach(tile => {
+            obscuringTiles.add(`${tile.q},${tile.r}`);
+        });
+
+        // Add second ring of tiles "below" the unit for better visibility in dense areas
+        const tilesBelow2 = [
+            { q: unit.q, r: unit.r + 2 },     // 2 tiles below
+            { q: unit.q + 1, r: unit.r + 1 }, // SE diagonal
+            { q: unit.q - 1, r: unit.r + 2 }, // SW diagonal
+            { q: unit.q + 2, r: unit.r },     // 2 tiles east
+            { q: unit.q - 2, r: unit.r + 2 }  // 2 tiles southwest
+        ];
+
+        tilesBelow2.forEach(tile => {
             obscuringTiles.add(`${tile.q},${tile.r}`);
         });
     });
@@ -4251,7 +4157,8 @@ export function render() {
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
-        const finalAlpha = needsTransparency ? visibilityAlpha * 0.35 : visibilityAlpha;
+        // Reduced transparency alpha from 0.35 to 0.2 for much better unit visibility
+        const finalAlpha = needsTransparency ? visibilityAlpha * 0.2 : visibilityAlpha;
 
         if (finalAlpha < 0.99) {
             ctx.save();
@@ -4717,13 +4624,16 @@ function drawMinimap(w, h) {
     // Determine size and position based on mode
     let size, x, y;
     if (isExpanded) {
-        // Expanded mode: centered on screen, nearly full screen
+        // Expanded mode: centered on screen, accounting for top bar (55px) and bottom UI (~300px)
+        const topBarHeight = 55;
+        const bottomUIHeight = 300;
         const availableWidth = Math.max(0, w - config.PADDING * 2);
-        const availableHeight = Math.max(0, h - config.PADDING * 2 - 40);
+        const availableHeight = Math.max(0, h - topBarHeight - bottomUIHeight - config.PADDING * 2);
         size = Math.min(config.EXPANDED_SIZE, availableWidth, availableHeight);
         if (size <= 0) return;
         x = (w - size) / 2;
-        y = (h - size) / 2;
+        // Center vertically in the available space between top bar and bottom UI
+        y = topBarHeight + config.PADDING + (availableHeight - size) / 2;
     } else {
         // Compact mode: top-left corner
         size = config.SIZE;

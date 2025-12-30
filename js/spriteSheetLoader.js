@@ -29,6 +29,10 @@ const anchorRegistry = new Map();
 // Used to draw sprites at correct size relative to originalSize
 const contentScaleRegistry = new Map();
 
+// Tile info registry - stores isometric tile dimensions
+// Key: type (e.g., 'terrain'), Value: { spriteWidth, totalHeight, hexHeight, earthLayerHeight }
+let terrainTileInfo = null;
+
 // Cache for mirrored (horizontally flipped) sprites
 const mirroredSpriteCache = new Map();
 
@@ -116,6 +120,12 @@ async function loadDefinition(type, filename) {
         if (type === 'units' && definitions[type].mirroring) {
             baseFacingDirection = definitions[type].mirroring.baseDirection || 'right';
             console.log(`[SpriteSheetLoader] Base facing direction: ${baseFacingDirection}`);
+        }
+
+        // Read tile info for isometric terrain tiles
+        if (type === 'terrain' && definitions[type].tileInfo) {
+            terrainTileInfo = definitions[type].tileInfo;
+            console.log(`[SpriteSheetLoader] Isometric terrain tiles: hexHeight=${terrainTileInfo.hexHeight}, earthLayer=${terrainTileInfo.earthLayerHeight}`);
         }
     } catch (err) {
         console.warn(`[SpriteSheetLoader] Could not load ${filename}:`, err.message);
@@ -640,6 +650,21 @@ export function getTerrainVariantCount(terrainType) {
  */
 export function getAvailableTerrainTypes() {
     return Object.keys(variantRegistry.terrain);
+}
+
+/**
+ * Get isometric terrain tile info (dimensions, earth layer height)
+ * Returns null if using non-isometric (flat) tiles
+ */
+export function getTerrainTileInfo() {
+    return terrainTileInfo;
+}
+
+/**
+ * Check if terrain tiles are isometric (have earth layer)
+ */
+export function hasIsometricTiles() {
+    return terrainTileInfo !== null && terrainTileInfo.earthLayerHeight > 0;
 }
 
 // Fallback mappings for unit classes without dedicated sprites

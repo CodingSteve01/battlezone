@@ -11,382 +11,457 @@
  */
 
 const TerrainGenerator = {
+    // Earth layer colors for isometric cliff edges
+    earthColors: {
+        default: { light: '#8a6840', mid: '#6a5030', dark: '#4a3820' },
+        forest: { light: '#604830', mid: '#503828', dark: '#402820' },
+        sand: { light: '#a89058', mid: '#8a7048', dark: '#6a5038' },
+        rock: { light: '#5a5550', mid: '#4a4540', dark: '#3a3530' },
+        water: { light: '#6a5a48', mid: '#5a4a38', dark: '#4a3a28' }
+    },
+
     types: {
         grass: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
+            baseColor: '#5a9848',      // Lush vibrant grass
+            lightColor: '#72b058',     // Sun-lit highlights
+            darkColor: '#3a7830',      // Shaded areas
+            midColor: '#4a8840',       // Mid-tone
+            accentColor: '#82c068',    // Bright accent
+            earthType: 'default',
             detailType: 'grass',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         forest: {
-            baseColor: '#3d6a4a',
-            lightColor: '#4d7a58',
-            darkColor: '#2a5038',
-            midColor: '#3a6045',
-            accentColor: '#5a8a5a',
+            baseColor: '#3a5a3a',      // Rich dark forest
+            lightColor: '#4a6a48',     // Dappled light
+            darkColor: '#2a4028',      // Deep shadow
+            midColor: '#355535',       // Mid forest
+            accentColor: '#5a7a58',    // Light patches
+            earthType: 'forest',
             detailType: 'forest_floor',
-            noiseScale: 0.03
+            noiseScale: 0.03,
+            hasGrassOverhang: false
         },
         hills: {
-            baseColor: '#7a8c5a',
-            lightColor: '#8a9c68',
-            darkColor: '#5a7040',
-            midColor: '#6a8050',
-            accentColor: '#9aac78',
+            baseColor: '#6a8a50',      // Grassy hill
+            lightColor: '#7a9a60',     // Sunlit slope
+            darkColor: '#4a6a38',      // Hill shadow
+            midColor: '#5a7a45',       // Mid-tone
+            accentColor: '#8aaa70',    // Highlight
+            earthType: 'default',
             detailType: 'rocky_grass',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: true
         },
         rock: {
-            baseColor: '#6a6868',
-            lightColor: '#7a7878',
-            darkColor: '#4a4848',
-            midColor: '#5a5858',
-            accentColor: '#8a8888',
+            baseColor: '#6a6a68',      // Natural stone
+            lightColor: '#8a8a85',     // Sunlit rock
+            darkColor: '#4a4a48',      // Rock shadow
+            midColor: '#5a5a58',       // Mid gray
+            accentColor: '#9a9a95',    // Light patches
+            earthType: 'rock',
             detailType: 'stone',
-            noiseScale: 0.04
+            noiseScale: 0.04,
+            hasGrassOverhang: false
         },
         water: {
-            // Shallow brook colors - lighter, more transparent look with visible sandy bottom
-            baseColor: '#5a9aaa',
-            lightColor: '#7abaca',
-            darkColor: '#4a8a9a',
-            midColor: '#6aaaaa',
-            accentColor: '#8acada',
-            bottomColor: '#c4b088',  // Sandy bottom color
+            // Clear blue water with visible bottom
+            baseColor: '#3a8ab0',      // Clear blue
+            lightColor: '#5aaad0',     // Sunlit surface
+            darkColor: '#2a6a90',      // Deep water
+            midColor: '#4a9ac0',       // Mid-tone
+            accentColor: '#6abae0',    // Bright highlight
+            bottomColor: '#c0a878',    // Sandy bottom
             pebbleColors: ['#8a7868', '#9a8a78', '#7a6858', '#aa9a88'],
+            earthType: 'water',
             detailType: 'shallow_water',
-            noiseScale: 0.015
+            noiseScale: 0.015,
+            hasGrassOverhang: false
         },
         sand: {
-            baseColor: '#c4a868',
-            lightColor: '#d4b878',
-            darkColor: '#b49858',
-            midColor: '#baa060',
-            accentColor: '#e4c888',
+            baseColor: '#c4a870',      // Warm golden sand
+            lightColor: '#d8bc88',     // Bright sand
+            darkColor: '#a89058',      // Shadowed
+            midColor: '#b4a068',       // Mid-tone
+            accentColor: '#e8cc98',    // Highlight
+            earthType: 'sand',
             detailType: 'sand',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: false
         },
         swamp: {
-            baseColor: '#4a5a35',
-            lightColor: '#5a6a45',
-            darkColor: '#3a4a28',
-            midColor: '#455530',
-            accentColor: '#6a7a55',
+            baseColor: '#4a5a38',      // Murky green
+            lightColor: '#5a6a48',     // Surface
+            darkColor: '#3a4a28',      // Deep murk
+            midColor: '#455530',       // Mid-tone
+            accentColor: '#6a7a55',    // Highlight
+            earthType: 'forest',
             detailType: 'murky',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: false
         },
         river: {
-            baseColor: '#2a6078',
-            lightColor: '#4a8098',
-            darkColor: '#1a4a60',
-            midColor: '#2a5570',
-            accentColor: '#5a90a8',
+            baseColor: '#3a7090',      // Clear river blue
+            lightColor: '#5a90b0',     // Sunlit surface
+            darkColor: '#2a5070',      // Deep water
+            midColor: '#3a6080',       // Mid-tone
+            accentColor: '#6aa0c0',    // Sparkle highlights
+            earthType: 'water',
             detailType: 'flowing_water',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: false
         },
         road: {
-            baseColor: '#8a7a60',
-            lightColor: '#9a8a70',
-            darkColor: '#6a5a48',
-            midColor: '#7a6a55',
-            accentColor: '#aa9a80',
+            baseColor: '#8a7a60',      // Worn dirt road
+            lightColor: '#9a8a70',     // Dusty surface
+            darkColor: '#6a5a48',      // Packed earth
+            midColor: '#7a6a55',       // Mid-tone
+            accentColor: '#aa9a80',    // Dry patches
+            earthType: 'default',
             detailType: 'road',
-            noiseScale: 0.03
+            noiseScale: 0.03,
+            hasGrassOverhang: false
         },
         path: {
-            baseColor: '#7a6850',
-            lightColor: '#8a7860',
-            darkColor: '#5a4838',
-            midColor: '#6a5845',
-            accentColor: '#9a8870',
+            baseColor: '#7a6850',      // Worn trail
+            lightColor: '#8a7860',     // Lighter patches
+            darkColor: '#5a4838',      // Shaded areas
+            midColor: '#6a5845',       // Mid-tone
+            accentColor: '#9a8870',    // Highlights
+            earthType: 'default',
             detailType: 'path',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: false
         },
         snow: {
-            baseColor: '#e8eef5',
-            lightColor: '#f8fcff',
-            darkColor: '#d0d8e0',
-            midColor: '#e0e8f0',
-            accentColor: '#ffffff',
+            baseColor: '#e8eef5',      // Pristine snow
+            lightColor: '#f8fcff',     // Bright highlights
+            darkColor: '#d0d8e0',      // Blue shadows
+            midColor: '#e0e8f0',       // Mid-tone
+            accentColor: '#ffffff',    // Pure white
+            earthType: 'rock',
             detailType: 'snow',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: false
         },
         pine: {
-            baseColor: '#2a4a35',
-            lightColor: '#3a5a45',
-            darkColor: '#1a3a25',
-            midColor: '#254030',
-            accentColor: '#4a6a55',
+            baseColor: '#2a4a35',      // Dark pine forest
+            lightColor: '#3a5a45',     // Dappled light
+            darkColor: '#1a3a25',      // Deep shadow
+            midColor: '#254030',       // Mid-tone
+            accentColor: '#4a6a55',    // Light patches
+            earthType: 'forest',
             detailType: 'forest_floor',
-            noiseScale: 0.03
+            noiseScale: 0.03,
+            hasGrassOverhang: false
         },
         tallgrass: {
-            baseColor: '#5a8a50',
-            lightColor: '#6a9a60',
-            darkColor: '#4a7a40',
-            midColor: '#558545',
-            accentColor: '#7aaa70',
+            baseColor: '#5a9850',      // Lush tall grass
+            lightColor: '#6aaa60',     // Sun-lit tips
+            darkColor: '#4a8840',      // Shaded base
+            midColor: '#559548',       // Mid-tone
+            accentColor: '#7aba70',    // Golden highlights
+            earthType: 'default',
             detailType: 'tallgrass',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: true
         },
         mud: {
-            baseColor: '#5a4838',
-            lightColor: '#6a5848',
-            darkColor: '#4a3828',
-            midColor: '#554030',
-            accentColor: '#7a6858',
+            baseColor: '#5a4838',      // Wet mud
+            lightColor: '#6a5848',     // Surface sheen
+            darkColor: '#4a3828',      // Deep mud
+            midColor: '#554030',       // Mid-tone
+            accentColor: '#7a6858',    // Dry patches
+            earthType: 'forest',
             detailType: 'mud',
-            noiseScale: 0.03
+            noiseScale: 0.03,
+            hasGrassOverhang: false
         },
         clearing: {
-            baseColor: '#6a9a60',
-            lightColor: '#7aaa70',
-            darkColor: '#5a8a50',
-            midColor: '#659558',
-            accentColor: '#8aba80',
+            baseColor: '#6aa860',      // Bright meadow grass
+            lightColor: '#7ab870',     // Sunlit areas
+            darkColor: '#5a9850',      // Shaded grass
+            midColor: '#659a58',       // Mid-tone
+            accentColor: '#8ac880',    // Highlights
+            earthType: 'default',
             detailType: 'grass',
-            noiseScale: 0.02
+            noiseScale: 0.02,
+            hasGrassOverhang: true
         },
         // Directional stream tiles - straight connection (opposite edges)
         stream_ew: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_straight',
-            direction: 'ew', // East-West (horizontal)
-            noiseScale: 0.025
+            direction: 'ew',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_nesw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_straight',
-            direction: 'nesw', // Northeast-Southwest diagonal
-            noiseScale: 0.025
+            direction: 'nesw',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_nwse: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_straight',
-            direction: 'nwse', // Northwest-Southeast diagonal
-            noiseScale: 0.025
+            direction: 'nwse',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         // Directional stream tiles - curved connections (adjacent edges)
         stream_e_ne: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'e_ne', // East to Northeast
-            noiseScale: 0.025
+            direction: 'e_ne',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_ne_nw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'ne_nw', // Northeast to Northwest
-            noiseScale: 0.025
+            direction: 'ne_nw',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_nw_w: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'nw_w', // Northwest to West
-            noiseScale: 0.025
+            direction: 'nw_w',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_w_sw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'w_sw', // West to Southwest
-            noiseScale: 0.025
+            direction: 'w_sw',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_sw_se: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'sw_se', // Southwest to Southeast
-            noiseScale: 0.025
+            direction: 'sw_se',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         stream_se_e: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            waterColor: '#5a9aaa',
-            waterLight: '#7abaca',
-            bankColor: '#8a7a60',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            waterColor: '#4a90a8',
+            waterLight: '#6ab0c8',
+            bankColor: '#8a7050',
+            earthType: 'default',
             detailType: 'stream_curve',
-            direction: 'se_e', // Southeast to East
-            noiseScale: 0.025
+            direction: 'se_e',
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         // Directional path tiles - straight connections
         path_ew: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_straight',
             direction: 'ew',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_nesw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_straight',
             direction: 'nesw',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_nwse: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_straight',
             direction: 'nwse',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         // Directional path tiles - curved connections
         path_e_ne: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'e_ne',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_ne_nw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'ne_nw',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_nw_w: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'nw_w',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_w_sw: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'w_sw',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_sw_se: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'sw_se',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         },
         path_se_e: {
-            baseColor: '#5a8a48',
-            lightColor: '#6d9a58',
-            darkColor: '#4a7a38',
-            midColor: '#558842',
-            accentColor: '#7aaa68',
-            pathColor: '#8a7a60',
-            pathLight: '#9a8a70',
-            pathDark: '#6a5a48',
+            baseColor: '#5a9848',
+            lightColor: '#72b058',
+            darkColor: '#3a7830',
+            midColor: '#4a8840',
+            accentColor: '#82c068',
+            pathColor: '#9a8a68',
+            pathLight: '#aa9a78',
+            pathDark: '#7a6a50',
+            earthType: 'default',
             detailType: 'path_curve',
             direction: 'se_e',
-            noiseScale: 0.025
+            noiseScale: 0.025,
+            hasGrassOverhang: true
         }
     },
 
@@ -437,6 +512,270 @@ const TerrainGenerator = {
         ctx.restore();
 
         return canvas;
+    },
+
+    /**
+     * Generate an isometric hexagonal terrain texture with earth layer and grass overhang
+     * Creates a 2.5D appearance similar to board game tiles
+     * @param {string} type - Terrain type
+     * @param {number} variant - Variant for randomization
+     * @param {number} width - Canvas width (default 256)
+     * @param {number} height - Canvas height for hex top surface (default 192)
+     * @param {number} earthHeight - Height of the earth layer below hex (default 40)
+     */
+    generateIsometric(type, variant = 0, width = 256, height = 192, earthHeight = 40) {
+        const terrain = this.types[type] || this.types.grass;
+        const totalHeight = height + earthHeight;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = totalHeight;
+        const ctx = canvas.getContext('2d');
+
+        const seed = type.charCodeAt(0) * 1000 + variant;
+        const noise = new SimplexNoise(seed);
+        const detailNoise = new SimplexNoise(seed + 12345);
+        const microNoise = new SimplexNoise(seed + 67890);
+
+        // Calculate hex dimensions - position hex in upper portion
+        const hexCenterX = width / 2;
+        const hexCenterY = height / 2;  // Center of hex surface area (not including earth)
+
+        // Calculate hex radius from dimensions
+        const radiusFromWidth = width / 2;
+        const radiusFromHeight = height / Math.sqrt(3);
+        const radius = Math.min(radiusFromWidth, radiusFromHeight) * 0.95;
+
+        // Clear with transparency
+        ctx.clearRect(0, 0, width, totalHeight);
+
+        // Get earth colors for this terrain type
+        const earthType = terrain.earthType || 'default';
+        const earthPalette = this.earthColors[earthType] || this.earthColors.default;
+
+        // Draw earth layer first (behind everything)
+        this.renderEarthLayer(ctx, hexCenterX, hexCenterY, radius, earthHeight, earthPalette, noise, variant);
+
+        // Draw hex surface with clipping
+        ctx.save();
+        this.createHexPath(ctx, hexCenterX, hexCenterY, radius);
+        ctx.clip();
+
+        // Render base terrain with noise
+        this.renderBaseLayer(ctx, terrain, noise, width, height, variant, hexCenterX, hexCenterY, radius);
+
+        // Add terrain-specific details
+        this.renderDetails(ctx, terrain, noise, detailNoise, microNoise, width, height, variant, hexCenterX, hexCenterY, radius);
+
+        ctx.restore();
+
+        // Add grass overhang for applicable terrains
+        if (terrain.hasGrassOverhang) {
+            this.renderGrassOverhang(ctx, hexCenterX, hexCenterY, radius, earthHeight, terrain, noise, variant);
+        }
+
+        return canvas;
+    },
+
+    /**
+     * Render the earth/cliff layer below the hex surface
+     * Creates a 3D platform effect visible on the bottom edges
+     */
+    renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
+        // For flat-top hex, bottom edges are at angles 60°, 120°, 180° (SE, S, SW)
+        // Vertices: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
+
+        // Get hex vertices
+        const vertices = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            vertices.push({
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle)
+            });
+        }
+
+        // Draw earth faces for bottom-facing edges
+        // Edge 0-1: E to SE (bottom-right diagonal)
+        this.renderEarthFace(ctx, vertices[0], vertices[1], earthHeight, earthPalette, 'right', noise, variant);
+
+        // Edge 1-2: SE to SW (bottom flat edge)
+        this.renderEarthFace(ctx, vertices[1], vertices[2], earthHeight, earthPalette, 'front', noise, variant);
+
+        // Edge 2-3: SW to W (bottom-left diagonal)
+        this.renderEarthFace(ctx, vertices[2], vertices[3], earthHeight, earthPalette, 'left', noise, variant);
+    },
+
+    /**
+     * Render a single earth face (cliff side)
+     */
+    renderEarthFace(ctx, v1, v2, earthHeight, earthPalette, facing, noise, variant) {
+        ctx.save();
+
+        // Create quadrilateral path for this face
+        ctx.beginPath();
+        ctx.moveTo(v1.x, v1.y);
+        ctx.lineTo(v2.x, v2.y);
+        ctx.lineTo(v2.x, v2.y + earthHeight);
+        ctx.lineTo(v1.x, v1.y + earthHeight);
+        ctx.closePath();
+
+        // Create gradient based on facing direction
+        let gradient;
+        const midX = (v1.x + v2.x) / 2;
+        const topY = (v1.y + v2.y) / 2;
+        const bottomY = topY + earthHeight;
+
+        if (facing === 'front') {
+            // Front face gets darkest gradient (bottom-center)
+            gradient = ctx.createLinearGradient(midX, topY, midX, bottomY);
+            gradient.addColorStop(0, earthPalette.light);
+            gradient.addColorStop(0.3, earthPalette.mid);
+            gradient.addColorStop(1, earthPalette.dark);
+        } else if (facing === 'right') {
+            // Right face gets medium-light gradient
+            gradient = ctx.createLinearGradient(v1.x, topY, v2.x, bottomY);
+            gradient.addColorStop(0, earthPalette.light);
+            gradient.addColorStop(0.5, earthPalette.mid);
+            gradient.addColorStop(1, this.darkenColor(earthPalette.dark, 0.9));
+        } else {
+            // Left face gets darkest (in shadow)
+            gradient = ctx.createLinearGradient(v2.x, topY, v1.x, bottomY);
+            gradient.addColorStop(0, this.darkenColor(earthPalette.light, 0.85));
+            gradient.addColorStop(0.4, this.darkenColor(earthPalette.mid, 0.8));
+            gradient.addColorStop(1, this.darkenColor(earthPalette.dark, 0.7));
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Add texture noise to earth
+        const noiseScale = 0.08;
+        for (let i = 0; i < 30; i++) {
+            const t = Math.random();
+            const s = Math.random();
+            const px = v1.x + (v2.x - v1.x) * t;
+            const py = v1.y + (v2.y - v1.y) * t + earthHeight * s;
+
+            const noiseVal = noise.noise2D(px * noiseScale + variant, py * noiseScale);
+            if (noiseVal > 0.3) {
+                const size = 1 + Math.random() * 2;
+                const alpha = 0.1 + Math.random() * 0.15;
+                ctx.fillStyle = noiseVal > 0.5
+                    ? `rgba(255,255,255,${alpha})`
+                    : `rgba(0,0,0,${alpha})`;
+                ctx.beginPath();
+                ctx.arc(px, py, size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // Add horizontal striations for rock texture
+        ctx.strokeStyle = `rgba(0,0,0,0.08)`;
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i < 5; i++) {
+            const y = topY + (earthHeight * (i + 0.5) / 5);
+            const wobble = noise.noise2D(i * 10 + variant, 0) * 3;
+            ctx.beginPath();
+            ctx.moveTo(v1.x + wobble, y + v1.y - topY);
+            ctx.lineTo(v2.x - wobble, y + v2.y - topY);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    },
+
+    /**
+     * Render grass overhang on the edges of the hex
+     * Creates small grass tufts that extend beyond the hex boundary
+     */
+    renderGrassOverhang(ctx, cx, cy, radius, earthHeight, terrain, noise, variant) {
+        const darkGreen = terrain.darkColor || '#3a7830';
+        const lightGreen = terrain.accentColor || '#82c068';
+        const midGreen = terrain.baseColor || '#5a9848';
+
+        // Get hex vertices
+        const vertices = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            vertices.push({
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle)
+            });
+        }
+
+        // Draw grass overhang on bottom edges (0-1, 1-2, 2-3)
+        const bottomEdges = [
+            { v1: vertices[0], v2: vertices[1], facing: 'se' },
+            { v1: vertices[1], v2: vertices[2], facing: 's' },
+            { v1: vertices[2], v2: vertices[3], facing: 'sw' }
+        ];
+
+        for (const edge of bottomEdges) {
+            this.renderEdgeGrass(ctx, edge.v1, edge.v2, edge.facing, darkGreen, midGreen, lightGreen, noise, variant);
+        }
+    },
+
+    /**
+     * Render grass tufts along a hex edge
+     */
+    renderEdgeGrass(ctx, v1, v2, facing, darkColor, midColor, lightColor, noise, variant) {
+        const edgeLength = Math.sqrt((v2.x - v1.x) ** 2 + (v2.y - v1.y) ** 2);
+        const tuftCount = Math.floor(edgeLength / 8);
+        const edgeAngle = Math.atan2(v2.y - v1.y, v2.x - v1.x);
+
+        for (let i = 0; i < tuftCount; i++) {
+            const t = (i + 0.5) / tuftCount;
+            const baseX = v1.x + (v2.x - v1.x) * t;
+            const baseY = v1.y + (v2.y - v1.y) * t;
+
+            // Add randomness to position along edge
+            const offset = (noise.noise2D(i * 5 + variant, variant * 2) - 0.5) * 6;
+            const perpX = Math.cos(edgeAngle + Math.PI / 2) * offset;
+            const perpY = Math.sin(edgeAngle + Math.PI / 2) * offset;
+
+            const tuftX = baseX + perpX;
+            const tuftY = baseY + perpY;
+
+            // Draw grass tuft hanging over the edge
+            const bladeCount = 3 + Math.floor(Math.random() * 3);
+            for (let b = 0; b < bladeCount; b++) {
+                const bladeAngle = edgeAngle + Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+                const bladeLength = 4 + Math.random() * 6;
+                const bend = (Math.random() - 0.5) * 0.5;
+
+                const endX = tuftX + Math.cos(bladeAngle + bend) * bladeLength;
+                const endY = tuftY + Math.sin(bladeAngle + bend) * bladeLength;
+                const ctrlX = tuftX + Math.cos(bladeAngle) * bladeLength * 0.5;
+                const ctrlY = tuftY + Math.sin(bladeAngle) * bladeLength * 0.5 + 2;
+
+                // Gradient from dark base to light tip
+                const gradient = ctx.createLinearGradient(tuftX, tuftY, endX, endY);
+                gradient.addColorStop(0, darkColor);
+                gradient.addColorStop(0.5, midColor);
+                gradient.addColorStop(1, lightColor);
+
+                ctx.beginPath();
+                ctx.moveTo(tuftX, tuftY);
+                ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 0.8 + Math.random() * 0.4;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+    },
+
+    /**
+     * Darken a hex color by a factor
+     */
+    darkenColor(hex, factor) {
+        const rgb = this.hexToRgb(hex);
+        return this.rgbToHex(
+            Math.round(rgb.r * factor),
+            Math.round(rgb.g * factor),
+            Math.round(rgb.b * factor)
+        );
     },
 
     /**

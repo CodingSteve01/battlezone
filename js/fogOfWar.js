@@ -5,7 +5,6 @@ import { state, getHex, getPlayerUnits, isHexVisible, isHexVisibleToPlayer, mark
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 import { hasLineOfSight } from './combat.js';
-import { markMeshDirty } from './rendererWebGL.js';
 
 /**
  * Calculate visible hexes for a single unit
@@ -113,9 +112,6 @@ export function updateVisibility() {
 
     // Update spotted status for current player's units
     updateSpottedStatus();
-    
-    // Mark mesh as dirty for WebGL renderer (fog of war changed)
-    markMeshDirty();
 }
 
 /**

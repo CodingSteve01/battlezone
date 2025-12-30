@@ -3,7 +3,6 @@
 import { CONFIG, TERRAIN, BIOMES } from './config.js';
 import { state, setHex, getHex } from './state.js';
 import { hexDistance, isValidHex, getNeighbors } from './hexMath.js';
-import { markMeshDirty } from './rendererWebGL.js';
 
 /**
  * Resolve the active biome from settings (handles 'random' option)
@@ -78,9 +77,6 @@ export function generateMap() {
 
     // Sync height values with biome-derived terrain
     applyTerrainHeights();
-    
-    // Mark mesh as dirty for WebGL renderer
-    markMeshDirty();
 }
 
 /**

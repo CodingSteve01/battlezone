@@ -47,12 +47,13 @@ const CharacterGenerator = {
             camouflage: 'ghillie'
         },
         commando: {
-            helmet: 'balaclava',
-            armor: 'stealth',
-            weapon: 'knife',
-            bodyBuild: 'athletic',
-            gear: ['garrote', 'throwing_knives'],
-            camouflage: 'black'
+            helmet: 'tactical_nvg',  // Tactical helmet with NVG and balaclava underneath
+            armor: 'heavy',          // Full combat armor like assault
+            weapon: 'rifle',         // Primary weapon
+            bodyBuild: 'heavy',      // Heavy build like assault
+            gear: ['nvg', 'grenades', 'knife'],
+            camouflage: 'flecktarn', // German Flecktarn camo pattern
+            balaclava: true          // Balaclava face covering under helmet
         },
         elitesoldat: {
             helmet: 'tactical',
@@ -93,7 +94,9 @@ const CharacterGenerator = {
         digital: { base: '#5a6a5a', light: '#6a7a6a', dark: '#4a5a4a' },
         ghillie: { base: '#4a5d23', light: '#5c6b34', dark: '#3a4a1d' },
         black: { base: '#2a2a2a', light: '#3a3a3a', dark: '#1a1a1a' },
-        desert: { base: '#c4a878', light: '#d4b888', dark: '#b49868' }
+        desert: { base: '#c4a878', light: '#d4b888', dark: '#b49868' },
+        // German Flecktarn camouflage pattern - 5 colors
+        flecktarn: { base: '#4a5a40', light: '#5a6a4a', dark: '#3a4830', spots: ['#2a3020', '#6a7a50', '#5a5a48', '#8a9a70'] }
     },
 
     generate(classType, pose, playerIndex, width = 130, height = 130, options = {}) {
@@ -1225,6 +1228,13 @@ const CharacterGenerator = {
             case 'tactical':
                 this.drawTacticalHelmet(ctx, centerX, headY, uniform, playerColor, faceWidth, faceHeight);
                 break;
+            case 'tactical_nvg':
+                // For commando: first draw balaclava to cover face
+                if (classConfig.balaclava) {
+                    this.drawBalaclava(ctx, centerX, headY, skinTone, faceWidth, faceHeight);
+                }
+                this.drawTacticalHelmetWithNVG(ctx, centerX, headY, uniform, playerColor, faceWidth, faceHeight);
+                break;
             case 'beret':
                 this.drawBeret(ctx, centerX, headY, playerColor, faceWidth);
                 break;
@@ -1239,8 +1249,11 @@ const CharacterGenerator = {
                 break;
         }
 
-        // Detailed facial features (unless covered by balaclava or ghillie)
-        if (classConfig.helmet !== 'balaclava' && classConfig.helmet !== 'ghillie') {
+        // Detailed facial features (unless covered by balaclava, ghillie, or tactical_nvg with balaclava)
+        const faceIsCovered = classConfig.helmet === 'balaclava' ||
+                             classConfig.helmet === 'ghillie' ||
+                             (classConfig.helmet === 'tactical_nvg' && classConfig.balaclava);
+        if (!faceIsCovered) {
             // Eyebrows with variation
             const browY = headY + 1 - browRidge * 3;
             ctx.strokeStyle = 'rgba(40,30,20,0.6)';
@@ -1572,6 +1585,151 @@ const CharacterGenerator = {
         ctx.moveTo(centerX + helmetWidth - 2, headY + 3);
         ctx.lineTo(centerX + helmetWidth - 4, headY + 8);
         ctx.stroke();
+    },
+
+    /**
+     * Draw tactical helmet with deployed NVG (Night Vision Goggles)
+     * For commando units - more aggressive look with NVG down over eyes
+     */
+    drawTacticalHelmetWithNVG(ctx, centerX, headY, uniform, playerColor, faceWidth = 11, faceHeight = 13) {
+        const helmetWidth = faceWidth + 5;  // Slightly wider for operator look
+        const helmetHeight = faceHeight * 0.85;
+
+        // Helmet shell - darker for tactical look
+        const helmetGradient = ctx.createLinearGradient(
+            centerX - helmetWidth, headY - helmetHeight,
+            centerX + helmetWidth, headY + 5
+        );
+        helmetGradient.addColorStop(0, '#4a4a48');
+        helmetGradient.addColorStop(0.3, '#3a3a38');
+        helmetGradient.addColorStop(0.7, '#2a2a28');
+        helmetGradient.addColorStop(1, '#1a1a18');
+
+        ctx.fillStyle = helmetGradient;
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - 4, helmetWidth, helmetHeight, 0, Math.PI, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(centerX - helmetWidth, headY - 4, helmetWidth * 2, 7);
+
+        // Helmet surface detail - tactical panels
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(centerX - helmetWidth * 0.35, headY - helmetHeight * 0.75);
+        ctx.lineTo(centerX - helmetWidth * 0.45, headY + 1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(centerX + helmetWidth * 0.35, headY - helmetHeight * 0.75);
+        ctx.lineTo(centerX + helmetWidth * 0.45, headY + 1);
+        ctx.stroke();
+
+        // Helmet rim
+        ctx.fillStyle = '#1a1a18';
+        ctx.fillRect(centerX - helmetWidth + 1, headY + 2, helmetWidth * 2 - 2, 3);
+
+        // NVG mount bracket on forehead
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(centerX - 6, headY - helmetHeight + 1, 12, 5);
+        ctx.fillStyle = '#1a1a18';
+        ctx.fillRect(centerX - 5, headY - helmetHeight + 2, 10, 3);
+
+        // NVG housing - deployed down over eyes
+        const nvgY = headY + 2;  // Position over eye area
+
+        // NVG arm/hinge mechanism
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(centerX - 3, headY - helmetHeight + 5, 6, nvgY - (headY - helmetHeight + 5));
+
+        // Main NVG housing body
+        ctx.fillStyle = '#0a0a0a';
+        ctx.beginPath();
+        ctx.roundRect(centerX - 10, nvgY - 3, 20, 10, 2);
+        ctx.fill();
+
+        // NVG objective lenses (dual tubes)
+        // Left tube
+        ctx.fillStyle = '#050505';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 5, nvgY + 2, 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Lens glass effect
+        ctx.fillStyle = '#1a3020';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 5, nvgY + 3, 2.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Lens highlight
+        ctx.fillStyle = '#2a5030';
+        ctx.beginPath();
+        ctx.ellipse(centerX - 5.5, nvgY + 2, 1, 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Right tube
+        ctx.fillStyle = '#050505';
+        ctx.beginPath();
+        ctx.ellipse(centerX + 5, nvgY + 2, 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Lens glass effect
+        ctx.fillStyle = '#1a3020';
+        ctx.beginPath();
+        ctx.ellipse(centerX + 5, nvgY + 3, 2.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Lens highlight
+        ctx.fillStyle = '#2a5030';
+        ctx.beginPath();
+        ctx.ellipse(centerX + 4.5, nvgY + 2, 1, 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // NVG bridge between tubes
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(centerX - 2, nvgY - 1, 4, 6);
+
+        // Battery pack on side
+        ctx.fillStyle = '#1a1a18';
+        ctx.fillRect(centerX + helmetWidth - 5, headY - 4, 6, 10);
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(centerX + helmetWidth - 4, headY - 3, 4, 8);
+
+        // Side rails (for accessories)
+        ctx.fillStyle = '#2a2a28';
+        ctx.fillRect(centerX - helmetWidth + 1, headY - 5, 3, 8);
+        ctx.fillRect(centerX + helmetWidth - 4, headY - 5, 3, 8);
+
+        // Ear protection bump
+        ctx.fillStyle = '#2a2a28';
+        ctx.beginPath();
+        ctx.ellipse(centerX - helmetWidth + 3, headY + 4, 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(centerX + helmetWidth - 3, headY + 4, 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Team color marker (small IR patch)
+        ctx.fillStyle = playerColor.primary;
+        ctx.fillRect(centerX - helmetWidth + 2, headY - helmetHeight + 5, 3, 4);
+        ctx.fillStyle = playerColor.highlight;
+        ctx.fillRect(centerX - helmetWidth + 2, headY - helmetHeight + 5, 1, 4);
+
+        // Counter-weight pouch on back of helmet
+        ctx.fillStyle = '#1a1a18';
+        ctx.beginPath();
+        ctx.ellipse(centerX, headY - helmetHeight + 3, 6, 4, 0, Math.PI, Math.PI * 2);
+        ctx.fill();
+
+        // Chin strap with quick-release buckle
+        ctx.strokeStyle = '#1a1a1a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX - helmetWidth + 3, headY + 4);
+        ctx.quadraticCurveTo(centerX - helmetWidth + 5, headY + 12, centerX - 4, headY + 14);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(centerX + helmetWidth - 3, headY + 4);
+        ctx.quadraticCurveTo(centerX + helmetWidth - 5, headY + 12, centerX + 4, headY + 14);
+        ctx.stroke();
+
+        // Buckle
+        ctx.fillStyle = '#2a2a28';
+        ctx.fillRect(centerX - 3, headY + 13, 6, 3);
     },
 
     drawBeret(ctx, centerX, headY, playerColor, faceWidth = 11) {
