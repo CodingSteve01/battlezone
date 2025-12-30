@@ -176,14 +176,16 @@ async function generateTerrain() {
     // For flat-top hex: width = 2*r, height = sqrt(3)*r
     // So height/width = sqrt(3)/2 ≈ 0.866
     const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
+    const earthLayerHeight = Math.round(settings.terrainSize * 0.18);  // ~18% of tile width for earth layer
     const total = types.length * settings.variants;
     let count = 0;
 
-    updateStatus('Generating terrain textures...');
+    updateStatus('Generating isometric terrain textures with earth layers...');
 
     for (const type of types) {
         for (let v = 0; v < settings.variants; v++) {
-            const canvas = TerrainGenerator.generate(type, v, settings.terrainSize, hexHeight);
+            // Use generateIsometric for 2.5D tiles with earth layer and grass overhang
+            const canvas = TerrainGenerator.generateIsometric(type, v, settings.terrainSize, hexHeight, earthLayerHeight);
             const label = `${type}_v${v}`;
 
             addPreviewItem(preview, canvas, label);
@@ -388,11 +390,13 @@ async function createSpriteSheets() {
 
     updateStatus('Creating sprite sheets...');
 
-    // Terrain sprite sheet (NO cropping - tiles must fill entire hex)
+    // Terrain sprite sheet (isometric tiles with earth layer)
     if (generatedAssets.terrain.length > 0) {
         const settings = getSettings();
         const hexHeight = Math.round(settings.terrainSize * Math.sqrt(3) / 2);
-        const sheet = createSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, hexHeight, false);
+        const earthLayerHeight = Math.round(settings.terrainSize * 0.18);
+        const totalHeight = hexHeight + earthLayerHeight;
+        const sheet = createTerrainSpriteSheet(generatedAssets.terrain, settings.variants, settings.terrainSize, totalHeight, hexHeight, earthLayerHeight);
         addSheetPreview(preview, sheet.canvas, 'terrain-hexes.png', sheet.json);
     }
 
@@ -466,6 +470,72 @@ function createSpriteSheet(assets, columns, spriteWidth, spriteHeight, enableCro
     const json = {
         version: '1.0',
         dimensions: { width: sheetWidth, height: sheetHeight },
+        sprites
+    };
+
+    return { canvas, json };
+}
+
+/**
+ * Create sprite sheet for isometric terrain tiles with earth layers
+ * Includes anchor points for proper positioning (anchor at hex surface center-bottom)
+ */
+function createTerrainSpriteSheet(assets, columns, spriteWidth, totalHeight, hexHeight, earthLayerHeight) {
+    const rows = Math.ceil(assets.length / columns);
+    const sheetWidth = columns * spriteWidth;
+    const sheetHeight = rows * totalHeight;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sheetWidth;
+    canvas.height = sheetHeight;
+    const ctx = canvas.getContext('2d');
+
+    const sprites = [];
+
+    assets.forEach((asset, i) => {
+        const col = i % columns;
+        const row = Math.floor(i / columns);
+        const x = col * spriteWidth;
+        const y = row * totalHeight;
+
+        ctx.drawImage(asset.canvas, x, y);
+
+        sprites.push({
+            id: asset.label,
+            bounds: { x, y, width: spriteWidth, height: totalHeight },
+            // Content bounds describe where the hex surface is (excluding earth layer overhang)
+            contentBounds: {
+                x: 0,
+                y: 0,
+                width: spriteWidth,
+                height: hexHeight  // Just the hex surface
+            },
+            // Anchor at center-bottom of hex surface (above earth layer)
+            // This is where the tile "sits" on the ground plane
+            anchor: {
+                x: 0.5,
+                y: hexHeight / totalHeight  // Normalized position at bottom of hex surface
+            },
+            earthLayerHeight: earthLayerHeight,
+            metadata: {
+                type: asset.type,
+                subtype: asset.subtype,
+                detailType: asset.detailType,
+                variant: asset.variant
+            }
+        });
+    });
+
+    const json = {
+        version: '2.0',
+        dimensions: { width: sheetWidth, height: sheetHeight },
+        tileInfo: {
+            spriteWidth,
+            totalHeight,
+            hexHeight,
+            earthLayerHeight
+        },
+        features: ['isometric', 'earthLayer', 'anchored'],
         sprites
     };
 

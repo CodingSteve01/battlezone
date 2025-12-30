@@ -87,12 +87,15 @@ export const CONFIG = {
     }
 };
 
-// Ultra-realistic color palette - warm, natural earth tones inspired by high-quality strategy games
+// Natural color palette - inspired by high-quality isometric terrain tiles
+// Colors matched to reference image with lush greens, warm earth tones
 export const TERRAIN = {
     grass: {
-        color: '#6a9a58',      // Warm meadow green with yellow undertones
-        colorLight: '#7db068', // Sun-drenched grass
-        colorDark: '#4a7a40',  // Shadowed meadow
+        color: '#5a9848',      // Lush vibrant grass green
+        colorLight: '#72b058', // Sun-lit grass
+        colorDark: '#3a7830',  // Shaded grass
+        earthColor: '#8a6840', // Brown earth visible on cliff edges
+        earthDark: '#5a4830',  // Darker earth shadow
         walkable: true,
         cover: false,
         canHide: false,
@@ -100,9 +103,11 @@ export const TERRAIN = {
         name: 'Gras'
     },
     forest: {
-        color: '#3d6a4a',      // Rich forest green
-        colorLight: '#4d7a58', // Canopy with light filtering
-        colorDark: '#2a5038',  // Deep forest shade
+        color: '#3a5a3a',      // Rich dark forest green
+        colorLight: '#4a6a48', // Dappled light
+        colorDark: '#2a4028',  // Deep forest shadow
+        earthColor: '#604830', // Forest floor earth
+        earthDark: '#402820',  // Dark humus
         walkable: true,
         cover: true,
         canHide: true,
@@ -110,9 +115,11 @@ export const TERRAIN = {
         name: 'Wald'
     },
     hills: {
-        color: '#7a8c5a',      // Warm grassy hill
-        colorLight: '#8a9c68', // Sunlit slope with golden highlights
-        colorDark: '#5a7040',  // Hill in shadow
+        color: '#6a8a50',      // Grassy hill with rocky patches
+        colorLight: '#7a9a60', // Sunlit hillside
+        colorDark: '#4a6a38',  // Hill shadow
+        earthColor: '#7a6a50', // Rocky earth
+        earthDark: '#5a4a38',  // Stone shadow
         walkable: true,
         cover: false,
         moveCost: 1,
@@ -121,36 +128,45 @@ export const TERRAIN = {
         defenseBonus: 10
     },
     rock: {
-        color: '#7a7878',      // Natural weathered stone
-        colorLight: '#908a88', // Sun-bleached rock
-        colorDark: '#5a5858',  // Rock shadow
+        color: '#6a6a68',      // Natural gray stone
+        colorLight: '#8a8a85', // Sunlit rock
+        colorDark: '#4a4a48',  // Rock shadow
+        earthColor: '#5a5550', // Stone base
+        earthDark: '#3a3530',  // Dark crevice
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Felsen'
     },
     water: {
-        color: '#4a7a95',      // Natural lake blue-green
-        colorLight: '#5a8aa8', // Sunlit ripples
-        colorDark: '#3a6a80',  // Deeper water
+        color: '#3a8ab0',      // Clear blue water
+        colorLight: '#5aaad0', // Sunlit surface
+        colorDark: '#2a6a90',  // Deep water
+        bottomColor: '#c0a878', // Sandy/rocky bottom visible
+        earthColor: '#8a7a60', // Bank earth
+        earthDark: '#5a4a40',  // Wet earth
         walkable: false,
         cover: false,
         moveCost: Infinity,
         name: 'Wasser'
     },
     sand: {
-        color: '#d4b888',      // Warm golden sand
-        colorLight: '#e4c898', // Sun-baked sand
-        colorDark: '#c4a878',  // Shadowed sand
+        color: '#c4a870',      // Warm golden sand
+        colorLight: '#d8bc88', // Bright sand
+        colorDark: '#a89058',  // Shadowed sand
+        earthColor: '#9a8060', // Sandy earth
+        earthDark: '#7a6040',  // Darker sand
         walkable: true,
         cover: false,
         moveCost: 1,
         name: 'Sand'
     },
     swamp: {
-        color: '#5a6a45',      // Murky swamp with warm undertones
-        colorLight: '#6a7a55', // Algae-covered surface
-        colorDark: '#3a4a30',  // Deep swamp shadow
+        color: '#4a5a38',      // Murky swamp green
+        colorLight: '#5a6a48', // Surface algae
+        colorDark: '#3a4a28',  // Deep murk
+        earthColor: '#504838', // Muddy earth
+        earthDark: '#383028',  // Dark mud
         walkable: true,
         cover: false,
         moveCost: 1,

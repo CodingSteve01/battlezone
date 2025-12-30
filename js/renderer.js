@@ -15,7 +15,9 @@ import {
     getShorelineSprite,
     getShorelineVariantCount,
     hasAnimatedTexture,
-    getAnimatedTexture
+    getAnimatedTexture,
+    getTerrainTileInfo,
+    hasIsometricTiles
 } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -1593,16 +1595,38 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        // Draw sprite texture - scale to fit hex with generous overlap to eliminate seams
-        context.save();
-        context.clip();
-        // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Increased buffer to completely eliminate anti-aliasing seams between tiles
-        const buffer = Math.max(12, size * 0.12);
-        const spriteWidth = size * 2 + buffer;
-        const spriteHeight = size * Math.sqrt(3) + buffer;
-        context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-        context.restore();
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // Isometric tiles: draw full tile without clipping
+            // Position so hex surface center aligns with (cx, cy)
+            const buffer = Math.max(6, size * 0.06);
+            const spriteWidth = size * 2 + buffer;
+            // Scale the total height proportionally
+            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
+            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
+            const earthLayerScaled = tileInfo.earthLayerHeight * scaleRatio;
+
+            // Don't clip - draw full isometric tile
+            // Position: center hex surface at (cx, cy), earth layer extends below
+            const drawX = cx - spriteWidth / 2;
+            const drawY = cy - hexSurfaceHeight / 2;  // Hex surface starts here
+
+            context.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
+        } else {
+            // Non-isometric tiles: clip to hex shape as before
+            context.save();
+            context.clip();
+            // Hex dimensions: width = 2*size, height = sqrt(3)*size
+            // Increased buffer to completely eliminate anti-aliasing seams between tiles
+            const buffer = Math.max(12, size * 0.12);
+            const spriteWidth = size * 2 + buffer;
+            const spriteHeight = size * Math.sqrt(3) + buffer;
+            context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
+            context.restore();
+        }
 
         // Restore hex path for border drawing
         context.beginPath();
@@ -2023,15 +2047,32 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
 
     // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
     if (texture) {
-        ctx.save();
-        ctx.clip();
-        // Hex dimensions: width = 2*size, height = sqrt(3)*size
-        // Increased buffer to completely eliminate anti-aliasing seams between tiles
-        const buffer = Math.max(12, size * 0.12);
-        const spriteWidth = size * 2 + buffer;
-        const spriteHeight = size * Math.sqrt(3) + buffer;
-        ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-        ctx.restore();
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // Isometric tiles: draw full tile without clipping
+            const buffer = Math.max(6, size * 0.06);
+            const spriteWidth = size * 2 + buffer;
+            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
+            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
+
+            // Position: center hex surface at (cx, cy), earth layer extends below
+            const drawX = cx - spriteWidth / 2;
+            const drawY = cy - hexSurfaceHeight / 2;
+
+            ctx.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
+        } else {
+            // Non-isometric tiles: clip to hex shape
+            ctx.save();
+            ctx.clip();
+            const buffer = Math.max(12, size * 0.12);
+            const spriteWidth = size * 2 + buffer;
+            const spriteHeight = size * Math.sqrt(3) + buffer;
+            ctx.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
+            ctx.restore();
+        }
 
         // Draw hex shape again for stroke
         ctx.beginPath();

@@ -100,6 +100,21 @@ export function isUsingSpriteSheets() {
 }
 
 /**
+ * Get isometric terrain tile info (dimensions, earth layer height)
+ * Returns null if using non-isometric (flat) tiles
+ */
+export function getTerrainTileInfo() {
+    return SpriteSheet.getTerrainTileInfo();
+}
+
+/**
+ * Check if terrain tiles are isometric (have earth layer)
+ */
+export function hasIsometricTiles() {
+    return SpriteSheet.hasIsometricTiles();
+}
+
+/**
  * Get a unit sprite image
  * Returns sprite or null (renderer will use placeholder)
  * For players 4-7, automatically colorizes base sprites (0-3) with player colors
