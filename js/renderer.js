@@ -3884,7 +3884,8 @@ export function render() {
     // Helper function to check if a foreground element might obscure a unit
     // Returns true if the element is on or near tiles that could obscure the unit
     const shouldBeTransparent = (element, unitTiles) => {
-        if (!element.hexQ || element.hexQ === undefined) return false;
+        // Handle case where hexQ is 0 (valid coordinate)
+        if (element.hexQ === undefined || element.hexQ === null) return false;
         
         // Check if this element's hex is in the obscuring tiles set
         const elementKey = `${element.hexQ},${element.hexR}`;

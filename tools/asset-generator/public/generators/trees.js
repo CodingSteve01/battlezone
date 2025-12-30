@@ -86,8 +86,7 @@ const TreeGenerator = {
             shape: 'palm',
             foliageDensity: 0.85,
             trunkTaper: 0.95,
-            branchiness: 0.1,
-            segmented: true  // Palm trunks have horizontal segments
+            branchiness: 0.1
         },
         datepalm: {
             trunkColor: '#9a7a58',
@@ -100,7 +99,6 @@ const TreeGenerator = {
             foliageDensity: 0.9,
             trunkTaper: 0.92,
             branchiness: 0.05,
-            segmented: true,
             dates: true  // Date palms have date clusters
         },
         fanpalm: {
@@ -113,8 +111,7 @@ const TreeGenerator = {
             shape: 'fanpalm',
             foliageDensity: 0.8,
             trunkTaper: 0.88,
-            branchiness: 0.0,
-            segmented: true
+            branchiness: 0.0
         }
     },
 
