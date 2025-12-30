@@ -208,13 +208,14 @@ export async function createWebGLTexture(gl) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     
     // Upload atlas to GPU
+    // texImage2D parameters: target, level, internalFormat, format, type, source
     gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        atlasCanvas
+        gl.TEXTURE_2D,      // target
+        0,                  // mipmap level
+        gl.RGBA,            // internalFormat - how WebGL stores the texture
+        gl.RGBA,            // format - format of the data being uploaded
+        gl.UNSIGNED_BYTE,   // type - data type
+        atlasCanvas         // source data
     );
     
     // Set texture parameters

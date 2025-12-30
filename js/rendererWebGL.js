@@ -323,8 +323,8 @@ function createViewMatrix() {
     const offsetY = state.offsetY || 0;
     const zoom = state.zoomLevel || 1;
     
-    // Simple 2D orthographic view matrix
-    // In WebGL, we use a 4x4 matrix even for 2D
+    // Simple 2D orthographic view matrix (column-major order)
+    // Translation is in the rightmost column (indices 12, 13, 14)
     return new Float32Array([
         zoom, 0, 0, 0,
         0, zoom, 0, 0,
@@ -390,7 +390,7 @@ export function renderWebGL() {
     // Set lighting uniforms
     const lightDir = CONFIG.LIGHTING?.DIRECTION || { x: -0.6, y: -1.0 };
     gl.uniform3f(locations.uniforms.lightDirection, lightDir.x, lightDir.y, -1.0);
-    gl.uniform1f(locations.uniforms.lightHeight, CONFIG.LIGHTING?.HEIGHT || 1.2);
+    gl.uniform1f(locations.uniforms.lightHeight, CONFIG.LIGHTING?.HEIGHT ?? 1.2);
     
     // Bind buffers and set up attributes
     // Position

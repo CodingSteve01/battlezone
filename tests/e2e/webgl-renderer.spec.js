@@ -79,12 +79,13 @@ test.describe('WebGL Renderer', () => {
     test('should fallback to Canvas 2D if WebGL fails', async ({ page }) => {
         // Override WebGL to simulate failure
         await page.addInitScript(() => {
+            const originalGetContext = HTMLCanvasElement.prototype.getContext;
             HTMLCanvasElement.prototype.getContext = function(contextType, ...args) {
                 if (contextType === 'webgl' || contextType === 'experimental-webgl') {
                     return null; // Simulate WebGL not available
                 }
-                // Fall through to original implementation for 2d context
-                return CanvasRenderingContext2D.prototype.constructor.call(this, contextType, ...args);
+                // Call original implementation for other context types (like '2d')
+                return originalGetContext.call(this, contextType, ...args);
             };
         });
         
