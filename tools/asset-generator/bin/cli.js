@@ -89,7 +89,7 @@ program
             const url = `http://localhost:${port}`;
             console.log(chalk.green(`✅ Server running at ${chalk.bold(url)}`));
             console.log(chalk.gray('\nFeatures:'));
-            console.log(chalk.gray('  • L-System procedural trees (oak, pine, birch, willow, maple, dead)'));
+            console.log(chalk.gray('  • L-System procedural trees (oak, pine, birch, willow, maple, dead, palm, datepalm, fanpalm)'));
             console.log(chalk.gray('  • Seamless hex terrain textures with Simplex noise'));
             console.log(chalk.gray('  • Character sprites with classes, poses, and player colors'));
             console.log(chalk.gray('  • Vegetation sprites (bushes, grass, ferns)'));

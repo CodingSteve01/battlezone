@@ -479,6 +479,90 @@ function getTreeDetailType(treeType) {
     return `tree_${typeName}`;
 }
 
+function getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint) {
+    const drawX = x - spriteWidth * anchorPoint.x;
+    const drawY = y - spriteHeight * anchorPoint.y;
+    return {
+        minX: drawX,
+        maxX: drawX + spriteWidth,
+        minY: drawY,
+        maxY: drawY + spriteHeight
+    };
+}
+
+function getTreeSpriteBounds(x, y, size, treeType, seed) {
+    const detailType = getTreeDetailType(treeType);
+    const result = getRandomDetailSpriteWithAnchor(detailType, seed * 0.001)
+        || getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
+    if (!result) return null;
+
+    const { sprite, contentScale, anchor } = result;
+    const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
+    const baseHeight = size * 2.8 * sizeVariation;
+    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
+    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
+}
+
+function getBushSpriteBounds(x, y, size, seed) {
+    const result = getRandomDetailSpriteWithAnchor('bush', seed * 0.001);
+    if (!result) return null;
+
+    const { sprite, contentScale, anchor } = result;
+    const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
+    const baseSize = size * 1.6 * sizeVariation;
+    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
+    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
+}
+
+function getShrubSpriteBounds(x, y, size, seed) {
+    const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
+    if (!result) return null;
+
+    const { sprite, contentScale, anchor } = result;
+    const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
+    const baseSize = size * 1.3 * sizeVariation;
+    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
+    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
+    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
+}
+
+function getRockBounds(x, y, size, seed) {
+    const sizeVariation = 0.5 + seededRandom(seed) * 0.8;
+    const rockSize = size * 0.6 * sizeVariation;
+    return {
+        minX: x - rockSize,
+        maxX: x + rockSize,
+        minY: y - rockSize * 0.9,
+        maxY: y + rockSize * 0.6
+    };
+}
+
+function getElementBounds(type, x, y, size, params) {
+    switch (type) {
+        case 'tree':
+        case 'tree-edge':
+        case 'tree-solitary':
+        case 'dead-tree':
+            return getTreeSpriteBounds(x, y, size, params.treeType ?? 0, params.seed ?? 0);
+        case 'bush':
+            return getBushSpriteBounds(x, y, size, params.seed ?? 0);
+        case 'shrub':
+        case 'shrub-hills':
+        case 'shrub-ruins':
+        case 'reeds':
+            return getShrubSpriteBounds(x, y, size, params.seed ?? 0);
+        case 'rock':
+        case 'rock-small':
+        case 'rock-hills':
+        case 'rock-sand':
+            return getRockBounds(x, y, size, params.seed ?? 0);
+        default:
+            return null;
+    }
+}
+
 function drawTree2D5(x, y, size, treeType, seed) {
     const detailType = getTreeDetailType(treeType);
     const result = getRandomDetailSpriteWithAnchor(detailType, seed * 0.001)
@@ -812,13 +896,18 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
         const actualY = cy + def.offsetY * size;
         const actualSortY = cy + def.sortOffsetY * size;
         const actualSize = def.sizeMultiplier * size;
+        const extraParams = def.extraParams || {};
+        const bounds = getElementBounds(def.type, actualX, actualY, actualSize, extraParams);
 
         return {
             type: def.type,
             x: actualX,
             y: actualY,
             sortY: actualSortY,
-            draw: () => def.drawFn(actualX, actualY, actualSize, def.extraParams)
+            hexQ: q,
+            hexR: r,
+            bounds,
+            draw: () => def.drawFn(actualX, actualY, actualSize, extraParams)
         };
     });
 }
@@ -3872,43 +3961,68 @@ export function render() {
     });
 
     // === DETECT ASSETS THAT OBSCURE IMPORTANT UNITS ===
-    // Find units that need clear visibility (selected unit, targeted unit)
-    const importantUnits = [];
+    // Find units that need clear visibility (selected, targeted, or owned)
+    const importantUnitIds = new Set();
+    visibleUnits.forEach(unit => {
+        if (unit.player === state.viewingPlayer) {
+            importantUnitIds.add(unit.id);
+        }
+    });
     if (currentUnit) {
-        importantUnits.push(currentUnit);
+        importantUnitIds.add(currentUnit.id);
     }
     if (state.targetedUnit) {
-        importantUnits.push(state.targetedUnit);
+        importantUnitIds.add(state.targetedUnit.id);
     }
 
+    const importantUnitDrawables = unitDrawables.filter(drawable => importantUnitIds.has(drawable.unit.id));
+
+    const unitFocusPoints = importantUnitDrawables.flatMap(drawable => ([
+        { x: drawable.x, y: drawable.y - assetSize * 0.15, sortY: drawable.sortY },
+        { x: drawable.x, y: drawable.y - assetSize * 0.5, sortY: drawable.sortY }
+    ]));
+
+    const isPointInBounds = (bounds, x, y) => {
+        if (!bounds) return false;
+        return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+    };
+
     // Helper function to check if a foreground element might obscure a unit
-    // Returns true if the element is on or near tiles that could obscure the unit
     const shouldBeTransparent = (element, unitTiles) => {
         // Handle case where hexQ is 0 (valid coordinate)
         if (element.hexQ === undefined || element.hexQ === null) return false;
-        
-        // Check if this element's hex is in the obscuring tiles set
+
+        // Check screen-space overlap first for precise detection
+        if (element.bounds && unitFocusPoints.length > 0) {
+            const overlaps = unitFocusPoints.some(point =>
+                element.sortY >= point.sortY - assetSize * 0.2 && isPointInBounds(element.bounds, point.x, point.y)
+            );
+            if (overlaps) {
+                return true;
+            }
+        }
+
+        // Fall back to tile-based obscuring tiles
         const elementKey = `${element.hexQ},${element.hexR}`;
         return unitTiles.has(elementKey);
     };
 
     // Collect all tiles that might have obscuring assets for important units
     const obscuringTiles = new Set();
-    importantUnits.forEach(unit => {
+    importantUnitDrawables.forEach(drawable => {
+        const unit = drawable.unit;
         if (!unit || !unit.alive) return;
-        
+
         // Add the unit's own tile
         obscuringTiles.add(`${unit.q},${unit.r}`);
-        
-        // Add tiles "below" the unit (in screen space, these are tiles with higher Y screen position)
-        // In hex coordinates, this means tiles to the south and southeast
+
+        // Add tiles "below" the unit (screen space: tiles with higher Y)
         const tilesBelow = [
             { q: unit.q, r: unit.r + 1 },     // Directly below
             { q: unit.q + 1, r: unit.r },     // Southeast
-            { q: unit.q + 1, r: unit.r + 1 }, // South-southeast
-            { q: unit.q - 1, r: unit.r + 1 }, // Southwest
+            { q: unit.q - 1, r: unit.r + 1 }  // Southwest
         ];
-        
+
         tilesBelow.forEach(tile => {
             obscuringTiles.add(`${tile.q},${tile.r}`);
         });
@@ -4385,7 +4499,10 @@ function drawMinimap(w, h) {
     let size, x, y;
     if (isExpanded) {
         // Expanded mode: centered on screen, nearly full screen
-        size = Math.min(config.EXPANDED_SIZE, Math.min(w, h) - 40);
+        const availableWidth = Math.max(0, w - config.PADDING * 2);
+        const availableHeight = Math.max(0, h - config.PADDING * 2 - 40);
+        size = Math.min(config.EXPANDED_SIZE, availableWidth, availableHeight);
+        if (size <= 0) return;
         x = (w - size) / 2;
         y = (h - size) / 2;
     } else {
