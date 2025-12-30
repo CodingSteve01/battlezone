@@ -7,6 +7,13 @@ export const CONFIG = {
     UNIT_SCALE: 0.6,              // Unit size relative to tile size for better proportions
     PLAYER_COLORS: ['#22c55e', '#ef4444', '#3b82f6', '#eab308', '#a855f7', '#f97316', '#06b6d4', '#ec4899'],
     PLAYER_NAMES: ['Grün', 'Rot', 'Blau', 'Gelb', 'Violett', 'Orange', 'Cyan', 'Pink'],
+    
+    // Renderer configuration
+    RENDERER: {
+        TYPE: 'canvas2d',           // 'canvas2d' or 'webgl'
+        PREFER_WEBGL: false,        // Auto-switch to WebGL if available
+        ALLOW_FALLBACK: true        // Fallback to Canvas 2D if WebGL fails
+    },
 
     // Team Budget System - players spend points to build their team
     TEAM_BUDGET: 350,         // Total points available for team composition

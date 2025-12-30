@@ -23,6 +23,7 @@ import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { isAIPlayer } from './ai.js';
 import { logRender, logError } from './errorLog.js';
+import { initWebGLRenderer, renderWebGL, isWebGLAvailable, markMeshDirty } from './rendererWebGL.js';
 
 // ===== SAFE GRADIENT HELPERS =====
 // Prevents "non-finite value" errors when coordinates are NaN/Infinity
@@ -893,6 +894,7 @@ export function getPresetList() { return ['default']; }
 
 let canvas, ctx;
 let texturesInitialized = false;
+let webglActive = false; // Track which renderer is currently active
 
 // ===== HEX TILE CACHING SYSTEM =====
 // Pre-renders hex tiles with terrain details for improved performance
@@ -1779,8 +1781,42 @@ function detectMobileDevice() {
     };
 }
 
-export function initRenderer() {
+export async function initRenderer() {
     canvas = document.getElementById('game-canvas');
+    
+    // Check if WebGL should be used
+    const useWebGL = CONFIG.RENDERER.PREFER_WEBGL || CONFIG.RENDERER.TYPE === 'webgl';
+    
+    if (useWebGL && isWebGLAvailable()) {
+        console.log('[Renderer] Attempting to initialize WebGL renderer...');
+        try {
+            const success = await initWebGLRenderer(canvas);
+            if (success) {
+                webglActive = true;
+                console.log('[Renderer] Using WebGL renderer');
+                
+                // Still need 2D context for UI elements
+                ctx = canvas.getContext('2d');
+                
+                // Skip rest of Canvas 2D initialization
+                resizeCanvas();
+                return;
+            } else if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
+                throw new Error('WebGL initialization failed and fallback disabled');
+            }
+            console.warn('[Renderer] WebGL initialization failed, falling back to Canvas 2D');
+        } catch (err) {
+            console.error('[Renderer] WebGL error:', err);
+            if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
+                throw err;
+            }
+            console.warn('[Renderer] Falling back to Canvas 2D');
+        }
+    }
+    
+    // Canvas 2D fallback or default
+    webglActive = false;
+    console.log('[Renderer] Using Canvas 2D renderer');
     ctx = canvas.getContext('2d');
 
     // Detect mobile/tablet and set initial quality
@@ -3657,6 +3693,12 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
 export function render() {
     if (!canvas || !ctx) {
         logRender('Canvas oder Context nicht verfügbar', `canvas: ${!!canvas}, ctx: ${!!ctx}`);
+        return;
+    }
+    
+    // If WebGL renderer is active, use it instead of Canvas 2D
+    if (webglActive) {
+        renderWebGL();
         return;
     }
 
