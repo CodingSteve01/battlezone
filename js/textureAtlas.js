@@ -6,6 +6,7 @@
  */
 
 import { TERRAIN } from './config.js';
+import { logEntry, logError } from './errorLog.js';
 
 // Atlas configuration
 const ATLAS_SIZE = 2048; // 2048x2048 texture atlas
@@ -24,46 +25,64 @@ let atlasReady = false;
  */
 export async function generateTextureAtlas() {
     if (atlasCanvas) {
+        logEntry('debug', '[TextureAtlas] Using cached atlas', `Size: ${atlasCanvas.width}x${atlasCanvas.height}`);
         return atlasCanvas;
     }
     
-    console.log('[TextureAtlas] Generating texture atlas...');
-    
-    // Create canvas for atlas
-    atlasCanvas = document.createElement('canvas');
-    atlasCanvas.width = ATLAS_SIZE;
-    atlasCanvas.height = ATLAS_SIZE;
-    const ctx = atlasCanvas.getContext('2d');
-    
-    // Fill with placeholder background
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
-    
-    // Generate each terrain type
-    const terrainTypes = Object.keys(TERRAIN);
-    let index = 0;
-    
-    for (const terrainType of terrainTypes) {
-        if (index >= TILES_PER_ROW * TILES_PER_ROW) {
-            console.warn('[TextureAtlas] Atlas full, skipping remaining terrain types');
-            break;
+    try {
+        logEntry('info', '[TextureAtlas] Generating texture atlas...', `Target size: ${ATLAS_SIZE}x${ATLAS_SIZE}, Tile size: ${TILE_SIZE}px`);
+        
+        // Create canvas for atlas
+        atlasCanvas = document.createElement('canvas');
+        atlasCanvas.width = ATLAS_SIZE;
+        atlasCanvas.height = ATLAS_SIZE;
+        const ctx = atlasCanvas.getContext('2d');
+        
+        if (!ctx) {
+            throw new Error('Failed to get 2D context from atlas canvas');
         }
         
-        const row = Math.floor(index / TILES_PER_ROW);
-        const col = index % TILES_PER_ROW;
-        const x = col * TILE_SIZE;
-        const y = row * TILE_SIZE;
+        // Fill with placeholder background
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
         
-        // Generate terrain tile
-        await generateTerrainTile(ctx, x, y, TILE_SIZE, terrainType);
+        // Generate each terrain type
+        const terrainTypes = Object.keys(TERRAIN);
+        let index = 0;
+        let generatedCount = 0;
         
-        index++;
+        for (const terrainType of terrainTypes) {
+            if (index >= TILES_PER_ROW * TILES_PER_ROW) {
+                logEntry('warn', '[TextureAtlas] Atlas full, skipping remaining terrain types', 
+                    `Generated: ${generatedCount}/${terrainTypes.length}`);
+                break;
+            }
+            
+            try {
+                const row = Math.floor(index / TILES_PER_ROW);
+                const col = index % TILES_PER_ROW;
+                const x = col * TILE_SIZE;
+                const y = row * TILE_SIZE;
+                
+                // Generate terrain tile
+                await generateTerrainTile(ctx, x, y, TILE_SIZE, terrainType);
+                generatedCount++;
+            } catch (err) {
+                logError(`[TextureAtlas] Failed to generate terrain tile: ${terrainType}`, err);
+            }
+            
+            index++;
+        }
+        
+        atlasReady = true;
+        logEntry('info', '[TextureAtlas] Atlas generated successfully', 
+            `Terrain types: ${generatedCount}/${terrainTypes.length}, Size: ${ATLAS_SIZE}x${ATLAS_SIZE}`);
+        
+        return atlasCanvas;
+    } catch (err) {
+        logError('[TextureAtlas] Failed to generate texture atlas', err);
+        throw err;
     }
-    
-    atlasReady = true;
-    console.log('[TextureAtlas] Atlas generated:', terrainTypes.length, 'terrain types');
-    
-    return atlasCanvas;
 }
 
 /**
@@ -200,34 +219,48 @@ export function getTerrainUVCoords(terrainType) {
  * @returns {WebGLTexture} Created texture
  */
 export async function createWebGLTexture(gl) {
-    if (!atlasCanvas && !atlasReady) {
-        await generateTextureAtlas();
+    try {
+        if (!atlasCanvas && !atlasReady) {
+            await generateTextureAtlas();
+        }
+        
+        if (!atlasCanvas) {
+            throw new Error('Atlas canvas not available after generation');
+        }
+        
+        const texture = gl.createTexture();
+        if (!texture) {
+            throw new Error('gl.createTexture() returned null');
+        }
+        
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        
+        // Upload atlas to GPU
+        // texImage2D parameters: target, level, internalFormat, format, type, source
+        gl.texImage2D(
+            gl.TEXTURE_2D,      // target
+            0,                  // mipmap level
+            gl.RGBA,            // internalFormat - how WebGL stores the texture
+            gl.RGBA,            // format - format of the data being uploaded
+            gl.UNSIGNED_BYTE,   // type - data type
+            atlasCanvas         // source data
+        );
+        
+        // Set texture parameters
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        
+        atlasTexture = texture;
+        logEntry('info', '[TextureAtlas] WebGL texture created', 
+            `Size: ${atlasCanvas.width}x${atlasCanvas.height}, ID: ${texture}`);
+        
+        return texture;
+    } catch (err) {
+        logError('[TextureAtlas] Failed to create WebGL texture', err);
+        throw err;
     }
-    
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    
-    // Upload atlas to GPU
-    // texImage2D parameters: target, level, internalFormat, format, type, source
-    gl.texImage2D(
-        gl.TEXTURE_2D,      // target
-        0,                  // mipmap level
-        gl.RGBA,            // internalFormat - how WebGL stores the texture
-        gl.RGBA,            // format - format of the data being uploaded
-        gl.UNSIGNED_BYTE,   // type - data type
-        atlasCanvas         // source data
-    );
-    
-    // Set texture parameters
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    
-    atlasTexture = texture;
-    console.log('[TextureAtlas] WebGL texture created');
-    
-    return texture;
 }
 
 /**

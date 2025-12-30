@@ -15,6 +15,7 @@ import { state, getHex } from './state.js';
 import { hexToPixel } from './hexMath.js';
 import { getFogLevel } from './fogOfWar.js';
 import { createWebGLTexture, getTerrainUVCoords } from './textureAtlas.js';
+import { logEntry, logError } from './errorLog.js';
 
 // WebGL context and resources
 let gl = null;
@@ -93,87 +94,156 @@ const FRAGMENT_SHADER = `
  * @returns {Promise<boolean>} - True if initialization successful
  */
 export async function initWebGLRenderer(canvasElement) {
-    canvas = canvasElement;
-    
-    // Try to get WebGL context
-    gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    
-    if (!gl) {
-        console.error('[WebGL] WebGL not supported in this browser');
-        return false;
-    }
-    
-    console.log('[WebGL] Context created');
-    
-    // Initialize shaders
-    if (!initShaders()) {
-        console.error('[WebGL] Failed to initialize shaders');
-        return false;
-    }
-    
-    // Initialize buffers
-    initBuffers();
-    
-    // Load texture atlas
     try {
-        textureAtlas = await createWebGLTexture(gl);
-        console.log('[WebGL] Texture atlas loaded');
+        canvas = canvasElement;
+        
+        if (!canvas) {
+            const error = new Error('Canvas element not provided');
+            logError('[WebGL] Initialization failed', error);
+            return false;
+        }
+        
+        logEntry('info', '[WebGL] Initializing WebGL renderer', `Canvas: ${canvas.width}x${canvas.height}`);
+        
+        // Try to get WebGL context
+        gl = canvas.getContext('webgl', {
+            alpha: true,
+            antialias: true,
+            depth: true,
+            premultipliedAlpha: false
+        }) || canvas.getContext('experimental-webgl', {
+            alpha: true,
+            antialias: true,
+            depth: true,
+            premultipliedAlpha: false
+        });
+        
+        if (!gl) {
+            const error = new Error('WebGL not supported in this browser');
+            logError('[WebGL] Context creation failed', error);
+            return false;
+        }
+        
+        // Log WebGL capabilities
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+            const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+            logEntry('info', '[WebGL] GPU Info', `Vendor: ${vendor}, Renderer: ${renderer}`);
+        }
+        
+        logEntry('info', '[WebGL] Context created', `Version: ${gl.getParameter(gl.VERSION)}`);
+    
+        // Initialize shaders
+        if (!initShaders()) {
+            const error = new Error('Shader initialization failed');
+            logError('[WebGL] Failed to initialize shaders', error);
+            return false;
+        }
+        
+        // Initialize buffers
+        initBuffers();
+        logEntry('info', '[WebGL] Buffers initialized', 'Position, TexCoord, Color, Index buffers created');
+        
+        // Load texture atlas
+        try {
+            textureAtlas = await createWebGLTexture(gl);
+            logEntry('info', '[WebGL] Texture atlas loaded', `Texture ID: ${textureAtlas}`);
+        } catch (err) {
+            logError('[WebGL] Failed to load texture atlas', err);
+            return false;
+        }
+        
+        // Setup WebGL state
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        
+        // Set clear color to match game background
+        gl.clearColor(0.02, 0.03, 0.06, 1.0);
+        
+        logEntry('info', '[WebGL] Renderer initialized successfully', `Max texture size: ${gl.getParameter(gl.MAX_TEXTURE_SIZE)}`);
+        return true;
     } catch (err) {
-        console.error('[WebGL] Failed to load texture atlas:', err);
+        logError('[WebGL] Unexpected error during initialization', err);
         return false;
     }
-    
-    // Setup WebGL state
-    gl.enable(gl.DEPTH_TEST);
-    gl.depthFunc(gl.LEQUAL);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    
-    // Set clear color to match game background
-    gl.clearColor(0.02, 0.03, 0.06, 1.0);
-    
-    console.log('[WebGL] Renderer initialized');
-    return true;
 }
 
 /**
  * Compile and link shaders
  */
 function initShaders() {
-    // Compile vertex shader
-    const vertexShader = compileShader(gl.VERTEX_SHADER, VERTEX_SHADER);
-    if (!vertexShader) return false;
-    
-    // Compile fragment shader
-    const fragmentShader = compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-    if (!fragmentShader) return false;
-    
-    // Create program
-    program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-    
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error('[WebGL] Shader program link error:', gl.getProgramInfoLog(program));
+    try {
+        // Compile vertex shader
+        const vertexShader = compileShader(gl.VERTEX_SHADER, VERTEX_SHADER);
+        if (!vertexShader) {
+            logError('[WebGL] Vertex shader compilation failed', new Error('See previous log for details'));
+            return false;
+        }
+        
+        // Compile fragment shader
+        const fragmentShader = compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+        if (!fragmentShader) {
+            logError('[WebGL] Fragment shader compilation failed', new Error('See previous log for details'));
+            return false;
+        }
+        
+        // Create program
+        program = gl.createProgram();
+        if (!program) {
+            logError('[WebGL] Failed to create shader program', new Error('gl.createProgram returned null'));
+            return false;
+        }
+        
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const programLog = gl.getProgramInfoLog(program);
+            const error = new Error(`Shader program link error: ${programLog}`);
+            logError('[WebGL] Program linking failed', error);
+            return false;
+        }
+        
+        // Get attribute locations
+        locations.attributes.position = gl.getAttribLocation(program, 'a_position');
+        locations.attributes.texCoord = gl.getAttribLocation(program, 'a_texCoord');
+        locations.attributes.color = gl.getAttribLocation(program, 'a_color');
+        
+        // Validate attribute locations
+        if (locations.attributes.position === -1) {
+            logError('[WebGL] Failed to get attribute location', new Error('a_position not found in shader'));
+            return false;
+        }
+        if (locations.attributes.texCoord === -1) {
+            logError('[WebGL] Failed to get attribute location', new Error('a_texCoord not found in shader'));
+            return false;
+        }
+        if (locations.attributes.color === -1) {
+            logError('[WebGL] Failed to get attribute location', new Error('a_color not found in shader'));
+            return false;
+        }
+        
+        // Get uniform locations
+        locations.uniforms.viewMatrix = gl.getUniformLocation(program, 'u_viewMatrix');
+        locations.uniforms.projectionMatrix = gl.getUniformLocation(program, 'u_projectionMatrix');
+        locations.uniforms.lightDirection = gl.getUniformLocation(program, 'u_lightDirection');
+        locations.uniforms.lightHeight = gl.getUniformLocation(program, 'u_lightHeight');
+        locations.uniforms.texture = gl.getUniformLocation(program, 'u_texture');
+        locations.uniforms.fogStrength = gl.getUniformLocation(program, 'u_fogStrength');
+        
+        // Validate uniform locations (null is acceptable for uniforms that might be optimized out)
+        logEntry('info', '[WebGL] Shaders compiled and linked successfully', 
+            `Attributes: position=${locations.attributes.position}, texCoord=${locations.attributes.texCoord}, color=${locations.attributes.color}`);
+        
+        return true;
+    } catch (err) {
+        logError('[WebGL] Unexpected error in shader initialization', err);
         return false;
     }
-    
-    // Get attribute locations
-    locations.attributes.position = gl.getAttribLocation(program, 'a_position');
-    locations.attributes.texCoord = gl.getAttribLocation(program, 'a_texCoord');
-    locations.attributes.color = gl.getAttribLocation(program, 'a_color');
-    
-    // Get uniform locations
-    locations.uniforms.viewMatrix = gl.getUniformLocation(program, 'u_viewMatrix');
-    locations.uniforms.projectionMatrix = gl.getUniformLocation(program, 'u_projectionMatrix');
-    locations.uniforms.lightDirection = gl.getUniformLocation(program, 'u_lightDirection');
-    locations.uniforms.lightHeight = gl.getUniformLocation(program, 'u_lightHeight');
-    locations.uniforms.texture = gl.getUniformLocation(program, 'u_texture');
-    locations.uniforms.fogStrength = gl.getUniformLocation(program, 'u_fogStrength');
-    
-    console.log('[WebGL] Shaders compiled and linked');
-    return true;
 }
 
 /**
@@ -181,15 +251,26 @@ function initShaders() {
  */
 function compileShader(type, source) {
     const shader = gl.createShader(type);
+    if (!shader) {
+        logError('[WebGL] Failed to create shader', new Error(`Type: ${type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT'}`));
+        return null;
+    }
+    
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('[WebGL] Shader compile error:', gl.getShaderInfoLog(shader));
+        const shaderLog = gl.getShaderInfoLog(shader);
+        const shaderType = type === gl.VERTEX_SHADER ? 'VERTEX' : 'FRAGMENT';
+        const error = new Error(`${shaderType} shader compile error: ${shaderLog}`);
+        error.shaderSource = source;
+        logError(`[WebGL] ${shaderType} shader compilation failed`, error);
         gl.deleteShader(shader);
         return null;
     }
     
+    const shaderType = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment';
+    logEntry('info', `[WebGL] ${shaderType} shader compiled`, 'No errors');
     return shader;
 }
 
@@ -264,34 +345,48 @@ function generateHexGeometry(cx, cy, size, height, terrainType, fogLevel) {
  * Build mesh data for all visible hexes
  */
 function buildHexMesh() {
-    // Clear existing mesh data
-    hexMeshData.vertices = [];
-    hexMeshData.uvs = [];
-    hexMeshData.colors = [];
-    hexMeshData.indices = [];
-    
-    if (!state.hexes || state.hexes.length === 0) {
-        return;
-    }
-    
-    const tileSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE * CONFIG.TILE_SCALE;
-    
-    // Generate geometry for each hex
-    state.hexes.forEach(hex => {
-        const pos = hexToPixel(hex.q, hex.r, tileSize);
-        const fogLevel = getFogLevel(hex.q, hex.r);
+    try {
+        // Clear existing mesh data
+        hexMeshData.vertices = [];
+        hexMeshData.uvs = [];
+        hexMeshData.colors = [];
+        hexMeshData.indices = [];
         
-        generateHexGeometry(
-            pos.x,
-            pos.y,
-            tileSize,
-            hex.height || 0,
-            hex.type,
-            fogLevel
-        );
-    });
-    
-    console.log(`[WebGL] Built mesh: ${hexMeshData.vertices.length / 3} vertices, ${hexMeshData.indices.length / 3} triangles`);
+        if (!state.hexes || state.hexes.length === 0) {
+            logEntry('warn', '[WebGL] No hexes to build mesh from', 'state.hexes is empty or undefined');
+            return;
+        }
+        
+        const tileSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE * CONFIG.TILE_SCALE;
+        
+        // Generate geometry for each hex
+        let generatedCount = 0;
+        state.hexes.forEach((hex, index) => {
+            try {
+                const pos = hexToPixel(hex.q, hex.r, tileSize);
+                const fogLevel = getFogLevel(hex.q, hex.r);
+                
+                generateHexGeometry(
+                    pos.x,
+                    pos.y,
+                    tileSize,
+                    hex.height || 0,
+                    hex.type,
+                    fogLevel
+                );
+                generatedCount++;
+            } catch (err) {
+                logError(`[WebGL] Failed to generate hex geometry at index ${index}`, err);
+            }
+        });
+        
+        const vertexCount = hexMeshData.vertices.length / 3;
+        const triangleCount = hexMeshData.indices.length / 3;
+        logEntry('info', '[WebGL] Mesh built successfully', 
+            `Hexes: ${generatedCount}, Vertices: ${vertexCount}, Triangles: ${triangleCount}`);
+    } catch (err) {
+        logError('[WebGL] Failed to build hex mesh', err);
+    }
 }
 
 /**
@@ -362,20 +457,22 @@ function createProjectionMatrix() {
  * Called each frame to render the game using WebGL
  */
 export function renderWebGL() {
-    if (!gl || !program) {
-        console.error('[WebGL] Renderer not initialized');
-        return;
-    }
-    
-    // Rebuild mesh if needed (e.g., after map generation or fog of war update)
-    if (state.meshDirty !== false) {
-        buildHexMesh();
-        uploadMeshData();
-        state.meshDirty = false;
-    }
-    
-    // Clear the canvas
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    try {
+        if (!gl || !program) {
+            logError('[WebGL] Renderer not initialized', new Error('gl or program is null'));
+            return;
+        }
+        
+        // Rebuild mesh if needed (e.g., after map generation or fog of war update)
+        if (state.meshDirty !== false) {
+            logEntry('debug', '[WebGL] Rebuilding mesh', 'Mesh marked as dirty');
+            buildHexMesh();
+            uploadMeshData();
+            state.meshDirty = false;
+        }
+        
+        // Clear the canvas
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     
     // Use shader program
     gl.useProgram(program);
@@ -415,9 +512,15 @@ export function renderWebGL() {
         gl.uniform1i(locations.uniforms.texture, 0);
     }
     
-    // Bind index buffer and draw
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshBuffer.index);
-    gl.drawElements(gl.TRIANGLES, hexMeshData.indices.length, gl.UNSIGNED_SHORT, 0);
+        // Bind index buffer and draw
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshBuffer.index);
+        
+        if (hexMeshData.indices.length > 0) {
+            gl.drawElements(gl.TRIANGLES, hexMeshData.indices.length, gl.UNSIGNED_SHORT, 0);
+        }
+    } catch (err) {
+        logError('[WebGL] Render error', err);
+    }
 }
 
 /**

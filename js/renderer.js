@@ -1788,12 +1788,13 @@ export async function initRenderer() {
     const useWebGL = CONFIG.RENDERER.PREFER_WEBGL || CONFIG.RENDERER.TYPE === 'webgl';
     
     if (useWebGL && isWebGLAvailable()) {
-        console.log('[Renderer] Attempting to initialize WebGL renderer...');
+        logEntry('info', '[Renderer] Attempting to initialize WebGL renderer', 
+            `Type: ${CONFIG.RENDERER.TYPE}, Prefer: ${CONFIG.RENDERER.PREFER_WEBGL}`);
         try {
             const success = await initWebGLRenderer(canvas);
             if (success) {
                 webglActive = true;
-                console.log('[Renderer] Using WebGL renderer');
+                logEntry('info', '[Renderer] Using WebGL renderer', 'Initialization successful');
                 
                 // Still need 2D context for UI elements
                 ctx = canvas.getContext('2d');
@@ -1802,21 +1803,25 @@ export async function initRenderer() {
                 resizeCanvas();
                 return;
             } else if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
-                throw new Error('WebGL initialization failed and fallback disabled');
+                const error = new Error('WebGL initialization failed and fallback disabled');
+                logError('[Renderer] Cannot initialize renderer', error);
+                throw error;
             }
-            console.warn('[Renderer] WebGL initialization failed, falling back to Canvas 2D');
+            logEntry('warn', '[Renderer] WebGL initialization failed, falling back to Canvas 2D', 
+                'Check previous logs for WebGL errors');
         } catch (err) {
-            console.error('[Renderer] WebGL error:', err);
+            logError('[Renderer] WebGL initialization error', err);
             if (!CONFIG.RENDERER.ALLOW_FALLBACK) {
                 throw err;
             }
-            console.warn('[Renderer] Falling back to Canvas 2D');
+            logEntry('warn', '[Renderer] Falling back to Canvas 2D', 'WebGL error occurred');
         }
     }
     
     // Canvas 2D fallback or default
     webglActive = false;
-    console.log('[Renderer] Using Canvas 2D renderer');
+    logEntry('info', '[Renderer] Using Canvas 2D renderer', 
+        `Reason: ${useWebGL ? 'WebGL fallback' : 'Canvas 2D configured'}`);
     ctx = canvas.getContext('2d');
 
     // Detect mobile/tablet and set initial quality
