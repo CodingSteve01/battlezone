@@ -94,16 +94,67 @@ function getShadowOffset(height, size) {
     return zOffset * (0.6 + lightHeight * 0.4);
 }
 
-function drawHeightExtrusion(cx, cy, size, height) {
+function drawHeightExtrusion(cx, cy, size, height, terrainType, fogLevel) {
     const offset = getTileZOffset(height, size);
     if (offset <= 0) return;
 
     ctx.save();
     ctx.beginPath();
     drawHexPath(cx, cy + offset, size);
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.35)';
+    const fillColor = fogLevel === 'hidden'
+        ? '#050810'
+        : getSkirtFillColor(terrainType, fogLevel);
+    ctx.fillStyle = fillColor;
+    ctx.globalAlpha = fogLevel === 'visible' ? 0.85 : 1;
     ctx.fill();
     ctx.restore();
+}
+
+const MIN_SKIRT_PIXELS = 20;
+
+function getBaseSkirtDepth(size) {
+    return Math.max(MIN_SKIRT_PIXELS, size * 0.2);
+}
+
+function getSkirtFillColor(terrainType, fogLevel) {
+    if (fogLevel === 'hidden') {
+        return '#050810';
+    }
+
+    const terrain = TERRAIN[terrainType];
+    const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
+
+    if (fogLevel === 'explored') {
+        return desaturateAndDarken(baseColor, 0.4, 0.6);
+    }
+
+    return desaturateAndDarken(baseColor, 0.7, 0.75);
+}
+
+function drawBaseSkirt(cx, cy, size, terrainType, fogLevel) {
+    const baseDepth = getBaseSkirtDepth(size);
+
+    ctx.save();
+    ctx.beginPath();
+    drawHexPath(cx, cy + baseDepth, size);
+    ctx.fillStyle = getSkirtFillColor(terrainType, fogLevel);
+    ctx.fill();
+    ctx.restore();
+}
+
+function shouldRenderBaseSkirt(hex) {
+    const neighbors = getNeighbors(hex.q, hex.r);
+    const forwardDirections = [0, 4, 5];
+    const myHeight = hex.height ?? 0;
+
+    return forwardDirections.some(direction => {
+        const neighbor = neighbors[direction];
+        if (!neighbor) return true;
+        const neighborHex = getHex(neighbor.q, neighbor.r);
+        if (!neighborHex) return true;
+        const neighborHeight = neighborHex.height ?? 0;
+        return neighborHeight !== myHeight;
+    });
 }
 
 /**
@@ -111,7 +162,7 @@ function drawHeightExtrusion(cx, cy, size, height) {
  * Creates realistic earth/ground appearance when looking at height differences
  * Optimized to reduce rendering overhead
  */
-function drawCliffFaces(cx, cy, size, hex) {
+function drawCliffFaces(cx, cy, size, hex, fogLevel) {
     if (!hex || hex.height === undefined) return;
     
     const myHeight = hex.height ?? 0;
@@ -122,7 +173,10 @@ function drawCliffFaces(cx, cy, size, hex) {
     
     // Pre-calculate earth color for this height level
     const earthBase = myHeight >= 3 ? 60 : (myHeight >= 2 ? 75 : 90);
-    const earthColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
+    const baseColor = `rgb(${earthBase}, ${earthBase - 15}, ${earthBase - 25})`;
+    const earthColor = fogLevel === 'hidden'
+        ? '#050810'
+        : baseColor;
     
     // Draw cliff face for each neighbor that's lower than this hex
     neighbors.forEach((neighbor, direction) => {
@@ -172,7 +226,7 @@ function drawCliffFaces(cx, cy, size, hex) {
         ctx.closePath();
         
         ctx.fillStyle = earthColor;
-        ctx.globalAlpha = lightFactor * 0.85; // Slight transparency for depth
+        ctx.globalAlpha = fogLevel === 'hidden' ? 1 : lightFactor * 0.85; // Slight transparency for depth
         ctx.fill();
         
         ctx.restore();
@@ -221,29 +275,6 @@ function applyTileLighting(cx, cy, size, height) {
     ctx.globalCompositeOperation = 'overlay';
     ctx.fillStyle = grad;
     ctx.fillRect(cx - size, cy - size, size * 2, size * 2);
-    ctx.restore();
-}
-
-function applySpriteLighting(drawX, drawY, width, height) {
-    const light = getLightVector();
-    const strength = CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18;
-    ctx.save();
-    ctx.globalCompositeOperation = 'multiply';
-    const grad = safeLinearGradient(
-        ctx,
-        drawX - light.x * width * 0.3,
-        drawY - light.y * height * 0.3,
-        drawX + width + light.x * width * 0.3,
-        drawY + height + light.y * height * 0.3,
-        'transparent'
-    );
-    if (typeof grad !== 'string') {
-        grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
-        grad.addColorStop(0.6, 'rgba(255, 255, 255, 0)');
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0.28)');
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(drawX, drawY, width, height);
     ctx.restore();
 }
 
@@ -402,7 +433,7 @@ function getBiomeTreePool(terrainType) {
         case 'highland':
             return ['pine', 'birch', 'oak', 'pine'];
         case 'tropical':
-            return ['oak', 'maple', 'willow', 'oak', 'maple'];
+            return ['willow', 'maple', 'oak', 'maple', 'willow', 'oak'];
         case 'wetland':
             return ['willow', 'oak', 'dead', 'birch', 'willow'];
         case 'desert':
@@ -476,10 +507,8 @@ function drawTree2D5(x, y, size, treeType, seed) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -509,10 +538,8 @@ function drawBush2D5(x, y, size, seed) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -539,10 +566,8 @@ function drawSmallShrub(x, y, size, seed) {
             ctx.translate(x, y);
             ctx.scale(-1, 1);
             ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-            applySpriteLighting(-spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-            applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
         }
         ctx.restore();
     }
@@ -562,7 +587,6 @@ function drawFlowerCluster(x, y, size, seed) {
         const drawX = x - spriteWidth * anchorPoint.x;
         const drawY = y - spriteHeight * anchorPoint.y;
         ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-        applySpriteLighting(drawX, drawY, spriteWidth, spriteHeight);
     }
 }
 
@@ -836,6 +860,9 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const s = 0.45; // Normalized size multiplier
     const positionScale = 0.95;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
+    const biome = state.activeBiome || 'temperate';
+    const vegetationBoost = biome === 'tropical' || biome === 'wetland' ? 1.35 : 1;
+    const shrubBoost = biome === 'tropical' ? 1.4 : (biome === 'wetland' ? 1.25 : 1);
 
     // Consistent sort offsets (normalized)
     const TREE_SORT_OFFSET = 0.4;
@@ -845,7 +872,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const TREE_Y_OFFSET = 0;
 
     if (type === 'forest' || type === 'pine') {
-        const baseTreeCount = 4 + Math.abs(baseSeed % 3);
+        const baseTreeCount = Math.max(4, Math.round((4 + Math.abs(baseSeed % 3)) * vegetationBoost));
 
         for (let i = 0; i < baseTreeCount; i++) {
             const anchorPoint = sampleHexOffset(baseSeed + i * 13);
@@ -869,7 +896,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Edge trees
-        const edgeTreeCount = 2 + Math.abs((baseSeed + 50) % 3);
+        const edgeTreeCount = Math.max(2, Math.round((2 + Math.abs((baseSeed + 50) % 3)) * vegetationBoost));
         for (let i = 0; i < edgeTreeCount; i++) {
             const anchorPoint = sampleHexOffset(baseSeed + i * 19 + 200, 0.7);
             const offsetX = anchorPoint.x * positionScale;
@@ -889,7 +916,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Undergrowth
-        const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
+        const undergrowthCount = Math.max(3, Math.round((3 + Math.abs((baseSeed + 100) % 3)) * shrubBoost));
         for (let i = 0; i < undergrowthCount; i++) {
             const anchorPoint = sampleHexOffset(baseSeed + i * 15 + 101);
             const offsetX = anchorPoint.x * positionScale;
@@ -908,11 +935,11 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
 
         // Occasional large bush
-        if (seededRandom(baseSeed + 300) > 0.6) {
+        if (seededRandom(baseSeed + 300) > 0.45) {
             const anchorPoint = sampleHexOffset(baseSeed + 301);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
-            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.3);
+            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.35);
 
             elements.push({
                 type: 'bush',
@@ -926,12 +953,15 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'grass' || type === 'clearing' || type === 'flowers' || type === 'heather') {
         const grassType = Math.abs(baseSeed) % 100;
+        const bushThreshold = biome === 'tropical' ? 40 : 28;
+        const shrubThreshold = biome === 'tropical' ? 70 : 55;
+        const treeThreshold = biome === 'tropical' ? 85 : 78;
 
-        if (grassType < 20) {
+        if (grassType < bushThreshold) {
             const anchorPoint = sampleHexOffset(baseSeed + 500);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
-            const sizeMultiplier = s * (0.7 + seededRandom(baseSeed + 502) * 0.4);
+            const sizeMultiplier = s * (0.7 + seededRandom(baseSeed + 502) * 0.45);
             elements.push({
                 type: 'bush',
                 offsetX,
@@ -943,8 +973,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        if (grassType >= 20 && grassType < 50) {
-            const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
+        if (grassType >= bushThreshold && grassType < shrubThreshold) {
+            const shrubCount = Math.max(1, Math.round((1 + Math.floor(seededRandom(baseSeed + 510) * 2)) * shrubBoost));
             for (let i = 0; i < shrubCount; i++) {
                 const anchorPoint = sampleHexOffset(baseSeed + i * 10 + 520);
                 const offsetX = anchorPoint.x * positionScale;
@@ -962,7 +992,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             }
         }
 
-        if (grassType >= 70 && grassType < 78) {
+        if (grassType >= treeThreshold && grassType < treeThreshold + 12) {
             const anchorPoint = sampleHexOffset(baseSeed + 600);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
@@ -979,7 +1009,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        if (type === 'heather' && grassType >= 80 && grassType < 90) {
+        if (type === 'heather' && grassType >= 80 && grassType < 92) {
             const anchorPoint = sampleHexOffset(baseSeed + 700);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
@@ -996,7 +1026,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     } else if (type === 'hills') {
         const hillsType = Math.abs(baseSeed) % 100;
 
-        if (hillsType < 40) {
+        if (hillsType < 50) {
             const anchorPoint = sampleHexOffset(baseSeed + 800);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
@@ -1011,7 +1041,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        if (hillsType >= 60 && hillsType < 80) {
+        if (hillsType >= 55 && hillsType < 85) {
             const anchorPoint = sampleHexOffset(baseSeed + 810);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
@@ -1027,7 +1057,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'sand') {
         const sandType = Math.abs(baseSeed) % 100;
-        if (sandType < 15) {
+        if (sandType < 20) {
             const anchorPoint = sampleHexOffset(baseSeed + 900);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
@@ -1083,7 +1113,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
         }
     } else if (type === 'swamp') {
         const swampType = Math.abs(baseSeed) % 100;
-        if (swampType < 25) {
+        if (swampType < 35) {
             const anchorPoint = sampleHexOffset(baseSeed + 1100);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
@@ -1098,7 +1128,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
                 drawFn: (x, y, sz, params) => drawTree2D5(x, y, sz, params.treeType, params.seed)
             });
         }
-        if (swampType >= 30 && swampType < 60) {
+        if (swampType >= 30 && swampType < 75) {
             const anchorPoint = sampleHexOffset(baseSeed + 1110);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
@@ -2234,60 +2264,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
  * Draw grass blades and ground texture for natural looking terrain
  */
 function drawStaticGrassBlades(cx, cy, hexSize, seed, grassType) {
-    ctx.save();
-
-    // Determine blade count and height based on grass type
-    const isTall = grassType === 'tallgrass';
-    const isHeather = grassType === 'heather';
-    const bladeCount = isTall ? 25 : (isHeather ? 20 : 18);
-    const heightMult = isTall ? 1.4 : (isHeather ? 0.8 : 1.0);
-
-    // Draw grass blades
-    for (let i = 0; i < bladeCount; i++) {
-        const rand1 = seededRandom(seed + i * 3);
-        const rand2 = seededRandom(seed + i * 3 + 1);
-        const rand3 = seededRandom(seed + i * 3 + 2);
-
-        const angle = rand1 * Math.PI * 2;
-        const dist = rand2 * hexSize * 0.7;
-        const x = cx + Math.cos(angle) * dist;
-        const y = cy + Math.sin(angle) * dist;
-
-        const bladeHeight = (4 + rand3 * 8) * heightMult;
-        const lean = (rand1 - 0.5) * 4;
-
-        // Color variation
-        const greenShade = isHeather ?
-            `rgb(${70 + rand3 * 30}, ${90 + rand3 * 20}, ${70 + rand3 * 30})` :
-            `rgb(${40 + rand3 * 30}, ${100 + rand3 * 40}, ${40 + rand3 * 20})`;
-
-        ctx.strokeStyle = greenShade;
-        ctx.lineWidth = 1 + rand2 * 0.5;
-        ctx.lineCap = 'round';
-
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.quadraticCurveTo(x + lean * 0.5, y - bladeHeight * 0.6, x + lean, y - bladeHeight);
-        ctx.stroke();
-    }
-
-    // Add subtle ground texture patches
-    ctx.globalAlpha = 0.2;
-    for (let i = 0; i < 5; i++) {
-        const rand1 = seededRandom(seed + i * 7 + 100);
-        const rand2 = seededRandom(seed + i * 7 + 101);
-
-        const px = cx + (rand1 - 0.5) * hexSize * 1.2;
-        const py = cy + (rand2 - 0.5) * hexSize * 1.2;
-        const patchSize = hexSize * 0.1 + rand2 * hexSize * 0.15;
-
-        ctx.fillStyle = isHeather ? 'rgba(100, 60, 100, 0.4)' : 'rgba(30, 70, 30, 0.4)';
-        ctx.beginPath();
-        ctx.ellipse(px, py, patchSize, patchSize * 0.5, rand1 * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
+    return;
 }
 
 /**
@@ -3607,6 +3584,10 @@ export function render() {
         // Try to use cached tile for better performance
         const cacheEntry = getCachedHexTile(hex, fogLevel);
 
+        if (shouldRenderBaseSkirt(hex)) {
+            drawBaseSkirt(sx, sy, tileSize, hex.type, fogLevel);
+        }
+
         if (cacheEntry) {
             // Draw cached tile with scaling - prevents cache invalidation during zoom
             const { canvas: cachedTile, baseSize } = cacheEntry;
@@ -3617,10 +3598,8 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            if (fogLevel !== 'hidden') {
-                drawHeightExtrusion(sx, sy, tileSize, hex.height);
-                drawCliffFaces(sx, sy, tileSize, hex);
-            }
+            drawHeightExtrusion(sx, sy, tileSize, hex.height, hex.type, fogLevel);
+            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
             ctx.drawImage(
                 cachedTile,
                 sx - scaledSize / 2,
@@ -3645,10 +3624,8 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            if (fogLevel !== 'hidden') {
-                drawHeightExtrusion(sx, sy, tileSize, hex.height);
-                drawCliffFaces(sx, sy, tileSize, hex);
-            }
+            drawHeightExtrusion(sx, sy, tileSize, hex.height, hex.type, fogLevel);
+            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
             drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
             // Fog overlays for non-cached rendering (match cached version)
