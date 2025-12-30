@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.22.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.0...shadow-squad-v3.22.1) (2025-12-30)
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#217](https://github.com/CodingSteve01/battlezone/issues/217)) ([f14d0d3](https://github.com/CodingSteve01/battlezone/commit/f14d0d3928e35b824a3031d37cac488b55ff358f))
+
 ## [3.22.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.21.0...shadow-squad-v3.22.0) (2025-12-30)
 
 
