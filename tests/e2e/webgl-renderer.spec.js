@@ -124,8 +124,9 @@ test.describe('WebGL Renderer', () => {
                 }
                 if (contextType === '2d') {
                     canvas2dCallCount++;
-                    // 2D context fails after WebGL init (simulating the bug)
-                    if (webglCallCount > 0 && canvas2dCallCount === 1) {
+                    // Simulate 2D context failure after WebGL init (the bug scenario)
+                    const shouldSimulate2DContextFailure = webglCallCount > 0 && canvas2dCallCount === 1;
+                    if (shouldSimulate2DContextFailure) {
                         return null;
                     }
                 }

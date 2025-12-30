@@ -1803,7 +1803,7 @@ export async function initRenderer() {
                 // we need to create a separate canvas for 2D overlay or handle gracefully
                 if (!ctx) {
                     logEntry('warn', '[Renderer] Cannot get 2D context after WebGL init', 
-                        'UI overlay may not work correctly');
+                        'UI overlay may not work correctly. Consider using a separate canvas for 2D UI elements.');
                 }
                 
                 // Skip rest of Canvas 2D initialization
