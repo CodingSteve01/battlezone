@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.22.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.21.0...shadow-squad-v3.22.0) (2025-12-30)
+
+
+### Features
+
+* **renderer:** WebGL mesh-based renderer with height-shaded textures ([#213](https://github.com/CodingSteve01/battlezone/issues/213)) ([afaad60](https://github.com/CodingSteve01/battlezone/commit/afaad60bfa5c18a902e394bc88d8ff69bcafbb7c))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#215](https://github.com/CodingSteve01/battlezone/issues/215)) ([1434513](https://github.com/CodingSteve01/battlezone/commit/1434513b149db9cdbf8e6c5b9b3d397ce70086b0))
+
 ## [3.21.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.20.0...shadow-squad-v3.21.0) (2025-12-30)
 
 
