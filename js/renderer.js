@@ -3018,32 +3018,31 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
     const outlineColor = getUnitOutlineColor(terrainColor);
 
-    // Soft silhouette halo to separate units from dense terrain
+    // Soft shadow under unit feet for grounding (subtle, no white circle)
     ctx.save();
-    ctx.globalAlpha *= 0.35;
-    ctx.fillStyle = outlineColor;
-    ctx.shadowColor = outlineColor;
-    ctx.shadowBlur = size * 0.35;
+    ctx.globalAlpha *= 0.25;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy - size * 0.1, size * 0.55, size * 0.35, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + size * 0.2, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     // Base ring around unit - dashed normally, solid when selected
+    // Ring size matches unit sprite footprint
     if (isSelected) {
         // Selected: solid thick ring in player color
         ctx.strokeStyle = playerColor;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 3;
         ctx.setLineDash([]);
     } else {
         // Normal: thin dashed ring in player color
         ctx.strokeStyle = playerColor;
         ctx.globalAlpha = 0.6;
         ctx.lineWidth = 2;
-        ctx.setLineDash([6, 4]);
+        ctx.setLineDash([5, 3]);
     }
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.9, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1;
@@ -3211,8 +3210,9 @@ function drawUnitOverlay(unit, cx, cy) {
     }
 
     // Cover status speech bubble (only for current player's units in cover)
+    // Position higher to avoid overlap with HP bar
     if (unit.hiding && unit.player === state.currentPlayer) {
-        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'In Deckung', '#22c55e', size);
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'In Deckung', '#22c55e', size * 0.8);
     }
 
     // Cloak indicator (visible to owner) with speech bubble
@@ -3221,8 +3221,8 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.shadowColor = '#a855f7';
         ctx.shadowBlur = 15;
 
-        // Draw speech bubble for stealth status
-        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.2, 'Getarnt!', '#a855f7', size);
+        // Draw speech bubble for stealth status - higher position, smaller size
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'Getarnt!', '#a855f7', size * 0.8);
 
         ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
         ctx.textAlign = 'center';
@@ -3276,10 +3276,10 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
     }
 
-    // "Spotted!" indicator
+    // "Spotted!" indicator - higher position, smaller size
     if (unit.spotted && unit.player === state.currentPlayer) {
         ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.8, cy - size * 1.4, 'Entdeckt!', '#ef4444', size);
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'Entdeckt!', '#ef4444', size * 0.8);
     }
 
     ctx.restore();
@@ -3788,9 +3788,8 @@ export function render() {
         // Try to use cached tile for better performance
         const cacheEntry = getCachedHexTile(hex, fogLevel);
 
-        if (shouldRenderBaseSkirt(hex)) {
-            drawBaseSkirt(sx, sy, tileSize, hex.type, fogLevel);
-        }
+        // Note: drawBaseSkirt removed - isometric terrain sprites already include earth layer
+        // The earth is built into the sprite via generateIsometric() in the asset generator
 
         if (cacheEntry) {
             // Draw cached tile with scaling - prevents cache invalidation during zoom
@@ -3802,8 +3801,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
-            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
+            // Note: drawHeightExtrusion and drawCliffFaces removed - isometric terrain sprites include earth layer
             ctx.drawImage(
                 cachedTile,
                 sx - scaledSize / 2,
@@ -3828,8 +3826,7 @@ export function render() {
             if (fogLevel === 'visible') {
                 drawHeightShadow(sx, sy, tileSize, hex.height);
             }
-            // Note: drawHeightExtrusion removed - isometric terrain sprites include earth layer
-            drawCliffFaces(sx, sy, tileSize, hex, fogLevel);
+            // Note: drawHeightExtrusion and drawCliffFaces removed - isometric terrain sprites include earth layer
             drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData);
 
             // Fog overlays for non-cached rendering (match cached version)

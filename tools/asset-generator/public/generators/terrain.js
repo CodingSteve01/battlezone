@@ -584,8 +584,17 @@ const TerrainGenerator = {
 
     /**
      * Render the earth/cliff layer below the hex surface
-     * Creates a 3D isometric platform with corners at left (v3) and right (v0) hex vertices
-     * Bottom edge is flat/horizontal for proper isometric appearance
+     * Creates a 3D isometric platform with three connected faces:
+     * - Right trapezoid (v0-v1 edge)
+     * - Front rectangle (v1-v2 edge - the bottom edge of hex)
+     * - Left trapezoid (v2-v3 edge)
+     *
+     * Visual representation:
+     *       /——\
+     *      |      |      <- Hex surface
+     *       \__/
+     *      |      |      <- Earth layer (three connected faces)
+     *       ————
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -607,14 +616,18 @@ const TerrainGenerator = {
         const rightCorner = { x: vertices[0].x, y: bottomY };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
+        // All three faces connect seamlessly without gaps
+
         // 1. Left face (trapezoid: v2-v3 at top, extends to leftCorner at bottom)
         this.renderCliffFaceIsometric(ctx, vertices[2], vertices[3],
             { x: vertices[2].x, y: bottomY }, leftCorner,
             earthPalette, 'left', noise, variant);
+
         // 2. Front face (rectangle: v1-v2 at top, same width at bottom)
         this.renderCliffFaceIsometric(ctx, vertices[1], vertices[2],
             { x: vertices[1].x, y: bottomY }, { x: vertices[2].x, y: bottomY },
             earthPalette, 'front', noise, variant);
+
         // 3. Right face (trapezoid: v0-v1 at top, extends to rightCorner at bottom)
         this.renderCliffFaceIsometric(ctx, vertices[0], vertices[1],
             rightCorner, { x: vertices[1].x, y: bottomY },
