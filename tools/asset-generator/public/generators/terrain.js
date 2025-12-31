@@ -585,16 +585,18 @@ const TerrainGenerator = {
     /**
      * Render the earth/cliff layer below the hex surface
      * Creates a 3D isometric platform with three connected faces:
-     * - Right trapezoid (v0-v1 edge)
-     * - Front rectangle (v1-v2 edge - the bottom edge of hex)
-     * - Left trapezoid (v2-v3 edge)
+     * - L (left parallelogram): v2-v3 at top, v2'-v3' at bottom
+     * - F (front rectangle): v1-v2 at top, v1'-v2' at bottom
+     * - R (right parallelogram): v0-v1 at top, v0'-v1' at bottom
      *
-     * Visual representation:
-     *       /——\
-     *      |      |      <- Hex surface
-     *       \__/
-     *      |      |      <- Earth layer (three connected faces)
-     *       ————
+     * Each vertex is duplicated vertically downward by earthHeight:
+     * v0' = (v0.x, v0.y + earthHeight)
+     * v1' = (v1.x, v1.y + earthHeight)
+     * v2' = (v2.x, v2.y + earthHeight)
+     * v3' = (v3.x, v3.y + earthHeight)
+     *
+     * This creates TRUE parallelograms for L and R (not trapezoids),
+     * because the vertical edges are parallel and the horizontal offset is preserved.
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -607,30 +609,43 @@ const TerrainGenerator = {
             });
         }
 
-        // v0 = E (right point), v1 = SE, v2 = SW, v3 = W (left point)
-        // Bottom Y is at the lowest hex vertex (v1/v2) plus earthHeight
-        const bottomY = vertices[1].y + earthHeight;
+        // v0 = E (right point, "4" in user's sketch)
+        // v1 = SE (bottom right, "5" in user's sketch)
+        // v2 = SW (bottom left, "6" in user's sketch)
+        // v3 = W (left point, "7" in user's sketch)
 
-        // Calculate bottom corner positions - extend to left (v3.x) and right (v0.x) hex corners
-        const leftCorner = { x: vertices[3].x, y: bottomY };
-        const rightCorner = { x: vertices[0].x, y: bottomY };
+        // Small overlap to prevent anti-aliasing gaps between hex surface and earth layer
+        const overlap = 2;
+
+        // Create bottom vertices by duplicating each top vertex vertically downward
+        // This is the key difference: each vertex moves straight down, creating parallelograms
+        const v0_bottom = { x: vertices[0].x, y: vertices[0].y + earthHeight };
+        const v1_bottom = { x: vertices[1].x, y: vertices[1].y + earthHeight };
+        const v2_bottom = { x: vertices[2].x, y: vertices[2].y + earthHeight };
+        const v3_bottom = { x: vertices[3].x, y: vertices[3].y + earthHeight };
+
+        // Adjusted top vertices with overlap for seamless connection to hex surface
+        const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
+        const v1_adj = { x: vertices[1].x, y: vertices[1].y - overlap };
+        const v2_adj = { x: vertices[2].x, y: vertices[2].y - overlap };
+        const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // All three faces connect seamlessly without gaps
+        // All three faces connect seamlessly at shared edges
 
-        // 1. Left face (trapezoid: v2-v3 at top, extends to leftCorner at bottom)
-        this.renderCliffFaceIsometric(ctx, vertices[2], vertices[3],
-            { x: vertices[2].x, y: bottomY }, leftCorner,
+        // 1. L (left parallelogram): v2-v3 at top, v2'-v3' at bottom
+        // This is a TRUE parallelogram because v2-v3 is parallel to v2'-v3'
+        this.renderCliffFaceIsometric(ctx, v2_adj, v3_adj, v2_bottom, v3_bottom,
             earthPalette, 'left', noise, variant);
 
-        // 2. Front face (rectangle: v1-v2 at top, same width at bottom)
-        this.renderCliffFaceIsometric(ctx, vertices[1], vertices[2],
-            { x: vertices[1].x, y: bottomY }, { x: vertices[2].x, y: bottomY },
+        // 2. F (front rectangle): v1-v2 at top, v1'-v2' at bottom
+        // This is a rectangle because v1.y = v2.y and v1'.y = v2'.y
+        this.renderCliffFaceIsometric(ctx, v1_adj, v2_adj, v1_bottom, v2_bottom,
             earthPalette, 'front', noise, variant);
 
-        // 3. Right face (trapezoid: v0-v1 at top, extends to rightCorner at bottom)
-        this.renderCliffFaceIsometric(ctx, vertices[0], vertices[1],
-            rightCorner, { x: vertices[1].x, y: bottomY },
+        // 3. R (right parallelogram): v0-v1 at top, v0'-v1' at bottom
+        // This is a TRUE parallelogram because v0-v1 is parallel to v0'-v1'
+        this.renderCliffFaceIsometric(ctx, v0_adj, v1_adj, v0_bottom, v1_bottom,
             earthPalette, 'right', noise, variant);
     },
 
@@ -866,7 +881,7 @@ const TerrainGenerator = {
     },
 
     /**
-     * Render waterfall effect on water terrain cliff faces
+     * Render waterfall effect on ALL THREE water terrain cliff faces (L, F, R)
      */
     renderWaterfall(ctx, cx, cy, radius, earthHeight, noise, variant) {
         const vertices = [];
@@ -878,88 +893,116 @@ const TerrainGenerator = {
             });
         }
 
-        const bottomY = Math.max(vertices[1].y, vertices[2].y);
-        const cliffBottomY = bottomY + earthHeight;
+        // v0 = E (4), v1 = SE (5), v2 = SW (6), v3 = W (7)
+        const v0 = vertices[0];
+        const v1 = vertices[1];
+        const v2 = vertices[2];
+        const v3 = vertices[3];
+
+        // Bottom vertices - each vertex drops straight down
+        const v0_bottom = { x: v0.x, y: v0.y + earthHeight };
+        const v1_bottom = { x: v1.x, y: v1.y + earthHeight };
+        const v2_bottom = { x: v2.x, y: v2.y + earthHeight };
+        const v3_bottom = { x: v3.x, y: v3.y + earthHeight };
 
         const waterLight = '#7dd3fc';
         const waterMid = '#38bdf8';
         const waterDark = '#0284c7';
         const foamWhite = '#f0f9ff';
 
-        const v1 = vertices[1];
-        const v2 = vertices[2];
-
         ctx.save();
 
-        // Draw water streams
-        const streamCount = 5 + Math.floor(variant % 4);
-        for (let s = 0; s < streamCount; s++) {
-            const streamT = (s + 0.5) / streamCount;
-            const streamX = v1.x + (v2.x - v1.x) * streamT;
-            const streamStartY = v1.y + (v2.y - v1.y) * streamT;
-            const streamWidth = 8 + noise.noise2D(s * 5, variant) * 6;
+        // Helper to draw waterfall streams on a face
+        const drawWaterfallOnFace = (topLeft, topRight, bottomLeft, bottomRight, facing, streamCount) => {
+            for (let s = 0; s < streamCount; s++) {
+                const t = (s + 0.5) / streamCount;
 
-            const gradient = ctx.createLinearGradient(streamX, streamStartY, streamX, cliffBottomY);
-            gradient.addColorStop(0, waterLight);
-            gradient.addColorStop(0.3, waterMid);
-            gradient.addColorStop(0.7, waterDark);
-            gradient.addColorStop(1, waterMid);
+                // Interpolate position along the top edge
+                const startX = topLeft.x + (topRight.x - topLeft.x) * t;
+                const startY = topLeft.y + (topRight.y - topLeft.y) * t;
 
-            ctx.beginPath();
-            ctx.moveTo(streamX - streamWidth / 2, streamStartY);
-            const segments = 10;
-            for (let i = 1; i <= segments; i++) {
-                const t = i / segments;
-                const y = streamStartY + (cliffBottomY - streamStartY) * t;
-                const waveX = streamX + Math.sin(t * Math.PI * 3 + variant + s) * 3;
-                const waveWidth = streamWidth * (0.8 + Math.sin(t * Math.PI * 2) * 0.2);
-                ctx.lineTo(waveX - waveWidth / 2, y);
-            }
-            for (let i = segments; i >= 0; i--) {
-                const t = i / segments;
-                const y = streamStartY + (cliffBottomY - streamStartY) * t;
-                const waveX = streamX + Math.sin(t * Math.PI * 3 + variant + s) * 3;
-                const waveWidth = streamWidth * (0.8 + Math.sin(t * Math.PI * 2) * 0.2);
-                ctx.lineTo(waveX + waveWidth / 2, y);
-            }
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
+                // Interpolate position along the bottom edge
+                const endX = bottomLeft.x + (bottomRight.x - bottomLeft.x) * t;
+                const endY = bottomLeft.y + (bottomRight.y - bottomLeft.y) * t;
 
-            // Foam highlights
-            ctx.strokeStyle = foamWhite;
-            ctx.lineWidth = 1;
-            ctx.globalAlpha = 0.6;
-            for (let f = 0; f < 3; f++) {
-                const foamY = streamStartY + (cliffBottomY - streamStartY) * (0.2 + f * 0.3);
-                const foamWidth = streamWidth * 0.6;
+                const streamWidth = 6 + noise.noise2D(s * 5 + facing.charCodeAt(0), variant) * 4;
+
+                const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+                gradient.addColorStop(0, waterLight);
+                gradient.addColorStop(0.3, waterMid);
+                gradient.addColorStop(0.7, waterDark);
+                gradient.addColorStop(1, waterMid);
+
                 ctx.beginPath();
-                ctx.moveTo(streamX - foamWidth / 2, foamY);
-                ctx.quadraticCurveTo(streamX, foamY - 5, streamX + foamWidth / 2, foamY);
-                ctx.stroke();
+                const segments = 10;
+
+                // Left edge of stream
+                for (let i = 0; i <= segments; i++) {
+                    const segT = i / segments;
+                    const x = startX + (endX - startX) * segT;
+                    const y = startY + (endY - startY) * segT;
+                    const waveOffset = Math.sin(segT * Math.PI * 3 + variant + s) * 2;
+                    const width = streamWidth * (0.8 + Math.sin(segT * Math.PI * 2) * 0.2);
+                    if (i === 0) ctx.moveTo(x + waveOffset - width / 2, y);
+                    else ctx.lineTo(x + waveOffset - width / 2, y);
+                }
+
+                // Right edge of stream (reverse)
+                for (let i = segments; i >= 0; i--) {
+                    const segT = i / segments;
+                    const x = startX + (endX - startX) * segT;
+                    const y = startY + (endY - startY) * segT;
+                    const waveOffset = Math.sin(segT * Math.PI * 3 + variant + s) * 2;
+                    const width = streamWidth * (0.8 + Math.sin(segT * Math.PI * 2) * 0.2);
+                    ctx.lineTo(x + waveOffset + width / 2, y);
+                }
+
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // Foam highlights
+                ctx.strokeStyle = foamWhite;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.5;
+                for (let f = 0; f < 2; f++) {
+                    const foamT = 0.3 + f * 0.35;
+                    const foamX = startX + (endX - startX) * foamT;
+                    const foamY = startY + (endY - startY) * foamT;
+                    ctx.beginPath();
+                    ctx.arc(foamX, foamY, streamWidth * 0.3, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
             }
-            ctx.globalAlpha = 1;
-        }
+        };
 
-        // Splash at bottom
-        for (let i = 0; i < 15; i++) {
-            const splashX = v1.x + (v2.x - v1.x) * Math.random();
-            const splashY = cliffBottomY - 5 + Math.random() * 10;
-            ctx.beginPath();
-            ctx.arc(splashX, splashY, 2 + Math.random() * 4, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(240, 249, 255, ${0.3 + Math.random() * 0.4})`;
-            ctx.fill();
-        }
+        // Draw waterfalls on all three faces
+        // L (left parallelogram): v2-v3 top, v2'-v3' bottom - darker, fewer streams
+        drawWaterfallOnFace(v2, v3, v2_bottom, v3_bottom, 'left', 3);
 
-        // Mist effect
-        const mistGradient = ctx.createLinearGradient(
-            (v1.x + v2.x) / 2, cliffBottomY - 20,
-            (v1.x + v2.x) / 2, cliffBottomY
-        );
-        mistGradient.addColorStop(0, 'rgba(255,255,255,0)');
-        mistGradient.addColorStop(1, 'rgba(255,255,255,0.3)');
-        ctx.fillStyle = mistGradient;
-        ctx.fillRect(v1.x, cliffBottomY - 20, v2.x - v1.x, 20);
+        // F (front rectangle): v1-v2 top, v1'-v2' bottom - main waterfall
+        drawWaterfallOnFace(v1, v2, v1_bottom, v2_bottom, 'front', 5 + Math.floor(variant % 3));
+
+        // R (right parallelogram): v0-v1 top, v0'-v1' bottom - lighter, fewer streams
+        drawWaterfallOnFace(v0, v1, v0_bottom, v1_bottom, 'right', 3);
+
+        // Splash effects at all three bottom edges
+        const addSplash = (bottomLeft, bottomRight) => {
+            for (let i = 0; i < 8; i++) {
+                const t = Math.random();
+                const splashX = bottomLeft.x + (bottomRight.x - bottomLeft.x) * t;
+                const splashY = bottomLeft.y + (bottomRight.y - bottomLeft.y) * t - 3 + Math.random() * 6;
+                ctx.beginPath();
+                ctx.arc(splashX, splashY, 1.5 + Math.random() * 3, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(240, 249, 255, ${0.2 + Math.random() * 0.3})`;
+                ctx.fill();
+            }
+        };
+
+        addSplash(v2_bottom, v3_bottom);
+        addSplash(v1_bottom, v2_bottom);
+        addSplash(v0_bottom, v1_bottom);
 
         ctx.restore();
     },
