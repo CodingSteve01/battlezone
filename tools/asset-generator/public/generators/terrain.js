@@ -591,13 +591,12 @@ const TerrainGenerator = {
     /**
      * Render the earth/cliff layer below the hex surface
      * Creates a 3D isometric platform with three connected faces:
-     * - L (left triangle): v2 at top, v2'-v3' at bottom
+     * - L (left quadrilateral): v3-v2 edge at top, v3'-v2' at bottom
      * - F (front rectangle): v1-v2 at top, v1'-v2' at bottom
-     * - R (right triangle): v1 at top, v1'-v0' at bottom
+     * - R (right quadrilateral): v0-v1 edge at top, v0'-v1' at bottom
      *
-     * The earth layer starts at the BOTTOM edge of the hexagon (v1, v2)
-     * not at the middle (v0, v3). This ensures the earth appears
-     * only BELOW the hexagon, not beside it.
+     * The earth layer connects directly to the hex edges from the
+     * outermost points (v0=E, v3=W) down to the bottom vertices.
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -618,33 +617,32 @@ const TerrainGenerator = {
         // Small overlap to prevent anti-aliasing gaps between hex surface and earth layer
         const overlap = 2;
 
-        // All bottom vertices are at the SAME Y level - the deepest hex point plus earthHeight
-        const bottomY = vertices[1].y + earthHeight;
+        // Create bottom vertices - each directly below its top vertex (vertical drop)
+        const v0_bottom = { x: vertices[0].x, y: vertices[0].y + earthHeight };
+        const v1_bottom = { x: vertices[1].x, y: vertices[1].y + earthHeight };
+        const v2_bottom = { x: vertices[2].x, y: vertices[2].y + earthHeight };
+        const v3_bottom = { x: vertices[3].x, y: vertices[3].y + earthHeight };
 
-        // Create bottom vertices - X matches top, Y is at bottom level
-        const v0_bottom = { x: vertices[0].x, y: bottomY };
-        const v1_bottom = { x: vertices[1].x, y: bottomY };
-        const v2_bottom = { x: vertices[2].x, y: bottomY };
-        const v3_bottom = { x: vertices[3].x, y: bottomY };
-
-        // Adjusted bottom edge vertices with overlap for seamless connection
+        // Adjusted vertices with overlap for seamless connection to hex surface
+        const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
         const v1_adj = { x: vertices[1].x, y: vertices[1].y - overlap };
         const v2_adj = { x: vertices[2].x, y: vertices[2].y - overlap };
+        const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // L and R are now TRIANGULAR (start at bottom edge of hex, not middle)
-        // This ensures earth only appears BELOW the hexagon, not beside it
+        // L and R start from the outermost hex points (v3=W, v0=E)
+        // This ensures the cliff faces connect directly to the hex edges
 
-        // 1. L (left triangle): v2 at top, v2' and v3' at bottom
-        this.renderCliffFaceTriangle(ctx, v2_adj, v2_bottom, v3_bottom,
+        // 1. L (left quadrilateral): v3-v2 edge at top, v3'-v2' at bottom
+        this.renderCliffFaceIsometric(ctx, v2_adj, v3_adj, v2_bottom, v3_bottom,
             earthPalette, 'left', noise, variant);
 
         // 2. F (front rectangle): v1-v2 at top, v1'-v2' at bottom
         this.renderCliffFaceIsometric(ctx, v1_adj, v2_adj, v1_bottom, v2_bottom,
             earthPalette, 'front', noise, variant);
 
-        // 3. R (right triangle): v1 at top, v0' and v1' at bottom
-        this.renderCliffFaceTriangle(ctx, v1_adj, v1_bottom, v0_bottom,
+        // 3. R (right quadrilateral): v0-v1 edge at top, v0'-v1' at bottom
+        this.renderCliffFaceIsometric(ctx, v0_adj, v1_adj, v0_bottom, v1_bottom,
             earthPalette, 'right', noise, variant);
     },
 
@@ -871,6 +869,9 @@ const TerrainGenerator = {
             });
         }
 
+        // Render dense grass across the hex surface based on noise map
+        this.renderSurfaceGrass(ctx, cx, cy, radius, darkGreen, midGreen, lightGreen, noise, variant);
+
         // Draw grass overhang on ALL visible edges of the hex and earth layer
         // Bottom edges of hex (v0-v1, v1-v2, v2-v3) - main grass overhang
         const bottomEdges = [
@@ -882,20 +883,77 @@ const TerrainGenerator = {
         for (const edge of bottomEdges) {
             this.renderEdgeGrass(ctx, edge.v1, edge.v2, edge.facing, darkGreen, midGreen, lightGreen, noise, variant, edge.density);
         }
+    },
 
-        // Also add grass tufts hanging down from the hex edge over the earth layer
-        // This creates a more natural overgrown look
-        const bottomY = vertices[1].y + earthHeight;
-        const v0_bottom = { x: vertices[0].x, y: bottomY };
-        const v1_bottom = { x: vertices[1].x, y: bottomY };
-        const v2_bottom = { x: vertices[2].x, y: bottomY };
-        const v3_bottom = { x: vertices[3].x, y: bottomY };
+    /**
+     * Render dense grass blades across the hex surface using noise map
+     * Creates a natural-looking grass coverage with varying density
+     */
+    renderSurfaceGrass(ctx, cx, cy, radius, darkColor, midColor, lightColor, noise, variant) {
+        // Grid-based grass placement with noise-driven density
+        const gridSpacing = 8; // Base spacing between grass tufts
+        const innerRadius = radius * 0.9; // Stay within hex bounds
 
-        // Add hanging grass/vines on the cliff faces
-        // L and R are now triangular (start at bottom edge of hex)
-        this.renderHangingGrassTriangle(ctx, vertices[2], v2_bottom, v3_bottom, 'left', darkGreen, midGreen, lightGreen, noise, variant);
-        this.renderHangingGrass(ctx, vertices[1], vertices[2], v1_bottom, v2_bottom, 'front', darkGreen, midGreen, lightGreen, noise, variant);
-        this.renderHangingGrassTriangle(ctx, vertices[1], v1_bottom, v0_bottom, 'right', darkGreen, midGreen, lightGreen, noise, variant);
+        // Calculate grid bounds
+        const gridSize = Math.ceil(innerRadius * 2 / gridSpacing);
+
+        for (let gx = -gridSize; gx <= gridSize; gx++) {
+            for (let gy = -gridSize; gy <= gridSize; gy++) {
+                // Calculate position with slight randomization
+                const baseX = cx + gx * gridSpacing;
+                const baseY = cy + gy * gridSpacing;
+
+                // Add noise-based offset
+                const offsetX = noise.noise2D(gx * 0.3 + variant, gy * 0.3) * gridSpacing * 0.4;
+                const offsetY = noise.noise2D(gy * 0.3, gx * 0.3 + variant) * gridSpacing * 0.4;
+
+                const x = baseX + offsetX;
+                const y = baseY + offsetY;
+
+                // Check if point is inside hex (approximate with distance)
+                const dx = x - cx;
+                const dy = y - cy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > innerRadius) continue;
+
+                // Use noise to determine if grass grows here (creates natural patches)
+                const densityNoise = noise.noise2D(x * 0.05 + variant * 0.1, y * 0.05);
+                if (densityNoise < -0.3) continue; // Skip sparse areas
+
+                // Calculate grass density based on noise
+                const density = Math.max(0.3, (densityNoise + 1) * 0.5);
+                const bladeCount = Math.floor(3 + density * 4);
+
+                // Draw grass tuft at this position
+                for (let b = 0; b < bladeCount; b++) {
+                    // Base angle is straight up (-PI/2) with natural variation
+                    const windNoise = noise.noise2D(x * 0.02, y * 0.02 + variant * 0.5);
+                    const bladeAngle = -Math.PI / 2 + windNoise * 0.3 + (Math.random() - 0.5) * 0.5;
+                    const bladeLength = 4 + Math.random() * 6 + density * 4;
+                    const tipBend = (Math.random() - 0.5) * 0.3 + windNoise * 0.2;
+
+                    const endX = x + Math.cos(bladeAngle + tipBend) * bladeLength;
+                    const endY = y + Math.sin(bladeAngle + tipBend) * bladeLength;
+                    const ctrlX = x + Math.cos(bladeAngle) * bladeLength * 0.6 + (Math.random() - 0.5) * 3;
+                    const ctrlY = y + Math.sin(bladeAngle) * bladeLength * 0.5;
+
+                    // Gradient from dark base to light tip
+                    const gradient = ctx.createLinearGradient(x, y, endX, endY);
+                    gradient.addColorStop(0, darkColor);
+                    gradient.addColorStop(0.4, midColor);
+                    gradient.addColorStop(0.8, lightColor);
+                    gradient.addColorStop(1, this.lightenColor(lightColor, 1.15));
+
+                    ctx.beginPath();
+                    ctx.moveTo(x + (b - bladeCount / 2) * 0.5, y);
+                    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 0.8 + Math.random() * 0.4;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+            }
+        }
     },
 
     /**
@@ -1269,12 +1327,11 @@ const TerrainGenerator = {
         const v2 = vertices[2];
         const v3 = vertices[3];
 
-        // All bottom vertices at the SAME Y level (consistent with renderEarthLayer)
-        const bottomY = v1.y + earthHeight;
-        const v0_bottom = { x: v0.x, y: bottomY };
-        const v1_bottom = { x: v1.x, y: bottomY };
-        const v2_bottom = { x: v2.x, y: bottomY };
-        const v3_bottom = { x: v3.x, y: bottomY };
+        // Bottom vertices - each directly below its top vertex (vertical drop)
+        const v0_bottom = { x: v0.x, y: v0.y + earthHeight };
+        const v1_bottom = { x: v1.x, y: v1.y + earthHeight };
+        const v2_bottom = { x: v2.x, y: v2.y + earthHeight };
+        const v3_bottom = { x: v3.x, y: v3.y + earthHeight };
 
         const waterLight = '#7dd3fc';
         const waterMid = '#38bdf8';
@@ -1402,14 +1459,14 @@ const TerrainGenerator = {
             }
         };
 
-        // L (left triangle): v2 top, v2'-v3' bottom
-        drawWaterfallOnTriangle(v2, v2_bottom, v3_bottom, 'left', 2);
+        // L (left quadrilateral): v3-v2 edge at top, v3'-v2' at bottom
+        drawWaterfallOnFace(v2, v3, v2_bottom, v3_bottom, 'left', 3);
 
         // F (front rectangle): v1-v2 top, v1'-v2' bottom - main waterfall
         drawWaterfallOnFace(v1, v2, v1_bottom, v2_bottom, 'front', 5 + Math.floor(variant % 3));
 
-        // R (right triangle): v1 top, v1'-v0' bottom
-        drawWaterfallOnTriangle(v1, v1_bottom, v0_bottom, 'right', 2);
+        // R (right quadrilateral): v0-v1 edge at top, v0'-v1' at bottom
+        drawWaterfallOnFace(v0, v1, v0_bottom, v1_bottom, 'right', 3);
 
         // Splash effects at all three bottom edges
         const addSplash = (bottomLeft, bottomRight) => {
