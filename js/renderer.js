@@ -4974,17 +4974,15 @@ function drawMinimap(w, h) {
     // Determine size and position based on mode
     let size, x, y;
     if (isExpanded) {
-        // Expanded mode: use full available screen width and height
-        const topBarHeight = 55;
-        const bottomUIHeight = 300;
-        const availableWidth = Math.max(0, w - config.PADDING * 2);
-        const availableHeight = Math.max(0, h - topBarHeight - bottomUIHeight - config.PADDING * 2);
+        // Expanded mode: use nearly full screen (with minimal padding)
+        const padding = 20;  // Small padding from edges
+        const availableWidth = Math.max(0, w - padding * 2);
+        const availableHeight = Math.max(0, h - padding * 2);
         // Use full available space - take the smaller of width/height to maintain square aspect
         size = Math.min(availableWidth, availableHeight);
         if (size <= 0) return;
         x = (w - size) / 2;
-        // Center vertically in the available space between top bar and bottom UI
-        y = topBarHeight + config.PADDING + (availableHeight - size) / 2;
+        y = (h - size) / 2;
     } else {
         // Compact mode: top-left corner
         size = config.SIZE;
