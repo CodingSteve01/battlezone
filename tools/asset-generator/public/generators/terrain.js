@@ -591,18 +591,13 @@ const TerrainGenerator = {
     /**
      * Render the earth/cliff layer below the hex surface
      * Creates a 3D isometric platform with three connected faces:
-     * - L (left quadrilateral): v2-v3 at top, v2'-v3' at bottom
+     * - L (left triangle): v2 at top, v2'-v3' at bottom
      * - F (front rectangle): v1-v2 at top, v1'-v2' at bottom
-     * - R (right quadrilateral): v0-v1 at top, v0'-v1' at bottom
+     * - R (right triangle): v1 at top, v1'-v0' at bottom
      *
-     * All bottom vertices are at the SAME Y level (bottomY):
-     * v0' = (v0.x, bottomY)
-     * v1' = (v1.x, bottomY)
-     * v2' = (v2.x, bottomY)
-     * v3' = (v3.x, bottomY)
-     *
-     * This ensures proper quadrilaterals that don't self-intersect.
-     * L and R are trapezoids, F is a rectangle.
+     * The earth layer starts at the BOTTOM edge of the hexagon (v1, v2)
+     * not at the middle (v0, v3). This ensures the earth appears
+     * only BELOW the hexagon, not beside it.
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -615,44 +610,97 @@ const TerrainGenerator = {
             });
         }
 
-        // v0 = E (right point, "4" in user's sketch)
-        // v1 = SE (bottom right, "5" in user's sketch)
-        // v2 = SW (bottom left, "6" in user's sketch)
-        // v3 = W (left point, "7" in user's sketch)
+        // v0 = E (right point) at cy
+        // v1 = SE (bottom right) at cy + radius*sin(60°) - lowest point
+        // v2 = SW (bottom left) at cy + radius*sin(60°) - lowest point
+        // v3 = W (left point) at cy
 
         // Small overlap to prevent anti-aliasing gaps between hex surface and earth layer
         const overlap = 2;
 
         // All bottom vertices are at the SAME Y level - the deepest hex point plus earthHeight
-        // This is critical: v1 and v2 are the lowest points of the hex
         const bottomY = vertices[1].y + earthHeight;
 
-        // Create bottom vertices - all at the same Y level, but X matches the top vertex
-        // This creates proper quadrilaterals (trapezoids for L/R, rectangle for F)
+        // Create bottom vertices - X matches top, Y is at bottom level
         const v0_bottom = { x: vertices[0].x, y: bottomY };
         const v1_bottom = { x: vertices[1].x, y: bottomY };
         const v2_bottom = { x: vertices[2].x, y: bottomY };
         const v3_bottom = { x: vertices[3].x, y: bottomY };
 
-        // Adjusted top vertices with overlap for seamless connection to hex surface
-        const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
+        // Adjusted bottom edge vertices with overlap for seamless connection
         const v1_adj = { x: vertices[1].x, y: vertices[1].y - overlap };
         const v2_adj = { x: vertices[2].x, y: vertices[2].y - overlap };
-        const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
+        // L and R are now TRIANGULAR (start at bottom edge of hex, not middle)
+        // This ensures earth only appears BELOW the hexagon, not beside it
 
-        // 1. L (left quadrilateral): v2-v3 at top, v2'-v3' at bottom
-        this.renderCliffFaceIsometric(ctx, v2_adj, v3_adj, v2_bottom, v3_bottom,
+        // 1. L (left triangle): v2 at top, v2' and v3' at bottom
+        this.renderCliffFaceTriangle(ctx, v2_adj, v2_bottom, v3_bottom,
             earthPalette, 'left', noise, variant);
 
         // 2. F (front rectangle): v1-v2 at top, v1'-v2' at bottom
         this.renderCliffFaceIsometric(ctx, v1_adj, v2_adj, v1_bottom, v2_bottom,
             earthPalette, 'front', noise, variant);
 
-        // 3. R (right quadrilateral): v0-v1 at top, v0'-v1' at bottom
-        this.renderCliffFaceIsometric(ctx, v0_adj, v1_adj, v0_bottom, v1_bottom,
+        // 3. R (right triangle): v1 at top, v0' and v1' at bottom
+        this.renderCliffFaceTriangle(ctx, v1_adj, v1_bottom, v0_bottom,
             earthPalette, 'right', noise, variant);
+    },
+
+    /**
+     * Render a triangular cliff face (for L and R sides)
+     * This creates the proper isometric 3D appearance with earth starting at hex bottom edge
+     */
+    renderCliffFaceTriangle(ctx, topVertex, bottomLeft, bottomRight, earthPalette, facing, noise, variant) {
+        ctx.save();
+
+        // Create triangular path
+        ctx.beginPath();
+        ctx.moveTo(topVertex.x, topVertex.y);
+        ctx.lineTo(bottomLeft.x, bottomLeft.y);
+        ctx.lineTo(bottomRight.x, bottomRight.y);
+        ctx.closePath();
+
+        // Determine colors based on facing direction
+        let baseColor, shadowColor, highlightColor;
+        if (facing === 'left') {
+            baseColor = earthPalette.mid;
+            shadowColor = earthPalette.dark;
+            highlightColor = earthPalette.light;
+        } else {
+            baseColor = this.darkenColor(earthPalette.mid, 0.7);
+            shadowColor = this.darkenColor(earthPalette.dark, 0.6);
+            highlightColor = earthPalette.mid;
+        }
+
+        // Create gradient
+        const gradient = ctx.createLinearGradient(topVertex.x, topVertex.y, bottomLeft.x, bottomLeft.y);
+        gradient.addColorStop(0, highlightColor);
+        gradient.addColorStop(0.3, baseColor);
+        gradient.addColorStop(0.7, baseColor);
+        gradient.addColorStop(1, shadowColor);
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Add subtle texture lines
+        ctx.clip();
+        ctx.strokeStyle = this.darkenColor(baseColor, 0.85);
+        ctx.lineWidth = 0.5;
+
+        const height = bottomLeft.y - topVertex.y;
+        const strataCount = Math.floor(height / 12);
+        for (let i = 0; i < strataCount; i++) {
+            const y = topVertex.y + (i / strataCount) * height;
+            const noiseOffset = noise.noise2D(i * 0.3, variant * 0.1) * 4;
+            ctx.beginPath();
+            ctx.moveTo(topVertex.x - 20, y + noiseOffset);
+            ctx.lineTo(bottomRight.x + 20, y + noiseOffset);
+            ctx.stroke();
+        }
+
+        ctx.restore();
     },
 
     /**
@@ -844,9 +892,60 @@ const TerrainGenerator = {
         const v3_bottom = { x: vertices[3].x, y: bottomY };
 
         // Add hanging grass/vines on the cliff faces
-        this.renderHangingGrass(ctx, vertices[2], vertices[3], v2_bottom, v3_bottom, 'left', darkGreen, midGreen, lightGreen, noise, variant);
+        // L and R are now triangular (start at bottom edge of hex)
+        this.renderHangingGrassTriangle(ctx, vertices[2], v2_bottom, v3_bottom, 'left', darkGreen, midGreen, lightGreen, noise, variant);
         this.renderHangingGrass(ctx, vertices[1], vertices[2], v1_bottom, v2_bottom, 'front', darkGreen, midGreen, lightGreen, noise, variant);
-        this.renderHangingGrass(ctx, vertices[0], vertices[1], v0_bottom, v1_bottom, 'right', darkGreen, midGreen, lightGreen, noise, variant);
+        this.renderHangingGrassTriangle(ctx, vertices[1], v1_bottom, v0_bottom, 'right', darkGreen, midGreen, lightGreen, noise, variant);
+    },
+
+    /**
+     * Render hanging grass/vines on a triangular cliff face
+     */
+    renderHangingGrassTriangle(ctx, topVertex, bottomLeft, bottomRight, _facing, darkColor, midColor, lightColor, _noise, _variant) {
+        // Calculate the bottom edge length for vine count
+        const bottomEdgeLength = Math.abs(bottomRight.x - bottomLeft.x);
+        const vineCount = Math.floor(bottomEdgeLength / 15);
+
+        for (let i = 0; i < vineCount; i++) {
+            const t = (i + 0.5 + (Math.random() - 0.5) * 0.3) / vineCount;
+
+            // All vines start from the single top vertex
+            const startX = topVertex.x;
+            const startY = topVertex.y;
+
+            // End position is along the bottom edge
+            const endX = bottomLeft.x + (bottomRight.x - bottomLeft.x) * t;
+            const endY = bottomLeft.y;
+
+            // Vine length - doesn't go all the way down
+            const vineLength = 0.15 + Math.random() * 0.35;
+            const vineEndX = startX + (endX - startX) * vineLength;
+            const vineEndY = startY + (endY - startY) * vineLength;
+
+            // Draw hanging grass blade
+            const gradient = ctx.createLinearGradient(startX, startY, vineEndX, vineEndY);
+            gradient.addColorStop(0, darkColor);
+            gradient.addColorStop(0.5, midColor);
+            gradient.addColorStop(1, lightColor);
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            const ctrlX = startX + (vineEndX - startX) * 0.5 + (Math.random() - 0.5) * 8;
+            const ctrlY = startY + (vineEndY - startY) * 0.7;
+            ctx.quadraticCurveTo(ctrlX, ctrlY, vineEndX, vineEndY);
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 1 + Math.random() * 0.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Add small leaf at end
+            if (Math.random() > 0.5) {
+                ctx.beginPath();
+                ctx.arc(vineEndX, vineEndY, 2, 0, Math.PI * 2);
+                ctx.fillStyle = lightColor;
+                ctx.fill();
+            }
+        }
     },
 
     /**
@@ -1250,14 +1349,67 @@ const TerrainGenerator = {
         };
 
         // Draw waterfalls on all three faces
-        // L (left parallelogram): v2-v3 top, v2'-v3' bottom - darker, fewer streams
-        drawWaterfallOnFace(v2, v3, v2_bottom, v3_bottom, 'left', 3);
+        // L and R are now triangular (single top vertex)
+
+        // Helper to draw waterfall on triangular face
+        const drawWaterfallOnTriangle = (topVertex, bottomLeft, bottomRight, facing, streamCount) => {
+            for (let s = 0; s < streamCount; s++) {
+                const t = (s + 0.5) / streamCount;
+
+                // All streams start from the single top vertex
+                const startX = topVertex.x;
+                const startY = topVertex.y;
+
+                // End position is along the bottom edge
+                const endX = bottomLeft.x + (bottomRight.x - bottomLeft.x) * t;
+                const endY = bottomLeft.y;
+
+                const streamWidth = 5 + noise.noise2D(s * 5 + facing.charCodeAt(0), variant) * 3;
+
+                const gradient = ctx.createLinearGradient(startX, startY, endX, endY);
+                gradient.addColorStop(0, waterLight);
+                gradient.addColorStop(0.3, waterMid);
+                gradient.addColorStop(0.7, waterDark);
+                gradient.addColorStop(1, waterMid);
+
+                ctx.beginPath();
+                const segments = 10;
+
+                // Left edge of stream
+                for (let i = 0; i <= segments; i++) {
+                    const segT = i / segments;
+                    const x = startX + (endX - startX) * segT;
+                    const y = startY + (endY - startY) * segT;
+                    const waveOffset = Math.sin(segT * Math.PI * 3 + variant + s) * 2;
+                    const width = streamWidth * (0.6 + segT * 0.4); // Widen as it falls
+                    if (i === 0) ctx.moveTo(x + waveOffset - width / 2, y);
+                    else ctx.lineTo(x + waveOffset - width / 2, y);
+                }
+
+                // Right edge of stream (reverse)
+                for (let i = segments; i >= 0; i--) {
+                    const segT = i / segments;
+                    const x = startX + (endX - startX) * segT;
+                    const y = startY + (endY - startY) * segT;
+                    const waveOffset = Math.sin(segT * Math.PI * 3 + variant + s) * 2;
+                    const width = streamWidth * (0.6 + segT * 0.4);
+                    ctx.lineTo(x + waveOffset + width / 2, y);
+                }
+
+                ctx.closePath();
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+        };
+
+        // L (left triangle): v2 top, v2'-v3' bottom
+        drawWaterfallOnTriangle(v2, v2_bottom, v3_bottom, 'left', 2);
 
         // F (front rectangle): v1-v2 top, v1'-v2' bottom - main waterfall
         drawWaterfallOnFace(v1, v2, v1_bottom, v2_bottom, 'front', 5 + Math.floor(variant % 3));
 
-        // R (right parallelogram): v0-v1 top, v0'-v1' bottom - lighter, fewer streams
-        drawWaterfallOnFace(v0, v1, v0_bottom, v1_bottom, 'right', 3);
+        // R (right triangle): v1 top, v1'-v0' bottom
+        drawWaterfallOnTriangle(v1, v1_bottom, v0_bottom, 'right', 2);
 
         // Splash effects at all three bottom edges
         const addSplash = (bottomLeft, bottomRight) => {
