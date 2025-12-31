@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.1...shadow-squad-v4.0.2) (2025-12-31)
+
+
+### Bug Fixes
+
+* **assets:** correct cliff face geometry and add surface grass ([#249](https://github.com/CodingSteve01/battlezone/issues/249)) ([058b7c4](https://github.com/CodingSteve01/battlezone/commit/058b7c488f79b6adb7109160197dd19c3e973828))
+* **assets:** correct hexagon earth layer positioning ([#247](https://github.com/CodingSteve01/battlezone/issues/247)) ([ca0951a](https://github.com/CodingSteve01/battlezone/commit/ca0951a9b5ce204b5a588a29b945712273b9bf26))
+* **assets:** use flat bottom for cliff faces ([#251](https://github.com/CodingSteve01/battlezone/issues/251)) ([bb18aa3](https://github.com/CodingSteve01/battlezone/commit/bb18aa30198382cffca7e3601aac426f5a9765bd))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#245](https://github.com/CodingSteve01/battlezone/issues/245)) ([0451921](https://github.com/CodingSteve01/battlezone/commit/045192183ab4a2ed4a3f746ac9586de2ea239281))
+* **assets:** Update generated sprite sheets ([#248](https://github.com/CodingSteve01/battlezone/issues/248)) ([d0695b8](https://github.com/CodingSteve01/battlezone/commit/d0695b8ce34c242d10b2d449a724772f185fb952))
+
 ## [4.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.0...shadow-squad-v4.0.1) (2025-12-31)
 
 
