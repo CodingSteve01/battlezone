@@ -3891,6 +3891,17 @@ export function render() {
         });
     }
 
+    // CRITICAL: Sort hexes by Y position (back-to-front) for correct isometric rendering
+    // Lower Y = further back, should be drawn first
+    // Also consider hex row (r) for consistent ordering of same-height tiles
+    visibleHexData.sort((a, b) => {
+        // Primary sort by screen Y position
+        const yDiff = a.sy - b.sy;
+        if (Math.abs(yDiff) > 0.5) return yDiff;
+        // Secondary sort by hex row for consistent ordering
+        return a.hex.r - b.hex.r;
+    });
+
     // PASS 1: Draw earth layers (cliff faces) FIRST
     // Only needed for isometric tiles with earth layer
     if (hasIsometricEarthLayer) {
