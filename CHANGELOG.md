@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.2...shadow-squad-v4.0.3) (2025-12-31)
+
+
+### Bug Fixes
+
+* **assets:** correct cliff face vertex parameter order ([#258](https://github.com/CodingSteve01/battlezone/issues/258)) ([9dda745](https://github.com/CodingSteve01/battlezone/commit/9dda745769da88fed349c9317411d820d8eecd8d))
+* **assets:** use flat bottom for cliff faces ([#254](https://github.com/CodingSteve01/battlezone/issues/254)) ([2c1ee45](https://github.com/CodingSteve01/battlezone/commit/2c1ee45bd4afc5b402f708159d2020e9b6da89e0))
+
 ## [4.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.1...shadow-squad-v4.0.2) (2025-12-31)
 
 
