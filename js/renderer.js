@@ -4164,8 +4164,8 @@ export function render() {
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
-        // Reduced transparency alpha from 0.35 to 0.2 for much better unit visibility
-        const finalAlpha = needsTransparency ? visibilityAlpha * 0.2 : visibilityAlpha;
+        // Trees stay mostly visible (80% opacity) - units show as outlines behind them
+        const finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
 
         if (finalAlpha < 0.99) {
             ctx.save();

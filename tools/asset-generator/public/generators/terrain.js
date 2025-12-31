@@ -63,7 +63,8 @@ const TerrainGenerator = {
             earthType: 'rock',
             detailType: 'stone',
             noiseScale: 0.04,
-            hasGrassOverhang: false
+            hasGrassOverhang: false,
+            hasRockOverhang: true
         },
         water: {
             // Clear blue water with visible bottom
@@ -574,6 +575,11 @@ const TerrainGenerator = {
             this.renderGrassOverhang(ctx, hexCenterX, hexCenterY, radius, earthHeight, terrain, noise, variant);
         }
 
+        // Add rock overhang for rock terrain - boulders extending above the hex
+        if (terrain.hasRockOverhang) {
+            this.renderRockOverhang(ctx, hexCenterX, hexCenterY, radius, earthHeight, terrain, noise, variant);
+        }
+
         // Add waterfall for water terrain
         if (type === 'water' || type === 'river' || type.startsWith('stream')) {
             this.renderWaterfall(ctx, hexCenterX, hexCenterY, radius, earthHeight, noise, variant);
@@ -585,18 +591,18 @@ const TerrainGenerator = {
     /**
      * Render the earth/cliff layer below the hex surface
      * Creates a 3D isometric platform with three connected faces:
-     * - L (left parallelogram): v2-v3 at top, v2'-v3' at bottom
+     * - L (left quadrilateral): v2-v3 at top, v2'-v3' at bottom
      * - F (front rectangle): v1-v2 at top, v1'-v2' at bottom
-     * - R (right parallelogram): v0-v1 at top, v0'-v1' at bottom
+     * - R (right quadrilateral): v0-v1 at top, v0'-v1' at bottom
      *
-     * Each vertex is duplicated vertically downward by earthHeight:
-     * v0' = (v0.x, v0.y + earthHeight)
-     * v1' = (v1.x, v1.y + earthHeight)
-     * v2' = (v2.x, v2.y + earthHeight)
-     * v3' = (v3.x, v3.y + earthHeight)
+     * All bottom vertices are at the SAME Y level (bottomY):
+     * v0' = (v0.x, bottomY)
+     * v1' = (v1.x, bottomY)
+     * v2' = (v2.x, bottomY)
+     * v3' = (v3.x, bottomY)
      *
-     * This creates TRUE parallelograms for L and R (not trapezoids),
-     * because the vertical edges are parallel and the horizontal offset is preserved.
+     * This ensures proper quadrilaterals that don't self-intersect.
+     * L and R are trapezoids, F is a rectangle.
      */
     renderEarthLayer(ctx, cx, cy, radius, earthHeight, earthPalette, noise, variant) {
         // For flat-top hex vertices at angles: 0° (E), 60° (SE), 120° (SW), 180° (W), 240° (NW), 300° (NE)
@@ -617,12 +623,16 @@ const TerrainGenerator = {
         // Small overlap to prevent anti-aliasing gaps between hex surface and earth layer
         const overlap = 2;
 
-        // Create bottom vertices by duplicating each top vertex vertically downward
-        // This is the key difference: each vertex moves straight down, creating parallelograms
-        const v0_bottom = { x: vertices[0].x, y: vertices[0].y + earthHeight };
-        const v1_bottom = { x: vertices[1].x, y: vertices[1].y + earthHeight };
-        const v2_bottom = { x: vertices[2].x, y: vertices[2].y + earthHeight };
-        const v3_bottom = { x: vertices[3].x, y: vertices[3].y + earthHeight };
+        // All bottom vertices are at the SAME Y level - the deepest hex point plus earthHeight
+        // This is critical: v1 and v2 are the lowest points of the hex
+        const bottomY = vertices[1].y + earthHeight;
+
+        // Create bottom vertices - all at the same Y level, but X matches the top vertex
+        // This creates proper quadrilaterals (trapezoids for L/R, rectangle for F)
+        const v0_bottom = { x: vertices[0].x, y: bottomY };
+        const v1_bottom = { x: vertices[1].x, y: bottomY };
+        const v2_bottom = { x: vertices[2].x, y: bottomY };
+        const v3_bottom = { x: vertices[3].x, y: bottomY };
 
         // Adjusted top vertices with overlap for seamless connection to hex surface
         const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
@@ -631,20 +641,16 @@ const TerrainGenerator = {
         const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // All three faces connect seamlessly at shared edges
 
-        // 1. L (left parallelogram): v2-v3 at top, v2'-v3' at bottom
-        // This is a TRUE parallelogram because v2-v3 is parallel to v2'-v3'
+        // 1. L (left quadrilateral): v2-v3 at top, v2'-v3' at bottom
         this.renderCliffFaceIsometric(ctx, v2_adj, v3_adj, v2_bottom, v3_bottom,
             earthPalette, 'left', noise, variant);
 
         // 2. F (front rectangle): v1-v2 at top, v1'-v2' at bottom
-        // This is a rectangle because v1.y = v2.y and v1'.y = v2'.y
         this.renderCliffFaceIsometric(ctx, v1_adj, v2_adj, v1_bottom, v2_bottom,
             earthPalette, 'front', noise, variant);
 
-        // 3. R (right parallelogram): v0-v1 at top, v0'-v1' at bottom
-        // This is a TRUE parallelogram because v0-v1 is parallel to v0'-v1'
+        // 3. R (right quadrilateral): v0-v1 at top, v0'-v1' at bottom
         this.renderCliffFaceIsometric(ctx, v0_adj, v1_adj, v0_bottom, v1_bottom,
             earthPalette, 'right', noise, variant);
     },
@@ -817,24 +823,83 @@ const TerrainGenerator = {
             });
         }
 
-        // Draw grass overhang on bottom edges (0-1, 1-2, 2-3)
+        // Draw grass overhang on ALL visible edges of the hex and earth layer
+        // Bottom edges of hex (v0-v1, v1-v2, v2-v3) - main grass overhang
         const bottomEdges = [
-            { v1: vertices[0], v2: vertices[1], facing: 'se' },
-            { v1: vertices[1], v2: vertices[2], facing: 's' },
-            { v1: vertices[2], v2: vertices[3], facing: 'sw' }
+            { v1: vertices[0], v2: vertices[1], facing: 'se', density: 1.0 },
+            { v1: vertices[1], v2: vertices[2], facing: 's', density: 1.2 },
+            { v1: vertices[2], v2: vertices[3], facing: 'sw', density: 1.0 }
         ];
 
         for (const edge of bottomEdges) {
-            this.renderEdgeGrass(ctx, edge.v1, edge.v2, edge.facing, darkGreen, midGreen, lightGreen, noise, variant);
+            this.renderEdgeGrass(ctx, edge.v1, edge.v2, edge.facing, darkGreen, midGreen, lightGreen, noise, variant, edge.density);
+        }
+
+        // Also add grass tufts hanging down from the hex edge over the earth layer
+        // This creates a more natural overgrown look
+        const bottomY = vertices[1].y + earthHeight;
+        const v0_bottom = { x: vertices[0].x, y: bottomY };
+        const v1_bottom = { x: vertices[1].x, y: bottomY };
+        const v2_bottom = { x: vertices[2].x, y: bottomY };
+        const v3_bottom = { x: vertices[3].x, y: bottomY };
+
+        // Add hanging grass/vines on the cliff faces
+        this.renderHangingGrass(ctx, vertices[2], vertices[3], v2_bottom, v3_bottom, 'left', darkGreen, midGreen, lightGreen, noise, variant);
+        this.renderHangingGrass(ctx, vertices[1], vertices[2], v1_bottom, v2_bottom, 'front', darkGreen, midGreen, lightGreen, noise, variant);
+        this.renderHangingGrass(ctx, vertices[0], vertices[1], v0_bottom, v1_bottom, 'right', darkGreen, midGreen, lightGreen, noise, variant);
+    },
+
+    /**
+     * Render hanging grass/vines on a cliff face
+     */
+    renderHangingGrass(ctx, topLeft, topRight, bottomLeft, bottomRight, facing, darkColor, midColor, lightColor, noise, variant) {
+        const edgeLength = Math.sqrt((topRight.x - topLeft.x) ** 2 + (topRight.y - topLeft.y) ** 2);
+        const vineCount = Math.floor(edgeLength / 12);
+
+        for (let i = 0; i < vineCount; i++) {
+            const t = (i + 0.5 + (Math.random() - 0.5) * 0.3) / vineCount;
+            const startX = topLeft.x + (topRight.x - topLeft.x) * t;
+            const startY = topLeft.y + (topRight.y - topLeft.y) * t;
+            const endX = bottomLeft.x + (bottomRight.x - bottomLeft.x) * t;
+            const endY = bottomLeft.y + (bottomRight.y - bottomLeft.y) * t;
+
+            // Vine length - doesn't go all the way down
+            const vineLength = 0.2 + Math.random() * 0.4;
+            const vineEndX = startX + (endX - startX) * vineLength;
+            const vineEndY = startY + (endY - startY) * vineLength;
+
+            // Draw hanging grass blade
+            const gradient = ctx.createLinearGradient(startX, startY, vineEndX, vineEndY);
+            gradient.addColorStop(0, darkColor);
+            gradient.addColorStop(0.5, midColor);
+            gradient.addColorStop(1, lightColor);
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            const ctrlX = startX + (vineEndX - startX) * 0.5 + (Math.random() - 0.5) * 8;
+            const ctrlY = startY + (vineEndY - startY) * 0.7;
+            ctx.quadraticCurveTo(ctrlX, ctrlY, vineEndX, vineEndY);
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 1 + Math.random() * 0.5;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Add small leaf at end
+            if (Math.random() > 0.5) {
+                ctx.beginPath();
+                ctx.arc(vineEndX, vineEndY, 2, 0, Math.PI * 2);
+                ctx.fillStyle = lightColor;
+                ctx.fill();
+            }
         }
     },
 
     /**
      * Render grass tufts along a hex edge - grass grows UPWARD
      */
-    renderEdgeGrass(ctx, v1, v2, facing, darkColor, midColor, lightColor, noise, variant) {
+    renderEdgeGrass(ctx, v1, v2, facing, darkColor, midColor, lightColor, noise, variant, density = 1.0) {
         const edgeLength = Math.sqrt((v2.x - v1.x) ** 2 + (v2.y - v1.y) ** 2);
-        const tuftCount = Math.floor(edgeLength / 6); // More grass
+        const tuftCount = Math.floor((edgeLength / 6) * density); // More grass with density
         const edgeAngle = Math.atan2(v2.y - v1.y, v2.x - v1.x);
         const outwardAngle = edgeAngle + Math.PI / 2;
 
@@ -881,6 +946,212 @@ const TerrainGenerator = {
     },
 
     /**
+     * Render large realistic boulders that extend above the hex boundary
+     * Creates an imposing, impassable rock formation look
+     */
+    renderRockOverhang(ctx, cx, cy, radius, earthHeight, terrain, noise, variant) {
+        // Rock color palettes for natural variation
+        const rockPalettes = [
+            { base: '#5a5855', light: '#908a85', dark: '#3a3835', highlight: '#b5aba5' },
+            { base: '#656260', light: '#959290', dark: '#454240', highlight: '#c5c2c0' },
+            { base: '#4a4845', light: '#7a7875', dark: '#2a2825', highlight: '#aaa8a5' }
+        ];
+
+        // Get hex vertices for reference
+        const vertices = [];
+        for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i;
+            vertices.push({
+                x: cx + radius * Math.cos(angle),
+                y: cy + radius * Math.sin(angle)
+            });
+        }
+
+        // Draw 2-4 large boulders that extend above the hex
+        const boulderCount = 2 + Math.floor(Math.abs(noise.noise2D(variant * 7, 0)) * 3);
+
+        for (let i = 0; i < boulderCount; i++) {
+            const seed = variant * 100 + i * 17;
+
+            // Position boulders along the top edges of the hex (v3-v4, v4-v5, v5-v0)
+            // These are the edges that face "up" in isometric view
+            const edgeIndex = i % 3;
+            const edgePositions = [
+                { v1: vertices[4], v2: vertices[5] }, // NW-NE edge (top)
+                { v1: vertices[3], v2: vertices[4] }, // W-NW edge (upper left)
+                { v1: vertices[5], v2: vertices[0] }  // NE-E edge (upper right)
+            ];
+            const edge = edgePositions[edgeIndex];
+
+            // Position along the edge
+            const t = 0.2 + Math.abs(noise.noise2D(seed, i)) * 0.6;
+            const baseX = edge.v1.x + (edge.v2.x - edge.v1.x) * t;
+            const baseY = edge.v1.y + (edge.v2.y - edge.v1.y) * t;
+
+            // Boulder extends UPWARD (negative Y) from the hex edge
+            const boulderWidth = radius * (0.3 + Math.abs(noise.noise2D(seed + 1, i)) * 0.25);
+            const boulderHeight = radius * (0.4 + Math.abs(noise.noise2D(seed + 2, i)) * 0.35);
+
+            // Select color palette
+            const paletteIdx = Math.floor(Math.abs(noise.noise2D(i * 5, seed)) * rockPalettes.length);
+            const colors = rockPalettes[paletteIdx % rockPalettes.length];
+
+            // Draw the boulder with realistic 3D shading
+            this.drawRealisticBoulder(ctx, baseX, baseY - boulderHeight * 0.3, boulderWidth, boulderHeight, colors, noise, seed);
+        }
+
+        // Add some smaller accent rocks near the edges
+        const smallRockCount = 3 + Math.floor(Math.abs(noise.noise2D(variant * 3, 0)) * 4);
+        for (let i = 0; i < smallRockCount; i++) {
+            const seed = variant * 200 + i * 13;
+
+            // Position near hex edges
+            const angle = noise.noise2D(seed, i) * Math.PI * 2;
+            const dist = radius * (0.7 + Math.abs(noise.noise2D(i, seed)) * 0.35);
+            const rx = cx + Math.cos(angle) * dist;
+            const ry = cy + Math.sin(angle) * dist;
+
+            // Only draw if it's near the top half of the hex
+            if (ry < cy + radius * 0.2) {
+                const rockSize = radius * (0.12 + Math.abs(noise.noise2D(seed + 3, i)) * 0.1);
+                const paletteIdx = Math.floor(Math.abs(noise.noise2D(i * 3, seed)) * rockPalettes.length);
+                const colors = rockPalettes[paletteIdx % rockPalettes.length];
+
+                this.drawSmallRock(ctx, rx, ry - rockSize * 0.5, rockSize, colors, noise, seed);
+            }
+        }
+    },
+
+    /**
+     * Draw a single realistic boulder with 3D shading and texture
+     */
+    drawRealisticBoulder(ctx, x, y, width, height, colors, noise, seed) {
+        // Create irregular boulder outline using bezier curves
+        ctx.beginPath();
+
+        // Generate control points for organic boulder shape
+        const points = [];
+        const segments = 10;
+        for (let i = 0; i < segments; i++) {
+            const angle = (i / segments) * Math.PI * 2;
+            // Vary radius for irregular shape - more variation horizontally
+            const radiusVar = 0.7 + noise.noise2D(seed + i * 0.5, i * 0.3) * 0.35;
+            const rx = width * 0.5 * radiusVar;
+            const ry = height * 0.5 * (0.8 + noise.noise2D(i * 0.3, seed) * 0.25);
+
+            points.push({
+                x: x + Math.cos(angle) * rx,
+                y: y + Math.sin(angle) * ry
+            });
+        }
+
+        // Draw smooth boulder outline
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 0; i < points.length; i++) {
+            const curr = points[i];
+            const next = points[(i + 1) % points.length];
+            const midX = (curr.x + next.x) / 2;
+            const midY = (curr.y + next.y) / 2;
+            ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+        }
+        ctx.closePath();
+
+        // Create radial gradient for 3D effect - light from top-left
+        const grad = ctx.createRadialGradient(
+            x - width * 0.25, y - height * 0.3, 0,
+            x + width * 0.1, y + height * 0.2, Math.max(width, height) * 0.7
+        );
+        grad.addColorStop(0, colors.highlight);
+        grad.addColorStop(0.25, colors.light);
+        grad.addColorStop(0.6, colors.base);
+        grad.addColorStop(1, colors.dark);
+
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Add subtle outline
+        ctx.strokeStyle = colors.dark;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Add surface texture - cracks and facets
+        ctx.strokeStyle = colors.dark;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = 0.25;
+
+        // Draw 2-4 crack lines
+        const crackCount = 2 + Math.floor(Math.abs(noise.noise2D(seed * 2, 0)) * 3);
+        for (let c = 0; c < crackCount; c++) {
+            const startAngle = noise.noise2D(c * 8, seed) * Math.PI * 2;
+            const startDist = Math.abs(noise.noise2D(c, seed * 2)) * 0.3;
+            let cx1 = x + Math.cos(startAngle) * width * startDist;
+            let cy1 = y + Math.sin(startAngle) * height * startDist;
+
+            ctx.beginPath();
+            ctx.moveTo(cx1, cy1);
+
+            const segments = 2 + Math.floor(Math.abs(noise.noise2D(c * 3, seed)) * 2);
+            for (let s = 0; s < segments; s++) {
+                const crackAngle = startAngle + (noise.noise2D(cx1 * 0.1 + s, cy1 * 0.1) - 0.5) * Math.PI * 0.8;
+                const crackLen = (width + height) * 0.15 * (0.5 + Math.random() * 0.5);
+                cx1 += Math.cos(crackAngle) * crackLen;
+                cy1 += Math.sin(crackAngle) * crackLen;
+                ctx.lineTo(cx1, cy1);
+            }
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        // Add highlight on top-left
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.ellipse(x - width * 0.2, y - height * 0.25, width * 0.2, height * 0.12, -0.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Add shadow underneath for grounding
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(x + width * 0.05, y + height * 0.4, width * 0.35, height * 0.08, 0, 0, Math.PI * 2);
+        ctx.fill();
+    },
+
+    /**
+     * Draw a small accent rock
+     */
+    drawSmallRock(ctx, x, y, size, colors, noise, seed) {
+        // Simple irregular rock shape
+        ctx.beginPath();
+        const points = 6;
+        for (let i = 0; i <= points; i++) {
+            const angle = (i / points) * Math.PI * 2;
+            const r = size * (0.7 + noise.noise2D(seed + i, i * 0.5) * 0.4);
+            const px = x + Math.cos(angle) * r;
+            const py = y + Math.sin(angle) * r * 0.7; // Flatten vertically
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        // Simple gradient
+        const grad = ctx.createLinearGradient(x - size, y - size, x + size, y + size);
+        grad.addColorStop(0, colors.light);
+        grad.addColorStop(0.5, colors.base);
+        grad.addColorStop(1, colors.dark);
+
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Subtle outline
+        ctx.strokeStyle = colors.dark;
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.3;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    },
+
+    /**
      * Render waterfall effect on ALL THREE water terrain cliff faces (L, F, R)
      */
     renderWaterfall(ctx, cx, cy, radius, earthHeight, noise, variant) {
@@ -899,11 +1170,12 @@ const TerrainGenerator = {
         const v2 = vertices[2];
         const v3 = vertices[3];
 
-        // Bottom vertices - each vertex drops straight down
-        const v0_bottom = { x: v0.x, y: v0.y + earthHeight };
-        const v1_bottom = { x: v1.x, y: v1.y + earthHeight };
-        const v2_bottom = { x: v2.x, y: v2.y + earthHeight };
-        const v3_bottom = { x: v3.x, y: v3.y + earthHeight };
+        // All bottom vertices at the SAME Y level (consistent with renderEarthLayer)
+        const bottomY = v1.y + earthHeight;
+        const v0_bottom = { x: v0.x, y: bottomY };
+        const v1_bottom = { x: v1.x, y: bottomY };
+        const v2_bottom = { x: v2.x, y: bottomY };
+        const v3_bottom = { x: v3.x, y: bottomY };
 
         const waterLight = '#7dd3fc';
         const waterMid = '#38bdf8';
