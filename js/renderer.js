@@ -1090,6 +1090,12 @@ function applyLightingToColor(color, lightFactor) {
 /**
  * Collect all 3D faces for a hex (top face + cliff faces)
  * Returns array of face objects with vertices, color, depth for sorting
+ * @param {Object} hex - The hex object with q, r, height
+ * @param {number} cx - Screen X position (center)
+ * @param {number} cy - Screen Y position (BASE position without height offset - 3D system handles height)
+ * @param {number} size - Tile size in pixels
+ * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
+ * @param {Object} terrain - Terrain configuration object
  */
 function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     const faces = [];
@@ -1242,8 +1248,9 @@ function render3DHexMeshes(visibleHexData, tileSize) {
     const cliffFaces = [];
     const topFaces = [];
 
-    for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
-        const faces = collectHex3DFaces(hex, sx, sy, tileSize, fogLevel, terrain);
+    for (const { hex, sx, baseY, fogLevel, terrain } of visibleHexData) {
+        // Use baseY (original position without height offset) - the 3D system handles all height calculations
+        const faces = collectHex3DFaces(hex, sx, baseY, tileSize, fogLevel, terrain);
         for (const face of faces) {
             if (face.type === 'cliff') {
                 cliffFaces.push(face);
@@ -4146,6 +4153,9 @@ export function render() {
         const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
+        // Calculate base Y position (without height offset) for 3D system
+        // The 3D system handles all height calculations internally
+        const baseY = sy + pos.zOffset;
         const cullMargin = tileSize * 2 + pos.zOffset + earthLayerScaled;
 
         // Skip if off screen (with margin)
@@ -4161,6 +4171,7 @@ export function render() {
             hex,
             sx,
             sy,
+            baseY,  // Original Y without height offset (for 3D system)
             fogLevel,
             terrain,
             zOffset: pos.zOffset
@@ -4168,6 +4179,7 @@ export function render() {
     }
 
     // Render all hexes using 3D mesh system with proper depth sorting
+    // Pass baseY (without height offset) so 3D system handles all height calculations
     render3DHexMeshes(visibleHexData, tileSize);
 
     // Post-processing pass: Details, lighting, animations, overlays
