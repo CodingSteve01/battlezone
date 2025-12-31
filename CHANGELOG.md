@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.1...shadow-squad-v5.0.2) (2025-12-31)
+
+
+### Bug Fixes
+
+* **renderer:** correct earth edge and unit scaling issues ([#274](https://github.com/CodingSteve01/battlezone/issues/274)) ([8e85b05](https://github.com/CodingSteve01/battlezone/commit/8e85b050f0d60343601bcca3fa1f67c0e91ab206))
+* **renderer:** make maximized minimap use full screen size ([#272](https://github.com/CodingSteve01/battlezone/issues/272)) ([e3056ef](https://github.com/CodingSteve01/battlezone/commit/e3056ef1653981f6d3613b2dc5e719f91e5e3ae3))
+
 ## [5.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.0...shadow-squad-v5.0.1) (2025-12-31)
 
 
