@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.0...shadow-squad-v4.0.1) (2025-12-31)
+
+
+### Bug Fixes
+
+* **ui:** add rock overhangs and adjust tree transparency ([#244](https://github.com/CodingSteve01/battlezone/issues/244)) ([4b94454](https://github.com/CodingSteve01/battlezone/commit/4b94454a118b0780ed04839cdb0ef89918cae205))
+
 ## [4.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.7...shadow-squad-v4.0.0) (2025-12-31)
 
 
