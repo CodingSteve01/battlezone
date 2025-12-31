@@ -1129,12 +1129,17 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
         fogLevel: fogLevel
     });
 
-    // CLIFF FACES - only for edges where neighbor is lower
+    // CLIFF FACES - only for edges where neighbor EXISTS and is lower
+    // Don't draw cliff faces at map edges where there's no neighbor
     const neighbors = getNeighbors(hex.q, hex.r);
 
     neighbors.forEach((neighbor, direction) => {
         const neighborHex = getHex(neighbor.q, neighbor.r);
-        const neighborHeight = neighborHex?.height ?? 0;
+
+        // Skip if neighbor doesn't exist (map edge) - no cliff face needed
+        if (!neighborHex) return;
+
+        const neighborHeight = neighborHex.height ?? 0;
         const heightDiff = myHeight - neighborHeight;
 
         if (heightDiff <= 0) return; // No cliff if neighbor is same height or higher
@@ -1228,24 +1233,40 @@ function draw3DFace(face, texture = null) {
 }
 
 /**
- * Render all hexes using 3D mesh system with proper depth sorting
+ * Render all hexes using 3D mesh system with two-pass rendering
+ * Pass 1: Draw all cliff faces (earth edges) - these go BELOW tile surfaces
+ * Pass 2: Draw all top faces (tile surfaces) - these go ON TOP
  */
 function render3DHexMeshes(visibleHexData, tileSize) {
-    // Collect ALL faces from all hexes
-    const allFaces = [];
+    // Collect ALL faces from all hexes, separated by type
+    const cliffFaces = [];
+    const topFaces = [];
 
     for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
         const faces = collectHex3DFaces(hex, sx, sy, tileSize, fogLevel, terrain);
-        allFaces.push(...faces);
+        for (const face of faces) {
+            if (face.type === 'cliff') {
+                cliffFaces.push(face);
+            } else {
+                topFaces.push(face);
+            }
+        }
     }
 
-    // Sort faces by depth (Painter's Algorithm)
+    // Sort each layer by depth (Painter's Algorithm)
     // Lower depth = further back = draw first
-    allFaces.sort((a, b) => a.depth - b.depth);
+    cliffFaces.sort((a, b) => a.depth - b.depth);
+    topFaces.sort((a, b) => a.depth - b.depth);
 
-    // Draw all faces in sorted order
-    for (const face of allFaces) {
-        const texture = (face.type === 'top' && face.fogLevel === 'visible')
+    // PASS 1: Draw all cliff faces (earth edges) first
+    // These are always rendered BELOW tile surfaces
+    for (const face of cliffFaces) {
+        draw3DFace(face, null);
+    }
+
+    // PASS 2: Draw all top faces (tile surfaces) on top
+    for (const face of topFaces) {
+        const texture = (face.fogLevel === 'visible')
             ? getTerrainTexture(face.hex.type, face.hex.q, face.hex.r)
             : null;
         draw3DFace(face, texture);
