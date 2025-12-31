@@ -7,6 +7,11 @@
 
 * **ui:** improve tile earth layer and character sprite rendering ([#237](https://github.com/CodingSteve01/battlezone/issues/237)) ([456b1bb](https://github.com/CodingSteve01/battlezone/commit/456b1bb8e7eddd957fc033a184744a9bcfa05125))
 
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#238](https://github.com/CodingSteve01/battlezone/issues/238)) ([8c0532a](https://github.com/CodingSteve01/battlezone/commit/8c0532a096b9155a8276d81dd33c599d274d0663))
+
 ## [3.22.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.5...shadow-squad-v3.22.6) (2025-12-30)
 
 
