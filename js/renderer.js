@@ -1217,8 +1217,21 @@ function draw3DFace(face, texture = null) {
         const width = maxX - minX;
         const height = maxY - minY;
 
-        // Draw texture
-        ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // For isometric tiles, only draw the hex surface portion (crop out earth layer)
+            // The source sprite has hex surface at the top, earth layer below
+            const sourceHexHeight = tileInfo.hexHeight;
+            ctx.drawImage(
+                texture,
+                0, 0, texture.width, sourceHexHeight,  // Source: only hex surface
+                minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
+            );
+        } else {
+            // Non-isometric tiles: draw full texture
+            ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
+        }
 
         // Apply lighting overlay
         ctx.fillStyle = face.lighting < 0.9
@@ -3433,8 +3446,8 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
     // Draw the human sprite (uses static asset if available, otherwise runtime)
     // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    // Size increased from 1.3x to 1.7x for better visibility against trees
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size * 1.7, playerColor, unit.class, unitStatus, isSelected, unit.player);
+    // Note: Scaling is handled in assetLoader.js drawUnit() - don't scale here
+    drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, unitStatus, isSelected, unit.player);
 
     // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
     // separately in drawUnitOverlay() to ensure they're always on top of trees
