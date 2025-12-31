@@ -627,12 +627,13 @@ const TerrainGenerator = {
         const v2_bottom = { x: vertices[2].x, y: bottomY };
         const v3_bottom = { x: vertices[3].x, y: bottomY };
 
-        // Adjusted TOP vertices with overlap for seamless connection to hex surface
-        // These start at the actual hex edge positions (not offset down)
-        const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
-        const v1_adj = { x: vertices[1].x, y: vertices[1].y - overlap };
-        const v2_adj = { x: vertices[2].x, y: vertices[2].y - overlap };
-        const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
+        // Adjusted TOP vertices - ALL start at cy (hex center) for rectangular cliff faces
+        // The hex tile will be rendered on top, covering the upper portion
+        // This eliminates gaps between the tile and cliff edge (like waterfalls do)
+        const v0_adj = { x: vertices[0].x, y: cy - overlap };
+        const v1_adj = { x: vertices[1].x, y: cy - overlap };
+        const v2_adj = { x: vertices[2].x, y: cy - overlap };
+        const v3_adj = { x: vertices[3].x, y: cy - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
         // renderCliffFaceIsometric draws: v1 → v2 → v2Bottom → v1Bottom
