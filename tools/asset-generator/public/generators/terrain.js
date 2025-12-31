@@ -617,32 +617,36 @@ const TerrainGenerator = {
         // Small overlap to prevent anti-aliasing gaps between hex surface and earth layer
         const overlap = 2;
 
-        // Create bottom vertices - each directly below its top vertex (vertical drop)
-        const v0_bottom = { x: vertices[0].x, y: vertices[0].y + earthHeight };
-        const v1_bottom = { x: vertices[1].x, y: vertices[1].y + earthHeight };
-        const v2_bottom = { x: vertices[2].x, y: vertices[2].y + earthHeight };
-        const v3_bottom = { x: vertices[3].x, y: vertices[3].y + earthHeight };
+        // All bottom vertices at the SAME Y level (flat bottom for isometric look)
+        // The bottom Y is the lowest hex point (v1/v2) plus earthHeight
+        const bottomY = vertices[1].y + earthHeight;
 
-        // Adjusted vertices with overlap for seamless connection to hex surface
+        // Create bottom vertices - X matches top vertex, Y is flat at bottomY
+        const v0_bottom = { x: vertices[0].x, y: bottomY };
+        const v1_bottom = { x: vertices[1].x, y: bottomY };
+        const v2_bottom = { x: vertices[2].x, y: bottomY };
+        const v3_bottom = { x: vertices[3].x, y: bottomY };
+
+        // Adjusted TOP vertices with overlap for seamless connection to hex surface
+        // These start at the actual hex edge positions (not offset down)
         const v0_adj = { x: vertices[0].x, y: vertices[0].y - overlap };
         const v1_adj = { x: vertices[1].x, y: vertices[1].y - overlap };
         const v2_adj = { x: vertices[2].x, y: vertices[2].y - overlap };
         const v3_adj = { x: vertices[3].x, y: vertices[3].y - overlap };
 
         // Draw 3 cliff faces in back-to-front order for proper layering
-        // L and R start from the outermost hex points (v3=W, v0=E)
-        // This ensures the cliff faces connect directly to the hex edges
+        // Each face is a parallelogram: top-left → bottom-left → bottom-right → top-right
 
-        // 1. L (left quadrilateral): v3-v2 edge at top, v3'-v2' at bottom
-        this.renderCliffFaceIsometric(ctx, v2_adj, v3_adj, v2_bottom, v3_bottom,
+        // 1. L (left parallelogram): v3 → v3' → v2' → v2
+        this.renderCliffFaceIsometric(ctx, v3_adj, v3_bottom, v2_bottom, v2_adj,
             earthPalette, 'left', noise, variant);
 
-        // 2. F (front rectangle): v1-v2 at top, v1'-v2' at bottom
-        this.renderCliffFaceIsometric(ctx, v1_adj, v2_adj, v1_bottom, v2_bottom,
+        // 2. F (front rectangle): v2 → v2' → v1' → v1
+        this.renderCliffFaceIsometric(ctx, v2_adj, v2_bottom, v1_bottom, v1_adj,
             earthPalette, 'front', noise, variant);
 
-        // 3. R (right quadrilateral): v0-v1 edge at top, v0'-v1' at bottom
-        this.renderCliffFaceIsometric(ctx, v0_adj, v1_adj, v0_bottom, v1_bottom,
+        // 3. R (right parallelogram): v0 → v0' → v1' → v1
+        this.renderCliffFaceIsometric(ctx, v0_adj, v0_bottom, v1_bottom, v1_adj,
             earthPalette, 'right', noise, variant);
     },
 
@@ -1327,11 +1331,12 @@ const TerrainGenerator = {
         const v2 = vertices[2];
         const v3 = vertices[3];
 
-        // Bottom vertices - each directly below its top vertex (vertical drop)
-        const v0_bottom = { x: v0.x, y: v0.y + earthHeight };
-        const v1_bottom = { x: v1.x, y: v1.y + earthHeight };
-        const v2_bottom = { x: v2.x, y: v2.y + earthHeight };
-        const v3_bottom = { x: v3.x, y: v3.y + earthHeight };
+        // All bottom vertices at the SAME Y level (flat bottom, consistent with renderEarthLayer)
+        const bottomY = v1.y + earthHeight;
+        const v0_bottom = { x: v0.x, y: bottomY };
+        const v1_bottom = { x: v1.x, y: bottomY };
+        const v2_bottom = { x: v2.x, y: bottomY };
+        const v3_bottom = { x: v3.x, y: bottomY };
 
         const waterLight = '#7dd3fc';
         const waterMid = '#38bdf8';
@@ -1459,14 +1464,14 @@ const TerrainGenerator = {
             }
         };
 
-        // L (left quadrilateral): v3-v2 edge at top, v3'-v2' at bottom
-        drawWaterfallOnFace(v2, v3, v2_bottom, v3_bottom, 'left', 3);
+        // L (left parallelogram): top edge v3→v2, bottom edge v3'→v2'
+        drawWaterfallOnFace(v3, v2, v3_bottom, v2_bottom, 'left', 3);
 
-        // F (front rectangle): v1-v2 top, v1'-v2' bottom - main waterfall
-        drawWaterfallOnFace(v1, v2, v1_bottom, v2_bottom, 'front', 5 + Math.floor(variant % 3));
+        // F (front rectangle): top edge v2→v1, bottom edge v2'→v1'
+        drawWaterfallOnFace(v2, v1, v2_bottom, v1_bottom, 'front', 5 + Math.floor(variant % 3));
 
-        // R (right quadrilateral): v0-v1 edge at top, v0'-v1' at bottom
-        drawWaterfallOnFace(v0, v1, v0_bottom, v1_bottom, 'right', 3);
+        // R (right parallelogram): top edge v1→v0, bottom edge v1'→v0'
+        drawWaterfallOnFace(v1, v0, v1_bottom, v0_bottom, 'right', 3);
 
         // Splash effects at all three bottom edges
         const addSplash = (bottomLeft, bottomRight) => {
@@ -1481,9 +1486,9 @@ const TerrainGenerator = {
             }
         };
 
-        addSplash(v2_bottom, v3_bottom);
-        addSplash(v1_bottom, v2_bottom);
-        addSplash(v0_bottom, v1_bottom);
+        addSplash(v3_bottom, v2_bottom);  // L bottom edge
+        addSplash(v2_bottom, v1_bottom);  // F bottom edge
+        addSplash(v1_bottom, v0_bottom);  // R bottom edge
 
         ctx.restore();
     },
