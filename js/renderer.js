@@ -4199,10 +4199,9 @@ export function render() {
     visibleHexData.sort((a, b) => a.sy - b.sy);
 
     for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
-        // Static terrain details (small rocks, grass tufts)
-        if (fogLevel === 'visible' && shouldRenderDetails()) {
-            drawStaticTerrainDetails(sx, sy, assetSize, hex.type, hex.q, hex.r);
-        }
+        // NOTE: Static terrain details (grass, rocks, etc.) are already baked into
+        // the terrain sprite sheet tiles - no need to render them again
+        // Removed: drawStaticTerrainDetails() call
 
         // Height-based lighting and shading - always apply subtle height shading
         if (fogLevel === 'visible') {
@@ -4797,7 +4796,6 @@ function drawZoomIndicator(w, h) {
  */
 export const MINIMAP_CONFIG = {
     SIZE: 90,            // Minimap size in pixels (compact for mobile)
-    EXPANDED_SIZE: 380,  // Expanded minimap size (large view, nearly full screen)
     PADDING: 8,          // Padding from screen edge
     HEX_SIZE: 3,         // Size of each hex on minimap
     OPACITY: 0.5,        // Base opacity (more transparent)
@@ -4976,12 +4974,13 @@ function drawMinimap(w, h) {
     // Determine size and position based on mode
     let size, x, y;
     if (isExpanded) {
-        // Expanded mode: centered on screen, accounting for top bar (55px) and bottom UI (~300px)
+        // Expanded mode: use full available screen width and height
         const topBarHeight = 55;
         const bottomUIHeight = 300;
         const availableWidth = Math.max(0, w - config.PADDING * 2);
         const availableHeight = Math.max(0, h - topBarHeight - bottomUIHeight - config.PADDING * 2);
-        size = Math.min(config.EXPANDED_SIZE, availableWidth, availableHeight);
+        // Use full available space - take the smaller of width/height to maintain square aspect
+        size = Math.min(availableWidth, availableHeight);
         if (size <= 0) return;
         x = (w - size) / 2;
         // Center vertically in the available space between top bar and bottom UI
