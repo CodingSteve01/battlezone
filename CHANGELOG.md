@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.0...shadow-squad-v5.0.1) (2025-12-31)
+
+
+### Bug Fixes
+
+* **renderer:** minimap sizing, unit scaling, and terrain details ([#270](https://github.com/CodingSteve01/battlezone/issues/270)) ([46721fe](https://github.com/CodingSteve01/battlezone/commit/46721fe8d1a6b45fde9e7c65d1c53945b6a47f0b))
+
 ## [5.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.5...shadow-squad-v5.0.0) (2025-12-31)
 
 
