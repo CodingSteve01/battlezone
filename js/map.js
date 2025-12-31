@@ -413,10 +413,83 @@ function applyBiomePostProcessing(biome) {
     });
 }
 
+/**
+ * Apply terrain heights using biome-based procedural generation
+ * Creates a natural height profile that varies smoothly across the map
+ */
 function applyTerrainHeights() {
+    const biome = getActiveBiome();
+    const seed = state.mapSeed || 0;
+
+    // Biome-specific height variation settings
+    const heightSettings = getBiomeHeightSettings(biome);
+
     state.hexes.forEach(hex => {
-        hex.height = getHeightForTerrain(hex.type);
+        // Get base height from terrain type (constraints)
+        const baseHeight = getHeightForTerrain(hex.type);
+
+        // Water/swamp types always stay at height 0
+        if (baseHeight === 0) {
+            hex.height = 0;
+            return;
+        }
+
+        // Rock/cliff types stay at max height
+        if (baseHeight === CONFIG.HEIGHT.MAX) {
+            hex.height = CONFIG.HEIGHT.MAX;
+            return;
+        }
+
+        // For other terrain, apply procedural height variation
+        // Use elevation noise to create smooth height transitions
+        const elevationNoise = fractalNoise(hex.q, hex.r, heightSettings.scale, 3, seed + 5000);
+
+        // Map noise (0-1) to height variation
+        // Noise below threshold = lower, above = keep or raise
+        let height = baseHeight;
+
+        if (elevationNoise > heightSettings.raiseThreshold) {
+            // Raise terrain slightly
+            height = Math.min(baseHeight + 1, CONFIG.HEIGHT.MAX - 1);
+        } else if (elevationNoise < heightSettings.lowerThreshold) {
+            // Lower terrain slightly (but not below 1 for walkable terrain)
+            height = Math.max(baseHeight - 1, 1);
+        }
+
+        // Hills terrain gets extra height boost
+        if (hex.type === 'hills' || hex.type === 'gravel') {
+            height = Math.min(height + 1, CONFIG.HEIGHT.MAX - 1);
+        }
+
+        hex.height = height;
     });
+}
+
+/**
+ * Get biome-specific height generation settings
+ * Different biomes have different elevation characteristics
+ */
+function getBiomeHeightSettings(biome) {
+    const biomeName = state.activeBiome || 'temperate';
+
+    // Default settings for temperate biome
+    const defaults = {
+        scale: 12,           // Noise scale (larger = smoother hills)
+        raiseThreshold: 0.65, // Noise above this raises terrain
+        lowerThreshold: 0.35  // Noise below this lowers terrain
+    };
+
+    // Biome-specific overrides
+    const biomeSettings = {
+        temperate: { scale: 12, raiseThreshold: 0.65, lowerThreshold: 0.35 },
+        desert: { scale: 10, raiseThreshold: 0.60, lowerThreshold: 0.40 },     // More varied dunes
+        tundra: { scale: 14, raiseThreshold: 0.60, lowerThreshold: 0.40 },     // Rolling frozen plains
+        tropical: { scale: 16, raiseThreshold: 0.70, lowerThreshold: 0.30 },   // Flatter jungle floor
+        highland: { scale: 8, raiseThreshold: 0.55, lowerThreshold: 0.45 },    // Most varied - mountains
+        wetland: { scale: 18, raiseThreshold: 0.75, lowerThreshold: 0.25 }     // Very flat marshland
+    };
+
+    return biomeSettings[biomeName] || defaults;
 }
 
 /**
