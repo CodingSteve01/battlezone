@@ -2534,7 +2534,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
         // Mixed forest with trees distributed across entire hex including edges
         // Main trees: 4-6 per hex for dense forest feel
         const baseTreeCount = 4 + Math.abs(baseSeed % 3);
-        const hexRadius = s * 1.1; // Extend beyond hex center for edge trees
+        const hexRadius = s * 0.9; // Keep trees within hex boundaries
 
         for (let i = 0; i < baseTreeCount; i++) {
             // Distribute trees more widely, including edges and bottom
@@ -2568,7 +2568,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
         for (let i = 0; i < edgeTreeCount; i++) {
             // Place trees at hex edges (left, right, bottom corners)
             const edgeAngle = (i / edgeTreeCount) * Math.PI * 2 + seededRandom(baseSeed + i * 20 + 200) * 0.6;
-            const edgeRadius = hexRadius * (0.85 + seededRandom(baseSeed + i * 20 + 201) * 0.3);
+            const edgeRadius = hexRadius * (0.7 + seededRandom(baseSeed + i * 20 + 201) * 0.25);
 
             const tx = cx + Math.cos(edgeAngle) * edgeRadius * 0.9;
             const ty = cy + Math.sin(edgeAngle) * edgeRadius * 0.7 + TREE_Y_OFFSET;
@@ -2589,7 +2589,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
         // Dense undergrowth: multiple shrubs and small bushes
         const undergrowthCount = 3 + Math.abs((baseSeed + 100) % 3);
         for (let i = 0; i < undergrowthCount; i++) {
-            const shrubX = cx + (seededRandom(baseSeed + i * 15 + 101) - 0.5) * s * 1.4;
+            const shrubX = cx + (seededRandom(baseSeed + i * 15 + 101) - 0.5) * s * 0.8;
             const shrubY = cy + (seededRandom(baseSeed + i * 15 + 102) - 0.5) * s * 0.9;
             const shrubSize = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
 
@@ -2638,7 +2638,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
         if (grassType >= 20 && grassType < 50) {
             const shrubCount = 1 + Math.floor(seededRandom(baseSeed + 510) * 2);
             for (let i = 0; i < shrubCount; i++) {
-                const shrubX = cx + (seededRandom(baseSeed + i * 10 + 520) - 0.5) * s * 1.2;
+                const shrubX = cx + (seededRandom(baseSeed + i * 10 + 520) - 0.5) * s * 0.8;
                 const shrubY = cy + (seededRandom(baseSeed + i * 10 + 521) - 0.5) * s * 0.8;
                 const shrubSize = s * (0.25 + seededRandom(baseSeed + i * 10 + 522) * 0.2);
                 elements.push({
@@ -2675,7 +2675,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 x: rockX,
                 y: rockY,
                 sortY: rockY + SHRUB_SORT_OFFSET,
-                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.0, baseSeed + 702)
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 0.6, baseSeed + 702)
             });
         }
     } else if (type === 'hills') {
@@ -2690,7 +2690,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 x: rockX,
                 y: rockY,
                 sortY: rockY + TREE_SORT_OFFSET,
-                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.5, baseSeed + 802)
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 0.9, baseSeed + 802)
             });
         }
 
@@ -2716,7 +2716,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 x: rockX,
                 y: rockY,
                 sortY: rockY + SHRUB_SORT_OFFSET,
-                draw: () => drawRockFormation2D5(rockX, rockY, s * 0.8, baseSeed + 902)
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 0.48, baseSeed + 902)
             });
         }
     } else if (type === 'rock' || type === 'cliff') {
@@ -2726,7 +2726,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
             x: cx,
             y: cy,
             sortY: cy + TREE_SORT_OFFSET,  // Rocks sort like trees (tall elements)
-            draw: () => drawRockFormation2D5(cx, cy, s * 2.2, baseSeed)
+            draw: () => drawRockFormation2D5(cx, cy, s * 1.32, baseSeed)
         });
     } else if (type === 'ruins') {
         // Ruins have rock formations and broken walls
@@ -2739,7 +2739,7 @@ function collectForegroundElements(cx, cy, size, type, hexQ, hexR) {
                 x: rockX,
                 y: rockY,
                 sortY: rockY + TREE_SORT_OFFSET,
-                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.8, baseSeed)
+                draw: () => drawRockFormation2D5(rockX, rockY, s * 1.08, baseSeed)
             });
         }
         // Add some shrubs growing through ruins
@@ -2838,7 +2838,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             for (let r = 0; r < rockCount; r++) {
                 const rx = cx + (seededRandom(baseSeed * 13 + r) - 0.5) * size * 0.8;
                 const ry = cy + (seededRandom(baseSeed * 14 + r) - 0.5) * size * 0.6;
-                drawRockFormation2D5(rx, ry, s * 1.5, baseSeed + r * 50);
+                drawRockFormation2D5(rx, ry, s * 0.9, baseSeed + r * 50);
             }
             // Base shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
@@ -2876,7 +2876,7 @@ function drawStaticTerrainDetails(cx, cy, size, type, hexQ = 0, hexR = 0) {
             for (let r = 0; r < hillRockCount; r++) {
                 const rockX = cx + (seededRandom(baseSeed * 10 + r) - 0.5) * size * 0.7;
                 const rockY = cy + (seededRandom(baseSeed * 11 + r) - 0.5) * size * 0.5;
-                drawRockFormation2D5(rockX, rockY, s * 1.2, baseSeed + r * 100);
+                drawRockFormation2D5(rockX, rockY, s * 0.72, baseSeed + r * 100);
             }
             break;
 
@@ -3408,11 +3408,12 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     const outlineColor = getUnitOutlineColor(terrainColor);
 
     // Soft shadow under unit feet for grounding (subtle, no white circle)
+    // Position matches unit feet at cy + size * 0.3
     ctx.save();
     ctx.globalAlpha *= 0.25;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.2, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + size * 0.3, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 

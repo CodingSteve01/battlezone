@@ -236,10 +236,10 @@ export function drawUnit(ctx, cx, cy, size, playerColor, classType, status, isSe
         // Get anchor point for positioning (typically center-bottom)
         const anchor = SpriteSheet.getUnitAnchor(classType, playerIndex, status) || { x: 0.5, y: 1.0 };
 
-        // Base sprite size - increased from 1.35x to 1.7x for better visibility
+        // Base sprite size - reduced from 1.7x to 1.36x (20% smaller for better proportions)
         // Note: All units use the same base size regardless of sprite cropping
         // to ensure consistent sizing across all players
-        const baseSize = size * 1.7;
+        const baseSize = size * 1.36;
 
         // Calculate sprite dimensions maintaining aspect ratio
         const spriteWidth = baseSize * (sprite.width / sprite.height);
