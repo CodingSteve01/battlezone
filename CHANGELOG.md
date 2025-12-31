@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.0.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.3...shadow-squad-v4.0.4) (2025-12-31)
+
+
+### Bug Fixes
+
+* **assets:** start cliff faces from hex center for seamless tile connection ([#262](https://github.com/CodingSteve01/battlezone/issues/262)) ([9a9dcbe](https://github.com/CodingSteve01/battlezone/commit/9a9dcbe0d87faa1d8647ece87be3ef9af8cc9b34))
+* **renderer:** implement two-pass rendering for seamless cliff faces ([#264](https://github.com/CodingSteve01/battlezone/issues/264)) ([58d3019](https://github.com/CodingSteve01/battlezone/commit/58d3019afe5f3836fbd1d1e127ab71a3ad118237))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#263](https://github.com/CodingSteve01/battlezone/issues/263)) ([bcc1453](https://github.com/CodingSteve01/battlezone/commit/bcc1453408be52f9f40df3bbb18019324d8b51e1))
+* **main:** release shadow-squad 4.0.3 ([#260](https://github.com/CodingSteve01/battlezone/issues/260)) ([17ffa2a](https://github.com/CodingSteve01/battlezone/commit/17ffa2af8eb47e136fd0ffdaa8d4a216d45ce01b))
+
 ## [4.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.2...shadow-squad-v4.0.3) (2025-12-31)
 
 
