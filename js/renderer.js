@@ -1616,7 +1616,6 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
             const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
             const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
             const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
-            const earthLayerScaled = tileInfo.earthLayerHeight * scaleRatio;
 
             // Position: center hex surface at (cx, cy), earth layer extends below
             const drawX = cx - spriteWidth / 2;
@@ -1624,22 +1623,24 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
 
             if (renderPass === 'earth') {
                 // Pass 1: Draw only the earth layer (cliff face)
-                // Earth layer starts from hex center (cy) and extends down
-                // In the source sprite: earth layer is from hexHeight to totalHeight
-                const sourceEarthY = tileInfo.hexHeight;
-                const sourceEarthHeight = tileInfo.earthLayerHeight;
+                // In the source sprite, earth layer starts at hex CENTER (hexHeight/2),
+                // NOT at hexHeight! The cliff faces extend from hex center downward.
+                // The hex surface will be drawn on top in pass 2 to cover the overlap.
+                const sourceEarthY = Math.floor(tileInfo.hexHeight / 2);
+                const sourceEarthHeight = tileInfo.totalHeight - sourceEarthY;
 
-                // Destination: from hex center (cy) to bottom of sprite
-                // We draw from cy (hex center) downward
+                // Scale the earth layer height proportionally
+                const earthPortionScaled = sourceEarthHeight * scaleRatio;
+
+                // Destination: from hex center (cy) downward
                 const destY = cy;
-                const destHeight = earthLayerScaled;
 
                 context.drawImage(
                     texture,
-                    0, sourceEarthY,                           // Source: start of earth layer
-                    texture.width, sourceEarthHeight,          // Source: earth layer dimensions
+                    0, sourceEarthY,                           // Source: from hex center in sprite
+                    texture.width, sourceEarthHeight,          // Source: to bottom of sprite
                     drawX, destY,                              // Dest: start at hex center
-                    spriteWidth, destHeight                    // Dest: scaled earth layer
+                    spriteWidth, earthPortionScaled            // Dest: scaled height
                 );
             } else if (renderPass === 'surface') {
                 // Pass 2: Draw only the hex surface (top portion)
@@ -2108,7 +2109,6 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
             const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
             const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
             const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
-            const earthLayerScaled = tileInfo.earthLayerHeight * scaleRatio;
 
             // Position: center hex surface at (cx, cy), earth layer extends below
             const drawX = cx - spriteWidth / 2;
@@ -2116,17 +2116,17 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
 
             if (renderPass === 'earth') {
                 // Pass 1: Draw only the earth layer (cliff face)
-                const sourceEarthY = tileInfo.hexHeight;
-                const sourceEarthHeight = tileInfo.earthLayerHeight;
-                const destY = cy;
-                const destHeight = earthLayerScaled;
+                // Earth layer starts at hex CENTER (hexHeight/2), NOT at hexHeight!
+                const sourceEarthY = Math.floor(tileInfo.hexHeight / 2);
+                const sourceEarthHeight = tileInfo.totalHeight - sourceEarthY;
+                const earthPortionScaled = sourceEarthHeight * scaleRatio;
 
                 ctx.drawImage(
                     texture,
                     0, sourceEarthY,
                     texture.width, sourceEarthHeight,
-                    drawX, destY,
-                    spriteWidth, destHeight
+                    drawX, cy,
+                    spriteWidth, earthPortionScaled
                 );
             } else if (renderPass === 'surface') {
                 // Pass 2: Draw only the hex surface (top portion)
