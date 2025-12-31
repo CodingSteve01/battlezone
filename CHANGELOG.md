@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.2...shadow-squad-v5.0.3) (2025-12-31)
+
+
+### Bug Fixes
+
+* **renderer:** correct asset scaling, shadows, and placement boundaries ([#275](https://github.com/CodingSteve01/battlezone/issues/275)) ([d14e329](https://github.com/CodingSteve01/battlezone/commit/d14e3297d3491505b76cb2aff6c07bdaed03f7f9))
+
 ## [5.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.1...shadow-squad-v5.0.2) (2025-12-31)
 
 
