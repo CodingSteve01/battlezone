@@ -1106,11 +1106,14 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
 
     if (fogLevel === 'hidden') {
+        // Night/unexplored - very dark, almost black
         topColor = '#0a0a12';
         cliffColor = '#050508';
     } else if (fogLevel === 'explored') {
-        topColor = desaturateAndDarken(topColor, 0.4, 0.5);
-        cliffColor = desaturateAndDarken(cliffColor, 0.4, 0.5);
+        // Fog/not currently visible - desaturated but still recognizable
+        // Higher saturation (0.3) and brightness (0.7) than before for foggy look
+        topColor = desaturateAndDarken(topColor, 0.3, 0.7);
+        cliffColor = desaturateAndDarken(cliffColor, 0.3, 0.65);
     }
 
     // TOP FACE - the hex surface
@@ -1788,11 +1791,13 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
     let fillColor = terrain.color;
     const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
 
-    // Fog of war overlay
+    // Fog of war color adjustments
     if (fogLevel === 'hidden') {
-        fillColor = '#000000';
+        // Night - completely dark
+        fillColor = '#050810';
     } else if (fogLevel === 'explored') {
-        fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
+        // Fog - desaturated but still recognizable
+        fillColor = desaturateAndDarken(terrain.color, 0.3, 0.7);
     }
 
     // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
@@ -1818,40 +1823,47 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
 }
 
 /**
- * Draw explored hex shadow overlay to a context
- * Creates a clean, natural-looking dim effect for previously seen areas
+ * Draw explored hex fog overlay to a context
+ * Creates a foggy, desaturated effect for previously seen but not currently visible areas
+ * Should look like fog/mist - visible but unclear
  */
 function drawExploredOverlay(context, cx, cy, hexSize) {
     context.save();
 
-    // Single clean overlay with slight gradient for natural look
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    // Subtle radial gradient - darker at edges, slightly lighter in center
-    const dimGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(8, 12, 20, 0.6)');
-    if (typeof dimGradient !== 'string') {
-        dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-        dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-        dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
+    // Foggy overlay - light gray with transparency to desaturate underlying terrain
+    // Uses a subtle gradient for depth - edges slightly foggier than center
+    const fogGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(180, 190, 200, 0.45)');
+    if (typeof fogGradient !== 'string') {
+        fogGradient.addColorStop(0, 'rgba(200, 210, 220, 0.35)');   // Center: lighter fog
+        fogGradient.addColorStop(0.7, 'rgba(170, 180, 195, 0.45)'); // Mid: medium fog
+        fogGradient.addColorStop(1, 'rgba(150, 165, 180, 0.55)');   // Edge: denser fog
     }
-    context.fillStyle = dimGradient;
+    context.fillStyle = fogGradient;
     context.fill();
 
     context.restore();
 }
 
 /**
- * Draw hidden hex fog overlay to a context
- * Creates a solid black fog for unseen areas
+ * Draw hidden hex night overlay to a context
+ * Creates a solid dark night effect for completely unexplored areas
+ * Should look like night/darkness - completely obscured
  */
 function drawHiddenOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    // Solid dark fog - completely obscures the terrain
-    context.fillStyle = '#050810';
+    // Night darkness - very dark blue-black, completely obscures terrain
+    const nightGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, '#030508');
+    if (typeof nightGradient !== 'string') {
+        nightGradient.addColorStop(0, '#050810');   // Center: slightly lighter
+        nightGradient.addColorStop(1, '#020305');   // Edge: darker
+    }
+    context.fillStyle = nightGradient;
     context.fill();
 
     context.restore();
@@ -4192,8 +4204,12 @@ export function render() {
             drawStaticTerrainDetails(sx, sy, assetSize, hex.type, hex.q, hex.r);
         }
 
-        // Height-based lighting and shading
+        // Height-based lighting and shading - always apply subtle height shading
         if (fogLevel === 'visible') {
+            // Permanent subtle height shading (cool shadows for low, warm highlights for high)
+            drawHeightShading(sx, sy, tileSize, hex.height);
+
+            // Debug number overlay (only when explicitly enabled)
             if (state.debug.showHeightOverlay) {
                 drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
             }
