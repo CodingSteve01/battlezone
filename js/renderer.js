@@ -995,6 +995,263 @@ export function clearRenderCaches() {
     cachedQualityLevel = null;
 }
 
+// ===== 3D HEX MESH RENDERING SYSTEM =====
+// Renders hexes as true 3D meshes with proper depth sorting
+
+/**
+ * Height multiplier for 3D extrusion (pixels per height level)
+ */
+const HEX_3D_HEIGHT_SCALE = 0.25;
+
+/**
+ * Light direction for shading (normalized)
+ */
+const LIGHT_DIR = { x: -0.5, y: -0.7, z: 0.5 };
+
+/**
+ * Get the 6 corner points of a hex at a given height
+ * Returns points in 3D space (x, y, z) where z is height
+ */
+function getHex3DCorners(cx, cy, size, heightLevel) {
+    const corners = [];
+    const z = heightLevel * size * HEX_3D_HEIGHT_SCALE;
+    for (let i = 0; i < 6; i++) {
+        const angle = Math.PI / 3 * i;
+        corners.push({
+            x: cx + size * Math.cos(angle),
+            y: cy + size * Math.sin(angle),
+            z: z
+        });
+    }
+    return corners;
+}
+
+/**
+ * Project 3D point to 2D screen coordinates (isometric projection)
+ * Higher z values move the point UP on screen
+ */
+function project3DTo2D(point) {
+    return {
+        x: point.x,
+        y: point.y - point.z  // z lifts the point up
+    };
+}
+
+/**
+ * Calculate face normal for lighting
+ */
+function calculateFaceNormal(p1, p2, p3) {
+    const v1 = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z };
+    const v2 = { x: p3.x - p1.x, y: p3.y - p1.y, z: p3.z - p1.z };
+    // Cross product
+    const normal = {
+        x: v1.y * v2.z - v1.z * v2.y,
+        y: v1.z * v2.x - v1.x * v2.z,
+        z: v1.x * v2.y - v1.y * v2.x
+    };
+    // Normalize
+    const len = Math.sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+    if (len > 0) {
+        normal.x /= len;
+        normal.y /= len;
+        normal.z /= len;
+    }
+    return normal;
+}
+
+/**
+ * Calculate lighting factor based on face normal
+ * Returns value 0-1 where 1 is fully lit
+ */
+function calculateLighting(normal) {
+    // Dot product with light direction
+    const dot = -(normal.x * LIGHT_DIR.x + normal.y * LIGHT_DIR.y + normal.z * LIGHT_DIR.z);
+    // Ambient + diffuse lighting
+    return Math.max(0.4, Math.min(1.0, 0.5 + dot * 0.5));
+}
+
+/**
+ * Apply lighting to a color
+ */
+function applyLightingToColor(color, lightFactor) {
+    // Parse hex color
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+
+    // Apply lighting
+    const nr = Math.round(Math.min(255, r * lightFactor));
+    const ng = Math.round(Math.min(255, g * lightFactor));
+    const nb = Math.round(Math.min(255, b * lightFactor));
+
+    return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
+/**
+ * Collect all 3D faces for a hex (top face + cliff faces)
+ * Returns array of face objects with vertices, color, depth for sorting
+ */
+function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
+    const faces = [];
+    const myHeight = hex.height ?? 0;
+
+    // Get colors based on fog level
+    let topColor = terrain?.color || '#6a9a58';
+    let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
+
+    if (fogLevel === 'hidden') {
+        topColor = '#0a0a12';
+        cliffColor = '#050508';
+    } else if (fogLevel === 'explored') {
+        topColor = desaturateAndDarken(topColor, 0.4, 0.5);
+        cliffColor = desaturateAndDarken(cliffColor, 0.4, 0.5);
+    }
+
+    // TOP FACE - the hex surface
+    const topCorners = getHex3DCorners(cx, cy, size, myHeight);
+    const topCenter = { x: cx, y: cy, z: myHeight * size * HEX_3D_HEIGHT_SCALE };
+
+    // Calculate depth for sorting (average Y position after projection)
+    const projectedTop = topCorners.map(project3DTo2D);
+    const topDepth = projectedTop.reduce((sum, p) => sum + p.y, 0) / 6 - topCenter.z;
+
+    // Top face normal points up
+    const topNormal = { x: 0, y: 0, z: 1 };
+    const topLighting = calculateLighting(topNormal);
+
+    faces.push({
+        type: 'top',
+        vertices: projectedTop,
+        color: topColor,
+        lighting: topLighting,
+        depth: topDepth,
+        hex: hex,
+        fogLevel: fogLevel
+    });
+
+    // CLIFF FACES - only for edges where neighbor is lower
+    const neighbors = getNeighbors(hex.q, hex.r);
+
+    neighbors.forEach((neighbor, direction) => {
+        const neighborHex = getHex(neighbor.q, neighbor.r);
+        const neighborHeight = neighborHex?.height ?? 0;
+        const heightDiff = myHeight - neighborHeight;
+
+        if (heightDiff <= 0) return; // No cliff if neighbor is same height or higher
+
+        // Get the two corners of this edge
+        const corner1 = topCorners[direction];
+        const corner2 = topCorners[(direction + 1) % 6];
+
+        // Bottom corners at neighbor's height
+        const bottomZ = neighborHeight * size * HEX_3D_HEIGHT_SCALE;
+        const bottom1 = { x: corner1.x, y: corner1.y, z: bottomZ };
+        const bottom2 = { x: corner2.x, y: corner2.y, z: bottomZ };
+
+        // Project all 4 corners
+        const projected = [
+            project3DTo2D(corner1),  // top-left
+            project3DTo2D(corner2),  // top-right
+            project3DTo2D(bottom2),  // bottom-right
+            project3DTo2D(bottom1)   // bottom-left
+        ];
+
+        // Calculate face normal (pointing outward from hex center)
+        const normal = calculateFaceNormal(corner1, corner2, bottom1);
+        const lighting = calculateLighting(normal);
+
+        // Depth is based on the front edge position
+        const cliffDepth = (projected[0].y + projected[1].y + projected[2].y + projected[3].y) / 4;
+
+        faces.push({
+            type: 'cliff',
+            vertices: projected,
+            color: cliffColor,
+            lighting: lighting,
+            depth: cliffDepth,
+            direction: direction,
+            heightDiff: heightDiff
+        });
+    });
+
+    return faces;
+}
+
+/**
+ * Draw a single 3D face
+ */
+function draw3DFace(face, texture = null) {
+    const litColor = applyLightingToColor(face.color, face.lighting);
+
+    ctx.beginPath();
+    ctx.moveTo(face.vertices[0].x, face.vertices[0].y);
+    for (let i = 1; i < face.vertices.length; i++) {
+        ctx.lineTo(face.vertices[i].x, face.vertices[i].y);
+    }
+    ctx.closePath();
+
+    if (face.type === 'top' && texture && face.fogLevel === 'visible') {
+        // For top faces, try to draw texture
+        ctx.save();
+        ctx.clip();
+
+        // Calculate bounding box
+        const minX = Math.min(...face.vertices.map(v => v.x));
+        const maxX = Math.max(...face.vertices.map(v => v.x));
+        const minY = Math.min(...face.vertices.map(v => v.y));
+        const maxY = Math.max(...face.vertices.map(v => v.y));
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Draw texture
+        ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
+
+        // Apply lighting overlay
+        ctx.fillStyle = face.lighting < 0.9
+            ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
+            : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
+        ctx.fill();
+
+        ctx.restore();
+    } else {
+        // Solid color fill with lighting
+        ctx.fillStyle = litColor;
+        ctx.fill();
+    }
+
+    // Subtle edge for cliff faces
+    if (face.type === 'cliff') {
+        ctx.strokeStyle = applyLightingToColor(face.color, face.lighting * 0.7);
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+    }
+}
+
+/**
+ * Render all hexes using 3D mesh system with proper depth sorting
+ */
+function render3DHexMeshes(visibleHexData, tileSize) {
+    // Collect ALL faces from all hexes
+    const allFaces = [];
+
+    for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
+        const faces = collectHex3DFaces(hex, sx, sy, tileSize, fogLevel, terrain);
+        allFaces.push(...faces);
+    }
+
+    // Sort faces by depth (Painter's Algorithm)
+    // Lower depth = further back = draw first
+    allFaces.sort((a, b) => a.depth - b.depth);
+
+    // Draw all faces in sorted order
+    for (const face of allFaces) {
+        const texture = (face.type === 'top' && face.fogLevel === 'visible')
+            ? getTerrainTexture(face.hex.type, face.hex.q, face.hex.r)
+            : null;
+        draw3DFace(face, texture);
+    }
+}
+
 /**
  * Get or create cached foreground elements (trees, rocks, bushes) for a hex.
  * These are deterministic based on hex position, so they can be cached.
@@ -3857,14 +4114,12 @@ export function render() {
     const hasIsometricEarthLayer = tileInfo && tileInfo.earthLayerHeight > 0;
 
     // ============================================
-    // TWO-PASS RENDERING FOR SEAMLESS CLIFF FACES
-    // Pass 1: Draw earth layers (cliff faces) for all visible hexes
-    // Pass 2: Draw hex surfaces + overlays on top
-    // This eliminates gaps between adjacent cliff faces
+    // 3D HEX MESH RENDERING SYSTEM
+    // Renders all hex faces (tops + cliff faces) with proper depth sorting
+    // Uses Painter's Algorithm for correct occlusion
     // ============================================
 
-    // PERFORMANCE OPTIMIZATION: Pre-filter visible hexes and cache positions
-    // This avoids redundant position calculations in both passes
+    // Pre-filter visible hexes and cache positions
     const visibleHexData = [];
     for (const hex of state.hexes) {
         const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
@@ -3891,129 +4146,21 @@ export function render() {
         });
     }
 
-    // CRITICAL: Sort hexes by Y position (back-to-front) for correct isometric rendering
-    // Lower Y = further back, should be drawn first
-    // Also consider hex row (r) for consistent ordering of same-height tiles
-    visibleHexData.sort((a, b) => {
-        // Primary sort by screen Y position
-        const yDiff = a.sy - b.sy;
-        if (Math.abs(yDiff) > 0.5) return yDiff;
-        // Secondary sort by hex row for consistent ordering
-        return a.hex.r - b.hex.r;
-    });
+    // Render all hexes using 3D mesh system with proper depth sorting
+    render3DHexMeshes(visibleHexData, tileSize);
 
-    // PASS 1: Draw earth layers (cliff faces) FIRST
-    // Only needed for isometric tiles with earth layer
-    if (hasIsometricEarthLayer) {
-        for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
-            // Try to use cached earth layer tile
-            const cacheEntry = getCachedHexTile(hex, fogLevel, 'earth');
+    // Post-processing pass: Details, lighting, animations, overlays
+    // Sort by Y for proper layering of overlays
+    visibleHexData.sort((a, b) => a.sy - b.sy);
 
-            if (cacheEntry) {
-                const { canvas: cachedTile, baseSize } = cacheEntry;
-                const scale = tileSize / baseSize;
-                const cachedTileSize = cachedTile.width;
-                const scaledSize = cachedTileSize * scale;
-
-                ctx.drawImage(
-                    cachedTile,
-                    sx - scaledSize / 2,
-                    sy - scaledSize / 2,
-                    scaledSize,
-                    scaledSize
-                );
-            } else {
-                // Fallback: draw earth layer directly
-                const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
-                let fillColor = terrain.color;
-                if (fogLevel === 'hidden') {
-                    fillColor = '#000000';
-                } else if (fogLevel === 'explored') {
-                    fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
-                }
-                const terrainData = fogLevel === 'visible' ? terrain : null;
-                drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData, 'earth');
-            }
-        }
-    }
-
-    // PASS 2: Draw hex surfaces + all overlays
     for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
-        // Try to use cached tile for better performance
-        // Use 'surface' pass for isometric tiles, 'full' for non-isometric
-        const renderPass = hasIsometricEarthLayer ? 'surface' : 'full';
-        const cacheEntry = getCachedHexTile(hex, fogLevel, renderPass);
-
-        if (cacheEntry) {
-            // Draw cached tile with scaling - prevents cache invalidation during zoom
-            const { canvas: cachedTile, baseSize } = cacheEntry;
-            const scale = tileSize / baseSize;
-            const cachedTileSize = cachedTile.width;
-            const scaledSize = cachedTileSize * scale;
-
-            if (fogLevel === 'visible') {
-                drawHeightShadow(sx, sy, tileSize, hex.height);
-            }
-            ctx.drawImage(
-                cachedTile,
-                sx - scaledSize / 2,
-                sy - scaledSize / 2,
-                scaledSize,
-                scaledSize
-            );
-        } else {
-            // Fallback: draw directly (low quality mode or cache miss, or animated terrain)
-            let fillColor = terrain.color;
-            const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
-
-            if (fogLevel === 'hidden') {
-                fillColor = '#000000';
-            } else if (fogLevel === 'explored') {
-                fillColor = desaturateAndDarken(terrain.color, 0.5, 0.75);
-            }
-
-            // No grid lines on base hex - grid overlay is drawn separately only for relevant hexes
-            // This matches cached tile behavior for seamless terrain
-            const terrainData = fogLevel === 'visible' ? terrain : null;
-            if (fogLevel === 'visible') {
-                drawHeightShadow(sx, sy, tileSize, hex.height);
-            }
-            // Use appropriate render pass for isometric vs non-isometric tiles
-            drawHex(sx, sy, tileSize, fillColor, null, 1, texture, terrainData, renderPass);
-
-            // Fog overlays for non-cached rendering (match cached version)
-            if (fogLevel === 'explored') {
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                // Clean dim overlay for explored areas
-                const dimGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, tileSize, 'rgba(8, 12, 20, 0.6)');
-                if (typeof dimGradient !== 'string') {
-                    dimGradient.addColorStop(0, 'rgba(8, 12, 20, 0.55)');
-                    dimGradient.addColorStop(0.6, 'rgba(5, 8, 15, 0.62)');
-                    dimGradient.addColorStop(1, 'rgba(2, 4, 10, 0.70)');
-                }
-                ctx.fillStyle = dimGradient;
-                ctx.fill();
-                ctx.restore();
-            } else if (fogLevel === 'hidden') {
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                // Solid dark fog for hidden areas
-                ctx.fillStyle = '#050810';
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
+        // Static terrain details (small rocks, grass tufts)
         if (fogLevel === 'visible' && shouldRenderDetails()) {
             drawStaticTerrainDetails(sx, sy, assetSize, hex.type, hex.q, hex.r);
         }
 
+        // Height-based lighting and shading
         if (fogLevel === 'visible') {
-            applyTileLighting(sx, sy, tileSize, hex.height);
-            drawHeightShading(sx, sy, tileSize, hex.height);
             if (state.debug.showHeightOverlay) {
                 drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
             }
