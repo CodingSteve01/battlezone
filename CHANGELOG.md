@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.4...shadow-squad-v4.0.5) (2025-12-31)
+
+
+### Bug Fixes
+
+* **renderer:** add Y-sorting for correct isometric cliff face rendering ([#267](https://github.com/CodingSteve01/battlezone/issues/267)) ([622b40f](https://github.com/CodingSteve01/battlezone/commit/622b40f24fea7526577b094b585bd20bb109e449))
+
 ## [4.0.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v4.0.3...shadow-squad-v4.0.4) (2025-12-31)
 
 
