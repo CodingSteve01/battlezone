@@ -636,17 +636,19 @@ const TerrainGenerator = {
 
         // Draw 3 cliff faces in back-to-front order for proper layering
         // renderCliffFaceIsometric draws: v1 → v2 → v2Bottom → v1Bottom
+        // Parameters: (ctx, topLeft, topRight, bottomLeft, bottomRight, ...)
+        // bottomLeft corresponds to topLeft, bottomRight corresponds to topRight
 
-        // 1. L (left parallelogram): v3 → v2 → v2' → v3'
-        this.renderCliffFaceIsometric(ctx, v3_adj, v2_adj, v2_bottom, v3_bottom,
+        // 1. L (left parallelogram): v3 → v2 → v3' → v2'
+        this.renderCliffFaceIsometric(ctx, v3_adj, v2_adj, v3_bottom, v2_bottom,
             earthPalette, 'left', noise, variant);
 
-        // 2. F (front rectangle): v2 → v1 → v1' → v2'
-        this.renderCliffFaceIsometric(ctx, v2_adj, v1_adj, v1_bottom, v2_bottom,
+        // 2. F (front rectangle): v2 → v1 → v2' → v1'
+        this.renderCliffFaceIsometric(ctx, v2_adj, v1_adj, v2_bottom, v1_bottom,
             earthPalette, 'front', noise, variant);
 
-        // 3. R (right parallelogram): v1 → v0 → v0' → v1'
-        this.renderCliffFaceIsometric(ctx, v1_adj, v0_adj, v0_bottom, v1_bottom,
+        // 3. R (right parallelogram): v1 → v0 → v1' → v0'
+        this.renderCliffFaceIsometric(ctx, v1_adj, v0_adj, v1_bottom, v0_bottom,
             earthPalette, 'right', noise, variant);
     },
 
