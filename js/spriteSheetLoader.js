@@ -316,12 +316,16 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
     const ctx = canvas.getContext('2d');
     const isV2 = definition.version === '2.0' || definition.features?.includes('cropped');
 
+    // Check if this is isometric terrain with earth layer - need full bounds for two-pass rendering
+    const hasEarthLayer = definition.features?.includes('earthLayer') && type === 'terrain';
+
     for (const sprite of definition.sprites || []) {
         if (!sprite.bounds) continue;
 
         // V2.0 format: use contentBounds if available (actual sprite content)
         // V1.0 format: use bounds directly
-        const sourceBounds = sprite.contentBounds || sprite.bounds;
+        // EXCEPTION: For terrain with earthLayer, always use full bounds to include cliff faces
+        const sourceBounds = (hasEarthLayer || !sprite.contentBounds) ? sprite.bounds : sprite.contentBounds;
         const { x, y, width, height } = sourceBounds;
         const outputSize = sprite.outputSize || definition.globalSettings?.outputSize || { width, height };
 
