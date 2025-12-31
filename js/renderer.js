@@ -1049,33 +1049,28 @@ function getCachedForegroundElements(q, r, cx, cy, size, type) {
 }
 
 function applyVisibilityClearing(elements, clearingMap) {
+    // NOTE: This function no longer removes trees/shrubs. Instead, visibility is handled
+    // by the shouldBeTransparent() system which checks actual screen-space overlap with units.
+    // Trees that overlap units will be made semi-transparent, not removed.
     const clearing = CONFIG.VISIBILITY_CLEARING;
     if (!clearing?.ENABLED || !clearingMap || clearingMap.size === 0) {
         return elements;
     }
 
-    return elements.flatMap(element => {
+    return elements.map(element => {
         const key = `${element.hexQ},${element.hexR}`;
         const level = clearingMap.get(key);
-        if (!level) return [element];
+        if (!level) return element;
 
-        const isTall = element.type.includes('tree');
-        const isShrub = element.type.includes('shrub') || element.type === 'bush';
-        const seed = element.seed ?? 0;
-
+        // Mark elements near units with visibilityAlpha for potential additional transparency
+        // The actual transparency decision is made by shouldBeTransparent() based on overlap
         if (level === 'clear') {
-            if (isTall && seededRandom(seed + 11) > clearing.TREE_KEEP_CHANCE) {
-                return [];
-            }
-            if (isShrub && seededRandom(seed + 31) > clearing.SHRUB_KEEP_CHANCE) {
-                return [];
-            }
-            element.visibilityAlpha = clearing.CLEAR_ALPHA;
+            element.nearUnit = true;
         } else if (level === 'fade') {
-            element.visibilityAlpha = clearing.FADE_ALPHA;
+            element.nearUnitFade = true;
         }
 
-        return [element];
+        return element;
     });
 }
 
@@ -3769,12 +3764,20 @@ export function render() {
     // Collect AP cost overlay positions for drawing on top of everything
     const apCostOverlays = [];
 
+    // Get earth layer height for proper viewport culling
+    const tileInfo = getTerrainTileInfo();
+    const hexSurfaceHeight = tileSize * Math.sqrt(3);
+    const earthLayerScaled = tileInfo && tileInfo.earthLayerHeight > 0
+        ? tileInfo.earthLayerHeight * (hexSurfaceHeight / tileInfo.hexHeight)
+        : 0;
+
     // Draw hexes (ground layer) - with tile caching for performance
     state.hexes.forEach(hex => {
         const pos = getTileScreenPosition(hex.q, hex.r, hex.height, tileSize);
         const sx = state.offsetX + pos.x;
         const sy = state.offsetY + pos.y;
-        const cullMargin = tileSize * 2 + pos.zOffset;
+        // Include earth layer height in cull margin so tiles with visible earth layers aren't culled prematurely
+        const cullMargin = tileSize * 2 + pos.zOffset + earthLayerScaled;
 
         // Skip if off screen (with margin)
         if (sx < -cullMargin || sx > w + cullMargin ||
