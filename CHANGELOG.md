@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.22.7](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.6...shadow-squad-v3.22.7) (2025-12-31)
+
+
+### Bug Fixes
+
+* **ui:** improve tile earth layer and character sprite rendering ([#237](https://github.com/CodingSteve01/battlezone/issues/237)) ([456b1bb](https://github.com/CodingSteve01/battlezone/commit/456b1bb8e7eddd957fc033a184744a9bcfa05125))
+
 ## [3.22.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v3.22.5...shadow-squad-v3.22.6) (2025-12-30)
 
 
