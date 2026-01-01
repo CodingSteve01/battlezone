@@ -2,7 +2,7 @@
   "version": "2.0",
   "dimensions": {
     "width": 500,
-    "height": 2396
+    "height": 2368
   },
   "features": [
     "cropped",
@@ -1807,13 +1807,13 @@
         "x": 0,
         "y": 1603,
         "width": 124,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 20,
+        "x": 30,
         "y": 1605,
-        "width": 84,
-        "height": 105
+        "width": 64,
+        "height": 103
       },
       "anchor": {
         "x": 0.5,
@@ -1835,13 +1835,13 @@
         "x": 124,
         "y": 1603,
         "width": 126,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 145,
+        "x": 155,
         "y": 1603,
-        "width": 84,
-        "height": 107
+        "width": 64,
+        "height": 105
       },
       "anchor": {
         "x": 0.5,
@@ -1863,13 +1863,13 @@
         "x": 250,
         "y": 1603,
         "width": 125,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 270,
+        "x": 280,
         "y": 1604,
-        "width": 84,
-        "height": 106
+        "width": 64,
+        "height": 104
       },
       "anchor": {
         "x": 0.5,
@@ -1891,13 +1891,13 @@
         "x": 375,
         "y": 1603,
         "width": 125,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 395,
+        "x": 405,
         "y": 1604,
-        "width": 84,
-        "height": 106
+        "width": 64,
+        "height": 104
       },
       "anchor": {
         "x": 0.5,
@@ -1917,15 +1917,15 @@
       "id": "commando_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 1710,
+        "y": 1708,
         "width": 124,
-        "height": 93
+        "height": 89
       },
       "contentBounds": {
         "x": 16,
-        "y": 1710,
+        "y": 1708,
         "width": 92,
-        "height": 93
+        "height": 89
       },
       "anchor": {
         "x": 0.5,
@@ -1945,15 +1945,15 @@
       "id": "commando_cover_p1",
       "bounds": {
         "x": 124,
-        "y": 1710,
+        "y": 1708,
         "width": 126,
-        "height": 93
+        "height": 89
       },
       "contentBounds": {
         "x": 141,
-        "y": 1710,
+        "y": 1708,
         "width": 92,
-        "height": 93
+        "height": 89
       },
       "anchor": {
         "x": 0.5,
@@ -1973,15 +1973,15 @@
       "id": "commando_cover_p2",
       "bounds": {
         "x": 250,
-        "y": 1710,
+        "y": 1708,
         "width": 125,
-        "height": 93
+        "height": 89
       },
       "contentBounds": {
         "x": 266,
-        "y": 1711,
+        "y": 1709,
         "width": 92,
-        "height": 92
+        "height": 88
       },
       "anchor": {
         "x": 0.5,
@@ -2001,15 +2001,15 @@
       "id": "commando_cover_p3",
       "bounds": {
         "x": 375,
-        "y": 1710,
+        "y": 1708,
         "width": 125,
-        "height": 93
+        "height": 89
       },
       "contentBounds": {
         "x": 391,
-        "y": 1712,
+        "y": 1710,
         "width": 92,
-        "height": 91
+        "height": 87
       },
       "anchor": {
         "x": 0.5,
@@ -2029,15 +2029,15 @@
       "id": "commando_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 1803,
+        "y": 1797,
         "width": 124,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 21,
-        "y": 1803,
-        "width": 81,
-        "height": 107
+        "x": 27,
+        "y": 1797,
+        "width": 70,
+        "height": 105
       },
       "anchor": {
         "x": 0.5,
@@ -2057,15 +2057,15 @@
       "id": "commando_attack_p1",
       "bounds": {
         "x": 124,
-        "y": 1803,
+        "y": 1797,
         "width": 126,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 146,
-        "y": 1804,
-        "width": 81,
-        "height": 106
+        "x": 152,
+        "y": 1798,
+        "width": 70,
+        "height": 104
       },
       "anchor": {
         "x": 0.5,
@@ -2085,15 +2085,15 @@
       "id": "commando_attack_p2",
       "bounds": {
         "x": 250,
-        "y": 1803,
+        "y": 1797,
         "width": 125,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 272,
-        "y": 1804,
-        "width": 81,
-        "height": 106
+        "x": 277,
+        "y": 1798,
+        "width": 70,
+        "height": 104
       },
       "anchor": {
         "x": 0.5,
@@ -2113,15 +2113,15 @@
       "id": "commando_attack_p3",
       "bounds": {
         "x": 375,
-        "y": 1803,
+        "y": 1797,
         "width": 125,
-        "height": 107
+        "height": 105
       },
       "contentBounds": {
-        "x": 397,
-        "y": 1805,
-        "width": 81,
-        "height": 105
+        "x": 402,
+        "y": 1799,
+        "width": 70,
+        "height": 103
       },
       "anchor": {
         "x": 0.5,
@@ -2141,15 +2141,15 @@
       "id": "commando_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 1910,
+        "y": 1902,
         "width": 124,
-        "height": 90
+        "height": 70
       },
       "contentBounds": {
-        "x": 9,
-        "y": 1910,
-        "width": 106,
-        "height": 90
+        "x": 10,
+        "y": 1902,
+        "width": 104,
+        "height": 70
       },
       "anchor": {
         "x": 0.5,
@@ -2169,15 +2169,15 @@
       "id": "commando_dead_p1",
       "bounds": {
         "x": 124,
-        "y": 1910,
+        "y": 1902,
         "width": 126,
-        "height": 90
+        "height": 70
       },
       "contentBounds": {
-        "x": 134,
-        "y": 1910,
-        "width": 105,
-        "height": 90
+        "x": 135,
+        "y": 1902,
+        "width": 103,
+        "height": 70
       },
       "anchor": {
         "x": 0.5,
@@ -2197,15 +2197,15 @@
       "id": "commando_dead_p2",
       "bounds": {
         "x": 250,
-        "y": 1910,
+        "y": 1902,
         "width": 125,
-        "height": 90
+        "height": 70
       },
       "contentBounds": {
-        "x": 260,
-        "y": 1910,
-        "width": 105,
-        "height": 90
+        "x": 261,
+        "y": 1902,
+        "width": 103,
+        "height": 70
       },
       "anchor": {
         "x": 0.5,
@@ -2225,15 +2225,15 @@
       "id": "commando_dead_p3",
       "bounds": {
         "x": 375,
-        "y": 1910,
+        "y": 1902,
         "width": 125,
-        "height": 90
+        "height": 70
       },
       "contentBounds": {
-        "x": 384,
-        "y": 1910,
-        "width": 107,
-        "height": 90
+        "x": 385,
+        "y": 1902,
+        "width": 105,
+        "height": 70
       },
       "anchor": {
         "x": 0.5,
@@ -2253,13 +2253,13 @@
       "id": "elitesoldat_normal_p0",
       "bounds": {
         "x": 0,
-        "y": 2000,
+        "y": 1972,
         "width": 124,
         "height": 106
       },
       "contentBounds": {
         "x": 20,
-        "y": 2000,
+        "y": 1972,
         "width": 84,
         "height": 106
       },
@@ -2281,13 +2281,13 @@
       "id": "elitesoldat_normal_p1",
       "bounds": {
         "x": 124,
-        "y": 2000,
+        "y": 1972,
         "width": 126,
         "height": 106
       },
       "contentBounds": {
         "x": 145,
-        "y": 2000,
+        "y": 1972,
         "width": 84,
         "height": 106
       },
@@ -2309,13 +2309,13 @@
       "id": "elitesoldat_normal_p2",
       "bounds": {
         "x": 250,
-        "y": 2000,
+        "y": 1972,
         "width": 125,
         "height": 106
       },
       "contentBounds": {
         "x": 270,
-        "y": 2001,
+        "y": 1973,
         "width": 84,
         "height": 105
       },
@@ -2337,13 +2337,13 @@
       "id": "elitesoldat_normal_p3",
       "bounds": {
         "x": 375,
-        "y": 2000,
+        "y": 1972,
         "width": 125,
         "height": 106
       },
       "contentBounds": {
         "x": 395,
-        "y": 2001,
+        "y": 1973,
         "width": 84,
         "height": 105
       },
@@ -2365,13 +2365,13 @@
       "id": "elitesoldat_cover_p0",
       "bounds": {
         "x": 0,
-        "y": 2106,
+        "y": 2078,
         "width": 124,
         "height": 93
       },
       "contentBounds": {
         "x": 16,
-        "y": 2107,
+        "y": 2079,
         "width": 92,
         "height": 92
       },
@@ -2393,13 +2393,13 @@
       "id": "elitesoldat_cover_p1",
       "bounds": {
         "x": 124,
-        "y": 2106,
+        "y": 2078,
         "width": 126,
         "height": 93
       },
       "contentBounds": {
         "x": 141,
-        "y": 2108,
+        "y": 2080,
         "width": 92,
         "height": 91
       },
@@ -2421,13 +2421,13 @@
       "id": "elitesoldat_cover_p2",
       "bounds": {
         "x": 250,
-        "y": 2106,
+        "y": 2078,
         "width": 125,
         "height": 93
       },
       "contentBounds": {
         "x": 266,
-        "y": 2108,
+        "y": 2080,
         "width": 92,
         "height": 91
       },
@@ -2449,13 +2449,13 @@
       "id": "elitesoldat_cover_p3",
       "bounds": {
         "x": 375,
-        "y": 2106,
+        "y": 2078,
         "width": 125,
         "height": 93
       },
       "contentBounds": {
         "x": 391,
-        "y": 2106,
+        "y": 2078,
         "width": 92,
         "height": 93
       },
@@ -2477,13 +2477,13 @@
       "id": "elitesoldat_attack_p0",
       "bounds": {
         "x": 0,
-        "y": 2199,
+        "y": 2171,
         "width": 124,
         "height": 107
       },
       "contentBounds": {
         "x": 21,
-        "y": 2200,
+        "y": 2172,
         "width": 81,
         "height": 106
       },
@@ -2505,13 +2505,13 @@
       "id": "elitesoldat_attack_p1",
       "bounds": {
         "x": 124,
-        "y": 2199,
+        "y": 2171,
         "width": 126,
         "height": 107
       },
       "contentBounds": {
         "x": 146,
-        "y": 2201,
+        "y": 2173,
         "width": 81,
         "height": 105
       },
@@ -2533,13 +2533,13 @@
       "id": "elitesoldat_attack_p2",
       "bounds": {
         "x": 250,
-        "y": 2199,
+        "y": 2171,
         "width": 125,
         "height": 107
       },
       "contentBounds": {
         "x": 272,
-        "y": 2201,
+        "y": 2173,
         "width": 81,
         "height": 105
       },
@@ -2561,13 +2561,13 @@
       "id": "elitesoldat_attack_p3",
       "bounds": {
         "x": 375,
-        "y": 2199,
+        "y": 2171,
         "width": 125,
         "height": 107
       },
       "contentBounds": {
         "x": 397,
-        "y": 2199,
+        "y": 2171,
         "width": 81,
         "height": 107
       },
@@ -2589,13 +2589,13 @@
       "id": "elitesoldat_dead_p0",
       "bounds": {
         "x": 0,
-        "y": 2306,
+        "y": 2278,
         "width": 124,
         "height": 90
       },
       "contentBounds": {
         "x": 9,
-        "y": 2306,
+        "y": 2278,
         "width": 105,
         "height": 90
       },
@@ -2617,13 +2617,13 @@
       "id": "elitesoldat_dead_p1",
       "bounds": {
         "x": 124,
-        "y": 2306,
+        "y": 2278,
         "width": 126,
         "height": 90
       },
       "contentBounds": {
         "x": 133,
-        "y": 2306,
+        "y": 2278,
         "width": 107,
         "height": 90
       },
@@ -2645,13 +2645,13 @@
       "id": "elitesoldat_dead_p2",
       "bounds": {
         "x": 250,
-        "y": 2306,
+        "y": 2278,
         "width": 125,
         "height": 90
       },
       "contentBounds": {
         "x": 259,
-        "y": 2306,
+        "y": 2278,
         "width": 106,
         "height": 90
       },
@@ -2673,13 +2673,13 @@
       "id": "elitesoldat_dead_p3",
       "bounds": {
         "x": 375,
-        "y": 2306,
+        "y": 2278,
         "width": 125,
         "height": 90
       },
       "contentBounds": {
         "x": 384,
-        "y": 2306,
+        "y": 2278,
         "width": 106,
         "height": 90
       },
