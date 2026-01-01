@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.12](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.11...shadow-squad-v5.0.12) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** add robust fog overlay for explored/hidden areas ([#297](https://github.com/CodingSteve01/battlezone/issues/297)) ([309153f](https://github.com/CodingSteve01/battlezone/commit/309153f1b92ed7c45f24555f5f11c384109dd2cc))
+
 ## [5.0.11](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.10...shadow-squad-v5.0.11) (2026-01-01)
 
 
