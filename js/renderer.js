@@ -4528,6 +4528,9 @@ export function render() {
         // Large elements (trees, rocks) use the darkest fog level of neighboring hexes
         // to prevent bright elements appearing at fog boundaries
         const largeElementTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'rock', 'rock-formation'];
+        const vegetationTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'bush', 'shrub', 'shrub-hills', 'shrub-ruins', 'tallgrass'];
+        const hexKey = `${hex.q},${hex.r}`;
+        const isInReachableArea = reachableHexes.has(hexKey);
         adjusted.forEach(element => {
             if (largeElementTypes.includes(element.type)) {
                 // Use darkest neighbor fog for large elements that span hex boundaries
@@ -4535,6 +4538,11 @@ export function render() {
                 element.fogFilter = getFogFilter(darkestFog);
             } else {
                 element.fogFilter = fogFilter;
+            }
+            // Mark vegetation in reachable area for transparency during movement planning
+            // This helps visibility especially in dense jungle/forest biomes
+            if (isInReachableArea && vegetationTypes.includes(element.type)) {
+                element.inReachableArea = true;
             }
         });
         foregroundElements.push(...adjusted);
@@ -4819,7 +4827,13 @@ export function render() {
         const fogFilter = drawable.fogFilter ?? '';
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
         // Trees stay mostly visible (80% opacity) - units show as outlines behind them
-        const finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
+        let finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
+
+        // Make vegetation semi-transparent in the entire reachable area
+        // This helps visibility especially in dense jungle/forest biomes
+        if (drawable.inReachableArea) {
+            finalAlpha *= 0.5;  // 50% opacity for vegetation in reachable area
+        }
 
         // Apply fog of war darkening using filter (brightness + saturation)
         const needsFogDarkening = !!fogFilter;
