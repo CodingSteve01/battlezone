@@ -191,13 +191,13 @@ function getSkirtFillColor(terrainType, fogLevel) {
     const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
 
     if (fogLevel === 'hidden') {
-        // ~70% darkening (30% brightness) - matching hex face values
-        return desaturateAndDarken(baseColor, 0.4, 0.30);
+        // Very dark for unexplored areas (shadow) - ~75% darkening
+        return desaturateAndDarken(baseColor, 0.4, 0.25);
     }
 
     if (fogLevel === 'explored') {
-        // ~40% darkening (60% brightness)
-        return desaturateAndDarken(baseColor, 0.7, 0.60);
+        // Moderately dark for explored but not visible (dim) - ~45% darkening
+        return desaturateAndDarken(baseColor, 0.6, 0.55);
     }
 
     return desaturateAndDarken(baseColor, 0.7, 0.75);
@@ -298,12 +298,12 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         const topY = Math.min(topY1, topY2);
         const bottomY = Math.max(bottomY1, bottomY2);
 
-        // Adjust brightness based on fog level
+        // Adjust brightness based on fog level (shadow effect)
         let fogBrightnessFactor = 1.0;
         if (fogLevel === 'hidden') {
-            fogBrightnessFactor = 0.30;  // ~70% darkening
+            fogBrightnessFactor = 0.25;  // Very dark for unexplored areas (shadow)
         } else if (fogLevel === 'explored') {
-            fogBrightnessFactor = 0.60;  // ~40% darkening
+            fogBrightnessFactor = 0.55;  // Moderately dark for explored but not visible (dim)
         }
 
         const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5 * fogBrightnessFactor));
@@ -1231,12 +1231,30 @@ function applyLightingToColor(color, lightFactor) {
 
 function getFogBrightness(fogLevel) {
     if (fogLevel === 'hidden') {
-        return 0.30;
+        return 0.25;  // Very dark for unexplored areas (shadow)
     }
     if (fogLevel === 'explored') {
-        return 0.60;
+        return 0.55;  // Moderately dark for explored but not visible (dim)
     }
-    return 1.0;
+    return 1.0;  // Full brightness for currently visible areas (lit)
+}
+
+/**
+ * Get CSS filter string for fog of war effect
+ * Combines brightness reduction with slight saturation reduction for a more natural shadow look
+ * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
+ * @returns {string} CSS filter string or empty string for visible areas
+ */
+function getFogFilter(fogLevel) {
+    if (fogLevel === 'hidden') {
+        // Dark shadow effect: reduced brightness and saturation
+        return 'brightness(0.25) saturate(0.5)';
+    }
+    if (fogLevel === 'explored') {
+        // Dim lighting effect: reduced brightness, slight saturation reduction
+        return 'brightness(0.55) saturate(0.75)';
+    }
+    return '';  // No filter for visible areas
 }
 
 /**
@@ -1337,11 +1355,11 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
  */
 function draw3DFace(face, texture = null) {
     const litColor = applyLightingToColor(face.color, face.lighting);
-    const fogBrightness = getFogBrightness(face.fogLevel);
+    const fogFilter = getFogFilter(face.fogLevel);
 
-    if (fogBrightness < 0.99) {
+    if (fogFilter) {
         ctx.save();
-        ctx.filter = `brightness(${fogBrightness})`;
+        ctx.filter = fogFilter;
     }
 
     ctx.beginPath();
@@ -1403,7 +1421,7 @@ function draw3DFace(face, texture = null) {
         ctx.stroke();
     }
 
-    if (fogBrightness < 0.99) {
+    if (fogFilter) {
         ctx.restore();
     }
 }
@@ -1984,38 +2002,6 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
     return tileCanvas;
 }
 
-/**
- * Draw explored hex fog overlay to a context
- * Creates a darkened effect (~40% darkness) for previously seen but not currently visible areas
- */
-function drawExploredOverlay(context, cx, cy, hexSize) {
-    context.save();
-
-    context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize);
-
-    // Simple black overlay for ~40% darkening
-    context.fillStyle = 'rgba(0, 0, 0, 0.40)';
-    context.fill();
-
-    context.restore();
-}
-
-/**
- * Draw hidden hex overlay to a context
- * Creates a darkened effect (~70% darkness) for unexplored areas
- */
-function drawHiddenOverlay(context, cx, cy, hexSize) {
-    context.save();
-    context.beginPath();
-    drawHexPathToContext(context, cx, cy, hexSize);
-
-    // Simple black overlay for ~70% darkening
-    context.fillStyle = 'rgba(0, 0, 0, 0.70)';
-    context.fill();
-
-    context.restore();
-}
 
 /**
  * Draw hex path to a specific context
@@ -4399,10 +4385,10 @@ export function render() {
         // Removed: drawStaticTerrainDetails() call
 
         // Height-based lighting and shading - always apply subtle height shading
-        const fogBrightness = getFogBrightness(fogLevel);
-        if (fogBrightness < 0.99) {
+        const fogFilter = getFogFilter(fogLevel);
+        if (fogFilter) {
             ctx.save();
-            ctx.filter = `brightness(${fogBrightness})`;
+            ctx.filter = fogFilter;
         }
 
         // Permanent subtle height shading (cool shadows for low, warm highlights for high)
@@ -4413,19 +4399,19 @@ export function render() {
             drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
         }
 
-        if (fogBrightness < 0.99) {
+        if (fogFilter) {
             ctx.restore();
         }
 
         // Draw animated terrain overlays (grass swaying, water ripples, etc.)
         // These are drawn on top of cached/static terrain for dynamic effects
         if (shouldRenderAnimations()) {
-            if (fogBrightness < 0.99) {
+            if (fogFilter) {
                 ctx.save();
-                ctx.filter = `brightness(${fogBrightness})`;
+                ctx.filter = fogFilter;
             }
             drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
-            if (fogBrightness < 0.99) {
+            if (fogFilter) {
                 ctx.restore();
             }
         }
@@ -4433,16 +4419,16 @@ export function render() {
         // Collect foreground elements for 2.5D sorting
         const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
         const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
-        // Apply fog level darkening to foreground elements
+        // Apply fog level darkening to foreground elements (store filter for later application)
         adjusted.forEach(element => {
-            element.fogAlpha = fogBrightness;
+            element.fogFilter = fogFilter;
         });
         foregroundElements.push(...adjusted);
 
         // Collect power-up positions for drawing on top of foreground elements
         const powerup = getPowerupAt(hex.q, hex.r);
         if (powerup) {
-            powerupPositions.push({ sx, sy, powerup, fogAlpha: fogBrightness });
+            powerupPositions.push({ sx, sy, powerup, fogFilter });
         }
 
         // === SHRINKING ZONE VISUAL INDICATOR ===
@@ -4716,13 +4702,13 @@ export function render() {
         }
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
-        const fogAlpha = drawable.fogAlpha ?? 1;
+        const fogFilter = drawable.fogFilter ?? '';
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
         // Trees stay mostly visible (80% opacity) - units show as outlines behind them
         const finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
 
-        // Apply fog of war darkening using brightness filter
-        const needsFogDarkening = fogAlpha < 0.99;
+        // Apply fog of war darkening using filter (brightness + saturation)
+        const needsFogDarkening = !!fogFilter;
         const needsAlpha = finalAlpha < 0.99;
 
         if (needsFogDarkening || needsAlpha) {
@@ -4731,8 +4717,8 @@ export function render() {
                 ctx.globalAlpha = finalAlpha;
             }
             if (needsFogDarkening) {
-                // Use brightness filter for fog darkening (explored = 60% brightness)
-                ctx.filter = `brightness(${fogAlpha})`;
+                // Use combined brightness + saturation filter for fog darkening
+                ctx.filter = fogFilter;
             }
             drawable.draw();
             ctx.restore();
@@ -4747,13 +4733,13 @@ export function render() {
     });
 
     // Draw powerups on top of all terrain and foreground elements
-    powerupPositions.forEach(({ sx, sy, powerup, fogAlpha }) => {
-        if (fogAlpha < 0.99) {
+    powerupPositions.forEach(({ sx, sy, powerup, fogFilter }) => {
+        if (fogFilter) {
             ctx.save();
-            ctx.filter = `brightness(${fogAlpha})`;
+            ctx.filter = fogFilter;
         }
         drawPowerup(sx, sy, powerup, assetSize);
-        if (fogAlpha < 0.99) {
+        if (fogFilter) {
             ctx.restore();
         }
     });
@@ -5488,13 +5474,13 @@ function drawMinimap(w, h) {
         // Apply zone coloring if outside
         let baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
 
-        // Darken based on fog level (scale RGB toward black)
+        // Darken based on fog level (scale RGB toward black - shadow effect)
         const fogLevel = getFogLevel(hex.q, hex.r);
         let brightness = 1.0;
         if (fogLevel === 'hidden') {
-            brightness = 0.25;  // 25% brightness for unexplored
+            brightness = 0.25;  // Very dark for unexplored areas (shadow)
         } else if (fogLevel === 'explored') {
-            brightness = 0.6;   // 60% brightness for explored
+            brightness = 0.55;  // Moderately dark for explored but not visible (dim)
         }
 
         // Apply brightness directly to color
