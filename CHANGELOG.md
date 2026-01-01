@@ -1,5 +1,18 @@
 # Changelog
 
+## [5.0.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.5...shadow-squad-v5.0.6) (2026-01-01)
+
+
+### Bug Fixes
+
+* **game:** improve debug logging, rendering, and visual assets ([#283](https://github.com/CodingSteve01/battlezone/issues/283)) ([4bceea7](https://github.com/CodingSteve01/battlezone/commit/4bceea70b25177b12a003a2a0cbcdb4113bfc2fa))
+* **renderer:** correct expanded minimap Y positioning ([#282](https://github.com/CodingSteve01/battlezone/issues/282)) ([a90568f](https://github.com/CodingSteve01/battlezone/commit/a90568f9d78fdbc4b832244c38a6064c1b84df03))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#285](https://github.com/CodingSteve01/battlezone/issues/285)) ([3246cb6](https://github.com/CodingSteve01/battlezone/commit/3246cb663ce0621b6f7f9aefac235377a8daef9a))
+
 ## [5.0.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.4...shadow-squad-v5.0.5) (2026-01-01)
 
 
