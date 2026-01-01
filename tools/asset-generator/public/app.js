@@ -526,6 +526,13 @@ function createTerrainSpriteSheet(assets, columns, spriteWidth, totalHeight, hex
         });
     });
 
+    // Calculate hexTopOffset - the Y offset where hex content actually starts
+    // Based on hex geometry: center at hexHeight/2, radius calculation, and 5% margin
+    const radiusFromWidth = spriteWidth / 2;
+    const radiusFromHeight = hexHeight / Math.sqrt(3);
+    const radius = Math.min(radiusFromWidth, radiusFromHeight) * 0.95;
+    const hexTopOffset = Math.round(hexHeight / 2 - radius * Math.sqrt(3) / 2);
+
     const json = {
         version: '2.0',
         dimensions: { width: sheetWidth, height: sheetHeight },
@@ -533,7 +540,8 @@ function createTerrainSpriteSheet(assets, columns, spriteWidth, totalHeight, hex
             spriteWidth,
             totalHeight,
             hexHeight,
-            earthLayerHeight
+            earthLayerHeight,
+            hexTopOffset
         },
         features: ['isometric', 'earthLayer', 'anchored'],
         sprites

@@ -1365,11 +1365,12 @@ function draw3DFace(face, texture = null) {
             const tileInfo = getTerrainTileInfo();
             if (tileInfo && tileInfo.earthLayerHeight > 0) {
                 // For isometric tiles, only draw the hex surface portion (crop out earth layer)
-                // The source sprite has hex surface at the top, earth layer below
-                const sourceHexHeight = tileInfo.hexHeight;
+                // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
+                const hexTopOffset = tileInfo.hexTopOffset || 0;
+                const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
                 ctx.drawImage(
                     texture,
-                    0, 0, texture.width, sourceHexHeight,  // Source: only hex surface
+                    0, hexTopOffset, texture.width, sourceContentHeight,  // Source: hex content only
                     minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
                 );
             } else {
@@ -2100,9 +2101,13 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
             // Position so hex surface center aligns with (cx, cy)
             const buffer = Math.max(6, size * 0.06);
             const spriteWidth = size * 2 + buffer;
-            // Scale the total height proportionally
+            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
+            const hexTopOffset = tileInfo.hexTopOffset || 0;
+            // The actual hex content height is hexHeight minus any top padding
+            const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
+            // Scale the content height proportionally
             const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
-            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const scaleRatio = hexSurfaceHeight / sourceContentHeight;
             const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
 
             // Position: center hex surface at (cx, cy), earth layer extends below
@@ -2132,13 +2137,11 @@ function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWid
                 );
             } else if (renderPass === 'surface') {
                 // Pass 2: Draw only the hex surface (top portion)
-                // In the source sprite: hex surface is from 0 to hexHeight
-                const sourceHexHeight = tileInfo.hexHeight;
-
+                // In the source sprite: hex surface content starts at hexTopOffset
                 context.drawImage(
                     texture,
-                    0, 0,                                       // Source: top of sprite
-                    texture.width, sourceHexHeight,            // Source: hex surface dimensions
+                    0, hexTopOffset,                           // Source: start at hex content
+                    texture.width, sourceContentHeight,        // Source: hex surface dimensions
                     drawX, drawY,                              // Dest: normal position
                     spriteWidth, hexSurfaceHeight              // Dest: scaled hex surface
                 );
@@ -2594,8 +2597,12 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
             // Isometric tiles: draw tile with two-pass rendering support
             const buffer = Math.max(6, size * 0.06);
             const spriteWidth = size * 2 + buffer;
+            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
+            const hexTopOffset = tileInfo.hexTopOffset || 0;
+            // The actual hex content height is hexHeight minus any top padding
+            const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
             const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
-            const scaleRatio = hexSurfaceHeight / tileInfo.hexHeight;
+            const scaleRatio = hexSurfaceHeight / sourceContentHeight;
             const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
 
             // Position: center hex surface at (cx, cy), earth layer extends below
@@ -2618,12 +2625,11 @@ function drawHex(cx, cy, size, fillColor, strokeColor = null, lineWidth = 1, tex
                 );
             } else if (renderPass === 'surface') {
                 // Pass 2: Draw only the hex surface (top portion)
-                const sourceHexHeight = tileInfo.hexHeight;
-
+                // In the source sprite: hex surface content starts at hexTopOffset
                 ctx.drawImage(
                     texture,
-                    0, 0,
-                    texture.width, sourceHexHeight,
+                    0, hexTopOffset,                           // Source: start at hex content
+                    texture.width, sourceContentHeight,        // Source: hex surface dimensions
                     drawX, drawY,
                     spriteWidth, hexSurfaceHeight
                 );
