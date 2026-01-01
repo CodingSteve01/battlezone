@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.3...shadow-squad-v5.0.4) (2026-01-01)
+
+
+### Bug Fixes
+
+* **game:** improve performance, visuals, and AI cooperation ([#277](https://github.com/CodingSteve01/battlezone/issues/277)) ([f5b561a](https://github.com/CodingSteve01/battlezone/commit/f5b561abc42166a0c0816ce3f0426875b13b92a5))
+
 ## [5.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.2...shadow-squad-v5.0.3) (2025-12-31)
 
 
