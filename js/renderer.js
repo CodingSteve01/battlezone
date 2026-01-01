@@ -1402,8 +1402,12 @@ function draw3DFace(face, texture = null) {
         ctx.fill();
     }
 
-    // Subtle edge for cliff faces
+    // Cliff faces: fill with color, then add subtle edge
     if (face.type === 'cliff') {
+        // Fill the cliff face with the lit color
+        ctx.fillStyle = litColor;
+        ctx.fill();
+        // Subtle darker edge for definition
         ctx.strokeStyle = applyLightingToColor(face.color, face.lighting * 0.7);
         ctx.lineWidth = 0.5;
         ctx.stroke();
@@ -5300,6 +5304,72 @@ function drawMinimapLegend(ctx, legendX, legendY, availableWidth) {
 }
 
 /**
+ * Draw horizontal legend for portrait mode (below the minimap)
+ * Compact layout using icon groups
+ */
+function drawMinimapLegendHorizontal(ctx, legendX, legendY, availableWidth) {
+    if (availableWidth < 200) return;
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '10px sans-serif';
+
+    const dotSize = 5;
+    const itemSpacing = 50;
+    let currentX = legendX;
+    const currentY = legendY;
+
+    // Key terrain types in a row
+    const terrainItems = [
+        { name: 'Gras', color: TERRAIN.grass.color },
+        { name: 'Wald', color: TERRAIN.forest.color },
+        { name: 'Hügel', color: TERRAIN.hills.color },
+        { name: 'Wasser', color: TERRAIN.water.color },
+        { name: 'Fels', color: TERRAIN.rock.color }
+    ];
+
+    terrainItems.forEach(item => {
+        if (currentX + itemSpacing > legendX + availableWidth) return;
+
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(currentX + dotSize, currentY, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillText(item.name, currentX + dotSize * 2 + 4, currentY);
+        currentX += itemSpacing;
+    });
+
+    // Unit indicators in second row
+    const unitY = legendY + 20;
+    currentX = legendX;
+
+    // Own units
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(currentX + dotSize, unitY, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText('Eigene', currentX + dotSize * 2 + 4, unitY);
+    currentX += itemSpacing;
+
+    // Enemy units
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(currentX + dotSize, unitY, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText('Feinde', currentX + dotSize * 2 + 4, unitY);
+
+    ctx.restore();
+}
+
+/**
  * Draw strategic minimap showing terrain, units, and zone
  * Supports both compact (corner) and expanded (center) modes
  * - Shows all terrain
@@ -5316,17 +5386,29 @@ function drawMinimap(w, h) {
 
     // Determine size and position based on mode
     let size, x, y;
+    let legendWidth = 0;  // Space reserved for legend
     if (isExpanded) {
         // Expanded mode: use available space between top bar and bottom UI
-        const padding = 20;  // Small padding from edges
-        const topOffset = 60;  // Space for top bar (player info, round, AP)
-        const bottomOffset = 280;  // Space for bottom UI (unit cards, action buttons, end turn)
-        const availableWidth = Math.max(0, w - padding * 2);
+        const padding = 8;  // Minimal padding from edges
+        const topOffset = 55;  // Space for top bar (player info, round, AP)
+        const bottomOffset = 60;  // Minimal space for hint text at bottom
+        const isLandscape = w > h;
+
+        // Reserve space for legend - on right side for landscape, below for portrait
+        legendWidth = isLandscape ? 110 : 0;
+
+        const availableWidth = Math.max(0, w - padding * 2 - legendWidth);
         const availableHeight = Math.max(0, h - topOffset - bottomOffset);
         // Use available space - take the smaller of width/height to maintain square aspect
         size = Math.min(availableWidth, availableHeight);
         if (size <= 0) return;
-        x = (w - size) / 2;
+
+        // Position map: left-aligned with legend on right for landscape, centered for portrait
+        if (isLandscape) {
+            x = (w - size - legendWidth) / 2;
+        } else {
+            x = (w - size) / 2;
+        }
         y = topOffset + (availableHeight - size) / 2;
     } else {
         // Compact mode: top-left corner
@@ -5549,6 +5631,8 @@ function drawMinimap(w, h) {
     // Draw label and close button outside the clip region
     ctx.save();
     if (isExpanded) {
+        const isLandscape = w > h;
+
         // Title for expanded view
         ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
         ctx.font = 'bold 16px sans-serif';
@@ -5561,8 +5645,14 @@ function drawMinimap(w, h) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.fillText('Tippe um den Viewport zu verschieben', x + size / 2, y + size + 20);
 
-        // Draw legend on the right side
-        drawMinimapLegend(ctx, x + size + 10, y, w - (x + size + 10) - 10);
+        // Draw legend - position depends on orientation
+        if (isLandscape) {
+            // Landscape: legend on the right side of the map
+            drawMinimapLegend(ctx, x + size + 15, y, legendWidth - 15);
+        } else {
+            // Portrait: legend below the map (compact horizontal layout)
+            drawMinimapLegendHorizontal(ctx, x, y + size + 40, size);
+        }
 
         // Draw close button
         drawMinimapCloseButton(x, y, size);
