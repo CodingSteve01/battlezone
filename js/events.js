@@ -40,9 +40,12 @@ export const ROUND_EVENTS = {
         description: 'Team erhält +3 AP zum Pool!',
         color: '#eab308',
         effect: () => {
-            // Add bonus to shared AP pool instead of individual units
-            state.sharedAP += 3;
-            state.maxSharedAP += 3;  // Also increase max for display
+            // Store bonus so it persists through turn starts
+            state.eventAPBonus = (state.eventAPBonus || 0) + 3;
+        },
+        cleanup: () => {
+            // Clear AP bonus when event ends
+            state.eventAPBonus = 0;
         }
     },
     thick_fog: {

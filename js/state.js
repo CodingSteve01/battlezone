@@ -447,8 +447,10 @@ export function getPlayerUnits(player) {
 export function initSharedAPPool(_player) {
     // Constant pool: always based on starting unit count, not current
     const poolSize = CONFIG.UNITS_PER_PLAYER * CONFIG.AP_PER_TURN;
-    state.sharedAP = poolSize;
-    state.maxSharedAP = poolSize;
+    // Add any bonus from round events (e.g., Kampfgeist)
+    const eventBonus = state.eventAPBonus || 0;
+    state.sharedAP = poolSize + eventBonus;
+    state.maxSharedAP = poolSize + eventBonus;
     state.unitAttacksThisTurn = {};  // Reset attack tracking
 }
 
