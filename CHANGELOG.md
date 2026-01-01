@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.10](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.9...shadow-squad-v5.0.10) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** render full terrain under fog ([#293](https://github.com/CodingSteve01/battlezone/issues/293)) ([01765c2](https://github.com/CodingSteve01/battlezone/commit/01765c2b8f070a10142714aded31fab3b3112c36))
+
 ## [5.0.9](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.8...shadow-squad-v5.0.9) (2026-01-01)
 
 
