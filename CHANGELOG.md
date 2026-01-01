@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.11](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.10...shadow-squad-v5.0.11) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** enhance fog of war visual effect with brightness and saturation ([#295](https://github.com/CodingSteve01/battlezone/issues/295)) ([e5a7042](https://github.com/CodingSteve01/battlezone/commit/e5a70424273a821b571a31096c524daecf13dc21))
+
 ## [5.0.10](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.9...shadow-squad-v5.0.10) (2026-01-01)
 
 
