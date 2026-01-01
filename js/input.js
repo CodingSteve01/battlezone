@@ -870,6 +870,7 @@ export function scrollToPosition(targetCameraX, targetCameraY, duration = 300) {
  * - Click own unit: Select it
  * - Click enemy: Attack if in range, otherwise move toward them
  * - Click empty hex: Move there
+ * - Second click anywhere (when enemy targeted): Execute attack
  */
 function handleTapOrClick(clientX, clientY) {
     // Block all input during AI turns (including spectator mode)
@@ -900,6 +901,46 @@ function handleTapOrClick(clientX, clientY) {
     if (!hex) return;
 
     const unit = getCurrentUnit();
+
+    // === CONFIRM ATTACK ON TARGETED ENEMY ===
+    // If an enemy is already targeted, clicking anywhere (except on own units) executes the attack
+    if (state.targetedUnit && unit && state.sharedAP >= 1 && !state.minigameInProgress) {
+        const targetedEnemy = state.targetedUnit;
+
+        // Check if clicking on own unit - that should select the unit instead
+        if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
+            // Fall through to unit selection logic below
+        } else {
+            // Check if targeted enemy is still in attack range
+            const attackable = getAttackableUnits(unit);
+            const canAttack = attackable.some(u => u.id === targetedEnemy.id);
+
+            if (canAttack && targetedEnemy.alive) {
+                // Execute attack on the targeted enemy
+                state.targetedUnit = null;
+                state.pendingMoveDestination = null;
+                state.currentPath = null;
+                state.minigameInProgress = true;
+
+                (async () => {
+                    try {
+                        const result = await executeAttackWithMinigame(unit, targetedEnemy);
+                        if (result.killed) {
+                            checkWinCondition();
+                        }
+                        render();
+                        updateUI();
+                        notifyTutorialAction('unitAttacked');
+                        showActionHint('attacked');
+                        checkTutorialHint();
+                    } finally {
+                        state.minigameInProgress = false;
+                    }
+                })();
+                return;
+            }
+        }
+    }
 
     // 1. Check if clicking on own unit
     if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
