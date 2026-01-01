@@ -8,7 +8,8 @@
     "spriteWidth": 256,
     "totalHeight": 301,
     "hexHeight": 222,
-    "earthLayerHeight": 79
+    "earthLayerHeight": 79,
+    "hexTopOffset": 6
   },
   "features": [
     "isometric",
