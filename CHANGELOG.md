@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.9](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.8...shadow-squad-v5.0.9) (2026-01-01)
+
+
+### Bug Fixes
+
+* **fogOfWar:** improve fog of war rendering and prevent AI cheating ([#291](https://github.com/CodingSteve01/battlezone/issues/291)) ([7d03bf8](https://github.com/CodingSteve01/battlezone/commit/7d03bf87f41934881c45ff0bae1efc38d3a76007))
+
 ## [5.0.8](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.7...shadow-squad-v5.0.8) (2026-01-01)
 
 
