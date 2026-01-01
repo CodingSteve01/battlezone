@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.1.0...shadow-squad-v5.2.0) (2026-01-01)
+
+
+### Features
+
+* **ai:** enhance tactical AI with smarter ability usage and spotted reactions ([#304](https://github.com/CodingSteve01/battlezone/issues/304)) ([45f41ea](https://github.com/CodingSteve01/battlezone/commit/45f41ea87da72d5cad32f9dd4f08f1d3939718ba))
+
 ## [5.1.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.13...shadow-squad-v5.1.0) (2026-01-01)
 
 
