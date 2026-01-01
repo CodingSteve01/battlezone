@@ -5020,15 +5020,17 @@ function drawMinimap(w, h) {
     // Determine size and position based on mode
     let size, x, y;
     if (isExpanded) {
-        // Expanded mode: use nearly full screen (with minimal padding)
+        // Expanded mode: use available space between top bar and bottom UI
         const padding = 20;  // Small padding from edges
+        const topOffset = 60;  // Space for top bar (player info, round, AP)
+        const bottomOffset = 280;  // Space for bottom UI (unit cards, action buttons, end turn)
         const availableWidth = Math.max(0, w - padding * 2);
-        const availableHeight = Math.max(0, h - padding * 2);
-        // Use full available space - take the smaller of width/height to maintain square aspect
+        const availableHeight = Math.max(0, h - topOffset - bottomOffset);
+        // Use available space - take the smaller of width/height to maintain square aspect
         size = Math.min(availableWidth, availableHeight);
         if (size <= 0) return;
         x = (w - size) / 2;
-        y = (h - size) / 2;
+        y = topOffset + (availableHeight - size) / 2;
     } else {
         // Compact mode: top-left corner
         size = config.SIZE;
