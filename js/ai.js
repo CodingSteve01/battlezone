@@ -16,7 +16,7 @@ import { updateUI, showPowerupPickup } from './ui.js';
 import { render } from './renderer.js';
 import { endTurn } from './turns.js';
 import { TERRAIN, CONFIG } from './config.js';
-import { scrollToUnit, scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
+import { scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
 import { checkPowerupPickup } from './powerups.js';
 import { getSpawnPositions } from './map.js';
@@ -1837,11 +1837,8 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         const relevantUnits = [unit, ...getRelevantUnitsForZoom(target, state.viewingPlayer)];
         await scrollToUnitWithZoom(target, scrollDelay, null, relevantUnits);
         await delay(200);
-    } else if (hasHumanViewer) {
-        // Normal scroll for human player watching AI
-        scrollToUnit(target, scrollDelay);
-        await delay(scrollDelay + 100);
     }
+    // NOTE: No scrolling in single-player AI turn to prevent revealing enemy positions
 
     state.targetedUnit = target;
     renderIfVisible();
@@ -2510,7 +2507,6 @@ async function executeAIMove(unit, target, spectatorMode = false) {
 
     const hasHumanViewer = spectatorMode || !isAIPlayer(state.viewingPlayer);
     const wasVisible = isUnitVisibleToViewer(unit);
-    const shouldFollowVisible = hasHumanViewer && wasVisible;
 
     const processReactiveFire = async () => {
         if (!unit.alive) return false;
@@ -2566,15 +2562,13 @@ async function executeAIMove(unit, target, spectatorMode = false) {
     const stepDelay = spectatorMode ? 200 : 120;
     const scrollDuration = spectatorMode ? 400 : 200;
 
-    // If unit starts visible or in spectator mode, scroll to it first
+    // If in spectator mode, scroll to unit first
     if (spectatorMode) {
         // Situational zoom based on unit and nearby enemies/allies
         const relevantUnits = getRelevantUnitsForZoom(unit, state.viewingPlayer);
         await scrollToUnitWithZoom(unit, scrollDuration, null, relevantUnits);
-    } else if (hasHumanViewer && wasVisible) {
-        scrollToUnit(unit, scrollDuration);
-        await delay(scrollDuration + 100);
     }
+    // NOTE: No scrolling in single-player AI turn to prevent revealing enemy positions
 
     // Animate step by step
     let unitBecameVisible = false;
@@ -2600,17 +2594,16 @@ async function executeAIMove(unit, target, spectatorMode = false) {
         // Check if unit just became visible
         if (hasHumanViewer && isNowVisible && !unitBecameVisible) {
             unitBecameVisible = true;
-            // Scroll to show the newly visible enemy with situational zoom
+            // In spectator mode, scroll to show the newly visible enemy
             if (spectatorMode) {
                 const relevantUnits = getRelevantUnitsForZoom(unit, state.viewingPlayer);
                 await scrollToUnitWithZoom(unit, 400, null, relevantUnits);
-            } else {
-                scrollToUnit(unit, 300);
-                await delay(350);
             }
+            // NOTE: No scrolling in single-player AI turn to prevent revealing enemy positions
         }
 
-        if (spectatorMode || shouldFollowVisible || unitBecameVisible) {
+        // Only follow unit in spectator mode to prevent revealing enemy positions
+        if (spectatorMode) {
             followUnitInstant(unit);
         }
 
