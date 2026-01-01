@@ -1,16 +1,17 @@
 // ===== INPUT HANDLING =====
 
-import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileSizeForHexSize, getTileZOffset, getTileScreenPosition } from './state.js';
+import { state, getHex, getCurrentUnit, getPlayerUnits, setQueuedPath, getQueuedPath, clearQueuedPath, getPreviouslyVisibleEnemies, updatePreviouslyVisibleEnemies, spendSharedAP, isUnitOnOverwatch, areUnitsAllied, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileSizeForHexSize, getTileZOffset, getTileScreenPosition, canUnitAttack } from './state.js';
 import { pixelToHex, hexDistance } from './hexMath.js';
 import { findPath, getMoveCost } from './pathfinding.js';
-import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover } from './units.js';
+import { getAttackableUnits, moveUnit, animateUnitMovement, canAutoTakeCover, autoTakeCover, getEffectiveRange } from './units.js';
 import {
     executeAttack, executeAttackWithMinigame, useSpecialAbility, useMedicHealingWithMinigame,
     prepareAmbush, canPrepareAmbush, getEligibleCoordinators, executeCoordinatedAttack,
     canUseSpecialAbility, getSpecialAbilityCost,
     canUseSuppression, useSuppression, canUseOverwatch, activateOverwatch,
     checkAmbushTriggers, executeAmbushAttack,
-    checkOverwatchTriggers, executeOverwatchAttack, onUnitMoved
+    checkOverwatchTriggers, executeOverwatchAttack, onUnitMoved,
+    hasLineOfSight
 } from './combat.js';
 import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
@@ -937,6 +938,10 @@ function handleTapOrClick(clientX, clientY) {
                         state.minigameInProgress = false;
                     }
                 })();
+                return;
+            } else if (targetedEnemy.alive) {
+                // Attack not possible - show feedback why
+                showAttackBlockedFeedback(unit, targetedEnemy);
                 return;
             }
         }
@@ -2306,6 +2311,9 @@ function setupTargetInfoClick() {
             } finally {
                 state.minigameInProgress = false;
             }
+        } else if (!state.minigameInProgress && state.targetedUnit) {
+            // Attack not possible - show feedback why
+            showAttackBlockedFeedback(unit, state.targetedUnit);
         }
     };
 
@@ -2463,4 +2471,65 @@ function setupActionButtons() {
             }
         };
     }
+}
+
+/**
+ * Show feedback when an attack is blocked
+ * Explains WHY the attack can't be executed
+ */
+function showAttackBlockedFeedback(unit, target) {
+    if (!unit || !target) return;
+
+    // Check possible reasons for blocked attack
+
+    // 1. Check if unit has reached attack limit
+    if (!canUnitAttack(unit)) {
+        playError();
+        showToast('❌ Diese Einheit hat diese Runde bereits angegriffen!', 'warning');
+        state.targetedUnit = null;
+        render();
+        updateUI();
+        return;
+    }
+
+    // 2. Check if not enough AP
+    if (state.sharedAP < 1) {
+        playError();
+        showToast('❌ Nicht genug AP für Angriff!', 'warning');
+        state.targetedUnit = null;
+        render();
+        updateUI();
+        return;
+    }
+
+    // 3. Check distance vs range
+    const effectiveRange = getEffectiveRange(unit);
+    const distance = hexDistance({ q: unit.q, r: unit.r }, { q: target.q, r: target.r });
+
+    if (distance > effectiveRange) {
+        playError();
+        showToast(`❌ Ziel außer Reichweite! (${distance} Felder, max. ${effectiveRange})`, 'warning');
+        // Keep target for reference, but provide guidance
+        render();
+        updateUI();
+        return;
+    }
+
+    // 4. Check line of sight
+    const los = hasLineOfSight(unit.q, unit.r, target.q, target.r);
+    if (!los.clear) {
+        playError();
+        const blockedByName = los.blockedBy || 'Hindernis';
+        showToast(`❌ Keine Sichtlinie! Blockiert durch ${blockedByName}`, 'warning');
+        // Keep target for reference
+        render();
+        updateUI();
+        return;
+    }
+
+    // 5. Generic fallback
+    playError();
+    showToast('❌ Angriff nicht möglich!', 'warning');
+    render();
+    updateUI();
 }
