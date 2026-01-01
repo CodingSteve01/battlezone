@@ -102,6 +102,7 @@ export const state = {
     currentPath: null,  // A* path for visualization
     pendingMoveDestination: null,  // Hex for tap-to-confirm movement
     pendingHealTarget: null,  // For context-sensitive healing action
+    minigameInProgress: false,  // Prevents triggering actions during minigame
 
     // Shared AP Pool - all units share one pool per turn
     sharedAP: 0,              // Current AP in the pool
@@ -263,6 +264,7 @@ export function resetState() {
     state.currentPath = null;
     state.pendingMoveDestination = null;
     state.pendingHealTarget = null;
+    state.minigameInProgress = false;
     state.round = 1;
     state.gameOver = false;
     state.animating = false;

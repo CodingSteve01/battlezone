@@ -888,6 +888,10 @@ function handleTapOrClick(clientX, clientY) {
                 const allyHex = hex.unit;
                 const healCost = getSpecialAbilityCost('medic');
                 if (allyHex.currentHp < allyHex.maxHp && state.sharedAP >= healCost && !unit.usedSpecial) {
+                    // Block if minigame is already in progress (prevents exploit)
+                    if (state.minigameInProgress) {
+                        return;
+                    }
                     // Show healing option
                     showToast(`💚 ${unit.name} kann ${allyHex.name} heilen! Tippe nochmal zum Heilen.`, 'info');
                     if (state.pendingHealTarget && state.pendingHealTarget.id === allyHex.id) {
@@ -896,9 +900,14 @@ function handleTapOrClick(clientX, clientY) {
                         // Spend AP and mark as used before starting minigame
                         spendSharedAP(healCost);
                         unit.usedSpecial = true;
+                        state.minigameInProgress = true;  // Block additional triggers
                         // Use async healing minigame
                         (async () => {
-                            await useMedicHealingWithMinigame(unit);
+                            try {
+                                await useMedicHealingWithMinigame(unit);
+                            } finally {
+                                state.minigameInProgress = false;  // Always reset
+                            }
                             render();
                             updateUI();
                         })();
@@ -970,28 +979,37 @@ async function handleEnemyClick(unit, hex) {
     const canAttack = attackable.some(u => u.id === enemy.id);
 
     if (canAttack && state.sharedAP >= 1) {
+        // Block if minigame is already in progress (prevents exploit)
+        if (state.minigameInProgress) {
+            return;
+        }
         // Enemy is in range - attack!
         if (state.targetedUnit && state.targetedUnit.id === enemy.id) {
             // Second tap on same enemy - execute attack with minigame
             state.targetedUnit = null;
             state.pendingMoveDestination = null;
             state.currentPath = null;
+            state.minigameInProgress = true;  // Block additional triggers
 
-            // Start the attack minigame and wait for result
-            const result = await executeAttackWithMinigame(unit, enemy);
+            try {
+                // Start the attack minigame and wait for result
+                const result = await executeAttackWithMinigame(unit, enemy);
 
-            if (result.killed) {
-                checkWinCondition();
+                if (result.killed) {
+                    checkWinCondition();
+                }
+
+                render();
+                updateUI();
+
+                // Notify guided tutorial of attack
+                notifyTutorialAction('unitAttacked');
+                // Check for tutorial hints after attack
+                showActionHint('attacked');
+                checkTutorialHint();
+            } finally {
+                state.minigameInProgress = false;  // Always reset
             }
-
-            render();
-            updateUI();
-
-            // Notify guided tutorial of attack
-            notifyTutorialAction('unitAttacked');
-            // Check for tutorial hints after attack
-            showActionHint('attacked');
-            checkTutorialHint();
         } else {
             // First tap - target this enemy
             state.targetedUnit = enemy;
@@ -1960,18 +1978,27 @@ async function handleAttackClick(unit, hex) {
         const canAttack = attackable.some(u => u.id === hex.unit.id);
 
         if (canAttack) {
+            // Block if minigame is already in progress (prevents exploit)
+            if (state.minigameInProgress) {
+                return;
+            }
             if (state.targetedUnit && state.targetedUnit.id === hex.unit.id) {
                 state.targetedUnit = null;
+                state.minigameInProgress = true;  // Block additional triggers
 
-                // Execute attack with minigame
-                const result = await executeAttackWithMinigame(unit, hex.unit);
+                try {
+                    // Execute attack with minigame
+                    const result = await executeAttackWithMinigame(unit, hex.unit);
 
-                if (result.killed) {
-                    checkWinCondition();
+                    if (result.killed) {
+                        checkWinCondition();
+                    }
+
+                    render();
+                    updateUI();
+                } finally {
+                    state.minigameInProgress = false;  // Always reset
                 }
-
-                render();
-                updateUI();
             } else {
                 state.targetedUnit = hex.unit;
                 render();
@@ -2182,13 +2209,22 @@ function setupActionButtons() {
             const cost = getSpecialAbilityCost(unit.class);
 
             if (canUseSpecialAbility(unit)) {
+                // Block if minigame is already in progress (prevents exploit)
+                if (state.minigameInProgress) {
+                    return;
+                }
                 // Medic uses healing minigame
                 if (unit.class === 'medic') {
                     // Spend AP and mark as used before starting minigame
                     spendSharedAP(cost);
                     unit.usedSpecial = true;
+                    state.minigameInProgress = true;  // Block additional triggers
                     (async () => {
-                        await useMedicHealingWithMinigame(unit);
+                        try {
+                            await useMedicHealingWithMinigame(unit);
+                        } finally {
+                            state.minigameInProgress = false;  // Always reset
+                        }
                         render();
                         updateUI();
                     })();

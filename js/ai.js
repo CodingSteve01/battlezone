@@ -134,22 +134,63 @@ function clearAIThoughts() {
 }
 
 // ===== AI MEMORY SYSTEM =====
-// Stores information about enemy positions, even when not visible
+// Team-based memory shared between allied AIs for coordinated strategy
+// Allied AIs share intel and target assignments to work as one team
 
-const aiMemory = {
-    lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence }
-    searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
-    threatAssessment: new Map(),     // unitId -> threat level
-    huntMode: false,                 // True when actively hunting remaining enemies
-    lastContactRound: 0,             // Last round we saw an enemy
-    playerCenterEstimate: null,      // Estimated center of player forces
-    searchPattern: 'expand',         // 'expand', 'sweep', 'pincer'
-    assignedTargets: new Map(),      // unitId -> targetUnitId (for focus fire)
-    // Decoy/Bait strategy
-    decoyUnit: null,                 // Unit acting as bait
-    ambushUnits: [],                 // Units waiting to ambush
-    decoyActive: false,              // Is decoy strategy currently active
-};
+/**
+ * Create a fresh memory object for a team
+ */
+function createTeamMemory() {
+    return {
+        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence }
+        searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
+        threatAssessment: new Map(),     // unitId -> threat level
+        huntMode: false,                 // True when actively hunting remaining enemies
+        lastContactRound: 0,             // Last round we saw an enemy
+        playerCenterEstimate: null,      // Estimated center of enemy forces
+        searchPattern: 'expand',         // 'expand', 'sweep', 'pincer'
+        assignedTargets: new Map(),      // unitId -> targetUnitId (for focus fire)
+        // Decoy/Bait strategy
+        decoyUnit: null,                 // Unit acting as bait
+        ambushUnits: [],                 // Units waiting to ambush
+        decoyActive: false,              // Is decoy strategy currently active
+        // Team coordination
+        lastUpdateRound: 0,              // Last round this memory was updated
+        teamPlayers: new Set(),          // Players that share this memory
+    };
+}
+
+// Team-based memory storage: teamId -> memory
+// Team ID is determined by alliance - allied players share the same memory
+const teamMemories = new Map();
+
+/**
+ * Get the team memory for the current AI player
+ * Allied AIs share the same memory for coordinated strategy
+ */
+function getTeamMemory() {
+    // Find the team ID - use the lowest player index in the alliance
+    let teamId = state.currentPlayer;
+    for (let p = 0; p < state.settings.players; p++) {
+        if (p !== state.currentPlayer && arePlayersAllied(state.currentPlayer, p)) {
+            teamId = Math.min(teamId, p);
+        }
+    }
+
+    // Get or create team memory
+    if (!teamMemories.has(teamId)) {
+        const memory = createTeamMemory();
+        memory.teamPlayers.add(state.currentPlayer);
+        teamMemories.set(teamId, memory);
+    }
+
+    const memory = teamMemories.get(teamId);
+    memory.teamPlayers.add(state.currentPlayer);
+    return memory;
+}
+
+// Reference to current team's memory (set at start of AI turn)
+let aiMemory = createTeamMemory();
 
 function getEnemySpawnCenters() {
     const spawns = getSpawnPositions();
@@ -167,20 +208,22 @@ function getEnemySpawnCenters() {
 }
 
 /**
- * Reset AI memory for new game
+ * Reset AI memory for new game - clears all team memories
  */
 export function resetAIMemory() {
-    aiMemory.lastKnownPositions.clear();
-    aiMemory.searchedAreas.clear();
-    aiMemory.threatAssessment.clear();
-    aiMemory.huntMode = false;
-    aiMemory.lastContactRound = 0;
-    aiMemory.playerCenterEstimate = null;
-    aiMemory.searchPattern = 'expand';
-    aiMemory.assignedTargets.clear();
-    aiMemory.decoyUnit = null;
-    aiMemory.ambushUnits = [];
-    aiMemory.decoyActive = false;
+    // Clear all team memories
+    teamMemories.clear();
+    // Reset the local reference
+    aiMemory = createTeamMemory();
+}
+
+/**
+ * Initialize AI memory for the current player's turn
+ * Sets aiMemory to the shared team memory so allies coordinate
+ */
+function initializeTeamMemory() {
+    aiMemory = getTeamMemory();
+    aiMemory.lastUpdateRound = state.round;
 }
 
 // ===== DECOY/BAIT STRATEGY =====
@@ -668,10 +711,28 @@ function calculatePositionExposure(q, r, enemies, unit) {
 }
 
 /**
+ * Get all units from allied AI players (for team coordination)
+ * This includes the current player and all allied AI players
+ */
+function getAllAlliedAIUnits() {
+    const alliedUnits = [];
+    for (let p = 0; p < state.settings.players; p++) {
+        // Include current player and all allied AI players
+        if (p === state.currentPlayer || (isAIPlayer(p) && arePlayersAllied(state.currentPlayer, p))) {
+            const units = getPlayerUnits(p).filter(u => u.alive);
+            alliedUnits.push(...units);
+        }
+    }
+    return alliedUnits;
+}
+
+/**
  * Analyze the battlefield and create a strategic plan
+ * Uses team-wide coordination for allied AIs
  */
 function analyzeAndPlan() {
     const aiUnits = getPlayerUnits(state.currentPlayer);
+    const allAlliedUnits = getAllAlliedAIUnits();  // All units from allied AIs
     const visibleEnemies = findAllVisibleEnemies();
 
     // Update AI memory with visible enemies
@@ -700,8 +761,8 @@ function analyzeAndPlan() {
         addAIThought('Aktiviere Jagdmodus - Feinde werden gesucht!', 'strategy');
     }
 
-    // Decide search pattern based on situation
-    decideSearchPattern(aiUnits, visibleEnemies);
+    // Decide search pattern based on situation (using all allied units)
+    decideSearchPattern(allAlliedUnits, visibleEnemies);
 
     // Generate thought based on search pattern
     const patternNames = {
@@ -714,8 +775,9 @@ function analyzeAndPlan() {
         addAIThought(`Strategie: ${patternNames[aiMemory.searchPattern]}`, 'strategy');
     }
 
-    // Assign targets for focus fire
-    assignTargets(aiUnits, visibleEnemies);
+    // Assign targets using ALL allied units for coordinated focus fire
+    // This ensures allied AIs don't duplicate target assignments
+    assignTargets(allAlliedUnits, visibleEnemies);
 
     // Check if decoy strategy should be used
     if (!aiMemory.decoyActive && shouldUseDecoyStrategy(aiUnits, visibleEnemies)) {
@@ -1016,6 +1078,9 @@ async function performAIActions() {
     const spectatorMode = isSpectatorMode();
 
     logAI('KI-Zug startet', `Spieler ${aiPlayerIndex + 1}, Spectator: ${spectatorMode}`);
+
+    // Initialize team memory - allied AIs share the same memory for coordination
+    initializeTeamMemory();
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
     const unitDelay = spectatorMode ? 800 : 400;
@@ -1339,8 +1404,8 @@ async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
         // Prefer cover
         if (hex.cover) score += 30;
 
-        // Move towards allies (for protection/healing)
-        const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+        // Move towards allies (for protection/healing) - includes ALL allied players
+        const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
         if (allies.length > 0) {
             const closestAlly = Math.min(...allies.map(a =>
                 hexDistance({ q, r }, { q: a.q, r: a.r })
@@ -1548,7 +1613,8 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
     score += escapeRoutes * 10;
 
     // === MEDIC-SPEZIAL: Nähe zu Verbündeten ===
-    const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+    // Get ALL allied units (from all allied players) for team coordination
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
     if (unit.class === 'medic') {
         for (const ally of allies) {
             const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
@@ -1561,11 +1627,11 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
         }
     }
 
-    // Avoid clustering with allies (spread out)
+    // Avoid clustering with allies (spread out) - includes ALL allied players' units
     for (const ally of allies) {
         const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
-        if (distToAlly <= 1) score -= 20;
-        else if (distToAlly <= 2) score -= 10;
+        if (distToAlly <= 1) score -= 25;  // Stronger penalty for clustering
+        else if (distToAlly <= 2) score -= 12;
     }
 
     // Flanking bonus
@@ -1866,8 +1932,8 @@ async function executeRetreat(unit, enemies, spectatorMode = false) {
         // Prefer cover
         if (hex.cover) score += 30;
 
-        // Move towards allies (for protection/healing)
-        const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+        // Move towards allies (for protection/healing) - includes ALL allied players
+        const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
         if (allies.length > 0) {
             const closestAlly = Math.min(...allies.map(a =>
                 hexDistance({ q, r }, { q: a.q, r: a.r })
@@ -1950,7 +2016,8 @@ function selectBestTarget(attacker, targets) {
 function shouldUseSpecial(unit, enemies, plan) {
     switch (unit.class) {
         case 'medic': {
-            const allies = getPlayerUnits(unit.player);
+            // Get ALL allied units (including from allied players) for team healing
+            const allies = getAllAlliedAIUnits();
             // Verbesserte Heilreichweite aus config
             const healRange = 4;
             const woundedNearby = allies.filter(a =>
@@ -2254,8 +2321,8 @@ function scoreCombatPosition(unit, q, r, enemies, plan) {
         }
     }
 
-    // Flanking bonus - attack from different angle than allies
-    const allies = getPlayerUnits(unit.player).filter(u => u.id !== unit.id);
+    // Flanking bonus - attack from different angle than allies (includes ALL allied players)
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
     if (primaryTarget && allies.length > 0) {
         const avgAllyAngle = allies.reduce((sum, a) => {
             return sum + Math.atan2(a.r - primaryTarget.r, a.q - primaryTarget.q);
@@ -2372,8 +2439,8 @@ function scoreSearchPosition(unit, q, r, plan) {
         }
 
         case 'sweep': {
-            // Move in coordinated line
-            const allies = getPlayerUnits(unit.player);
+            // Move in coordinated line (with ALL allied units)
+            const allies = getAllAlliedAIUnits();
             const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
             // Stay roughly aligned with allies
             score -= Math.abs(r - avgAllyR) * 5;
