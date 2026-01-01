@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.0.7](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.6...shadow-squad-v5.0.7) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** restore cliff faces and improve expanded minimap layout ([#286](https://github.com/CodingSteve01/battlezone/issues/286)) ([b408f57](https://github.com/CodingSteve01/battlezone/commit/b408f57d99aec6dd649b37ffbb7711afe8a76c8b))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#288](https://github.com/CodingSteve01/battlezone/issues/288)) ([6eaf2e9](https://github.com/CodingSteve01/battlezone/commit/6eaf2e99485850510c138a5af983b8c9aeba0814))
+
 ## [5.0.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.5...shadow-squad-v5.0.6) (2026-01-01)
 
 
