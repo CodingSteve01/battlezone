@@ -47,13 +47,13 @@ const CharacterGenerator = {
             camouflage: 'ghillie'
         },
         commando: {
-            helmet: 'tactical_nvg',  // Tactical helmet with NVG and balaclava underneath
-            armor: 'heavy',          // Full combat armor like assault
-            weapon: 'rifle',         // Primary weapon
-            bodyBuild: 'heavy',      // Heavy build like assault
-            gear: ['nvg', 'grenades', 'knife'],
-            camouflage: 'flecktarn', // German Flecktarn camo pattern
-            balaclava: true          // Balaclava face covering under helmet
+            helmet: 'none',           // No helmet - stealthy operative look
+            armor: 'stealth',         // Minimal tactical gear for agility
+            weapon: 'smg',            // Compact weapon for CQB
+            bodyBuild: 'lean',        // Lean athletic build - agile operative
+            gear: ['nvg_goggles', 'knife', 'silencer'],
+            camouflage: 'black',      // All black tactical clothing
+            balaclava: true           // Black balaclava face covering
         },
         elitesoldat: {
             helmet: 'tactical_nvg',    // Tactical helmet with NVG mount
@@ -61,7 +61,7 @@ const CharacterGenerator = {
             weapon: 'rifle',           // Assault rifle (G36/HK416 style)
             bodyBuild: 'heavy',        // Heavy tactical build
             gear: ['nvg', 'grenades', 'knife', 'radio'],
-            camouflage: 'flecktarn',   // German Flecktarn camo pattern
+            camouflage: 'desert_flecktarn',  // Desert Flecktarn (Wüsten-Flecktarn) pattern
             balaclava: true,           // Face covering under helmet (KSK style)
             badge: true                // Elite unit insignia
         }
@@ -94,10 +94,12 @@ const CharacterGenerator = {
         woodland: { base: '#4a5a3a', light: '#5a6a4a', dark: '#3a4a2a' },
         digital: { base: '#5a6a5a', light: '#6a7a6a', dark: '#4a5a4a' },
         ghillie: { base: '#4a5d23', light: '#5c6b34', dark: '#3a4a1d' },
-        black: { base: '#2a2a2a', light: '#3a3a3a', dark: '#1a1a1a' },
+        black: { base: '#1a1a1a', light: '#2a2a2a', dark: '#0a0a0a' },  // Deep black for commando
         desert: { base: '#c4a878', light: '#d4b888', dark: '#b49868' },
         // German Flecktarn camouflage pattern - 5 colors
-        flecktarn: { base: '#4a5a40', light: '#5a6a4a', dark: '#3a4830', spots: ['#2a3020', '#6a7a50', '#5a5a48', '#8a9a70'] }
+        flecktarn: { base: '#4a5a40', light: '#5a6a4a', dark: '#3a4830', spots: ['#2a3020', '#6a7a50', '#5a5a48', '#8a9a70'] },
+        // Desert Flecktarn (Wüsten-Flecktarn) - tan/sand base with brown/olive spots
+        desert_flecktarn: { base: '#c4a878', light: '#d4b888', dark: '#a48858', spots: ['#8b7355', '#6b5b45', '#b49868', '#9a8a68'] }
     },
 
     generate(classType, pose, playerIndex, width = 130, height = 130, options = {}) {
@@ -1230,7 +1232,7 @@ const CharacterGenerator = {
                 this.drawTacticalHelmet(ctx, centerX, headY, uniform, playerColor, faceWidth, faceHeight);
                 break;
             case 'tactical_nvg':
-                // For commando: first draw balaclava to cover face
+                // For elite soldiers: balaclava under tactical helmet
                 if (classConfig.balaclava) {
                     this.drawBalaclava(ctx, centerX, headY, skinTone, faceWidth, faceHeight);
                 }
@@ -1248,12 +1250,19 @@ const CharacterGenerator = {
             case 'balaclava':
                 this.drawBalaclava(ctx, centerX, headY, skinTone, faceWidth, faceHeight);
                 break;
+            case 'none':
+                // No helmet - just balaclava if configured (for commando)
+                if (classConfig.balaclava) {
+                    this.drawBalaclava(ctx, centerX, headY, skinTone, faceWidth, faceHeight, true);
+                }
+                break;
         }
 
-        // Detailed facial features (unless covered by balaclava, ghillie, or tactical_nvg with balaclava)
+        // Detailed facial features (unless covered by balaclava, ghillie, or helmet with balaclava)
         const faceIsCovered = classConfig.helmet === 'balaclava' ||
                              classConfig.helmet === 'ghillie' ||
-                             (classConfig.helmet === 'tactical_nvg' && classConfig.balaclava);
+                             (classConfig.helmet === 'tactical_nvg' && classConfig.balaclava) ||
+                             (classConfig.helmet === 'none' && classConfig.balaclava);
         if (!faceIsCovered) {
             // Eyebrows with variation
             const browY = headY + 1 - browRidge * 3;
@@ -1923,26 +1932,33 @@ const CharacterGenerator = {
         ctx.fill();
     },
 
-    drawBalaclava(ctx, centerX, headY, skinTone, faceWidth = 11, faceHeight = 13) {
+    drawBalaclava(ctx, centerX, headY, skinTone, faceWidth = 11, faceHeight = 13, withGoggles = false) {
         const maskWidth = faceWidth + 3;
         const maskHeight = faceHeight + 4;
 
-        // Balaclava covering head with gradient
+        // Balaclava covering head with gradient (deeper black for commando)
         const maskGradient = ctx.createRadialGradient(
             centerX - 3, headY, 0,
             centerX + 2, headY + 6, maskWidth + 5
         );
-        maskGradient.addColorStop(0, '#2a2a2a');
-        maskGradient.addColorStop(0.5, '#1a1a1a');
-        maskGradient.addColorStop(1, '#0a0a0a');
+        if (withGoggles) {
+            // Commando: pure black tactical balaclava
+            maskGradient.addColorStop(0, '#1a1a1a');
+            maskGradient.addColorStop(0.5, '#0f0f0f');
+            maskGradient.addColorStop(1, '#050505');
+        } else {
+            maskGradient.addColorStop(0, '#2a2a2a');
+            maskGradient.addColorStop(0.5, '#1a1a1a');
+            maskGradient.addColorStop(1, '#0a0a0a');
+        }
 
         ctx.fillStyle = maskGradient;
         ctx.beginPath();
         ctx.ellipse(centerX, headY + 4, maskWidth, maskHeight, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Knit texture
-        ctx.strokeStyle = 'rgba(40,40,40,0.3)';
+        // Knit texture (subtler for commando)
+        ctx.strokeStyle = withGoggles ? 'rgba(30,30,30,0.2)' : 'rgba(40,40,40,0.3)';
         ctx.lineWidth = 0.5;
         for (let i = 0; i < 8; i++) {
             ctx.beginPath();
@@ -1951,83 +1967,149 @@ const CharacterGenerator = {
             ctx.stroke();
         }
 
-        // Eye opening with depth
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.beginPath();
-        ctx.ellipse(centerX, headY + 3, 10, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
+        if (withGoggles) {
+            // Commando: NVG-style tactical goggles instead of exposed eyes
+            // Goggle frame
+            ctx.fillStyle = '#1a1a1a';
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 1;
 
-        // Skin showing through
-        const skinGradient = ctx.createRadialGradient(centerX - 2, headY + 2, 0, centerX, headY + 3, 9);
-        skinGradient.addColorStop(0, skinTone.highlight);
-        skinGradient.addColorStop(0.5, skinTone.base);
-        skinGradient.addColorStop(1, skinTone.shadow);
+            // Left goggle lens housing
+            ctx.beginPath();
+            ctx.ellipse(centerX - 5, headY + 2, 6, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
 
-        ctx.fillStyle = skinGradient;
-        ctx.beginPath();
-        ctx.ellipse(centerX, headY + 3, 9, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
+            // Right goggle lens housing
+            ctx.beginPath();
+            ctx.ellipse(centerX + 5, headY + 2, 6, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
 
-        // Eye sockets
-        ctx.fillStyle = 'rgba(0,0,0,0.05)';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 4, headY + 3, 3, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(centerX + 4, headY + 3, 3, 2, 0, 0, Math.PI * 2);
-        ctx.fill();
+            // Bridge connecting goggles
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(centerX - 2, headY, 4, 4);
 
-        // Eye whites
-        ctx.fillStyle = '#f0ede8';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 4, headY + 3, 2.5, 1.8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(centerX + 4, headY + 3, 2.5, 1.8, 0, 0, Math.PI * 2);
-        ctx.fill();
+            // Left lens (dark reflective)
+            const leftLensGrad = ctx.createRadialGradient(centerX - 6, headY + 1, 0, centerX - 5, headY + 2, 5);
+            leftLensGrad.addColorStop(0, '#2a3a3a');
+            leftLensGrad.addColorStop(0.5, '#1a2525');
+            leftLensGrad.addColorStop(1, '#0a1515');
+            ctx.fillStyle = leftLensGrad;
+            ctx.beginPath();
+            ctx.ellipse(centerX - 5, headY + 2, 4.5, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
 
-        // Irises
-        ctx.fillStyle = '#3a3520';
-        ctx.beginPath();
-        ctx.ellipse(centerX - 4 + 0.3, headY + 3, 1.5, 1.5, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.ellipse(centerX + 4 + 0.3, headY + 3, 1.5, 1.5, 0, 0, Math.PI * 2);
-        ctx.fill();
+            // Right lens (dark reflective)
+            const rightLensGrad = ctx.createRadialGradient(centerX + 4, headY + 1, 0, centerX + 5, headY + 2, 5);
+            rightLensGrad.addColorStop(0, '#2a3a3a');
+            rightLensGrad.addColorStop(0.5, '#1a2525');
+            rightLensGrad.addColorStop(1, '#0a1515');
+            ctx.fillStyle = rightLensGrad;
+            ctx.beginPath();
+            ctx.ellipse(centerX + 5, headY + 2, 4.5, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
 
-        // Pupils
-        ctx.fillStyle = '#0a0a0a';
-        ctx.beginPath();
-        ctx.arc(centerX - 4 + 0.3, headY + 3, 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(centerX + 4 + 0.3, headY + 3, 0.8, 0, Math.PI * 2);
-        ctx.fill();
+            // Lens reflections
+            ctx.fillStyle = 'rgba(100, 150, 150, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 6, headY + 1, 2, 1.5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4, headY + 1, 2, 1.5, 0.3, 0, Math.PI * 2);
+            ctx.fill();
 
-        // Eye highlights
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(centerX - 4 - 0.3, headY + 2.5, 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(centerX + 4 - 0.3, headY + 2.5, 0.5, 0, Math.PI * 2);
-        ctx.fill();
+            // Strap visible at sides
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 11, headY + 2);
+            ctx.lineTo(centerX - 13, headY + 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(centerX + 11, headY + 2);
+            ctx.lineTo(centerX + 13, headY + 2);
+            ctx.stroke();
+        } else {
+            // Standard balaclava: eye opening with visible eyes
+            // Eye opening with depth
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(centerX, headY + 3, 10, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
 
-        // Brow wrinkles through mask
-        ctx.strokeStyle = 'rgba(50,50,50,0.2)';
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(centerX - 6, headY);
-        ctx.quadraticCurveTo(centerX, headY - 0.5, centerX + 6, headY);
-        ctx.stroke();
+            // Skin showing through
+            const skinGradient = ctx.createRadialGradient(centerX - 2, headY + 2, 0, centerX, headY + 3, 9);
+            skinGradient.addColorStop(0, skinTone.highlight);
+            skinGradient.addColorStop(0.5, skinTone.base);
+            skinGradient.addColorStop(1, skinTone.shadow);
 
-        // Nose bridge hint
+            ctx.fillStyle = skinGradient;
+            ctx.beginPath();
+            ctx.ellipse(centerX, headY + 3, 9, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye sockets
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 4, headY + 3, 3, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4, headY + 3, 3, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye whites
+            ctx.fillStyle = '#f0ede8';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 4, headY + 3, 2.5, 1.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4, headY + 3, 2.5, 1.8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Irises
+            ctx.fillStyle = '#3a3520';
+            ctx.beginPath();
+            ctx.ellipse(centerX - 4 + 0.3, headY + 3, 1.5, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(centerX + 4 + 0.3, headY + 3, 1.5, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pupils
+            ctx.fillStyle = '#0a0a0a';
+            ctx.beginPath();
+            ctx.arc(centerX - 4 + 0.3, headY + 3, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + 4 + 0.3, headY + 3, 0.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye highlights
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(centerX - 4 - 0.3, headY + 2.5, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX + 4 - 0.3, headY + 2.5, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Brow wrinkles through mask
+            ctx.strokeStyle = 'rgba(50,50,50,0.2)';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(centerX - 6, headY);
+            ctx.quadraticCurveTo(centerX, headY - 0.5, centerX + 6, headY);
+            ctx.stroke();
+        }
+
+        // Nose bridge hint (visible for both styles)
         ctx.fillStyle = 'rgba(0,0,0,0.15)';
         ctx.beginPath();
-        ctx.moveTo(centerX - 1, headY + 2);
-        ctx.lineTo(centerX + 1, headY + 2);
-        ctx.lineTo(centerX + 1.5, headY + 6);
-        ctx.lineTo(centerX - 1.5, headY + 6);
+        ctx.moveTo(centerX - 1, headY + 5);
+        ctx.lineTo(centerX + 1, headY + 5);
+        ctx.lineTo(centerX + 1.5, headY + 9);
+        ctx.lineTo(centerX - 1.5, headY + 9);
         ctx.closePath();
         ctx.fill();
     },
