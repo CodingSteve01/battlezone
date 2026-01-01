@@ -56,13 +56,14 @@ const CharacterGenerator = {
             balaclava: true          // Balaclava face covering under helmet
         },
         elitesoldat: {
-            helmet: 'tactical',
-            armor: 'heavy',
-            weapon: 'rifle',
-            bodyBuild: 'heavy',
-            gear: ['grenades', 'radio'],
-            camouflage: 'digital',
-            badge: true  // Elite badge/insignia
+            helmet: 'tactical_nvg',    // Tactical helmet with NVG mount
+            armor: 'heavy',            // Full combat armor
+            weapon: 'rifle',           // Assault rifle (G36/HK416 style)
+            bodyBuild: 'heavy',        // Heavy tactical build
+            gear: ['nvg', 'grenades', 'knife', 'radio'],
+            camouflage: 'flecktarn',   // German Flecktarn camo pattern
+            balaclava: true,           // Face covering under helmet (KSK style)
+            badge: true                // Elite unit insignia
         }
     },
 
@@ -149,13 +150,13 @@ const CharacterGenerator = {
         }
 
         // Calculate body positions based on stance
+        // Position body so feet reach the ground (groundY)
+        // Normal: boots end at bodyY + 45, Crouching: boots end at bodyY + 35
         const scale = poseConfig.stance === 'crouching' ? 0.75 : 1;
-        const bodyY = groundY - (poseConfig.stance === 'crouching' ? 55 : 70);
+        const bodyY = groundY - (poseConfig.stance === 'crouching' ? 35 : 45);
 
-        // Draw shadow first
-        if (poseConfig.stance !== 'fallen') {
-            this.drawShadow(ctx, centerX, groundY, poseConfig);
-        }
+        // Note: Shadow is NOT drawn in the sprite - the game renderer draws shadows separately
+        // This ensures proper layering and avoids double shadows
 
         // Draw body parts in correct order (back to front)
         this.drawLegs(ctx, centerX, bodyY, groundY, poseConfig, uniform, classConfig);
