@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.0.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.4...shadow-squad-v5.0.5) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** correct unit sprite positioning and update elite soldier look ([#279](https://github.com/CodingSteve01/battlezone/issues/279)) ([814a0ed](https://github.com/CodingSteve01/battlezone/commit/814a0ed9467e2b1531155038aea6a33a6a272d2f))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#281](https://github.com/CodingSteve01/battlezone/issues/281)) ([a466f40](https://github.com/CodingSteve01/battlezone/commit/a466f404a109d57c0541e1c8fd83489880de2538))
+
 ## [5.0.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.3...shadow-squad-v5.0.4) (2026-01-01)
 
 
