@@ -1229,6 +1229,16 @@ function applyLightingToColor(color, lightFactor) {
     return `rgb(${nr}, ${ng}, ${nb})`;
 }
 
+function getFogBrightness(fogLevel) {
+    if (fogLevel === 'hidden') {
+        return 0.30;
+    }
+    if (fogLevel === 'explored') {
+        return 0.60;
+    }
+    return 1.0;
+}
+
 /**
  * Collect all 3D faces for a hex (top face + cliff faces)
  * Returns array of face objects with vertices, color, depth for sorting
@@ -1243,21 +1253,8 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     const faces = [];
     const myHeight = hex.height ?? 0;
 
-    // Get colors based on fog level
     let topColor = terrain?.color || '#6a9a58';
     let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
-
-    if (fogLevel === 'hidden') {
-        // Unexplored - ~70% darkening (30% brightness)
-        // Still shows terrain character but very dark
-        topColor = desaturateAndDarken(topColor, 0.4, 0.30);  // Deep shadow: 40% saturation, 30% brightness
-        cliffColor = desaturateAndDarken(cliffColor, 0.4, 0.25);
-    } else if (fogLevel === 'explored') {
-        // Explored but not visible - ~40% darkening (60% brightness)
-        // Darker than visible but clearly recognizable
-        topColor = desaturateAndDarken(topColor, 0.7, 0.60);  // Medium shadow: 70% saturation, 60% brightness
-        cliffColor = desaturateAndDarken(cliffColor, 0.7, 0.55);
-    }
 
     // TOP FACE - the hex surface
     const topCorners = getHex3DCorners(cx, cy, size, myHeight);
@@ -1327,7 +1324,8 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
             lighting: lighting,
             depth: cliffDepth,
             direction: direction,
-            heightDiff: heightDiff
+            heightDiff: heightDiff,
+            fogLevel: fogLevel
         });
     });
 
@@ -1339,6 +1337,12 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
  */
 function draw3DFace(face, texture = null) {
     const litColor = applyLightingToColor(face.color, face.lighting);
+    const fogBrightness = getFogBrightness(face.fogLevel);
+
+    if (fogBrightness < 0.99) {
+        ctx.save();
+        ctx.filter = `brightness(${fogBrightness})`;
+    }
 
     ctx.beginPath();
     ctx.moveTo(face.vertices[0].x, face.vertices[0].y);
@@ -1348,58 +1352,40 @@ function draw3DFace(face, texture = null) {
     ctx.closePath();
 
     if (face.type === 'top' && texture) {
-        // For top faces, draw texture for visible and explored terrain
-        // Hidden terrain uses solid color (too dark to show texture detail)
-        const shouldDrawTexture = face.fogLevel === 'visible' || face.fogLevel === 'explored';
+        ctx.save();
+        ctx.clip();
 
-        if (shouldDrawTexture) {
-            ctx.save();
-            ctx.clip();
+        // Calculate bounding box
+        const minX = Math.min(...face.vertices.map(v => v.x));
+        const maxX = Math.max(...face.vertices.map(v => v.x));
+        const minY = Math.min(...face.vertices.map(v => v.y));
+        const maxY = Math.max(...face.vertices.map(v => v.y));
+        const width = maxX - minX;
+        const height = maxY - minY;
 
-            // Calculate bounding box
-            const minX = Math.min(...face.vertices.map(v => v.x));
-            const maxX = Math.max(...face.vertices.map(v => v.x));
-            const minY = Math.min(...face.vertices.map(v => v.y));
-            const maxY = Math.max(...face.vertices.map(v => v.y));
-            const width = maxX - minX;
-            const height = maxY - minY;
-
-            // Check if using isometric tiles with earth layer
-            const tileInfo = getTerrainTileInfo();
-            if (tileInfo && tileInfo.earthLayerHeight > 0) {
-                // For isometric tiles, only draw the hex surface portion (crop out earth layer)
-                // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
-                const hexTopOffset = tileInfo.hexTopOffset || 0;
-                const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
-                ctx.drawImage(
-                    texture,
-                    0, hexTopOffset, texture.width, sourceContentHeight,  // Source: hex content only
-                    minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
-                );
-            } else {
-                // Non-isometric tiles: draw full texture
-                ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
-            }
-
-            // Apply fog/shadow overlay based on fog level
-            if (face.fogLevel === 'explored') {
-                // Explored but not visible: apply 40% darkness overlay
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.40)';
-                ctx.fill();
-            } else if (face.fogLevel === 'visible') {
-                // Visible: apply normal lighting overlay
-                ctx.fillStyle = face.lighting < 0.9
-                    ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
-                    : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
-                ctx.fill();
-            }
-
-            ctx.restore();
+        // Check if using isometric tiles with earth layer
+        const tileInfo = getTerrainTileInfo();
+        if (tileInfo && tileInfo.earthLayerHeight > 0) {
+            // For isometric tiles, only draw the hex surface portion (crop out earth layer)
+            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
+            const hexTopOffset = tileInfo.hexTopOffset || 0;
+            const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
+            ctx.drawImage(
+                texture,
+                0, hexTopOffset, texture.width, sourceContentHeight,  // Source: hex content only
+                minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
+            );
         } else {
-            // Hidden: solid color fill (too dark for texture)
-            ctx.fillStyle = litColor;
-            ctx.fill();
+            // Non-isometric tiles: draw full texture
+            ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
         }
+
+        // Apply normal lighting overlay
+        ctx.fillStyle = face.lighting < 0.9
+            ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
+            : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
+        ctx.fill();
+        ctx.restore();
     } else if (face.type === 'top') {
         // Solid color fill with lighting
         ctx.fillStyle = litColor;
@@ -1415,6 +1401,10 @@ function draw3DFace(face, texture = null) {
         ctx.strokeStyle = applyLightingToColor(face.color, face.lighting * 0.7);
         ctx.lineWidth = 0.5;
         ctx.stroke();
+    }
+
+    if (fogBrightness < 0.99) {
+        ctx.restore();
     }
 }
 
@@ -1453,10 +1443,7 @@ function render3DHexMeshes(visibleHexData, tileSize) {
 
     // PASS 2: Draw all top faces (tile surfaces) on top
     for (const face of topFaces) {
-        // Get texture for visible and explored terrain (hidden uses solid color)
-        const texture = (face.fogLevel === 'visible' || face.fogLevel === 'explored')
-            ? getTerrainTexture(face.hex.type, face.hex.q, face.hex.r)
-            : null;
+        const texture = getTerrainTexture(face.hex.type, face.hex.q, face.hex.r);
         draw3DFace(face, texture);
     }
 }
@@ -1968,6 +1955,7 @@ function getCachedHexTile(hex, fogLevel, renderPass = 'full') {
  * @returns {HTMLCanvasElement} Canvas with rendered hex
  */
 function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
+    void fogLevel;
     // Canvas size needs margin for effects
     const margin = hexSize * 0.2;
     const canvasSize = hexSize * 2 + margin * 2;
@@ -1981,36 +1969,17 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
     const cy = canvasSize / 2;
 
     const terrain = TERRAIN[hex.type];
-    let fillColor = terrain.color;
-    const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
-
-    // Fog of war color adjustments - matching collectHex3DFaces values
-    if (fogLevel === 'hidden') {
-        // Unexplored - ~70% darkening (30% brightness)
-        fillColor = desaturateAndDarken(terrain.color, 0.4, 0.30);
-    } else if (fogLevel === 'explored') {
-        // Explored but not visible - ~40% darkening (60% brightness)
-        fillColor = desaturateAndDarken(terrain.color, 0.7, 0.60);
-    }
+    const fillColor = terrain.color;
+    const texture = getTerrainTexture(hex.type, hex.q, hex.r);
 
     // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
-    const terrainData = fogLevel === 'visible' ? terrain : null;
+    const terrainData = terrain;
 
     // Pass null for strokeColor - grid overlay is drawn separately when needed
     // Pass renderPass to control which portion of the tile is drawn
     drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r, renderPass);
 
     // Terrain details are drawn in the main render pass to keep asset sizing consistent
-
-    // Add fog overlays AFTER terrain (so they cover everything properly)
-    // Only apply fog overlays for surface or full pass, not for earth pass
-    if (renderPass !== 'earth') {
-        if (fogLevel === 'explored') {
-            drawExploredOverlay(tileCtx, cx, cy, hexSize);
-        } else if (fogLevel === 'hidden') {
-            drawHiddenOverlay(tileCtx, cx, cy, hexSize);
-        }
-    }
 
     return tileCanvas;
 }
@@ -4430,42 +4399,50 @@ export function render() {
         // Removed: drawStaticTerrainDetails() call
 
         // Height-based lighting and shading - always apply subtle height shading
-        if (fogLevel === 'visible') {
-            // Permanent subtle height shading (cool shadows for low, warm highlights for high)
-            drawHeightShading(sx, sy, tileSize, hex.height);
+        const fogBrightness = getFogBrightness(fogLevel);
+        if (fogBrightness < 0.99) {
+            ctx.save();
+            ctx.filter = `brightness(${fogBrightness})`;
+        }
 
-            // Debug number overlay (only when explicitly enabled)
-            if (state.debug.showHeightOverlay) {
-                drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
-            }
+        // Permanent subtle height shading (cool shadows for low, warm highlights for high)
+        drawHeightShading(sx, sy, tileSize, hex.height);
+
+        // Debug number overlay (only when explicitly enabled)
+        if (state.debug.showHeightOverlay) {
+            drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
+        }
+
+        if (fogBrightness < 0.99) {
+            ctx.restore();
         }
 
         // Draw animated terrain overlays (grass swaying, water ripples, etc.)
         // These are drawn on top of cached/static terrain for dynamic effects
-        if (fogLevel === 'visible' && shouldRenderAnimations()) {
+        if (shouldRenderAnimations()) {
+            if (fogBrightness < 0.99) {
+                ctx.save();
+                ctx.filter = `brightness(${fogBrightness})`;
+            }
             drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
+            if (fogBrightness < 0.99) {
+                ctx.restore();
+            }
         }
 
         // Collect foreground elements for 2.5D sorting
-        // Include both visible and explored hexes (explored hexes get darkened)
-        if (fogLevel === 'visible' || fogLevel === 'explored') {
-            const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
-            const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
-            // Apply fog level darkening to foreground elements
-            // Explored hexes get 60% brightness (40% darkening)
-            const fogAlpha = fogLevel === 'explored' ? 0.60 : 1.0;
-            adjusted.forEach(element => {
-                element.fogAlpha = fogAlpha;
-            });
-            foregroundElements.push(...adjusted);
-        }
+        const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
+        const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
+        // Apply fog level darkening to foreground elements
+        adjusted.forEach(element => {
+            element.fogAlpha = fogBrightness;
+        });
+        foregroundElements.push(...adjusted);
 
         // Collect power-up positions for drawing on top of foreground elements
-        if (fogLevel === 'visible') {
-            const powerup = getPowerupAt(hex.q, hex.r);
-            if (powerup) {
-                powerupPositions.push({ sx, sy, powerup });
-            }
+        const powerup = getPowerupAt(hex.q, hex.r);
+        if (powerup) {
+            powerupPositions.push({ sx, sy, powerup, fogAlpha: fogBrightness });
         }
 
         // === SHRINKING ZONE VISUAL INDICATOR ===
@@ -4770,8 +4747,15 @@ export function render() {
     });
 
     // Draw powerups on top of all terrain and foreground elements
-    powerupPositions.forEach(({ sx, sy, powerup }) => {
+    powerupPositions.forEach(({ sx, sy, powerup, fogAlpha }) => {
+        if (fogAlpha < 0.99) {
+            ctx.save();
+            ctx.filter = `brightness(${fogAlpha})`;
+        }
         drawPowerup(sx, sy, powerup, assetSize);
+        if (fogAlpha < 0.99) {
+            ctx.restore();
+        }
     });
 
     // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
