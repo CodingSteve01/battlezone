@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.1.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.13...shadow-squad-v5.1.0) (2026-01-01)
+
+
+### Features
+
+* **ai:** add spotted-awareness, foreshadowing, and zone-smart search ([#302](https://github.com/CodingSteve01/battlezone/issues/302)) ([3e99efe](https://github.com/CodingSteve01/battlezone/commit/3e99efe298512809411fce5a156c8cc00c004578))
+
 ## [5.0.13](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.12...shadow-squad-v5.0.13) (2026-01-01)
 
 
