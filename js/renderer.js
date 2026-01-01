@@ -1258,6 +1258,72 @@ function getFogFilter(fogLevel) {
 }
 
 /**
+ * Draw fog of war overlays on all non-visible hexes
+ * This is a robust fallback that works regardless of CSS filter support
+ * Draws semi-transparent dark hexes over terrain to create the fog effect
+ * @param {Array} visibleHexData - Array of hex render data with fogLevel
+ * @param {number} tileSize - Current tile size
+ */
+function drawFogOverlays(visibleHexData, tileSize) {
+    // Early return if no data or invalid context
+    if (!visibleHexData || !ctx || !tileSize) return;
+
+    // Sort by fog level to batch similar overlays (minor optimization)
+    const exploredHexes = [];
+    const hiddenHexes = [];
+
+    for (const data of visibleHexData) {
+        if (!data || data.sx === undefined || data.sy === undefined) continue;
+        if (data.fogLevel === 'explored') {
+            exploredHexes.push(data);
+        } else if (data.fogLevel === 'hidden') {
+            hiddenHexes.push(data);
+        }
+        // visible hexes don't need overlay
+    }
+
+    // Draw explored hexes overlay (moderate darkening)
+    if (exploredHexes.length > 0) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 15, 30, 0.45)';  // Dark blue-black for shadow feel
+        for (const data of exploredHexes) {
+            ctx.beginPath();
+            // Draw hex path inline
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i;
+                const px = data.sx + tileSize * Math.cos(angle);
+                const py = data.sy + tileSize * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // Draw hidden hexes overlay (strong darkening)
+    if (hiddenHexes.length > 0) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(5, 8, 20, 0.75)';  // Very dark for unexplored areas
+        for (const data of hiddenHexes) {
+            ctx.beginPath();
+            // Draw hex path inline
+            for (let i = 0; i < 6; i++) {
+                const angle = Math.PI / 3 * i;
+                const px = data.sx + tileSize * Math.cos(angle);
+                const py = data.sy + tileSize * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+}
+
+/**
  * Collect all 3D faces for a hex (top face + cliff faces)
  * Returns array of face objects with vertices, color, depth for sorting
  * @param {Object} hex - The hex object with q, r, height
@@ -4378,6 +4444,10 @@ export function render() {
     // Render all hexes using 3D mesh system with proper depth sorting
     // Pass baseY (without height offset) so 3D system handles all height calculations
     render3DHexMeshes(visibleHexData, tileSize);
+
+    // Draw fog of war overlays on terrain (explored/hidden hexes)
+    // This creates a visible darkening effect for areas not in current view
+    drawFogOverlays(visibleHexData, tileSize);
 
     // Post-processing pass: Details, lighting, animations, overlays
     // Sort by Y for proper layering of overlays
