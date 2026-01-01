@@ -173,9 +173,7 @@ function drawHeightExtrusion(cx, cy, size, height, terrainType, fogLevel) {
     ctx.save();
     ctx.beginPath();
     drawHexPath(cx, cy + offset, size);
-    const fillColor = fogLevel === 'hidden'
-        ? '#1a1f2a'  // Dark but not completely black for unexplored areas
-        : getSkirtFillColor(terrainType, fogLevel);
+    const fillColor = getSkirtFillColor(terrainType, fogLevel);
     ctx.fillStyle = fillColor;
     ctx.globalAlpha = fogLevel === 'visible' ? 0.85 : 1;
     ctx.fill();
@@ -189,15 +187,17 @@ function getBaseSkirtDepth(size) {
 }
 
 function getSkirtFillColor(terrainType, fogLevel) {
-    if (fogLevel === 'hidden') {
-        return '#1a1f2a';  // Dark but not completely black for unexplored areas
-    }
-
     const terrain = TERRAIN[terrainType];
     const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
 
+    if (fogLevel === 'hidden') {
+        // ~70% darkening (30% brightness) - matching hex face values
+        return desaturateAndDarken(baseColor, 0.4, 0.30);
+    }
+
     if (fogLevel === 'explored') {
-        return desaturateAndDarken(baseColor, 0.4, 0.6);
+        // ~40% darkening (60% brightness)
+        return desaturateAndDarken(baseColor, 0.7, 0.60);
     }
 
     return desaturateAndDarken(baseColor, 0.7, 0.75);
@@ -293,34 +293,38 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.lineTo(bottomX1, bottomY1);
         ctx.closePath();
 
+        // Create gradient from top (lighter) to bottom (darker) for depth
+        const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
+        const topY = Math.min(topY1, topY2);
+        const bottomY = Math.max(bottomY1, bottomY2);
+
+        // Adjust brightness based on fog level
+        let fogBrightnessFactor = 1.0;
         if (fogLevel === 'hidden') {
-            // Hidden hexes show dark cliff faces (dark but not completely black)
-            ctx.fillStyle = '#1a1f2a';
-            ctx.fill();
-        } else {
-            // Create gradient from top (lighter) to bottom (darker) for depth
-            const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
-            const topY = Math.min(topY1, topY2);
-            const bottomY = Math.max(bottomY1, bottomY2);
+            fogBrightnessFactor = 0.30;  // ~70% darkening
+        } else if (fogLevel === 'explored') {
+            fogBrightnessFactor = 0.60;  // ~40% darkening
+        }
 
-            const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5));
-            if (typeof gradient !== 'string') {
-                // Top edge: slightly lighter (edge highlight)
-                gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor));
-                // Middle: earth tone
-                gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor));
-                // Bottom: darker shadow
-                gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor));
-            }
+        const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5 * fogBrightnessFactor));
+        if (typeof gradient !== 'string') {
+            // Top edge: slightly lighter (edge highlight)
+            gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor * fogBrightnessFactor));
+            // Middle: earth tone
+            gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor * fogBrightnessFactor));
+            // Bottom: darker shadow
+            gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor * fogBrightnessFactor));
+        }
 
-            ctx.fillStyle = gradient;
-            ctx.fill();
+        ctx.fillStyle = gradient;
+        ctx.fill();
 
-            // Add subtle top edge highlight for definition
+        // Add subtle top edge highlight for definition (only for visible/explored)
+        if (fogLevel !== 'hidden') {
             ctx.beginPath();
             ctx.moveTo(topX1, topY1);
             ctx.lineTo(topX2, topY2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor})`;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor * fogBrightnessFactor})`;
             ctx.lineWidth = 1;
             ctx.stroke();
         }
@@ -1244,16 +1248,15 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
 
     if (fogLevel === 'hidden') {
-        // Unexplored - render terrain normally but in deep shadow
-        // Preserve terrain character (higher saturation) but very dark
-        // This prevents flickering and average color issues
-        topColor = desaturateAndDarken(topColor, 0.5, 0.12);  // Deep shadow: 50% saturation, 12% brightness
-        cliffColor = desaturateAndDarken(cliffColor, 0.5, 0.10);
+        // Unexplored - ~70% darkening (30% brightness)
+        // Still shows terrain character but very dark
+        topColor = desaturateAndDarken(topColor, 0.4, 0.30);  // Deep shadow: 40% saturation, 30% brightness
+        cliffColor = desaturateAndDarken(cliffColor, 0.4, 0.25);
     } else if (fogLevel === 'explored') {
-        // Explored but not visible - 50% of the shadow effect
-        // Darker than visible but lighter than hidden
-        topColor = desaturateAndDarken(topColor, 0.65, 0.45);  // Medium shadow: 65% saturation, 45% brightness
-        cliffColor = desaturateAndDarken(cliffColor, 0.65, 0.40);
+        // Explored but not visible - ~40% darkening (60% brightness)
+        // Darker than visible but clearly recognizable
+        topColor = desaturateAndDarken(topColor, 0.7, 0.60);  // Medium shadow: 70% saturation, 60% brightness
+        cliffColor = desaturateAndDarken(cliffColor, 0.7, 0.55);
     }
 
     // TOP FACE - the hex surface
@@ -1380,8 +1383,8 @@ function draw3DFace(face, texture = null) {
 
             // Apply fog/shadow overlay based on fog level
             if (face.fogLevel === 'explored') {
-                // Explored but not visible: apply 55% darkness overlay
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                // Explored but not visible: apply 40% darkness overlay
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.40)';
                 ctx.fill();
             } else if (face.fogLevel === 'visible') {
                 // Visible: apply normal lighting overlay
@@ -1981,13 +1984,13 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
     let fillColor = terrain.color;
     const texture = fogLevel === 'visible' ? getTerrainTexture(hex.type, hex.q, hex.r) : null;
 
-    // Fog of war color adjustments
+    // Fog of war color adjustments - matching collectHex3DFaces values
     if (fogLevel === 'hidden') {
-        // Unexplored - dark but terrain still slightly visible
-        fillColor = desaturateAndDarken(terrain.color, 0.15, 0.25);
+        // Unexplored - ~70% darkening (30% brightness)
+        fillColor = desaturateAndDarken(terrain.color, 0.4, 0.30);
     } else if (fogLevel === 'explored') {
-        // Fog - desaturated but still recognizable
-        fillColor = desaturateAndDarken(terrain.color, 0.3, 0.7);
+        // Explored but not visible - ~40% darkening (60% brightness)
+        fillColor = desaturateAndDarken(terrain.color, 0.7, 0.60);
     }
 
     // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
@@ -2014,8 +2017,7 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
 
 /**
  * Draw explored hex fog overlay to a context
- * Creates a foggy, desaturated effect for previously seen but not currently visible areas
- * Should look like fog/mist - visible but unclear
+ * Creates a darkened effect (~40% darkness) for previously seen but not currently visible areas
  */
 function drawExploredOverlay(context, cx, cy, hexSize) {
     context.save();
@@ -2023,15 +2025,8 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    // Foggy overlay - light gray with transparency to desaturate underlying terrain
-    // Uses a subtle gradient for depth - edges slightly foggier than center
-    const fogGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(180, 190, 200, 0.45)');
-    if (typeof fogGradient !== 'string') {
-        fogGradient.addColorStop(0, 'rgba(200, 210, 220, 0.35)');   // Center: lighter fog
-        fogGradient.addColorStop(0.7, 'rgba(170, 180, 195, 0.45)'); // Mid: medium fog
-        fogGradient.addColorStop(1, 'rgba(150, 165, 180, 0.55)');   // Edge: denser fog
-    }
-    context.fillStyle = fogGradient;
+    // Simple black overlay for ~40% darkening
+    context.fillStyle = 'rgba(0, 0, 0, 0.40)';
     context.fill();
 
     context.restore();
@@ -2039,23 +2034,15 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
 
 /**
  * Draw hidden hex overlay to a context
- * Creates a dark desaturated effect for unexplored areas
- * Shows terrain underneath but heavily dimmed - not completely black
+ * Creates a darkened effect (~70% darkness) for unexplored areas
  */
 function drawHiddenOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    // Dark overlay that still shows terrain underneath
-    // Using semi-transparent dark blue-gray instead of complete black
-    // This makes unexplored areas visible but clearly "unknown"
-    const darkOverlay = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(15, 20, 30, 0.85)');
-    if (typeof darkOverlay !== 'string') {
-        darkOverlay.addColorStop(0, 'rgba(20, 25, 35, 0.80)');   // Center: slightly more visible
-        darkOverlay.addColorStop(1, 'rgba(10, 15, 25, 0.90)');   // Edge: darker
-    }
-    context.fillStyle = darkOverlay;
+    // Simple black overlay for ~70% darkening
+    context.fillStyle = 'rgba(0, 0, 0, 0.70)';
     context.fill();
 
     context.restore();
@@ -4459,11 +4446,17 @@ export function render() {
             drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
         }
 
-        // Collect foreground elements for 2.5D sorting (always rendered for visual consistency)
-        // Use cached foreground element definitions for better performance
-        if (fogLevel === 'visible') {
+        // Collect foreground elements for 2.5D sorting
+        // Include both visible and explored hexes (explored hexes get darkened)
+        if (fogLevel === 'visible' || fogLevel === 'explored') {
             const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
             const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
+            // Apply fog level darkening to foreground elements
+            // Explored hexes get 60% brightness (40% darkening)
+            const fogAlpha = fogLevel === 'explored' ? 0.60 : 1.0;
+            adjusted.forEach(element => {
+                element.fogAlpha = fogAlpha;
+            });
             foregroundElements.push(...adjusted);
         }
 
@@ -4746,13 +4739,24 @@ export function render() {
         }
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
+        const fogAlpha = drawable.fogAlpha ?? 1;
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
         // Trees stay mostly visible (80% opacity) - units show as outlines behind them
         const finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
 
-        if (finalAlpha < 0.99) {
+        // Apply fog of war darkening using brightness filter
+        const needsFogDarkening = fogAlpha < 0.99;
+        const needsAlpha = finalAlpha < 0.99;
+
+        if (needsFogDarkening || needsAlpha) {
             ctx.save();
-            ctx.globalAlpha = finalAlpha;
+            if (needsAlpha) {
+                ctx.globalAlpha = finalAlpha;
+            }
+            if (needsFogDarkening) {
+                // Use brightness filter for fog darkening (explored = 60% brightness)
+                ctx.filter = `brightness(${fogAlpha})`;
+            }
             drawable.draw();
             ctx.restore();
         } else {
@@ -5386,6 +5390,14 @@ function drawMinimapLegendHorizontal(ctx, legendX, legendY, availableWidth) {
  */
 function drawMinimap(w, h) {
     if (state.hexes.length === 0) return;
+
+    // Hide minimap during AI turn in single-player to prevent revealing enemy positions
+    const isAiTurn = isAIPlayer() && state.currentPlayer !== state.viewingPlayer;
+    if (isAiTurn) {
+        // Update bounds to indicate minimap is hidden
+        lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: true, expanded: false };
+        return;
+    }
 
     const config = MINIMAP_CONFIG;
     const isExpanded = minimapExpanded;
