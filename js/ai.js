@@ -1284,9 +1284,33 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         }
 
         // === NORMAL TACTICAL DECISION TREE ===
+        const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
 
-        // 1. Should we retreat? (Low HP, enemies nearby)
+        // Get spotted awareness for tactical decisions
+        const spottedInfo = getSpottedAwareness(unit, enemies);
+
+        // Generate spotted-awareness thought
+        if (spectatorMode && enemies.length > 0) {
+            if (spottedInfo.isSpotted) {
+                if (spottedInfo.urgency === 'critical') {
+                    addAIThought(`⚠️ ${unitName}: Entdeckt & verwundet - kritische Lage!`, 'strategy');
+                } else if (spottedInfo.shouldSeekCover) {
+                    addAIThought(`👁️ ${unitName}: Vom Feind entdeckt - suche Deckung`, 'strategy');
+                }
+            } else if (spottedInfo.canSurpriseAttack) {
+                addAIThought(`🎯 ${unitName}: Unentdeckt - Überraschungsangriff möglich!`, 'strategy');
+            }
+        }
+
+        // 1. Should we retreat? (Low HP, enemies nearby, or spotted and vulnerable)
         if (shouldRetreat(unit, enemies) && canSpendAP(1)) {
+            // Enhanced retreat thought with reason
+            const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
+            let retreatReason = `${hpPercent}% HP`;
+            if (spottedInfo.isSpotted && spottedInfo.closestEnemyDist <= 3) {
+                retreatReason += ', Feind zu nah';
+            }
+            addAIThought(`🛡️ ${unitName}: Rückzug (${retreatReason})`, 'retreat');
             await executeRetreatWithBudget(unit, enemies, spectatorMode, unitBudget - apSpentByUnit);
             return;
         }
@@ -1295,12 +1319,29 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         // WICHTIG: canUnitAttack prüft MAX_ATTACKS_PER_UNIT (gleiche Regel wie für Menschen)
         if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1) && canUnitAttack(unit)) {
             const target = attackable.find(t => t.id === assignedTargetId);
+            // Enhanced attack thought with evaluation
+            const targetName = CLASS_NAMES_DE[target.class] || target.class;
+            const canKill = target.currentHp <= unit.damage;
+            if (canKill) {
+                addAIThought(`💀 ${unitName}: Todesstoß auf ${targetName}!`, 'attack');
+            } else {
+                const damagePercent = Math.round((unit.damage / target.currentHp) * 100);
+                addAIThought(`⚔️ ${unitName}: Fokusfeuer auf ${targetName} (~${damagePercent}% Schaden)`, 'attack');
+            }
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
             trackAPSpent(1);
         } else if (attackable.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             // 3. Attack best available target
             const target = selectBestTarget(unit, attackable);
             if (target) {
+                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                const canKill = target.currentHp <= unit.damage;
+                if (canKill) {
+                    addAIThought(`💀 ${unitName}: Kann ${targetName} eliminieren!`, 'attack');
+                } else {
+                    const targetHpPercent = Math.round((target.currentHp / target.maxHp) * 100);
+                    addAIThought(`⚔️ ${unitName} → ${targetName} (${targetHpPercent}% HP)`, 'attack');
+                }
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
             }
@@ -1309,17 +1350,16 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         // 4. Use special ability if beneficial AND within budget
         const specialCost = getSpecialAbilityCost(unit.class);
         if (canSpendAP(specialCost) && canUseSpecialAbility(unit) && shouldUseSpecial(unit, enemies, plan)) {
-            // Generate special ability thought
-            const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-            const specialNames = {
-                scout: 'Sprint aktiviert! 🏃',
-                assault: 'Powershot vorbereitet! 💥',
-                medic: 'Heilung eingeleitet! 💚',
-                sniper: 'Tarnung aktiviert! 🫥',
-                commando: 'Stealth-Modus! 🥷',
-                elitesoldat: 'Taktischer Modus! 🎖️'
+            // Generate special ability thought with reason
+            const specialReasons = {
+                scout: spottedInfo.isSpotted ? 'Sprint für Flucht!' : 'Sprint für Flanke!',
+                assault: 'Powershot für max. Schaden!',
+                medic: 'Team braucht Heilung!',
+                sniper: spottedInfo.isSpotted ? 'Tarnung nach Entdeckung!' : 'Tarnung für Hinterhalt!',
+                commando: 'Stealth für Infiltration!',
+                elitesoldat: 'Taktischer Vorteil!'
             };
-            addAIThought(`${unitName}: ${specialNames[unit.class] || 'Spezialfähigkeit!'}`, 'special');
+            addAIThought(`✨ ${unitName}: ${specialReasons[unit.class] || 'Spezialfähigkeit!'}`, 'special');
 
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
@@ -1335,6 +1375,23 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             const remainingBudget = unitBudget - apSpentByUnit;
             const moveTarget = selectStrategicMoveTargetWithBudget(unit, plan, remainingBudget);
             if (moveTarget) {
+                // Generate move thought based on situation
+                if (spectatorMode && !moveTarget.foresight?.explanation) {
+                    // Generate a thought about why we're moving
+                    if (enemies.length === 0) {
+                        addAIThought(`🔍 ${unitName}: Erkundet Gebiet`, 'move');
+                    } else if (spottedInfo.isSpotted && spottedInfo.shouldSeekCover) {
+                        addAIThought(`🏃 ${unitName}: Repositioniert in Deckung`, 'move');
+                    } else {
+                        const closestEnemy = enemies[0];
+                        const distAfter = hexDistance({ q: moveTarget.q, r: moveTarget.r }, { q: closestEnemy.q, r: closestEnemy.r });
+                        if (distAfter <= unit.range) {
+                            addAIThought(`🎯 ${unitName}: Bewegt sich in Angriffsreichweite`, 'move');
+                        } else {
+                            addAIThought(`📍 ${unitName}: Taktische Neupositionierung`, 'move');
+                        }
+                    }
+                }
                 await executeAIMove(unit, moveTarget, spectatorMode);
                 trackAPSpent(moveTarget.cost);
             }
@@ -1346,6 +1403,8 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         if (attackableAfterMove.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             const target = selectBestTarget(unit, attackableAfterMove);
             if (target) {
+                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                addAIThought(`⚔️ ${unitName}: Folgeangriff auf ${targetName}!`, 'attack');
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
             }
@@ -1369,12 +1428,9 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
 
 /**
  * Execute retreat with AP budget constraint
+ * Note: AI thought is generated by caller before this function
  */
 async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-    const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
-    addAIThought(`${unitName} zieht sich zurück (${hpPercent}% HP)`, 'retreat');
-
     const reachable = getReachableHexes(unit);
     if (reachable.size === 0) return;
 
@@ -1432,6 +1488,7 @@ async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
 
 /**
  * Select strategic move target with AP budget constraint
+ * Now includes FORESHADOWING - evaluates what happens AFTER the move
  */
 function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
     const reachable = getReachableHexes(unit);
@@ -1441,6 +1498,9 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
     const maxCost = Math.min(maxAP, state.sharedAP);
     const candidates = [];
     const enemies = plan.visibleEnemies;
+
+    // Get spotted awareness for this unit
+    const spottedInfo = getSpottedAwareness(unit, enemies);
 
     reachable.forEach((data, key) => {
         if (data.cost > maxCost) return;
@@ -1454,6 +1514,24 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
         if (enemies.length > 0) {
             // Combat mode - position for attack
             score = scoreCombatPositionSafe(unit, q, r, enemies, plan);
+
+            // === FORESHADOWING: What happens after this move? ===
+            const foresight = evaluateMoveWithForeshadowing(unit, q, r, data.cost, enemies, maxAP);
+            score += foresight.scoreAdjustment;
+
+            // === SPOTTED AWARENESS ===
+            if (spottedInfo.isSpotted) {
+                // We're spotted - prioritize cover and defensive positions
+                if (hex.cover) score += 40; // Extra cover bonus when spotted
+                if (spottedInfo.shouldSeekCover && !hex.cover) {
+                    score -= 60; // Penalty for exposed positions when we should seek cover
+                }
+            } else {
+                // Not spotted - can be more aggressive, flanking bonus
+                if (spottedInfo.canSurpriseAttack && foresight.canAttackAfter) {
+                    score += 50; // Surprise attack opportunity!
+                }
+            }
         } else if (plan.knownEnemyPositions.length > 0) {
             // Hunt mode - move towards last known positions
             score = scoreHuntPosition(unit, q, r, plan);
@@ -1508,13 +1586,21 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
             }
         }
 
-        candidates.push({ q, r, score, cost: data.cost });
+        candidates.push({ q, r, score, cost: data.cost, foresight: enemies.length > 0 ? evaluateMoveWithForeshadowing(unit, q, r, data.cost, enemies, maxAP) : null });
     });
 
     if (candidates.length === 0) return null;
 
     candidates.sort((a, b) => b.score - a.score);
-    return candidates[0];
+
+    // Generate AI thought about the chosen move
+    const bestMove = candidates[0];
+    if (bestMove.foresight && bestMove.foresight.explanation && isSpectatorMode()) {
+        const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+        addAIThought(`${unitName}: ${bestMove.foresight.explanation}`, 'move');
+    }
+
+    return bestMove;
 }
 
 /**
@@ -1880,23 +1966,144 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
 // ===== TACTICAL DECISIONS =====
 
 /**
+ * Check if unit is spotted by enemies and should react
+ * Returns an object with spotted status and recommended action
+ */
+function getSpottedAwareness(unit, enemies) {
+    const isSpotted = unit.spotted === true;
+    const hpPercent = unit.currentHp / unit.maxHp;
+    const isStealth = unit.class === 'sniper' || unit.class === 'commando';
+
+    // Find closest enemy
+    let closestEnemyDist = Infinity;
+    let closestEnemy = null;
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: enemy.q, r: enemy.r });
+        if (dist < closestEnemyDist) {
+            closestEnemyDist = dist;
+            closestEnemy = enemy;
+        }
+    }
+
+    const result = {
+        isSpotted,
+        closestEnemyDist,
+        closestEnemy,
+        shouldSeekCover: false,
+        shouldCloak: false,
+        canSurpriseAttack: false,
+        urgency: 'normal' // 'low', 'normal', 'high', 'critical'
+    };
+
+    if (isSpotted) {
+        // SPOTTED: React defensively
+        if (isStealth && hpPercent < 0.7) {
+            result.shouldSeekCover = true;
+            result.shouldCloak = true;
+            result.urgency = 'high';
+        } else if (hpPercent < 0.5) {
+            result.shouldSeekCover = true;
+            result.urgency = 'critical';
+        } else if (closestEnemyDist <= 3 && !unit.cloaked) {
+            result.shouldSeekCover = true;
+            result.urgency = 'normal';
+        }
+    } else {
+        // NOT SPOTTED: Can be aggressive
+        if (isStealth && closestEnemyDist <= unit.range + 2) {
+            result.canSurpriseAttack = true;
+            result.urgency = 'low'; // No rush, we're hidden
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Evaluate a move with foreshadowing - check what happens AFTER moving
+ * Returns score adjustment and explanation for AI thoughts
+ */
+function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies, remainingAP) {
+    const apAfterMove = remainingAP - moveCost;
+    const evaluation = {
+        canAttackAfter: false,
+        canRetreatAfter: false,
+        exposedWithoutOptions: false,
+        killableTargets: [],
+        threatsInRange: [],
+        scoreAdjustment: 0,
+        explanation: ''
+    };
+
+    // Check which enemies we can attack from the new position
+    for (const enemy of enemies) {
+        const distToEnemy = hexDistance({ q: targetQ, r: targetR }, { q: enemy.q, r: enemy.r });
+
+        // Can we attack this enemy?
+        if (distToEnemy <= unit.range) {
+            evaluation.canAttackAfter = true;
+            if (enemy.currentHp <= unit.damage) {
+                evaluation.killableTargets.push(enemy);
+            }
+        }
+
+        // Can this enemy attack us?
+        const enemyRange = enemy.range || 3;
+        if (distToEnemy <= enemyRange) {
+            evaluation.threatsInRange.push(enemy);
+        }
+    }
+
+    // CRITICAL: Moving into danger without AP to attack is DUMB
+    if (evaluation.threatsInRange.length > 0 && apAfterMove < 1) {
+        evaluation.exposedWithoutOptions = true;
+        evaluation.scoreAdjustment -= 200; // Heavy penalty!
+        evaluation.explanation = `WARNUNG: Keine AP für Gegenangriff nach Bewegung!`;
+    }
+
+    // Bonus for kill opportunities
+    if (evaluation.killableTargets.length > 0 && apAfterMove >= 1) {
+        evaluation.scoreAdjustment += 50 * evaluation.killableTargets.length;
+        const targetName = CLASS_NAMES_DE[evaluation.killableTargets[0].class] || evaluation.killableTargets[0].class;
+        evaluation.explanation = `Todesstoß möglich gegen ${targetName}!`;
+    }
+
+    // Penalty for exposure without attack opportunity
+    if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
+        evaluation.scoreAdjustment -= 100;
+        evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
+    }
+
+    // Good: Can attack AND have AP left for emergency
+    if (evaluation.canAttackAfter && apAfterMove >= 2) {
+        evaluation.scoreAdjustment += 30;
+    }
+
+    return evaluation;
+}
+
+/**
  * Check if unit should retreat
+ * Now includes spotted-awareness
  */
 function shouldRetreat(unit, enemies) {
     if (enemies.length === 0) return false;
 
     const hpPercent = unit.currentHp / unit.maxHp;
+    const spottedInfo = getSpottedAwareness(unit, enemies);
 
     // Medics should retreat earlier (they're valuable)
     if (unit.class === 'medic' && hpPercent < 0.5) return true;
 
+    // Snipers/Commandos: retreat if spotted and damaged
+    if ((unit.class === 'sniper' || unit.class === 'commando') && spottedInfo.isSpotted) {
+        if (hpPercent < 0.6) return true;
+        if (spottedInfo.closestEnemyDist <= 2) return true; // Too close!
+    }
+
     // Snipers shouldn't be in close combat
     if (unit.class === 'sniper') {
-        const closestEnemy = enemies.reduce((min, e) => {
-            const d = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
-            return d < min ? d : min;
-        }, Infinity);
-        if (closestEnemy <= 2 && hpPercent < 0.6) return true;
+        if (spottedInfo.closestEnemyDist <= 2 && hpPercent < 0.6) return true;
     }
 
     // General retreat threshold
@@ -1907,6 +2114,9 @@ function shouldRetreat(unit, enemies) {
         hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= 3
     );
     if (nearbyEnemies.length >= 3 && hpPercent < 0.5) return true;
+
+    // NEW: Spotted and wounded = retreat
+    if (spottedInfo.isSpotted && spottedInfo.urgency === 'critical') return true;
 
     return false;
 }
@@ -2427,10 +2637,31 @@ function scoreHuntPosition(unit, q, r, plan) {
 
 /**
  * Score position for systematic search
+ * IMPROVED: Zone-aware - don't search outside shrinking zone or towards edges
  */
 function scoreSearchPosition(unit, q, r, plan) {
     let score = 0;
     const hexKey = `${q},${r}`;
+
+    // === CRITICAL: ZONE AWARENESS FOR SEARCH ===
+    // Don't waste time searching areas outside the zone or near the edge
+    const targetInZone = isHexInZone(q, r);
+    if (!targetInZone) {
+        // Position is outside zone - enemies can't be there (they'd take damage)
+        score -= 500; // Heavy penalty - searching here is pointless
+        return score; // Early return - no point calculating more
+    }
+
+    // Calculate distance from zone center (0,0) and zone edge
+    const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+    const distFromZoneEdge = state.zoneRadius - distFromCenter;
+
+    // Penalty for being near zone edge - enemies are unlikely to be there
+    if (distFromZoneEdge <= 2) {
+        score -= 40; // Edge of zone - enemies probably moved inward
+    } else if (distFromZoneEdge <= 4) {
+        score -= 15; // Near edge
+    }
 
     // Exploration bonuses
     const aiExplored = state.playerExploredHexes[state.currentPlayer];
@@ -2443,36 +2674,52 @@ function scoreSearchPosition(unit, q, r, plan) {
         score -= 30;
     }
 
+    // Enemy spawn centers - but ONLY if they're still in the zone!
     const enemySpawnCenters = getEnemySpawnCenters();
     if (enemySpawnCenters.length > 0) {
-        const radius = CONFIG.MAP_SIZES[state.settings.size];
-        const minSpawnDist = Math.min(...enemySpawnCenters.map(pos =>
-            hexDistance({ q, r }, pos)
-        ));
-        const spawnWeight = Math.max(0, radius - minSpawnDist);
-        score += spawnWeight * (plan.inHuntMode ? 3 : 2);
+        // Filter spawn centers to only those still in the zone
+        const validSpawnCenters = enemySpawnCenters.filter(pos => isHexInZone(pos.q, pos.r));
+
+        if (validSpawnCenters.length > 0) {
+            const radius = CONFIG.MAP_SIZES[state.settings.size];
+            const minSpawnDist = Math.min(...validSpawnCenters.map(pos =>
+                hexDistance({ q, r }, pos)
+            ));
+            const spawnWeight = Math.max(0, radius - minSpawnDist);
+            score += spawnWeight * (plan.inHuntMode ? 3 : 2);
+        }
     }
 
-    // Search pattern specific scoring
+    // Search pattern specific scoring - ZONE-AWARE
     switch (plan.searchPattern) {
         case 'expand': {
-            // Move outward from current position toward map edges
-            const distFromStart = Math.sqrt(q * q + r * r);
-            const currentDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
-            if (distFromStart > currentDist) {
-                score += 15;
+            // CHANGED: Don't expand toward edges - expand toward unexplored areas WITHIN zone
+            // Move toward center of zone if zone is shrinking, otherwise explore
+            if (state.zoneRadius < CONFIG.MAP_SIZES[state.settings.size]) {
+                // Zone is shrinking - move toward center, not edges
+                const currentDistFromCenter = Math.max(Math.abs(unit.q), Math.abs(unit.r), Math.abs(-unit.q - unit.r));
+                if (distFromCenter < currentDistFromCenter) {
+                    score += 20; // Moving toward center is good
+                }
+            } else {
+                // Zone not shrinking yet - can explore outward but stay in zone
+                const distFromStart = Math.sqrt(q * q + r * r);
+                const currentDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
+                if (distFromStart > currentDist && distFromZoneEdge > 3) {
+                    score += 15;
+                }
             }
             break;
         }
 
         case 'sweep': {
-            // Move in coordinated line (with ALL allied units)
+            // Move in coordinated line (with ALL allied units) - but toward zone center
             const allies = getAllAlliedAIUnits();
             const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
             // Stay roughly aligned with allies
             score -= Math.abs(r - avgAllyR) * 5;
-            // But push forward
-            score += q * 2;
+            // Push toward center, not just "forward"
+            score -= distFromCenter * 2;
             break;
         }
 
@@ -2480,25 +2727,29 @@ function scoreSearchPosition(unit, q, r, plan) {
             // Move to flank estimated enemy position
             if (aiMemory.playerCenterEstimate) {
                 const estPos = aiMemory.playerCenterEstimate;
-                const distToEst = hexDistance({ q, r }, estPos);
-                // Get closer but approach from sides
-                if (distToEst > 2) {
-                    score -= distToEst * 3;
+                // Only consider estimate if it's in the zone
+                if (isHexInZone(Math.round(estPos.q), Math.round(estPos.r))) {
+                    const distToEst = hexDistance({ q, r }, estPos);
+                    // Get closer but approach from sides
+                    if (distToEst > 2) {
+                        score -= distToEst * 3;
+                    }
+                    // Bonus for being at angles
+                    const angle = Math.atan2(r - estPos.r, q - estPos.q);
+                    const unitIndex = getPlayerUnits(unit.player).indexOf(unit);
+                    const targetAngle = (unitIndex / getPlayerUnits(unit.player).length) * 2 * Math.PI;
+                    const angleDiff = Math.abs(angle - targetAngle);
+                    score += (Math.PI - angleDiff) * 10;
                 }
-                // Bonus for being at angles
-                const angle = Math.atan2(r - estPos.r, q - estPos.q);
-                const unitIndex = getPlayerUnits(unit.player).indexOf(unit);
-                const targetAngle = (unitIndex / getPlayerUnits(unit.player).length) * 2 * Math.PI;
-                const angleDiff = Math.abs(angle - targetAngle);
-                score += (Math.PI - angleDiff) * 10;
             }
             break;
         }
     }
 
     // Move towards map center (higher chance of finding enemies)
-    const distToCenter = Math.sqrt(q * q + r * r);
-    score -= distToCenter * (plan.inHuntMode ? 3 : 2);
+    // IMPROVED: Weight this more heavily when zone is shrinking
+    const zoneShrinkFactor = state.zoneRadius < CONFIG.MAP_SIZES[state.settings.size] ? 2 : 1;
+    score -= distFromCenter * (plan.inHuntMode ? 3 : 2) * zoneShrinkFactor;
 
     // Hills for vision
     const hex = getHex(q, r);
