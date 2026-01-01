@@ -5397,8 +5397,9 @@ function drawMinimap(w, h) {
         // Expanded mode: use available space between top bar and bottom UI
         const padding = 8;  // Minimal padding from edges
         const topOffset = 55;  // Space for top bar (player info, round, AP)
-        const bottomOffset = 60;  // Minimal space for hint text at bottom
         const isLandscape = w > h;
+        // Portrait needs more space below for hint text + horizontal legend (2 rows)
+        const bottomOffset = isLandscape ? 60 : 100;
 
         // Reserve space for legend - on right side for landscape, below for portrait
         legendWidth = isLandscape ? 110 : 0;
@@ -5473,7 +5474,7 @@ function drawMinimap(w, h) {
     // Update bounds with hexSize for click detection
     lastMinimapBounds.hexSize = hexSize;
 
-    // Draw all hexes
+    // Draw all hexes - render terrain with visibility-based darkening
     state.hexes.forEach(hex => {
         const terrain = TERRAIN[hex.type];
         if (!terrain) return;
@@ -5482,32 +5483,39 @@ function drawMinimap(w, h) {
         const px = centerX + hex.q * hexSize * 1.5;
         const py = centerY + (hex.r + hex.q * 0.5) * hexSize * Math.sqrt(3);
 
-        // Check fog level for coloring
-        const fogLevel = getFogLevel(hex.q, hex.r);
-
         // Check if hex is outside the safe zone
         const outsideZone = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius && !isHexInZone(hex.q, hex.r);
 
         // Apply height-based brightness adjustment to terrain color
         const heightAdjustedColor = adjustColorForHeight(terrain.color, hex.height || 0, CONFIG.HEIGHT.MAX);
 
-        // Draw hex as small circle/diamond (larger in expanded mode)
-        ctx.beginPath();
-        ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
+        // Apply zone coloring if outside
+        let baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
 
+        // Darken based on fog level (scale RGB toward black)
+        const fogLevel = getFogLevel(hex.q, hex.r);
+        let brightness = 1.0;
         if (fogLevel === 'hidden') {
-            // Minimap: dark but still shows terrain hint
-            const darkColor = desaturateAndDarken(heightAdjustedColor, 0.2, 0.30);
-            ctx.fillStyle = outsideZone ? blendWithRed(darkColor, 0.3) : darkColor;
+            brightness = 0.25;  // 25% brightness for unexplored
         } else if (fogLevel === 'explored') {
-            const baseColor = desaturateAndDarken(heightAdjustedColor, 0.4, 0.6);
-            ctx.fillStyle = outsideZone ? blendWithRed(baseColor, 0.4) : baseColor;
-        } else {
-            ctx.fillStyle = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
+            brightness = 0.6;   // 60% brightness for explored
         }
+
+        // Apply brightness directly to color
+        const num = parseInt(baseColor.replace('#', ''), 16);
+        const R = Math.round(((num >> 16) & 0xFF) * brightness);
+        const G = Math.round(((num >> 8) & 0xFF) * brightness);
+        const B = Math.round((num & 0xFF) * brightness);
+        const finalColor = `rgb(${R},${G},${B})`;
+
+        const dotRadius = hexSize * (isExpanded ? 0.9 : 0.8);
+
+        ctx.beginPath();
+        ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
+        ctx.fillStyle = finalColor;
         ctx.fill();
 
-        // Add red border for hexes outside zone
+        // Add red border for hexes outside zone (only if visible enough)
         if (outsideZone && fogLevel !== 'hidden') {
             ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
             ctx.lineWidth = isExpanded ? 1.5 : 1;
