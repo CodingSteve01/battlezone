@@ -174,7 +174,7 @@ function drawHeightExtrusion(cx, cy, size, height, terrainType, fogLevel) {
     ctx.beginPath();
     drawHexPath(cx, cy + offset, size);
     const fillColor = fogLevel === 'hidden'
-        ? '#050810'
+        ? '#1a1f2a'  // Dark but not completely black for unexplored areas
         : getSkirtFillColor(terrainType, fogLevel);
     ctx.fillStyle = fillColor;
     ctx.globalAlpha = fogLevel === 'visible' ? 0.85 : 1;
@@ -190,7 +190,7 @@ function getBaseSkirtDepth(size) {
 
 function getSkirtFillColor(terrainType, fogLevel) {
     if (fogLevel === 'hidden') {
-        return '#050810';
+        return '#1a1f2a';  // Dark but not completely black for unexplored areas
     }
 
     const terrain = TERRAIN[terrainType];
@@ -294,8 +294,8 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         ctx.closePath();
 
         if (fogLevel === 'hidden') {
-            // Hidden hexes show dark cliff faces
-            ctx.fillStyle = '#050810';
+            // Hidden hexes show dark cliff faces (dark but not completely black)
+            ctx.fillStyle = '#1a1f2a';
             ctx.fill();
         } else {
             // Create gradient from top (lighter) to bottom (darker) for depth
@@ -1106,9 +1106,9 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
 
     if (fogLevel === 'hidden') {
-        // Night/unexplored - very dark, almost black
-        topColor = '#0a0a12';
-        cliffColor = '#050508';
+        // Unexplored - dark but with visible desaturated terrain underneath
+        topColor = desaturateAndDarken(topColor, 0.15, 0.25);  // Very desaturated and dark
+        cliffColor = desaturateAndDarken(cliffColor, 0.15, 0.20);
     } else if (fogLevel === 'explored') {
         // Fog/not currently visible - desaturated but still recognizable
         // Higher saturation (0.3) and brightness (0.7) than before for foggy look
@@ -1806,8 +1806,8 @@ function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
 
     // Fog of war color adjustments
     if (fogLevel === 'hidden') {
-        // Night - completely dark
-        fillColor = '#050810';
+        // Unexplored - dark but terrain still slightly visible
+        fillColor = desaturateAndDarken(terrain.color, 0.15, 0.25);
     } else if (fogLevel === 'explored') {
         // Fog - desaturated but still recognizable
         fillColor = desaturateAndDarken(terrain.color, 0.3, 0.7);
@@ -1861,22 +1861,24 @@ function drawExploredOverlay(context, cx, cy, hexSize) {
 }
 
 /**
- * Draw hidden hex night overlay to a context
- * Creates a solid dark night effect for completely unexplored areas
- * Should look like night/darkness - completely obscured
+ * Draw hidden hex overlay to a context
+ * Creates a dark desaturated effect for unexplored areas
+ * Shows terrain underneath but heavily dimmed - not completely black
  */
 function drawHiddenOverlay(context, cx, cy, hexSize) {
     context.save();
     context.beginPath();
     drawHexPathToContext(context, cx, cy, hexSize);
 
-    // Night darkness - very dark blue-black, completely obscures terrain
-    const nightGradient = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, '#030508');
-    if (typeof nightGradient !== 'string') {
-        nightGradient.addColorStop(0, '#050810');   // Center: slightly lighter
-        nightGradient.addColorStop(1, '#020305');   // Edge: darker
+    // Dark overlay that still shows terrain underneath
+    // Using semi-transparent dark blue-gray instead of complete black
+    // This makes unexplored areas visible but clearly "unknown"
+    const darkOverlay = safeRadialGradient(context, cx, cy, 0, cx, cy, hexSize, 'rgba(15, 20, 30, 0.85)');
+    if (typeof darkOverlay !== 'string') {
+        darkOverlay.addColorStop(0, 'rgba(20, 25, 35, 0.80)');   // Center: slightly more visible
+        darkOverlay.addColorStop(1, 'rgba(10, 15, 25, 0.90)');   // Edge: darker
     }
-    context.fillStyle = nightGradient;
+    context.fillStyle = darkOverlay;
     context.fill();
 
     context.restore();
@@ -3407,13 +3409,15 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
     const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
     const outlineColor = getUnitOutlineColor(terrainColor);
 
-    // Soft shadow under unit feet for grounding (subtle, no white circle)
-    // Position matches unit feet at cy + size * 0.3
+    // Soft shadow under unit feet for grounding
+    // Shadow is centered so feet appear in the middle of the shadow ellipse
+    // The unit sprite's feet are at cy + size * 0.3, so we center shadow there
     ctx.save();
-    ctx.globalAlpha *= 0.25;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.globalAlpha *= 0.3;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + size * 0.3, size * 0.4, size * 0.15, 0, 0, Math.PI * 2);
+    // Shadow ellipse: center exactly at foot position, slightly larger for visibility
+    ctx.ellipse(cx, cy + size * 0.3, size * 0.35, size * 0.12, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -3819,18 +3823,35 @@ function updatePerformance() {
         state.currentFps = state.currentFps * 0.9 + fps * 0.1;
         state.frameCount++;
 
-        // Auto quality adjustment every 30 frames
-        if (state.settings.renderQuality === 'auto' && state.frameCount % 30 === 0) {
-            if (state.currentFps < 20) {
-                state.lowPerfFrames++;
-                if (state.lowPerfFrames > 2) {
+        // Auto quality adjustment every 60 frames (more stable, less flickering)
+        // Uses hysteresis to prevent rapid quality switching on older devices
+        if (state.settings.renderQuality === 'auto' && state.frameCount % 60 === 0) {
+            if (state.currentFps < 15) {
+                // Very low FPS - switch to low quality faster
+                state.lowPerfFrames += 2;
+                if (state.lowPerfFrames > 4) {
                     state.effectiveQuality = 'low';
                 }
-            } else if (state.currentFps < 35) {
-                state.effectiveQuality = 'medium';
+            } else if (state.currentFps < 25) {
+                // Low FPS - slowly increment counter
+                state.lowPerfFrames++;
+                if (state.lowPerfFrames > 5) {
+                    state.effectiveQuality = 'low';
+                } else if (state.lowPerfFrames > 3) {
+                    state.effectiveQuality = 'medium';
+                }
+            } else if (state.currentFps < 40) {
+                // Medium FPS - stay at current or switch to medium
+                if (state.effectiveQuality === 'high') {
+                    state.effectiveQuality = 'medium';
+                }
                 state.lowPerfFrames = Math.max(0, state.lowPerfFrames - 1);
-            } else if (state.currentFps > 50 && state.lowPerfFrames === 0) {
+            } else if (state.currentFps > 55 && state.lowPerfFrames === 0) {
+                // High FPS - only upgrade after sustained good performance
                 state.effectiveQuality = 'high';
+            } else {
+                // Gradually recover from low performance
+                state.lowPerfFrames = Math.max(0, state.lowPerfFrames - 1);
             }
         } else if (state.settings.renderQuality !== 'auto') {
             state.effectiveQuality = state.settings.renderQuality;
@@ -3853,9 +3874,13 @@ function shouldRenderDetails() {
 
 /**
  * Check if foreground elements (trees, rocks) should be rendered
+ * Always render foreground for visual consistency - trees shouldn't disappear
+ * when quality changes dynamically on older devices
  */
 function shouldRenderForeground() {
-    return state.effectiveQuality !== 'low';
+    // Always render trees/rocks to prevent them from appearing/disappearing
+    // Performance is handled through simplified rendering in low quality mode
+    return true;
 }
 
 /**
@@ -5074,7 +5099,9 @@ function drawMinimap(w, h) {
         ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
 
         if (fogLevel === 'hidden') {
-            ctx.fillStyle = outsideZone ? '#2a1a1e' : '#1a1a2e';
+            // Minimap: dark but still shows terrain hint
+            const darkColor = desaturateAndDarken(terrain.color, 0.2, 0.30);
+            ctx.fillStyle = outsideZone ? blendWithRed(darkColor, 0.3) : darkColor;
         } else if (fogLevel === 'explored') {
             const baseColor = desaturateAndDarken(terrain.color, 0.4, 0.6);
             ctx.fillStyle = outsideZone ? blendWithRed(baseColor, 0.4) : baseColor;
