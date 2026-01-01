@@ -1392,11 +1392,22 @@ function hexEdgeFactorNormalized(x, y) {
     return Math.max(absX, absY);
 }
 
-function sampleHexOffset(seed, minEdgeFactor = 0) {
+/**
+ * Sample a random offset within the hex boundaries
+ * @param {number} seed - Random seed for deterministic positioning
+ * @param {number} minEdgeFactor - Minimum distance from center (0-1)
+ * @param {number} xConstraint - Maximum X offset (0-1), default 0.7 to keep assets within visible area
+ * @param {number} yTopConstraint - Maximum Y offset upward (0-1), default 0.6
+ * @param {number} yBottomConstraint - Maximum Y offset downward (0-1), default 0.4 to keep asset bottoms visible
+ */
+function sampleHexOffset(seed, minEdgeFactor = 0, xConstraint = 0.7, yTopConstraint = 0.6, yBottomConstraint = 0.4) {
     for (let i = 0; i < 12; i++) {
         const attemptSeed = seed + i * 17;
-        const x = seededRandom(attemptSeed) * 2 - 1;
-        const y = (seededRandom(attemptSeed + 7) * 2 - 1) * HEX_HALF_HEIGHT;
+        // Constrain X to stay within visible hex area (considering asset width)
+        const x = (seededRandom(attemptSeed) * 2 - 1) * xConstraint;
+        // Constrain Y: more room upward (for tall assets), less downward (asset bottoms stay in hex)
+        const rawY = seededRandom(attemptSeed + 7) * 2 - 1;
+        const y = (rawY > 0 ? rawY * yBottomConstraint : rawY * yTopConstraint) * HEX_HALF_HEIGHT;
         if (!isPointInHexNormalized(x, y)) continue;
         if (hexEdgeFactorNormalized(x, y) < minEdgeFactor) continue;
         return { x, y };
@@ -1411,7 +1422,8 @@ function sampleHexOffset(seed, minEdgeFactor = 0) {
 function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const elements = [];
     const s = 0.45; // Normalized size multiplier
-    const positionScale = 0.95;
+    // Position scale reduced to keep assets within visible hex area
+    const positionScale = 0.75;
     const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
     const biome = state.activeBiome || 'temperate';
     const vegetationBoost = biome === 'tropical' ? 1.2 : (biome === 'wetland' ? 1.3 : 1);
@@ -1422,7 +1434,8 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     const BG_TREE_SORT_OFFSET = 0.25;
     const SHRUB_SORT_OFFSET = 0.35;
     const BUSH_SORT_OFFSET = 0.38;
-    const TREE_Y_OFFSET = 0;
+    // Trees positioned higher (negative Y) to keep bottoms in hex
+    const TREE_Y_OFFSET = -0.1;
 
     if (type === 'forest' || type === 'pine') {
         const baseTreeCount = Math.max(4, Math.round((4 + Math.abs(baseSeed % 3)) * vegetationBoost));
@@ -1448,10 +1461,11 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        // Edge trees
+        // Edge trees - constrained to stay within hex visible area
         const edgeTreeCount = Math.max(2, Math.round((2 + Math.abs((baseSeed + 50) % 3)) * vegetationBoost));
         for (let i = 0; i < edgeTreeCount; i++) {
-            const anchorPoint = sampleHexOffset(baseSeed + i * 19 + 200, 0.7);
+            // Edge trees: minEdgeFactor=0.5, tighter X constraint, limited Y to keep in bounds
+            const anchorPoint = sampleHexOffset(baseSeed + i * 19 + 200, 0.5, 0.6, 0.5, 0.3);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale + TREE_Y_OFFSET;
             const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + i * 20 + 202) * 1.0);
