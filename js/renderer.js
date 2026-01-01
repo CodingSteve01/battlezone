@@ -191,13 +191,13 @@ function getSkirtFillColor(terrainType, fogLevel) {
     const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
 
     if (fogLevel === 'hidden') {
-        // Very dark for unexplored areas (shadow) - ~75% darkening
-        return desaturateAndDarken(baseColor, 0.4, 0.25);
+        // Very dark for unexplored areas (shadow) - ~88% darkening (2x darker than before)
+        return desaturateAndDarken(baseColor, 0.3, 0.12);
     }
 
     if (fogLevel === 'explored') {
-        // Moderately dark for explored but not visible (dim) - ~45% darkening
-        return desaturateAndDarken(baseColor, 0.6, 0.55);
+        // Dark for explored but not visible (same as old hidden) - ~75% darkening
+        return desaturateAndDarken(baseColor, 0.4, 0.25);
     }
 
     return desaturateAndDarken(baseColor, 0.7, 0.75);
@@ -301,9 +301,9 @@ function drawCliffFaces(cx, cy, size, hex, fogLevel) {
         // Adjust brightness based on fog level (shadow effect)
         let fogBrightnessFactor = 1.0;
         if (fogLevel === 'hidden') {
-            fogBrightnessFactor = 0.25;  // Very dark for unexplored areas (shadow)
+            fogBrightnessFactor = 0.12;  // Very dark for unexplored areas (shadow) - 2x darker
         } else if (fogLevel === 'explored') {
-            fogBrightnessFactor = 0.55;  // Moderately dark for explored but not visible (dim)
+            fogBrightnessFactor = 0.25;  // Dark for explored but not visible (same as old hidden)
         }
 
         const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5 * fogBrightnessFactor));
@@ -1231,10 +1231,10 @@ function applyLightingToColor(color, lightFactor) {
 
 function getFogBrightness(fogLevel) {
     if (fogLevel === 'hidden') {
-        return 0.25;  // Very dark for unexplored areas (shadow)
+        return 0.12;  // Very dark for unexplored areas (shadow) - 2x darker than before
     }
     if (fogLevel === 'explored') {
-        return 0.55;  // Moderately dark for explored but not visible (dim)
+        return 0.25;  // Moderately dark for explored but not visible (dim) - same as old hidden
     }
     return 1.0;  // Full brightness for currently visible areas (lit)
 }
@@ -1247,12 +1247,12 @@ function getFogBrightness(fogLevel) {
  */
 function getFogFilter(fogLevel) {
     if (fogLevel === 'hidden') {
-        // Dark shadow effect: reduced brightness and saturation
-        return 'brightness(0.25) saturate(0.5)';
+        // Very dark shadow effect: reduced brightness and saturation - 2x darker than before
+        return 'brightness(0.12) saturate(0.3)';
     }
     if (fogLevel === 'explored') {
-        // Dim lighting effect: reduced brightness, slight saturation reduction
-        return 'brightness(0.55) saturate(0.75)';
+        // Dark effect for explored but not visible - same as old hidden
+        return 'brightness(0.25) saturate(0.5)';
     }
     return '';  // No filter for visible areas
 }
@@ -1282,10 +1282,10 @@ function drawFogOverlays(visibleHexData, tileSize) {
         // visible hexes don't need overlay
     }
 
-    // Draw explored hexes overlay (moderate darkening)
+    // Draw explored hexes overlay (moderate darkening - same as old hidden)
     if (exploredHexes.length > 0) {
         ctx.save();
-        ctx.fillStyle = 'rgba(10, 15, 30, 0.45)';  // Dark blue-black for shadow feel
+        ctx.fillStyle = 'rgba(5, 8, 20, 0.75)';  // Same as old hidden for explored but not visible
         for (const data of exploredHexes) {
             ctx.beginPath();
             // Draw hex path inline
@@ -1302,10 +1302,10 @@ function drawFogOverlays(visibleHexData, tileSize) {
         ctx.restore();
     }
 
-    // Draw hidden hexes overlay (strong darkening)
+    // Draw hidden hexes overlay (very strong darkening - 2x darker than before)
     if (hiddenHexes.length > 0) {
         ctx.save();
-        ctx.fillStyle = 'rgba(5, 8, 20, 0.75)';  // Very dark for unexplored areas
+        ctx.fillStyle = 'rgba(2, 4, 10, 0.88)';  // Very dark for unexplored areas - 2x darker
         for (const data of hiddenHexes) {
             ctx.beginPath();
             // Draw hex path inline
@@ -5552,9 +5552,9 @@ function drawMinimap(w, h) {
         const fogLevel = getFogLevel(hex.q, hex.r);
         let brightness = 1.0;
         if (fogLevel === 'hidden') {
-            brightness = 0.25;  // Very dark for unexplored areas (shadow)
+            brightness = 0.12;  // Very dark for unexplored areas (shadow) - 2x darker
         } else if (fogLevel === 'explored') {
-            brightness = 0.55;  // Moderately dark for explored but not visible (dim)
+            brightness = 0.25;  // Dark for explored but not visible (same as old hidden)
         }
 
         // Apply brightness directly to color
