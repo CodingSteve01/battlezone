@@ -3497,7 +3497,7 @@ function drawSpeechBubble(ctx, x, y, text, color, size) {
  * Draw a human unit with equipment
  */
 function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
-    const size = state.hexSize * 0.65;
+    const size = state.hexSize * 0.59;  // Reduced from 0.65 to fix units being ~10% too large
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
@@ -3676,7 +3676,7 @@ function drawUnitOverlay(unit, cx, cy) {
         return;
     }
 
-    const size = state.hexSize * 0.65;
+    const size = state.hexSize * 0.59;  // Match drawUnit size
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
@@ -3727,10 +3727,14 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.shadowBlur = 0;
     }
 
+    // Track vertical offset for speech bubbles to prevent overlap
+    let speechBubbleOffset = 0;
+
     // Cover status speech bubble (only for current player's units in cover)
     // Position higher to avoid overlap with HP bar
     if (unit.hiding && unit.player === state.currentPlayer) {
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'In Deckung', '#22c55e', size * 0.8);
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'In Deckung', '#22c55e', size * 0.8);
+        speechBubbleOffset += size * 0.6;  // Offset next bubble
     }
 
     // Cloak indicator (visible to owner) with speech bubble
@@ -3739,8 +3743,8 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.shadowColor = '#a855f7';
         ctx.shadowBlur = 15;
 
-        // Draw speech bubble for stealth status - higher position, smaller size
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'Getarnt!', '#a855f7', size * 0.8);
+        // Draw speech bubble for stealth status - offset if cover bubble already shown
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Getarnt!', '#a855f7', size * 0.8);
 
         ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
         ctx.textAlign = 'center';

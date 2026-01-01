@@ -187,6 +187,9 @@ export function initInput() {
     // Action buttons
     setupActionButtons();
 
+    // Target info panel click - allows tapping "tap to attack" hint to attack
+    setupTargetInfoClick();
+
     // Window resize
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', () => setTimeout(handleResize, 200));
@@ -1042,15 +1045,22 @@ async function handleEnemyClick(unit, hex) {
             // No toast needed here as it would overlap with the target info panel
         }
     } else {
-        // Enemy not in range - show message
-        playError();
+        // Enemy not in range - still target them so player can see info and plan approach
         if (state.sharedAP < 1) {
+            playError();
             showToast('❌ Keine AP für Angriff!', 'warning');
+            state.targetedUnit = null;
         } else {
-            showToast('❌ Feind außer Reichweite!', 'warning');
+            // Target the enemy even though out of range - helps player plan
+            state.targetedUnit = enemy;
+            state.pendingMoveDestination = null;
+            state.currentPath = null;
+            state.selectedAction = 'attack';  // Switch to attack mode
+            playTarget();
+            showToast('⚠️ Feind entdeckt! Näher herangehen zum Angreifen.', 'info');
         }
-        state.targetedUnit = null;
         render();
+        updateUI();
     }
 }
 
@@ -2213,6 +2223,57 @@ function setupMenuButtons() {
             showScreen('menu');
         };
     }
+}
+
+/**
+ * Setup click handler for target info panel
+ * Allows tapping the "tap again to attack" panel to execute attack
+ */
+function setupTargetInfoClick() {
+    const targetInfo = document.getElementById('target-info');
+    if (!targetInfo) return;
+
+    const handleClick = async () => {
+        // Only respond if there's a targeted enemy and game is active
+        if (!state.targetedUnit || state.gameOver || isAIPlayer()) return;
+
+        const unit = getCurrentUnit();
+        if (!unit) return;
+
+        // Check if enemy is in attack range
+        const attackable = getAttackableUnits(unit);
+        const canAttack = attackable.some(u => u.id === state.targetedUnit.id);
+
+        if (canAttack && state.sharedAP >= 1 && !state.minigameInProgress) {
+            // Execute attack with minigame
+            const enemy = state.targetedUnit;
+            state.targetedUnit = null;
+            state.pendingMoveDestination = null;
+            state.currentPath = null;
+            state.minigameInProgress = true;
+
+            try {
+                const result = await executeAttackWithMinigame(unit, enemy);
+                if (result.killed) {
+                    checkWinCondition();
+                }
+                render();
+                updateUI();
+                notifyTutorialAction('unitAttacked');
+                showActionHint('attacked');
+                checkTutorialHint();
+            } finally {
+                state.minigameInProgress = false;
+            }
+        }
+    };
+
+    // Support both click and touch
+    targetInfo.addEventListener('click', handleClick);
+    targetInfo.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        handleClick();
+    });
 }
 
 /**
