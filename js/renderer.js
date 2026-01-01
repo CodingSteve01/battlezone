@@ -5549,12 +5549,13 @@ function drawMinimap(w, h) {
         let baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
 
         // Darken based on fog level (scale RGB toward black - shadow effect)
+        // Minimap uses HALF the darkness of the main view for better readability
         const fogLevel = getFogLevel(hex.q, hex.r);
         let brightness = 1.0;
         if (fogLevel === 'hidden') {
-            brightness = 0.12;  // Very dark for unexplored areas (shadow) - 2x darker
+            brightness = 0.5;  // Half as dark as main view (0.12 → 0.5)
         } else if (fogLevel === 'explored') {
-            brightness = 0.25;  // Dark for explored but not visible (same as old hidden)
+            brightness = 0.6;  // Half as dark as main view (0.25 → 0.6)
         }
 
         // Apply brightness directly to color

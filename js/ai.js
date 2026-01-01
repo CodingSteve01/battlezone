@@ -18,7 +18,7 @@ import { endTurn } from './turns.js';
 import { TERRAIN, CONFIG } from './config.js';
 import { scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
-import { checkPowerupPickup } from './powerups.js';
+import { checkPowerupPickup, getPowerupAt } from './powerups.js';
 import { getSpawnPositions } from './map.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
@@ -1467,6 +1467,21 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
 
+        // === POWERUP BONUS ===
+        // Prioritize positions with powerups
+        const powerup = getPowerupAt(q, r);
+        if (powerup) {
+            // High bonus for powerups, scaled by unit health
+            const healthPercent = unit.currentHp / unit.maxHp;
+            if (powerup.type === 'health' && healthPercent < 0.7) {
+                score += 80;  // Extra bonus for health when damaged
+            } else if (powerup.type === 'ap') {
+                score += 70;  // AP powerups are valuable
+            } else {
+                score += 50;  // Other powerups still valuable
+            }
+        }
+
         // === ZONE AWARENESS ===
         const unitInZone = isHexInZone(unit.q, unit.r);
         const targetInZone = isHexInZone(q, r);
@@ -2160,6 +2175,21 @@ function selectStrategicMoveTarget(unit, plan) {
         const terrainData = TERRAIN[hex.type];
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
+
+        // === POWERUP BONUS ===
+        // Prioritize positions with powerups
+        const powerup = getPowerupAt(q, r);
+        if (powerup) {
+            // High bonus for powerups, scaled by unit health
+            const healthPercent = unit.currentHp / unit.maxHp;
+            if (powerup.type === 'health' && healthPercent < 0.7) {
+                score += 80;  // Extra bonus for health when damaged
+            } else if (powerup.type === 'ap') {
+                score += 70;  // AP powerups are valuable
+            } else {
+                score += 50;  // Other powerups still valuable
+            }
+        }
 
         // === ZONE AWARENESS ===
         const unitInZone = isHexInZone(unit.q, unit.r);
