@@ -224,6 +224,11 @@ function handleMouseDown(e) {
 function handleMouseMove(e) {
     if (state.gameOver) return;
 
+    // Block camera panning when minimap is expanded (tactical briefing mode)
+    if (isMinimapExpanded()) {
+        return;
+    }
+
     if (isDragging) {
         const dx = e.clientX - dragStartX;
         const dy = e.clientY - dragStartY;
@@ -330,6 +335,11 @@ function handleTouchMove(e) {
     // Always prevent default
     e.preventDefault();
     e.stopPropagation();
+
+    // Block camera panning/zooming when minimap is expanded (tactical briefing mode)
+    if (isMinimapExpanded()) {
+        return;
+    }
 
     if (e.touches.length === 2 && isPinching && initialPinchCenter) {
         // Handle pinch zoom
@@ -612,6 +622,11 @@ export function centerOnTeam(playerIndex, duration = 600) {
 function handleWheel(e) {
     e.preventDefault();
 
+    // Block zoom/scroll when minimap is expanded (tactical briefing mode)
+    if (isMinimapExpanded()) {
+        return;
+    }
+
     // Check if ctrl/meta is held for zoom, otherwise pan
     if (e.ctrlKey || e.metaKey) {
         // Zoom with ctrl+scroll
@@ -864,6 +879,11 @@ function handleTapOrClick(clientX, clientY) {
         return;
     }
     if (handleHeightOverlayToggleClick(clientX, clientY)) {
+        return;
+    }
+
+    // Block all game interactions when minimap is expanded (tactical briefing mode)
+    if (isMinimapExpanded()) {
         return;
     }
 

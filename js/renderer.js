@@ -3824,6 +3824,31 @@ function blendWithRed(color, amount) {
 }
 
 /**
+ * Adjust color brightness based on height for minimap visualization
+ * Height 0 = darkest, Height 3 = brightest
+ * @param color - Hex color string
+ * @param height - Height value (0-3)
+ * @param maxHeight - Maximum height (default 3)
+ * @returns Hex color string
+ */
+function adjustColorForHeight(color, height, maxHeight = 3) {
+    const num = parseInt(color.replace('#', ''), 16);
+    let R = (num >> 16) & 0xFF;
+    let G = (num >> 8) & 0xFF;
+    let B = num & 0xFF;
+
+    // Map height to brightness factor: 0.7 (low) to 1.2 (high)
+    const brightnessFactor = 0.7 + (height / maxHeight) * 0.5;
+
+    R = Math.min(255, Math.round(R * brightnessFactor));
+    G = Math.min(255, Math.round(G * brightnessFactor));
+    B = Math.min(255, Math.round(B * brightnessFactor));
+
+    // Return hex format for compatibility with other color functions
+    return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
+}
+
+/**
  * Update performance tracking and determine effective quality
  */
 function updatePerformance() {
@@ -4855,7 +4880,14 @@ let minimapExpanded = false;  // Track expanded/fullscreen state
 
 export function setMinimapActive(active) { minimapActive = active; }
 export function isMinimapExpanded() { return minimapExpanded; }
-export function setMinimapExpanded(expanded) { minimapExpanded = expanded; }
+export function setMinimapExpanded(expanded) {
+    minimapExpanded = expanded;
+    // Hide/show bottom UI panel in tactical briefing mode
+    const unitPanel = document.querySelector('.unit-panel');
+    if (unitPanel) {
+        unitPanel.style.display = expanded ? 'none' : '';
+    }
+}
 
 // Store last drawn minimap bounds for click detection
 let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false, expanded: false };
@@ -5003,6 +5035,113 @@ function drawHeightOverlayToggle() {
 }
 
 /**
+ * Draw legend for expanded minimap showing terrain types, units, and height
+ */
+function drawMinimapLegend(ctx, legendX, legendY, availableWidth) {
+    // Only draw legend if there's enough space
+    if (availableWidth < 80) return;
+
+    const lineHeight = 18;
+    const dotSize = 6;
+    let currentY = legendY;
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+
+    // Title
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('LEGENDE', legendX, currentY);
+    currentY += lineHeight + 4;
+
+    // Terrain types
+    ctx.font = '10px sans-serif';
+    const terrainItems = [
+        { name: 'Gras', color: TERRAIN.grass.color },
+        { name: 'Wald', color: TERRAIN.forest.color },
+        { name: 'Hügel', color: TERRAIN.hills.color },
+        { name: 'Wasser', color: TERRAIN.water.color },
+        { name: 'Fels', color: TERRAIN.rock.color },
+        { name: 'Sand', color: TERRAIN.sand.color },
+        { name: 'Sumpf', color: TERRAIN.swamp.color }
+    ];
+
+    terrainItems.forEach(item => {
+        // Color dot
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillText(item.name, legendX + dotSize * 2 + 6, currentY);
+        currentY += lineHeight;
+    });
+
+    currentY += 8;
+
+    // Units section
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('EINHEITEN', legendX, currentY);
+    currentY += lineHeight;
+
+    ctx.font = '10px sans-serif';
+
+    // Own units
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText('Eigene', legendX + dotSize * 2 + 6, currentY);
+    currentY += lineHeight;
+
+    // Enemy units
+    ctx.fillStyle = '#ff4444';
+    ctx.beginPath();
+    ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillText('Feinde', legendX + dotSize * 2 + 6, currentY);
+    currentY += lineHeight + 8;
+
+    // Height gradient
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('HÖHE', legendX, currentY);
+    currentY += lineHeight;
+
+    // Draw height gradient bar
+    const gradientWidth = Math.min(60, availableWidth - 10);
+    const gradientHeight = 10;
+
+    // Create gradient from dark to light
+    const gradient = ctx.createLinearGradient(legendX, currentY, legendX + gradientWidth, currentY);
+    gradient.addColorStop(0, adjustColorForHeight('#4a7c4e', 0, 3));
+    gradient.addColorStop(0.5, adjustColorForHeight('#4a7c4e', 1.5, 3));
+    gradient.addColorStop(1, adjustColorForHeight('#4a7c4e', 3, 3));
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(legendX, currentY - gradientHeight / 2, gradientWidth, gradientHeight);
+
+    // Labels
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('Tief', legendX, currentY + gradientHeight);
+    ctx.textAlign = 'right';
+    ctx.fillText('Hoch', legendX + gradientWidth, currentY + gradientHeight);
+
+    ctx.restore();
+}
+
+/**
  * Draw strategic minimap showing terrain, units, and zone
  * Supports both compact (corner) and expanded (center) modes
  * - Shows all terrain
@@ -5103,19 +5242,22 @@ function drawMinimap(w, h) {
         // Check if hex is outside the safe zone
         const outsideZone = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius && !isHexInZone(hex.q, hex.r);
 
+        // Apply height-based brightness adjustment to terrain color
+        const heightAdjustedColor = adjustColorForHeight(terrain.color, hex.height || 0, CONFIG.HEIGHT.MAX);
+
         // Draw hex as small circle/diamond (larger in expanded mode)
         ctx.beginPath();
         ctx.arc(px, py, hexSize * (isExpanded ? 0.9 : 0.8), 0, Math.PI * 2);
 
         if (fogLevel === 'hidden') {
             // Minimap: dark but still shows terrain hint
-            const darkColor = desaturateAndDarken(terrain.color, 0.2, 0.30);
+            const darkColor = desaturateAndDarken(heightAdjustedColor, 0.2, 0.30);
             ctx.fillStyle = outsideZone ? blendWithRed(darkColor, 0.3) : darkColor;
         } else if (fogLevel === 'explored') {
-            const baseColor = desaturateAndDarken(terrain.color, 0.4, 0.6);
+            const baseColor = desaturateAndDarken(heightAdjustedColor, 0.4, 0.6);
             ctx.fillStyle = outsideZone ? blendWithRed(baseColor, 0.4) : baseColor;
         } else {
-            ctx.fillStyle = outsideZone ? blendWithRed(terrain.color, 0.3) : terrain.color;
+            ctx.fillStyle = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
         }
         ctx.fill();
 
@@ -5260,6 +5402,9 @@ function drawMinimap(w, h) {
         ctx.font = '12px sans-serif';
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.fillText('Tippe um den Viewport zu verschieben', x + size / 2, y + size + 20);
+
+        // Draw legend on the right side
+        drawMinimapLegend(ctx, x + size + 10, y, w - (x + size + 10) - 10);
 
         // Draw close button
         drawMinimapCloseButton(x, y, size);
