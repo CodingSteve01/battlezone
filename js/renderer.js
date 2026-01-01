@@ -1258,6 +1258,37 @@ function getFogFilter(fogLevel) {
 }
 
 /**
+ * Get the darkest fog level among a hex and its neighbors
+ * Used for large elements (trees, rocks) that visually span hex boundaries
+ * @param {number} q - Hex q coordinate
+ * @param {number} r - Hex r coordinate
+ * @returns {string} The darkest fog level ('hidden' > 'explored' > 'visible')
+ */
+function getDarkestNeighborFogLevel(q, r) {
+    const centerFog = getFogLevel(q, r);
+
+    // If center is already hidden, no need to check neighbors
+    if (centerFog === 'hidden') return 'hidden';
+
+    // Check all 6 neighbors for darker fog levels
+    const neighbors = getNeighbors(q, r);
+    let darkest = centerFog;
+
+    for (const neighbor of neighbors) {
+        const neighborFog = getFogLevel(neighbor.q, neighbor.r);
+        // Priority: hidden > explored > visible
+        if (neighborFog === 'hidden') {
+            return 'hidden';  // Can't get darker than this
+        }
+        if (neighborFog === 'explored' && darkest === 'visible') {
+            darkest = 'explored';
+        }
+    }
+
+    return darkest;
+}
+
+/**
  * Draw fog of war overlays on all non-visible hexes
  * This is a robust fallback that works regardless of CSS filter support
  * Draws semi-transparent dark hexes over terrain to create the fog effect
@@ -4494,8 +4525,17 @@ export function render() {
         const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
         const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
         // Apply fog level darkening to foreground elements (store filter for later application)
+        // Large elements (trees, rocks) use the darkest fog level of neighboring hexes
+        // to prevent bright elements appearing at fog boundaries
+        const largeElementTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'rock', 'rock-formation'];
         adjusted.forEach(element => {
-            element.fogFilter = fogFilter;
+            if (largeElementTypes.includes(element.type)) {
+                // Use darkest neighbor fog for large elements that span hex boundaries
+                const darkestFog = getDarkestNeighborFogLevel(hex.q, hex.r);
+                element.fogFilter = getFogFilter(darkestFog);
+            } else {
+                element.fogFilter = fogFilter;
+            }
         });
         foregroundElements.push(...adjusted);
 
