@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.13](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.12...shadow-squad-v5.0.13) (2026-01-01)
+
+
+### Bug Fixes
+
+* **input,renderer,turns:** improve targeting, fog darkness, and AI camera ([#299](https://github.com/CodingSteve01/battlezone/issues/299)) ([2950c3c](https://github.com/CodingSteve01/battlezone/commit/2950c3c4b8f974fb0d72621a8266f6a947175637))
+
 ## [5.0.12](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.11...shadow-squad-v5.0.12) (2026-01-01)
 
 
