@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.0...shadow-squad-v5.2.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* **input:** add feedback when attack is blocked and limit zoom minimum ([#306](https://github.com/CodingSteve01/battlezone/issues/306)) ([aad44c6](https://github.com/CodingSteve01/battlezone/commit/aad44c679a124aaa35f906b7fb38c685df94a564))
+
 ## [5.2.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.1.0...shadow-squad-v5.2.0) (2026-01-01)
 
 
