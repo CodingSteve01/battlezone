@@ -46,7 +46,7 @@ export function getTileScreenPosition(q, r, height, hexSize = getTileSize()) {
     return { x: pos.x, y: pos.y - zOffset, zOffset };
 }
 
-const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.1);
+const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.6);  // Minimum 60% zoom - lower values cause performance issues
 const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 
 // Central game state object
