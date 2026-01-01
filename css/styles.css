@@ -4615,3 +4615,89 @@ button:focus:not(:focus-visible),
     font-weight: 700;
     margin-left: 8px;
 }
+
+/* Log location styling */
+.log-location {
+    font-size: 10px;
+    color: #6b7280;
+    margin-top: 2px;
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+/* Stack trace collapsible styling */
+.log-stack details {
+    margin-top: 6px;
+}
+
+.log-stack summary {
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 11px;
+    user-select: none;
+}
+
+.log-stack summary:hover {
+    color: var(--text-primary);
+}
+
+.log-stack pre {
+    margin: 6px 0 0 0;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Manual copy dialog */
+.manual-copy-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    padding: 20px;
+}
+
+.manual-copy-content {
+    background: var(--surface-elevated);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 90%;
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.manual-copy-content h4 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.manual-copy-content p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.manual-copy-content textarea {
+    flex: 1;
+    min-height: 200px;
+    padding: 12px;
+    background: var(--surface-base);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+    font-size: 11px;
+    resize: none;
+}

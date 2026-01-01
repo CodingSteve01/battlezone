@@ -133,6 +133,11 @@ export function startTurn() {
     // Note: Queued paths are now automatically executed after turn screen is dismissed
     // See executeQueuedPathsForPlayer() in input.js
 
+    // SECURITY: Always center camera on current player's team at turn start
+    // This prevents revealing enemy positions through scroll position
+    // The camera position from the previous player's turn should not be visible
+    centerOnTeam(state.currentPlayer, 0); // Instant centering (duration=0)
+
     // Check if this is an AI player
     if (isAIPlayer()) {
         // Skip turn screen for AI, go directly to game

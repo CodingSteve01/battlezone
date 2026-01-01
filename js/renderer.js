@@ -539,21 +539,26 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
 function initVegetationRenderer() { /* no-op */ }
 function initTerrainRenderer() { /* no-op */ }
 
+/**
+ * Get biome-appropriate tree types for realistic vegetation
+ */
 function getBiomeTreePool(terrainType) {
     const biome = state.activeBiome || 'temperate';
 
+    // Terrain-specific overrides
     if (terrainType === 'pine' || terrainType === 'snow') {
-        return ['pine', 'birch', 'dead', 'pine'];
+        return ['pine', 'pine', 'birch', 'dead', 'pine'];
     }
 
     if (terrainType === 'swamp') {
-        return ['willow', 'dead', 'oak', 'birch', 'willow'];
+        return ['willow', 'willow', 'dead', 'oak', 'willow'];
     }
 
     if (terrainType === 'sand') {
-        return ['dead', 'dead', 'oak'];
+        return ['dead', 'dead', 'dead', 'oak'];  // Sparse dead trees
     }
 
+    // Biome-specific tree pools for more realistic vegetation
     switch (biome) {
         case 'tundra':
             return ['pine', 'birch', 'dead', 'pine'];
@@ -757,6 +762,10 @@ function drawBush2D5(x, y, size, seed) {
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
+
+        // Apply biome-appropriate color tint for realism
+        applyBiomeVegetationTint(drawX, drawY, spriteWidth, spriteHeight);
+
         ctx.restore();
     }
 }
@@ -786,7 +795,37 @@ function drawSmallShrub(x, y, size, seed) {
         } else {
             ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
         }
+
+        // Apply biome-appropriate color tint for realism
+        applyBiomeVegetationTint(drawX, drawY, spriteWidth, spriteHeight);
+
         ctx.restore();
+    }
+}
+
+/**
+ * Apply biome-appropriate color tinting to vegetation sprites
+ * This creates more cohesive and realistic environments
+ */
+function applyBiomeVegetationTint(x, y, width, height) {
+    const biome = state.activeBiome || 'temperate';
+
+    // Biome-specific tints for vegetation
+    const biomeTints = {
+        desert: { color: 'rgba(200, 180, 120, 0.12)', blend: 'multiply' },       // Yellower, sun-bleached
+        tropical: { color: 'rgba(40, 120, 60, 0.1)', blend: 'overlay' },         // Vibrant deep green
+        tundra: { color: 'rgba(100, 120, 140, 0.12)', blend: 'multiply' },       // Cool bluish
+        wetland: { color: 'rgba(60, 90, 70, 0.1)', blend: 'multiply' },          // Dark green, mossy
+        highland: { color: 'rgba(110, 120, 100, 0.08)', blend: 'multiply' },     // Subtle gray-green
+        temperate: null                                                           // No tint - natural colors
+    };
+
+    const tintConfig = biomeTints[biome];
+    if (tintConfig) {
+        ctx.globalCompositeOperation = tintConfig.blend;
+        ctx.fillStyle = tintConfig.color;
+        ctx.fillRect(x, y, width, height);
+        ctx.globalCompositeOperation = 'source-over';
     }
 }
 
@@ -808,42 +847,140 @@ function drawFlowerCluster(x, y, size, seed) {
 }
 
 function drawRockFormation2D5(x, y, size, seed) {
-    // Draw procedural rock since we don't have rock sprites yet
-    const sizeVariation = 0.5 + seededRandom(seed) * 0.8;
-    const rockSize = size * 0.6 * sizeVariation;
+    // Draw procedural rock with realistic details
+    const sizeVariation = 0.4 + seededRandom(seed) * 0.5;
+    // Keep rock size reasonable so it stays within tile bounds
+    const rockSize = Math.min(size * 0.5 * sizeVariation, size * 0.4);
 
     ctx.save();
     ctx.translate(x, y);
 
-    // Rock base color with variation
-    const grayValue = 80 + seededRandom(seed * 3) * 40;
-    ctx.fillStyle = `rgb(${grayValue}, ${grayValue - 5}, ${grayValue - 10})`;
+    // Get biome for color matching
+    const biome = state.activeBiome || 'temperate';
 
-    // Draw irregular rock shape
+    // Biome-appropriate rock colors (warmer, more natural tones)
+    const rockColors = {
+        temperate: { r: 95, g: 88, b: 78 },      // Warm gray-brown
+        tropical: { r: 85, g: 80, b: 70 },       // Darker warm
+        desert: { r: 140, g: 120, b: 95 },       // Sandy brown
+        tundra: { r: 100, g: 100, b: 105 },      // Cool gray
+        wetland: { r: 80, g: 78, b: 72 },        // Dark mossy
+        highland: { r: 90, g: 85, b: 80 }        // Mountain gray
+    };
+    const baseColor = rockColors[biome] || rockColors.temperate;
+
+    // Add variation to base color
+    const colorVar = seededRandom(seed * 3) * 20 - 10;
+    const r = Math.max(0, Math.min(255, baseColor.r + colorVar));
+    const g = Math.max(0, Math.min(255, baseColor.g + colorVar - 3));
+    const b = Math.max(0, Math.min(255, baseColor.b + colorVar - 5));
+
+    // Draw ground shadow first
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.beginPath();
-    const points = 6 + Math.floor(seededRandom(seed * 4) * 3);
+    ctx.ellipse(rockSize * 0.1, rockSize * 0.35, rockSize * 0.9, rockSize * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rock main body gradient for 3D depth
+    const rockGrad = ctx.createRadialGradient(
+        -rockSize * 0.3, -rockSize * 0.2, 0,
+        rockSize * 0.1, rockSize * 0.1, rockSize
+    );
+    rockGrad.addColorStop(0, `rgb(${r + 25}, ${g + 25}, ${b + 20})`);  // Light face
+    rockGrad.addColorStop(0.4, `rgb(${r}, ${g}, ${b})`);               // Mid tone
+    rockGrad.addColorStop(1, `rgb(${r - 25}, ${g - 25}, ${b - 20})`);   // Shadow
+
+    // Draw irregular rock shape (kept within bounds)
+    ctx.fillStyle = rockGrad;
+    ctx.beginPath();
+    const points = 7 + Math.floor(seededRandom(seed * 4) * 4);
     for (let i = 0; i < points; i++) {
         const angle = (i / points) * Math.PI * 2;
-        const dist = rockSize * (0.6 + seededRandom(seed + i) * 0.4);
+        const dist = rockSize * (0.65 + seededRandom(seed + i * 7) * 0.35);
         const px = Math.cos(angle) * dist;
-        const py = Math.sin(angle) * dist * 0.6 - rockSize * 0.3; // Flatten and raise
+        // Constrain Y to stay within bounds (flatter at bottom, taller at sides)
+        const yScale = Math.abs(Math.cos(angle)) < 0.3 ? 0.4 : 0.55;
+        const py = Math.sin(angle) * dist * yScale;
         if (i === 0) ctx.moveTo(px, py);
         else ctx.lineTo(px, py);
     }
     ctx.closePath();
     ctx.fill();
 
-    // Highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    // Rock surface details - cracks and texture
+    ctx.strokeStyle = `rgba(${r - 30}, ${g - 30}, ${b - 25}, 0.3)`;
+    ctx.lineWidth = 0.8;
+
+    // Main crack
     ctx.beginPath();
-    ctx.ellipse(-rockSize * 0.2, -rockSize * 0.4, rockSize * 0.25, rockSize * 0.15, -0.3, 0, Math.PI * 2);
+    ctx.moveTo(-rockSize * 0.2, -rockSize * 0.25);
+    ctx.quadraticCurveTo(0, 0, rockSize * 0.15, rockSize * 0.2);
+    ctx.stroke();
+
+    // Secondary cracks
+    for (let i = 0; i < 3; i++) {
+        const crackSeed = seed + i * 100;
+        const startX = (seededRandom(crackSeed) - 0.5) * rockSize * 1.2;
+        const startY = (seededRandom(crackSeed + 1) - 0.5) * rockSize * 0.5;
+        const length = rockSize * 0.2 + seededRandom(crackSeed + 2) * rockSize * 0.2;
+        const angle = seededRandom(crackSeed + 3) * Math.PI * 2;
+
+        ctx.strokeStyle = `rgba(${r - 35}, ${g - 35}, ${b - 30}, 0.25)`;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length * 0.5);
+        ctx.stroke();
+    }
+
+    // Highlight on top/left
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.ellipse(-rockSize * 0.25, -rockSize * 0.15, rockSize * 0.35, rockSize * 0.18, -0.4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    // Smaller specular highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.beginPath();
-    ctx.ellipse(rockSize * 0.1, rockSize * 0.1, rockSize * 0.4, rockSize * 0.15, 0, 0, Math.PI * 2);
+    ctx.ellipse(-rockSize * 0.15, -rockSize * 0.2, rockSize * 0.12, rockSize * 0.08, -0.3, 0, Math.PI * 2);
     ctx.fill();
+
+    // Moss patches (more in wetland/temperate, less in desert)
+    const mossChance = biome === 'wetland' ? 0.7 : biome === 'desert' ? 0.1 : 0.4;
+    if (seededRandom(seed * 5) < mossChance) {
+        const mossColor = biome === 'wetland'
+            ? 'rgba(60, 85, 50, 0.4)'
+            : 'rgba(70, 90, 55, 0.3)';
+
+        // Moss on shaded side
+        ctx.fillStyle = mossColor;
+        const mossCount = 2 + Math.floor(seededRandom(seed * 6) * 3);
+        for (let i = 0; i < mossCount; i++) {
+            const mx = rockSize * 0.2 + seededRandom(seed + i * 50) * rockSize * 0.4;
+            const my = seededRandom(seed + i * 51) * rockSize * 0.3 - rockSize * 0.05;
+            const mSize = rockSize * 0.1 + seededRandom(seed + i * 52) * rockSize * 0.1;
+
+            ctx.beginPath();
+            ctx.ellipse(mx, my, mSize, mSize * 0.6, seededRandom(seed + i * 53) * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Edge definition
+    ctx.strokeStyle = `rgba(${r - 40}, ${g - 40}, ${b - 35}, 0.2)`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let i = 0; i < points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+        const dist = rockSize * (0.65 + seededRandom(seed + i * 7) * 0.35);
+        const px = Math.cos(angle) * dist;
+        const yScale = Math.abs(Math.cos(angle)) < 0.3 ? 0.4 : 0.55;
+        const py = Math.sin(angle) * dist * yScale;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.stroke();
 
     ctx.restore();
 }
@@ -1000,8 +1137,9 @@ export function clearRenderCaches() {
 
 /**
  * Height multiplier for 3D extrusion (pixels per height level)
+ * MUST match getTileZOffset in state.js (0.18) to prevent gaps between tiles
  */
-const HEX_3D_HEIGHT_SCALE = 0.25;
+const HEX_3D_HEIGHT_SCALE = 0.18;
 
 /**
  * Light direction for shading (normalized)
@@ -1106,14 +1244,16 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
 
     if (fogLevel === 'hidden') {
-        // Unexplored - dark but with visible desaturated terrain underneath
-        topColor = desaturateAndDarken(topColor, 0.15, 0.25);  // Very desaturated and dark
-        cliffColor = desaturateAndDarken(cliffColor, 0.15, 0.20);
+        // Unexplored - render terrain normally but in deep shadow
+        // Preserve terrain character (higher saturation) but very dark
+        // This prevents flickering and average color issues
+        topColor = desaturateAndDarken(topColor, 0.5, 0.12);  // Deep shadow: 50% saturation, 12% brightness
+        cliffColor = desaturateAndDarken(cliffColor, 0.5, 0.10);
     } else if (fogLevel === 'explored') {
-        // Fog/not currently visible - desaturated but still recognizable
-        // Higher saturation (0.3) and brightness (0.7) than before for foggy look
-        topColor = desaturateAndDarken(topColor, 0.3, 0.7);
-        cliffColor = desaturateAndDarken(cliffColor, 0.3, 0.65);
+        // Explored but not visible - 50% of the shadow effect
+        // Darker than visible but lighter than hidden
+        topColor = desaturateAndDarken(topColor, 0.65, 0.45);  // Medium shadow: 65% saturation, 45% brightness
+        cliffColor = desaturateAndDarken(cliffColor, 0.65, 0.40);
     }
 
     // TOP FACE - the hex surface
@@ -1204,43 +1344,59 @@ function draw3DFace(face, texture = null) {
     }
     ctx.closePath();
 
-    if (face.type === 'top' && texture && face.fogLevel === 'visible') {
-        // For top faces, try to draw texture
-        ctx.save();
-        ctx.clip();
+    if (face.type === 'top' && texture) {
+        // For top faces, draw texture for visible and explored terrain
+        // Hidden terrain uses solid color (too dark to show texture detail)
+        const shouldDrawTexture = face.fogLevel === 'visible' || face.fogLevel === 'explored';
 
-        // Calculate bounding box
-        const minX = Math.min(...face.vertices.map(v => v.x));
-        const maxX = Math.max(...face.vertices.map(v => v.x));
-        const minY = Math.min(...face.vertices.map(v => v.y));
-        const maxY = Math.max(...face.vertices.map(v => v.y));
-        const width = maxX - minX;
-        const height = maxY - minY;
+        if (shouldDrawTexture) {
+            ctx.save();
+            ctx.clip();
 
-        // Check if using isometric tiles with earth layer
-        const tileInfo = getTerrainTileInfo();
-        if (tileInfo && tileInfo.earthLayerHeight > 0) {
-            // For isometric tiles, only draw the hex surface portion (crop out earth layer)
-            // The source sprite has hex surface at the top, earth layer below
-            const sourceHexHeight = tileInfo.hexHeight;
-            ctx.drawImage(
-                texture,
-                0, 0, texture.width, sourceHexHeight,  // Source: only hex surface
-                minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
-            );
+            // Calculate bounding box
+            const minX = Math.min(...face.vertices.map(v => v.x));
+            const maxX = Math.max(...face.vertices.map(v => v.x));
+            const minY = Math.min(...face.vertices.map(v => v.y));
+            const maxY = Math.max(...face.vertices.map(v => v.y));
+            const width = maxX - minX;
+            const height = maxY - minY;
+
+            // Check if using isometric tiles with earth layer
+            const tileInfo = getTerrainTileInfo();
+            if (tileInfo && tileInfo.earthLayerHeight > 0) {
+                // For isometric tiles, only draw the hex surface portion (crop out earth layer)
+                // The source sprite has hex surface at the top, earth layer below
+                const sourceHexHeight = tileInfo.hexHeight;
+                ctx.drawImage(
+                    texture,
+                    0, 0, texture.width, sourceHexHeight,  // Source: only hex surface
+                    minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
+                );
+            } else {
+                // Non-isometric tiles: draw full texture
+                ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
+            }
+
+            // Apply fog/shadow overlay based on fog level
+            if (face.fogLevel === 'explored') {
+                // Explored but not visible: apply 55% darkness overlay
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+                ctx.fill();
+            } else if (face.fogLevel === 'visible') {
+                // Visible: apply normal lighting overlay
+                ctx.fillStyle = face.lighting < 0.9
+                    ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
+                    : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
+                ctx.fill();
+            }
+
+            ctx.restore();
         } else {
-            // Non-isometric tiles: draw full texture
-            ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
+            // Hidden: solid color fill (too dark for texture)
+            ctx.fillStyle = litColor;
+            ctx.fill();
         }
-
-        // Apply lighting overlay
-        ctx.fillStyle = face.lighting < 0.9
-            ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
-            : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
-        ctx.fill();
-
-        ctx.restore();
-    } else {
+    } else if (face.type === 'top') {
         // Solid color fill with lighting
         ctx.fillStyle = litColor;
         ctx.fill();
@@ -1289,7 +1445,8 @@ function render3DHexMeshes(visibleHexData, tileSize) {
 
     // PASS 2: Draw all top faces (tile surfaces) on top
     for (const face of topFaces) {
-        const texture = (face.fogLevel === 'visible')
+        // Get texture for visible and explored terrain (hidden uses solid color)
+        const texture = (face.fogLevel === 'visible' || face.fogLevel === 'explored')
             ? getTerrainTexture(face.hex.type, face.hex.q, face.hex.r)
             : null;
         draw3DFace(face, texture);
@@ -1482,13 +1639,13 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        // Undergrowth
-        const undergrowthCount = Math.max(3, Math.round((3 + Math.abs((baseSeed + 100) % 3)) * shrubBoost));
+        // Forest floor ferns and undergrowth (more dense ground cover)
+        const undergrowthCount = Math.max(5, Math.round((5 + Math.abs((baseSeed + 100) % 4)) * shrubBoost));
         for (let i = 0; i < undergrowthCount; i++) {
             const anchorPoint = sampleHexOffset(baseSeed + i * 15 + 101);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
-            const sizeMultiplier = s * (0.35 + seededRandom(baseSeed + i * 15 + 103) * 0.25);
+            const sizeMultiplier = s * (0.3 + seededRandom(baseSeed + i * 15 + 103) * 0.35);
 
             elements.push({
                 type: 'shrub',
@@ -1501,12 +1658,13 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
             });
         }
 
-        // Occasional large bush
-        if (seededRandom(baseSeed + 300) > 0.45) {
-            const anchorPoint = sampleHexOffset(baseSeed + 301);
+        // Forest floor bushes (2-4 bushes like grass tiles)
+        const bushCount = 2 + Math.floor(seededRandom(baseSeed + 290) * 3);
+        for (let i = 0; i < bushCount; i++) {
+            const anchorPoint = sampleHexOffset(baseSeed + i * 17 + 300);
             const offsetX = anchorPoint.x * positionScale;
             const offsetY = anchorPoint.y * positionScale;
-            const sizeMultiplier = s * (0.6 + seededRandom(baseSeed + 303) * 0.35);
+            const sizeMultiplier = s * (0.5 + seededRandom(baseSeed + i * 17 + 303) * 0.4);
 
             elements.push({
                 type: 'bush',
@@ -1514,7 +1672,7 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
                 offsetY,
                 sortOffsetY: offsetY + BUSH_SORT_OFFSET,
                 sizeMultiplier,
-                extraParams: { seed: baseSeed + 304 },
+                extraParams: { seed: baseSeed + i + 304 },
                 drawFn: (x, y, sz, params) => drawBush2D5(x, y, sz, params.seed)
             });
         }
