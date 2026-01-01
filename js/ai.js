@@ -1283,7 +1283,8 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             return;
         }
 
-        // === NORMAL TACTICAL DECISION TREE ===
+        // === INTELLIGENT TACTICAL DECISION TREE ===
+        // Neu: Klassenspezifische Entscheidungslogik mit Vorausplanung
         const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
 
         // Get spotted awareness for tactical decisions
@@ -1302,6 +1303,27 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             }
         }
 
+        // === KLASSENSPEZIFISCHE PRIORITÄTEN ===
+        // Jede Klasse hat eine optimierte Entscheidungsreihenfolge
+
+        // ========== MEDIC: Heilung hat HÖCHSTE Priorität ==========
+        if (unit.class === 'medic') {
+            const medicResult = await executeMedicAI(unit, plan, {
+                canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
+                renderIfVisible, actionDelayBase, shortDelay, spottedInfo, unitBudget, apSpentByUnit
+            });
+            if (medicResult.handled) return;
+        }
+
+        // ========== SNIPER/COMMANDO: Tarnung VOR Bewegung wenn entdeckt ==========
+        if ((unit.class === 'sniper' || unit.class === 'commando') && spottedInfo.isSpotted) {
+            const stealthResult = await executeSpottedStealthReaction(unit, enemies, plan, {
+                canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
+                renderIfVisible, actionDelayBase, shortDelay
+            });
+            if (stealthResult.retreated) return;
+        }
+
         // 1. Should we retreat? (Low HP, enemies nearby, or spotted and vulnerable)
         if (shouldRetreat(unit, enemies) && canSpendAP(1)) {
             // Enhanced retreat thought with reason
@@ -1314,6 +1336,12 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             await executeRetreatWithBudget(unit, enemies, spectatorMode, unitBudget - apSpentByUnit);
             return;
         }
+
+        // ========== PRE-MOVE ABILITIES: Aktiviere VOR Bewegung für taktischen Vorteil ==========
+        const preMoveAbilityUsed = await usePreMoveAbility(unit, enemies, plan, {
+            canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
+            renderIfVisible, actionDelayBase, shortDelay, spottedInfo
+        });
 
         // 2. Attack assigned target if possible (focus fire)
         // WICHTIG: canUnitAttack prüft MAX_ATTACKS_PER_UNIT (gleiche Regel wie für Menschen)
@@ -1347,9 +1375,9 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             }
         }
 
-        // 4. Use special ability if beneficial AND within budget
+        // 4. Use special ability if beneficial AND within budget (wenn noch nicht verwendet)
         const specialCost = getSpecialAbilityCost(unit.class);
-        if (canSpendAP(specialCost) && canUseSpecialAbility(unit) && shouldUseSpecial(unit, enemies, plan)) {
+        if (!preMoveAbilityUsed && canSpendAP(specialCost) && canUseSpecialAbility(unit) && shouldUseSpecial(unit, enemies, plan)) {
             // Generate special ability thought with reason
             const specialReasons = {
                 scout: spottedInfo.isSpotted ? 'Sprint für Flucht!' : 'Sprint für Flanke!',
@@ -1890,6 +1918,425 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
     }
 }
 
+// ===== NEUE INTELLIGENTE KI-FUNKTIONEN =====
+
+/**
+ * MEDIC AI - Heilung hat HÖCHSTE Priorität
+ * Medic heilt ZUERST verletzte Verbündete, DANN greift er an
+ * @returns {Object} { handled: boolean } - true wenn Medic-Logik die Runde abgeschlossen hat
+ */
+async function executeMedicAI(unit, plan, context) {
+    const { canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
+            renderIfVisible, actionDelayBase, shortDelay, unitBudget, apSpentByUnit } = context;
+    const _enemies = plan.visibleEnemies; // Für zukünftige Nutzung bei Feind-Meidung
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+
+    // Hole ALLE verbündeten Einheiten (inkl. von verbündeten Spielern)
+    const allies = getAllAlliedAIUnits();
+    const healRange = 4; // Aus config
+
+    // Finde verletzte Verbündete in Heilreichweite
+    const woundedInRange = allies.filter(a =>
+        a.id !== unit.id &&
+        a.currentHp < a.maxHp * 0.8 &&
+        hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= healRange
+    );
+
+    // Kritisch verletzte Verbündete (unter 40% HP)
+    const criticallyWounded = woundedInRange.filter(a => a.currentHp < a.maxHp * 0.4);
+
+    // Verletzte außerhalb der Reichweite
+    const woundedOutOfRange = allies.filter(a =>
+        a.id !== unit.id &&
+        a.currentHp < a.maxHp * 0.6 &&
+        hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) > healRange
+    );
+
+    // Ist der Medic selbst verletzt?
+    const selfWounded = unit.currentHp < unit.maxHp * 0.7;
+
+    const specialCost = getSpecialAbilityCost('medic');
+
+    // === ENTSCHEIDUNGSLOGIK FÜR HEILUNG ===
+    // Priorität 1: Kritisch verletzte Verbündete in Reichweite heilen
+    // Priorität 2: Mehrere verletzte Verbündete heilen
+    // Priorität 3: Selbst heilen wenn verletzt
+    // Priorität 4: Zu verletzten Verbündeten bewegen wenn keine in Reichweite
+
+    const shouldHealNow =
+        (criticallyWounded.length > 0) ||
+        (woundedInRange.length >= 2) ||
+        (selfWounded && woundedInRange.length >= 1) ||
+        (woundedInRange.some(a => a.currentHp < a.maxHp * 0.5));
+
+    if (shouldHealNow && canSpendAP(specialCost) && canUseSpecialAbility(unit)) {
+        // Heile JETZT!
+        const totalWounded = woundedInRange.length + (selfWounded ? 1 : 0);
+        const mostCritical = criticallyWounded[0] || woundedInRange[0];
+
+        if (criticallyWounded.length > 0) {
+            const criticalName = CLASS_NAMES_DE[mostCritical.class] || mostCritical.class;
+            addAIThought(`💚 ${unitName}: NOTFALL! ${criticalName} kritisch verletzt - heile sofort!`, 'special');
+        } else if (totalWounded >= 2) {
+            addAIThought(`💚 ${unitName}: ${totalWounded} Verletzte in Reichweite - Massenheilung!`, 'special');
+        } else {
+            addAIThought(`💚 ${unitName}: Team braucht Heilung!`, 'special');
+        }
+
+        useSpecialAbility(unit);
+        trackAPSpent(specialCost);
+
+        if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+            updateUI();
+            render();
+        }
+        await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+    }
+
+    // === BEWEGUNG ZU VERLETZTEN VERBÜNDETEN ===
+    // Wenn verletzte Verbündete außerhalb der Reichweite sind, bewege dich zu ihnen
+    if (woundedOutOfRange.length > 0 && canSpendAP(1)) {
+        const remainingBudget = unitBudget - apSpentByUnit;
+
+        // Finde beste Position in Nähe verletzter Verbündeter
+        const moveTarget = selectMedicMoveTarget(unit, woundedOutOfRange, plan, remainingBudget);
+        if (moveTarget) {
+            const targetAlly = woundedOutOfRange[0];
+            const targetName = CLASS_NAMES_DE[targetAlly.class] || targetAlly.class;
+            const hpPercent = Math.round(targetAlly.currentHp / targetAlly.maxHp * 100);
+            addAIThought(`🏃 ${unitName}: Eile zu ${targetName} (${hpPercent}% HP)`, 'move');
+
+            await executeAIMove(unit, moveTarget, spectatorMode);
+            trackAPSpent(moveTarget.cost);
+
+            // Nach Bewegung: Prüfe ob jetzt heilen möglich ist
+            const newWoundedInRange = allies.filter(a =>
+                a.id !== unit.id &&
+                a.currentHp < a.maxHp * 0.8 &&
+                hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= healRange
+            );
+
+            if (newWoundedInRange.length > 0 && canSpendAP(specialCost) && canUseSpecialAbility(unit)) {
+                addAIThought(`💚 ${unitName}: Jetzt in Reichweite - heile!`, 'special');
+                useSpecialAbility(unit);
+                trackAPSpent(specialCost);
+
+                if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                    updateUI();
+                    render();
+                }
+                await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            }
+        }
+    }
+
+    // === MEDIC KANN AUCH ANGREIFEN (aber niedrige Priorität) ===
+    // Medic greift nur an, wenn:
+    // 1. Keine Heilung nötig ist
+    // 2. Feind in Reichweite und angreifbar
+    // 3. Oder wenn ein Kill-Shot möglich ist
+    const attackable = getAttackableUnits(unit);
+    if (attackable.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
+        const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
+        const noHealingNeeded = woundedInRange.length === 0 && !selfWounded;
+
+        if (killableTarget || noHealingNeeded) {
+            const target = killableTarget || selectBestTarget(unit, attackable);
+            if (target) {
+                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                if (killableTarget) {
+                    addAIThought(`💀 ${unitName}: Gelegenheitsziel - ${targetName} eliminieren!`, 'attack');
+                } else {
+                    addAIThought(`⚔️ ${unitName}: Team gesund - unterstütze mit Feuer`, 'attack');
+                }
+                await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
+                trackAPSpent(1);
+            }
+        }
+    }
+
+    // Medic-spezifische Logik ist vollständig, aber andere Einheiten sollen nicht abgebrochen werden
+    return { handled: false };
+}
+
+/**
+ * Finde beste Bewegungsposition für Medic in Richtung verletzter Verbündeter
+ */
+function selectMedicMoveTarget(unit, woundedAllies, plan, maxAP) {
+    const reachable = getReachableHexes(unit);
+    if (reachable.size === 0) return null;
+
+    const maxCost = Math.min(maxAP, state.sharedAP);
+    let bestHex = null;
+    let bestScore = -Infinity;
+
+    reachable.forEach((data, key) => {
+        if (data.cost > maxCost) return;
+
+        const [q, r] = key.split(',').map(Number);
+        const hex = getHex(q, r);
+        if (!hex || hex.unit) return;
+
+        let score = 0;
+
+        // Nähe zu verletzten Verbündeten ist wichtigster Faktor
+        const healRange = 4;
+        for (const ally of woundedAllies) {
+            const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+
+            // Massive Bonus für Positionen in Heilreichweite
+            if (distToAlly <= healRange) {
+                score += 200;
+                // Extra Bonus für kritisch Verletzte
+                if (ally.currentHp < ally.maxHp * 0.4) {
+                    score += 100;
+                }
+            } else {
+                // Je näher, desto besser
+                score -= distToAlly * 10;
+            }
+        }
+
+        // Deckung bevorzugen (Medic-Überleben ist wichtig!)
+        if (hex.cover) score += 50;
+        if (hex.type === 'hills') score += 20;
+
+        // Zone-Awareness
+        if (!isHexInZone(q, r)) score -= 300;
+
+        // Feinde meiden
+        const enemies = plan.visibleEnemies;
+        for (const enemy of enemies) {
+            const distToEnemy = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+            if (distToEnemy <= enemy.range) {
+                score -= 80; // Nicht in feindliche Reichweite laufen
+            }
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestHex = { q, r, cost: data.cost };
+        }
+    });
+
+    return bestHex;
+}
+
+/**
+ * SPOTTED STEALTH REACTION - Sniper/Commando reagieren auf Entdeckung
+ * Wenn entdeckt: Tarnung aktivieren oder zurückziehen
+ * @returns {Object} { retreated: boolean, cloaked: boolean }
+ */
+async function executeSpottedStealthReaction(unit, enemies, _plan, context) {
+    const { canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
+            actionDelayBase, shortDelay } = context;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+
+    const result = { retreated: false, cloaked: false };
+
+    // Finde nächsten Feind
+    let closestEnemyDist = Infinity;
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: enemy.q, r: enemy.r });
+        if (dist < closestEnemyDist) {
+            closestEnemyDist = dist;
+        }
+    }
+
+    const specialCost = getSpecialAbilityCost(unit.class);
+    const hpPercent = unit.currentHp / unit.maxHp;
+
+    // === ENTSCHEIDUNGSLOGIK BEI ENTDECKUNG ===
+    // Sniper: Tarnung bevorzugt wenn möglich, sonst Rückzug
+    // Commando: Kann offensiver bleiben, aber Tarnung hilft bei Flucht
+
+    const shouldCloak =
+        !unit.cloaked &&
+        canSpendAP(specialCost) &&
+        canUseSpecialAbility(unit) &&
+        (
+            (closestEnemyDist <= 4) ||  // Feind nah
+            (hpPercent < 0.6) ||         // Verletzt
+            (unit.class === 'sniper' && closestEnemyDist <= 3)  // Sniper in Nahkampfgefahr
+        );
+
+    if (shouldCloak) {
+        if (unit.class === 'sniper') {
+            addAIThought(`🔫 ${unitName}: Entdeckt! Aktiviere Tarnung für Rückzug!`, 'special');
+        } else {
+            addAIThought(`🥷 ${unitName}: Entdeckt! Verschwinde im Schatten!`, 'special');
+        }
+
+        useSpecialAbility(unit);
+        trackAPSpent(specialCost);
+        result.cloaked = true;
+
+        if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+            updateUI();
+            render();
+        }
+        await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+
+        // Nach Tarnung: Rückzug wenn verletzt oder Sniper in Nahkampfgefahr
+        if ((hpPercent < 0.5) || (unit.class === 'sniper' && closestEnemyDist <= 2)) {
+            addAIThought(`🏃 ${unitName}: Ziehe mich getarnt zurück!`, 'retreat');
+            await executeRetreat(unit, enemies, spectatorMode);
+            result.retreated = true;
+        }
+    } else if (hpPercent < 0.4 && closestEnemyDist <= 3) {
+        // Kritisch verletzt und Feind nah - Rückzug ohne Tarnung
+        addAIThought(`⚠️ ${unitName}: Kritisch! Sofortiger Rückzug!`, 'retreat');
+        await executeRetreat(unit, enemies, spectatorMode);
+        result.retreated = true;
+    }
+
+    return result;
+}
+
+/**
+ * PRE-MOVE ABILITIES - Aktiviere Fähigkeiten VOR Bewegung für taktischen Vorteil
+ * Scout: Sprint für längere Bewegung
+ * Commando: Stealth für unsichtbares Anschleichen
+ * Elite: Taktischer Modus für Bonus-Bewegung
+ * @returns {boolean} true wenn eine Fähigkeit aktiviert wurde
+ */
+async function usePreMoveAbility(unit, enemies, _plan, context) {
+    const { canSpendAP, trackAPSpent, hasHumanViewer,
+            actionDelayBase, shortDelay, spottedInfo } = context;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+
+    const specialCost = getSpecialAbilityCost(unit.class);
+    if (!canSpendAP(specialCost) || !canUseSpecialAbility(unit)) {
+        return false;
+    }
+
+    // === SCOUT: Sprint VOR Bewegung für Reichweite ===
+    if (unit.class === 'scout' && enemies.length > 0) {
+        const closestEnemyDist = Math.min(...enemies.map(e =>
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+        ));
+
+        // Sprint wenn Feind außerhalb normaler Reichweite aber mit Sprint erreichbar
+        const normalMoveRange = unit.move;
+        const sprintMoveRange = unit.move + 3;
+
+        const needsSprintToReach = closestEnemyDist > unit.range + normalMoveRange &&
+                                    closestEnemyDist <= unit.range + sprintMoveRange;
+
+        // Oder Sprint zur Flucht wenn entdeckt und in Gefahr
+        const needsSprintToEscape = spottedInfo.isSpotted &&
+                                     spottedInfo.closestEnemyDist <= 3 &&
+                                     unit.currentHp < unit.maxHp * 0.5;
+
+        if (needsSprintToReach || needsSprintToEscape) {
+            if (needsSprintToEscape) {
+                addAIThought(`🏃 ${unitName}: Sprint für Flucht aktiviert!`, 'special');
+            } else {
+                addAIThought(`🏃 ${unitName}: Sprint! Schließe Lücke zum Feind!`, 'special');
+            }
+            useSpecialAbility(unit);
+            trackAPSpent(specialCost);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return true;
+        }
+    }
+
+    // === COMMANDO: Stealth VOR Anschleichen ===
+    if (unit.class === 'commando' && !unit.cloaked && enemies.length > 0) {
+        const closestEnemyDist = Math.min(...enemies.map(e =>
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+        ));
+
+        // Stealth wenn Feind in Angriffs-Distanz nach Bewegung
+        const canReachEnemy = closestEnemyDist <= unit.move + 2;
+        const notTooClose = closestEnemyDist > 1; // Nicht bereits in Nahkampf
+
+        if (canReachEnemy && notTooClose && !spottedInfo.isSpotted) {
+            addAIThought(`🥷 ${unitName}: Aktiviere Stealth für Hinterhalt!`, 'special');
+            useSpecialAbility(unit);
+            trackAPSpent(specialCost);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return true;
+        }
+    }
+
+    // === ELITE SOLDIER: Taktischer Modus vor Angriff ===
+    if (unit.class === 'elitesoldat' && !unit.tacticalMode && enemies.length > 0) {
+        const closestEnemyDist = Math.min(...enemies.map(e =>
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+        ));
+
+        // Taktischer Modus wenn Feind bald erreichbar
+        const canEngageWithTactical = closestEnemyDist <= unit.move + 2 + unit.range;
+
+        // Oder wenn hochwertige Ziele in der Nähe
+        const valuableTargetsNearby = enemies.some(e =>
+            (e.class === 'medic' || e.class === 'sniper') &&
+            hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.move + 2 + unit.range
+        );
+
+        if (canEngageWithTactical || valuableTargetsNearby) {
+            addAIThought(`🎖️ ${unitName}: Taktischer Modus aktiviert!`, 'special');
+            useSpecialAbility(unit);
+            trackAPSpent(specialCost);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return true;
+        }
+    }
+
+    // === ASSAULT: Powershot VOR Angriff wenn Kill möglich ===
+    if (unit.class === 'assault' && enemies.length > 0) {
+        const attackable = getAttackableUnits(unit);
+
+        // Powershot wenn ein wichtiges Ziel getötet werden kann
+        const canKillWithPowershot = attackable.some(e =>
+            e.currentHp <= unit.damage + 25 && // Mit Powershot tötbar
+            e.currentHp > unit.damage // Ohne Powershot NICHT tötbar
+        );
+
+        // Oder wenn Medic/Sniper in Reichweite
+        const valuableTargetInRange = attackable.some(e =>
+            e.class === 'medic' || e.class === 'sniper'
+        );
+
+        if (canKillWithPowershot || valuableTargetInRange) {
+            const target = attackable.find(e =>
+                (e.currentHp <= unit.damage + 25 && e.currentHp > unit.damage) ||
+                e.class === 'medic' || e.class === 'sniper'
+            );
+            const targetName = target ? (CLASS_NAMES_DE[target.class] || target.class) : 'Ziel';
+
+            addAIThought(`💥 ${unitName}: Powershot auf ${targetName}!`, 'special');
+            useSpecialAbility(unit);
+            trackAPSpent(specialCost);
+
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // German class names for display
 const CLASS_NAMES_DE = {
     scout: 'Späher',
@@ -2233,107 +2680,177 @@ function selectBestTarget(attacker, targets) {
 
 /**
  * Decide if special ability should be used
- * VERBESSERTE KI: Intelligentere Entscheidungen basierend auf Situation
+ * KOMPLETT ÜBERARBEITETE KI: Fallback-Logik für nicht-genutzte Fähigkeiten
+ * Die meisten Fähigkeiten werden jetzt über usePreMoveAbility gehandhabt
  */
 function shouldUseSpecial(unit, enemies, plan) {
     switch (unit.class) {
         case 'medic': {
-            // Get ALL allied units (including from allied players) for team healing
+            // === MEDIC: Heile IMMER wenn Verbündete verletzt sind ===
             const allies = getAllAlliedAIUnits();
-            // Verbesserte Heilreichweite aus config
             const healRange = 4;
+
+            // Finde alle verletzten Verbündeten in Reichweite (inkl. selbst)
             const woundedNearby = allies.filter(a =>
-                a.currentHp < a.maxHp * 0.7 &&
+                a.currentHp < a.maxHp * 0.8 &&
                 hexDistance({ q: unit.q, r: unit.r }, { q: a.q, r: a.r }) <= healRange
             );
-            // Heal if multiple wounded or anyone critically wounded or if self wounded
-            const selfWounded = unit.currentHp < unit.maxHp * 0.6;
-            return woundedNearby.length >= 2 ||
-                   woundedNearby.some(a => a.currentHp < a.maxHp * 0.4) ||
-                   (selfWounded && woundedNearby.length >= 1);
+
+            const selfWounded = unit.currentHp < unit.maxHp * 0.7;
+            const criticallyWounded = woundedNearby.some(a => a.currentHp < a.maxHp * 0.4);
+            const moderatelyWounded = woundedNearby.some(a => a.currentHp < a.maxHp * 0.6);
+
+            // SEHR AGGRESSIVE HEILUNG:
+            // - Sofort heilen wenn IRGENDWER kritisch verletzt ist
+            // - Heilen wenn 2+ Verbündete verletzt sind
+            // - Heilen wenn 1 Verbündeter moderat verletzt UND Medic selbst verletzt
+            // - Heilen wenn nur 1 Verbündeter unter 50% HP ist
+            return criticallyWounded ||
+                   woundedNearby.length >= 2 ||
+                   (selfWounded && woundedNearby.length >= 1) ||
+                   moderatelyWounded;
         }
 
-        case 'scout':
-            // Sprint to close distance, escape, or explore faster
+        case 'scout': {
+            // === SCOUT: Sprint aggressiver nutzen ===
+            // Die Pre-Move Logik hat das meiste abgedeckt, aber Fallbacks:
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                // Sprint zum Angriff wenn Feind in erreichbarer Nähe
+
+                // Sprint wenn Feind knapp außer Reichweite
                 if (closestEnemy > unit.range && closestEnemy <= unit.range + unit.move + 3) {
                     return true;
                 }
-                // Sprint zur Flucht wenn schwer verletzt
-                if (unit.currentHp < unit.maxHp * 0.4 && closestEnemy <= 4) {
+
+                // Sprint für taktische Repositionierung wenn verletzt
+                if (unit.currentHp < unit.maxHp * 0.5) {
+                    return true;
+                }
+
+                // Sprint um Flanke anzugreifen
+                if (closestEnemy <= unit.range + 2 && closestEnemy > unit.range) {
                     return true;
                 }
             }
-            // Sprint während Hunt-Modus für schnellere Aufklärung
-            return plan.inHuntMode;
 
-        case 'assault':
-            // Powershot auf wichtige Ziele oder wenn Feind in Reichweite
+            // Sprint in Hunt-Modus für schnellere Aufklärung
+            if (plan.inHuntMode) {
+                return true;
+            }
+
+            // Sprint auch zum Erkunden nutzen wenn keine Feinde sichtbar
+            return enemies.length === 0 && Math.random() < 0.3;
+        }
+
+        case 'assault': {
+            // === ASSAULT: Powershot aggressiver nutzen ===
             if (enemies.length > 0) {
-                const inRange = enemies.filter(e =>
+                const attackableUnits = getAttackableUnits(unit);
+                const inRange = attackableUnits.length > 0 ? attackableUnits : enemies.filter(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
                 );
-                // Powershot auf hochwertige Ziele (Medic, Sniper)
-                if (inRange.some(e => e.class === 'medic' || e.class === 'sniper')) {
-                    return true;
-                }
-                // Powershot wenn Feind schwach und in Reichweite
-                if (inRange.some(e => e.currentHp <= unit.damage + 25)) {
-                    return true; // Kann mit Powershot töten
-                }
+
+                if (inRange.length === 0) return false;
+
+                // Powershot auf JEDEN Feind in Reichweite - Assault ist zum Kämpfen da!
+                // Priorität: Medic > Sniper > Commando > Schwache Feinde > Alle anderen
+                const highPriorityTarget = inRange.some(e =>
+                    e.class === 'medic' || e.class === 'sniper' || e.class === 'commando'
+                );
+
+                const canKillWithPowershot = inRange.some(e =>
+                    e.currentHp <= unit.damage + 25
+                );
+
+                const anyTargetInRange = inRange.length > 0;
+
+                // Powershot wenn: Hochwertiges Ziel ODER Kill möglich ODER mindestens 1 Feind
+                return highPriorityTarget || canKillWithPowershot || (anyTargetInRange && Math.random() < 0.7);
             }
             return false;
+        }
 
-        case 'sniper':
-            // Cloak nur wenn taktisch sinnvoll
+        case 'sniper': {
+            // === SNIPER: Tarnung strategischer nutzen ===
             if (unit.cloaked) return false;
+
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                // Tarnung wenn in Gefahr
+
+                // SOFORTIGE Tarnung wenn in Nahkampfgefahr
                 if (closestEnemy <= 3) {
                     return true;
                 }
-                // Tarnung wenn verletzt und Feinde in der Nähe
-                if (unit.currentHp < unit.maxHp * 0.5 && closestEnemy <= 5) {
+
+                // Tarnung wenn verletzt (Überlebenspriorität)
+                if (unit.currentHp < unit.maxHp * 0.6 && closestEnemy <= 5) {
                     return true;
                 }
-            }
-            // Seltener tarnen im Hunt-Modus
-            return plan.inHuntMode && Math.random() < 0.2;
 
-        case 'commando':
-            // Stealth für Hinterhalt
+                // Tarnung wenn spotted und Feinde in der Nähe
+                if (unit.spotted && closestEnemy <= unit.range) {
+                    return true;
+                }
+
+                // Proaktive Tarnung für bessere Positionierung
+                if (closestEnemy > unit.range && closestEnemy <= unit.range + 3) {
+                    // Tarnung um sicher in Position zu kommen
+                    return Math.random() < 0.5;
+                }
+            }
+
+            // Im Hunt-Modus: Gelegentlich tarnen für Hinterhalte
+            return plan.inHuntMode && Math.random() < 0.3;
+        }
+
+        case 'commando': {
+            // === COMMANDO: Stealth für Überraschungsangriffe ===
             if (unit.cloaked) return false;
+
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                // Stealth wenn Feind in Angriffsreichweite (kann danach anschleichen)
+
+                // Stealth wenn Feind erreichbar aber noch nicht in Nahkampf
                 if (closestEnemy <= unit.move + 2 && closestEnemy > 1) {
                     return true;
                 }
-            }
-            // Im Hunt-Modus öfter Stealth für Überraschungsangriffe
-            return plan.inHuntMode && Math.random() < 0.4;
 
-        case 'elitesoldat':
-            // Taktischer Modus wenn Feind in erreichbarer Nähe für Angriff
-            if (unit.tacticalMode) return false; // Already activated
+                // Stealth zur Flucht wenn verletzt
+                if (unit.currentHp < unit.maxHp * 0.4) {
+                    return true;
+                }
+
+                // Stealth wenn spotted
+                if (unit.spotted && closestEnemy <= 4) {
+                    return true;
+                }
+            }
+
+            // Im Hunt-Modus: Öfter Stealth für Überraschungsangriffe
+            return plan.inHuntMode && Math.random() < 0.5;
+        }
+
+        case 'elitesoldat': {
+            // === ELITE: Taktischer Modus für maximalen Schaden ===
+            if (unit.tacticalMode) return false;
+
             if (enemies.length > 0) {
                 const closestEnemy = Math.min(...enemies.map(e =>
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
                 ));
-                // Aktiviere wenn Feind in Reichweite nach Bewegung
+
+                // Taktischer Modus wenn Feind in Angriffsreichweite
                 if (closestEnemy <= unit.range + unit.move + 2) {
                     return true;
                 }
-                // Aktiviere wenn hochwertige Ziele in Nähe (Medic, Sniper)
+
+                // Taktischer Modus für hochwertige Ziele
                 const valuableTargets = enemies.filter(e =>
                     (e.class === 'medic' || e.class === 'sniper') &&
                     hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range + unit.move + 2
@@ -2343,6 +2860,7 @@ function shouldUseSpecial(unit, enemies, plan) {
                 }
             }
             return false;
+        }
 
         default:
             return false;
