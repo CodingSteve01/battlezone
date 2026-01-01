@@ -3886,16 +3886,9 @@ function shouldRenderDetails() {
     return state.effectiveQuality !== 'low';
 }
 
-/**
- * Check if foreground elements (trees, rocks) should be rendered
- * Always render foreground for visual consistency - trees shouldn't disappear
- * when quality changes dynamically on older devices
- */
-function shouldRenderForeground() {
-    // Always render trees/rocks to prevent them from appearing/disappearing
-    // Performance is handled through simplified rendering in low quality mode
-    return true;
-}
+// Note: Foreground elements (trees, rocks) are ALWAYS rendered for visual consistency.
+// Previously shouldRenderForeground() returned false on low quality, causing trees
+// to disappear when quality changed dynamically on older devices.
 
 /**
  * Check if animated terrain overlays should be rendered
@@ -4273,9 +4266,9 @@ export function render() {
             drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
         }
 
-        // Collect foreground elements for 2.5D sorting (always needed for depth sorting)
+        // Collect foreground elements for 2.5D sorting (always rendered for visual consistency)
         // Use cached foreground element definitions for better performance
-        if (fogLevel === 'visible' && shouldRenderForeground()) {
+        if (fogLevel === 'visible') {
             const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
             const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
             foregroundElements.push(...adjusted);
