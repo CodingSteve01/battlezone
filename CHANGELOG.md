@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.8](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.7...shadow-squad-v5.0.8) (2026-01-01)
+
+
+### Bug Fixes
+
+* **renderer:** fix expanded minimap height and tile flickering ([#289](https://github.com/CodingSteve01/battlezone/issues/289)) ([db01896](https://github.com/CodingSteve01/battlezone/commit/db018965f82bf7be713aae3f3556502b3c9e38bb))
+
 ## [5.0.7](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.0.6...shadow-squad-v5.0.7) (2026-01-01)
 
 
