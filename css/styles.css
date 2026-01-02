@@ -2313,6 +2313,154 @@ button:focus:not(:focus-visible),
     margin-right: 6px;
 }
 
+/* ===== PODIUM DISPLAY ===== */
+.podium-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 0 16px;
+}
+
+.podium-spot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+
+.podium-spot.empty {
+    width: 90px;
+}
+
+.podium-spot.winner {
+    transform: scale(1.05);
+}
+
+.podium-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.podium-medal {
+    font-size: 28px;
+    margin-bottom: 4px;
+    animation: bounce 2s infinite;
+}
+
+.position-1 .podium-medal {
+    font-size: 36px;
+}
+
+.podium-sprite {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 6px;
+}
+
+.podium-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.podium-name {
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.podium-score {
+    font-size: 12px;
+    color: var(--dim);
+    font-weight: 600;
+}
+
+.podium-block {
+    width: 90px;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.position-1 .podium-block {
+    height: 80px;
+}
+
+.position-2 .podium-block {
+    height: 55px;
+}
+
+.position-3 .podium-block {
+    height: 35px;
+}
+
+.podium-position {
+    font-size: 24px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Top 3 Awards */
+.top-awards {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.awards-title {
+    font-size: 12px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.awards-list {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.award-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    animation: awardSlideIn 0.4s ease-out backwards;
+}
+
+.award-badge:nth-child(1) { animation-delay: 0.3s; }
+.award-badge:nth-child(2) { animation-delay: 0.4s; }
+.award-badge:nth-child(3) { animation-delay: 0.5s; }
+
+.award-badge .award-icon {
+    font-size: 20px;
+}
+
+.award-info {
+    text-align: left;
+}
+
+.award-badge .award-title {
+    font-size: 11px;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.award-badge .award-player {
+    font-size: 12px;
+    font-weight: 500;
+}
+
 .gameover-buttons {
     display: flex;
     gap: 12px;

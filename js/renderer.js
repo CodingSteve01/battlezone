@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition, arePlayersAllied } from './state.js';
 import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -3778,8 +3778,24 @@ function drawUnitOverlay(unit, cx, cy) {
 
     ctx.save();
 
-    // NOTE: Player number badge and level badge removed for cleaner HUD
-    // All detailed info is shown in the unit tabs at the bottom of the screen
+    // === ENEMY INDICATOR ===
+    // Show a red ring around enemy units to clearly identify them
+    const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
+    if (isEnemy) {
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+
+        // Small "enemy" marker at top
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(cx, cy - size * 0.85, size * 0.15, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     // Shield indicator (if unit has shield from power-up)
     if (unit.shield) {
