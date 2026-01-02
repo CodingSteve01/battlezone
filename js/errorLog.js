@@ -262,7 +262,24 @@ export function initErrorCapture() {
 
     // Capture unhandled errors
     window.addEventListener('error', (event) => {
-        logEntry('error', `Unhandled: ${event.message}`, event.error);
+        // "Script error" without details is a cross-origin error
+        // This happens when scripts from CDNs or different domains throw errors
+        if (event.message === 'Script error.' && !event.error) {
+            // Try to get more info from the event
+            const details = {
+                filename: event.filename || 'Unbekannte Datei (Cross-Origin)',
+                lineno: event.lineno,
+                colno: event.colno,
+                info: 'Cross-Origin Script-Fehler. Details werden vom Browser aus Sicherheitsgründen verborgen.'
+            };
+            logEntry('error', 'Cross-Origin Script-Fehler', details);
+        } else {
+            logEntry('error', `Unhandled: ${event.message}`, event.error || {
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno
+            });
+        }
     });
 
     // Capture unhandled promise rejections

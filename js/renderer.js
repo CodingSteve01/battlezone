@@ -4322,7 +4322,11 @@ export function render() {
 
     // Validate critical state before rendering
     if (!state.hexes || state.hexes.length === 0) {
-        logRender('Keine Hexfelder vorhanden', `hexes: ${state.hexes?.length || 0}`);
+        // Only log once to avoid spam - this is expected during initialization
+        if (!render._noHexesLogged) {
+            logRender('Warte auf Hexfelder', 'Karte wird noch generiert...');
+            render._noHexesLogged = true;
+        }
         // Draw a helpful message instead of black screen
         ctx.fillStyle = '#1a1a3e';
         ctx.fillRect(0, 0, w, h);
@@ -4332,6 +4336,8 @@ export function render() {
         ctx.fillText('Karte wird geladen...', w / 2, h / 2);
         return;
     }
+    // Reset flag when hexes are loaded
+    render._noHexesLogged = false;
 
     // SAFETY: Ensure visibility arrays exist for current viewing player
     const viewPlayer = state.viewingPlayer;

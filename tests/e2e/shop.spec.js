@@ -1,6 +1,54 @@
 import { test, expect } from '@playwright/test';
 
 /**
+ * Helper function to wait for app initialization
+ * The app sets data-app-ready="true" on body when fully initialized
+ */
+async function waitForAppReady(page) {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    // Wait for app to be fully initialized (event handlers set up)
+    await page.waitForSelector('body[data-app-ready="true"]', { timeout: 10000 });
+}
+
+/**
+ * Helper function to navigate to shop screen
+ */
+async function navigateToShop(page) {
+    await waitForAppReady(page);
+
+    // Wait for menu to be visible
+    const menu = page.locator('#menu');
+    await expect(menu).toBeVisible({ timeout: 5000 });
+
+    // Click start button to go to wizard
+    const startBtn = page.locator('#start-btn');
+    await expect(startBtn).toBeVisible();
+    await startBtn.click();
+
+    // Wait for map wizard screen
+    const wizardMap = page.locator('#wizard-map');
+    await expect(wizardMap).toBeVisible({ timeout: 5000 });
+
+    // Click next to go to players screen
+    const wizardMapNext = page.locator('#wizard-map-next');
+    await expect(wizardMapNext).toBeVisible();
+    await wizardMapNext.click();
+
+    // Wait for players wizard screen
+    const wizardPlayers = page.locator('#wizard-players');
+    await expect(wizardPlayers).toBeVisible({ timeout: 5000 });
+
+    // Click next to go to team selection (shop)
+    const wizardPlayersNext = page.locator('#wizard-players-next');
+    await expect(wizardPlayersNext).toBeVisible();
+    await wizardPlayersNext.click();
+
+    // Wait for shop screen
+    await expect(page.locator('#team-select')).toBeVisible({ timeout: 5000 });
+}
+
+/**
  * Shop/Team Selection screen tests
  * Verifies the shop loads correctly without console errors
  */
@@ -19,39 +67,7 @@ test.describe('Shop Screen', () => {
             }
         });
 
-        await page.goto('/');
-        await page.waitForLoadState('domcontentloaded');
-
-        // Wait for menu to be visible
-        const menu = page.locator('#menu');
-        await expect(menu).toBeVisible({ timeout: 5000 });
-
-        // Click start button to go to wizard
-        const startBtn = page.locator('#start-btn');
-        await expect(startBtn).toBeVisible();
-        await startBtn.click();
-
-        // Wait for map wizard screen
-        const wizardMap = page.locator('#wizard-map');
-        await expect(wizardMap).toBeVisible({ timeout: 3000 });
-
-        // Click next to go to players screen
-        const wizardMapNext = page.locator('#wizard-map-next');
-        await expect(wizardMapNext).toBeVisible();
-        await wizardMapNext.click();
-
-        // Wait for players wizard screen
-        const wizardPlayers = page.locator('#wizard-players');
-        await expect(wizardPlayers).toBeVisible({ timeout: 3000 });
-
-        // Click next to go to team selection (shop)
-        const wizardPlayersNext = page.locator('#wizard-players-next');
-        await expect(wizardPlayersNext).toBeVisible();
-        await wizardPlayersNext.click();
-
-        // Wait for team selection screen (shop)
-        const teamSelect = page.locator('#team-select');
-        await expect(teamSelect).toBeVisible({ timeout: 3000 });
+        await navigateToShop(page);
 
         // Verify shop header is visible
         const shopHeader = page.locator('.shop-header');
@@ -98,16 +114,7 @@ test.describe('Shop Screen', () => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
 
-        await page.goto('/');
-        await page.waitForLoadState('domcontentloaded');
-
-        // Navigate to shop
-        await page.locator('#start-btn').click();
-        await page.locator('#wizard-map-next').click();
-        await page.locator('#wizard-players-next').click();
-
-        // Wait for shop
-        await expect(page.locator('#team-select')).toBeVisible({ timeout: 3000 });
+        await navigateToShop(page);
 
         // Get initial budget text
         const budgetCurrent = page.locator('.budget-current');
@@ -123,10 +130,10 @@ test.describe('Shop Screen', () => {
         // Card should be marked as selected
         await expect(firstCard).toHaveClass(/selected/);
 
-        // Team preview should show the selected unit
+        // Team preview should show the selected unit (uses .team-slot.filled class)
         const teamPreview = page.locator('#team-preview-units');
-        const previewSlots = teamPreview.locator('.team-preview-slot');
-        await expect(previewSlots).toHaveCount(1, { timeout: 2000 });
+        const filledSlots = teamPreview.locator('.team-slot.filled');
+        await expect(filledSlots).toHaveCount(1, { timeout: 2000 });
 
         expect(errors).toEqual([]);
     });
@@ -135,16 +142,7 @@ test.describe('Shop Screen', () => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
 
-        await page.goto('/');
-        await page.waitForLoadState('domcontentloaded');
-
-        // Navigate to shop
-        await page.locator('#start-btn').click();
-        await page.locator('#wizard-map-next').click();
-        await page.locator('#wizard-players-next').click();
-
-        // Wait for shop
-        await expect(page.locator('#team-select')).toBeVisible({ timeout: 3000 });
+        await navigateToShop(page);
 
         // Check badge has a background color (not transparent)
         const badge = page.locator('#team-select-badge');
