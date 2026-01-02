@@ -3765,7 +3765,7 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
 /**
  * Draw a dead unit as a decoration on the map
- * Shown grayed out with a gravestone marker
+ * Uses the dedicated dead sprite (unit lying on ground)
  */
 function drawDeadUnit(unit, cx, cy) {
     // Safety check
@@ -3778,18 +3778,13 @@ function drawDeadUnit(unit, cx, cy) {
 
     ctx.save();
 
-    // Draw unit sprite with heavy desaturation and reduced opacity
-    ctx.globalAlpha = 0.4;
-    ctx.filter = 'grayscale(80%) brightness(0.6)';
+    // Draw unit sprite with desaturation and reduced opacity
+    ctx.globalAlpha = 0.5;
+    ctx.filter = 'grayscale(70%) brightness(0.7)';
 
-    // Draw the unit sprite (lying flat - scale Y to flatten it)
-    ctx.translate(cx, cy + size * 0.2);
-    ctx.scale(1, 0.4); // Flatten vertically to show "fallen"
-    ctx.translate(-cx, -(cy + size * 0.2));
-
-    // Try to use sprite loader for the dead unit
+    // Draw the dead sprite (unit lying on ground)
     try {
-        drawUnitSprite(ctx, cx, cy, size, playerColor, unit.class, 'normal', false, unit.player);
+        drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, 'dead', false, unit.player);
     } catch {
         // Fallback: draw colored ellipse
         ctx.fillStyle = playerColor;
@@ -3798,16 +3793,6 @@ function drawDeadUnit(unit, cx, cy) {
         ctx.fill();
     }
 
-    ctx.restore();
-
-    // Draw small gravestone/cross marker above
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = '#6b7280';
-    ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('✝', cx, cy - size * 0.3);
     ctx.restore();
 }
 
@@ -3828,6 +3813,7 @@ function drawUnitOverlay(unit, cx, cy) {
 
     // === ENEMY INDICATOR ===
     // Show a red ring around enemy units to clearly identify them
+    // The ring alone is sufficient - additional markers create visual clutter
     const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
     if (isEnemy) {
         ctx.strokeStyle = '#ef4444';
@@ -3837,12 +3823,6 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
-
-        // Small "enemy" marker at top
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(cx, cy - size * 0.85, size * 0.15, 0, Math.PI * 2);
-        ctx.fill();
     }
 
     // Shield indicator (if unit has shield from power-up)
@@ -3893,38 +3873,8 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.shadowBlur = 0;
     }
 
-    // Sprint active indicator (Scout)
-    if (unit.usedSpecial && unit.class === 'scout') {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#22c55e';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🏃', cx + size * 0.6, cy - size * 0.8);
-        ctx.shadowBlur = 0;
-    }
-
-    // Powershot active indicator (Assault)
-    if (unit.usedSpecial && unit.class === 'assault' && unit.damage > UNIT_CLASSES.assault.damage) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('💥', cx + size * 0.6, cy - size * 0.8);
-        ctx.shadowBlur = 0;
-    }
-
-    // Damage boost indicator
-    if (unit.damageBoost && unit.damageBoost > 0) {
-        ctx.fillStyle = '#ef4444';
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚔️', cx + size * 0.6, cy - size * 0.3);
-    }
+    // Note: Sprint/Powershot/DamageBoost indicators removed - the action buttons
+    // already show when abilities are active, no need for redundant unit overlays
 
     // "Spotted!" indicator - higher position, smaller size
     if (unit.spotted && unit.player === state.currentPlayer) {
@@ -4935,24 +4885,47 @@ export function render() {
     });
 
     // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
+    // Note: Using canvas-drawn shield instead of emoji for consistent cross-platform rendering
     if (coverPositions.length > 0) {
         const bestCoverPositions = coverPositions
             .sort((a, b) => a.cost - b.cost)
             .slice(0, 4);
 
         bestCoverPositions.forEach(({ sx, sy }) => {
-            ctx.globalAlpha = 1;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 6;
+            const iconSize = assetSize * 0.22;
+            const iconY = sy - assetSize * 0.3;
+
+            ctx.save();
+
+            // Drop shadow
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 4;
             ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            ctx.font = `${Math.round(assetSize * 0.5)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('🛡️', sx, sy - assetSize * 0.25);
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            ctx.shadowOffsetY = 2;
+
+            // Shield shape path
+            ctx.beginPath();
+            ctx.moveTo(sx, iconY - iconSize);
+            ctx.lineTo(sx + iconSize * 0.85, iconY - iconSize * 0.6);
+            ctx.lineTo(sx + iconSize * 0.85, iconY + iconSize * 0.2);
+            ctx.quadraticCurveTo(sx + iconSize * 0.4, iconY + iconSize * 0.8, sx, iconY + iconSize);
+            ctx.quadraticCurveTo(sx - iconSize * 0.4, iconY + iconSize * 0.8, sx - iconSize * 0.85, iconY + iconSize * 0.2);
+            ctx.lineTo(sx - iconSize * 0.85, iconY - iconSize * 0.6);
+            ctx.closePath();
+
+            // Fill with gradient
+            const gradient = ctx.createLinearGradient(sx - iconSize, iconY - iconSize, sx + iconSize, iconY + iconSize);
+            gradient.addColorStop(0, '#4ade80');
+            gradient.addColorStop(1, '#16a34a');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = '#15803d';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.restore();
         });
     }
 
