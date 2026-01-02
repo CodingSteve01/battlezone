@@ -2136,8 +2136,44 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
 
     candidates.sort((a, b) => b.score - a.score);
 
-    // Generate AI thought about the chosen move
+    // === DESPERATION MODE ===
+    // If all moves have very negative scores, AI might be "stuck"
+    // In this case, force movement toward enemies/center to prevent passive play
     const bestMove = candidates[0];
+
+    if (bestMove.score < -100 && candidates.length > 1) {
+        // All moves look bad - enter desperation mode
+        // Find the move that gets us closest to enemies or zone center
+        let desperationTarget = null;
+        let bestDesperation = Infinity;
+
+        for (const candidate of candidates) {
+            let desperationScore = 0;
+
+            // If enemies visible, prioritize getting closer to them
+            if (enemies.length > 0) {
+                const closestEnemyDist = Math.min(...enemies.map(e =>
+                    hexDistance({ q: candidate.q, r: candidate.r }, { q: e.q, r: e.r })
+                ));
+                desperationScore = closestEnemyDist;
+            } else {
+                // No enemies visible - move toward zone center
+                desperationScore = Math.max(Math.abs(candidate.q), Math.abs(candidate.r), Math.abs(-candidate.q - candidate.r));
+            }
+
+            if (desperationScore < bestDesperation) {
+                bestDesperation = desperationScore;
+                desperationTarget = candidate;
+            }
+        }
+
+        if (desperationTarget && desperationTarget !== bestMove) {
+            addAIThought('Keine optimale Position gefunden - Angriffsmodus aktiviert!', 'strategy');
+            return desperationTarget;
+        }
+    }
+
+    // Generate AI thought about the chosen move
     if (bestMove.foresight && bestMove.foresight.explanation && isSpectatorMode()) {
         const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
         addAIThought(`${unitName}: ${bestMove.foresight.explanation}`, 'move');
