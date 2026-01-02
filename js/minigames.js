@@ -300,6 +300,7 @@ function createMinigameOverlay() {
             <div class="minigame-hint" id="minigame-hint"></div>
             <div class="minigame-explanation" id="minigame-explanation"></div>
             <div class="minigame-start-prompt" id="minigame-start-prompt">Tippe zum Starten</div>
+            <button class="minigame-cancel-btn" id="minigame-cancel-btn">✕ Abbrechen</button>
             <div class="minigame-countdown" id="minigame-countdown"></div>
             <canvas id="minigame-canvas" width="300" height="200"></canvas>
             <div class="minigame-result" id="minigame-result"></div>
@@ -444,6 +445,30 @@ function addMinigameStyles() {
             }
         }
 
+        .minigame-cancel-btn {
+            color: #ef4444;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 20px;
+            background: transparent;
+            border: 2px solid #ef4444;
+            border-radius: 20px;
+            cursor: pointer;
+            display: none;
+            margin-top: 10px;
+            transition: all 0.2s;
+        }
+
+        .minigame-cancel-btn.visible {
+            display: inline-block;
+        }
+
+        .minigame-cancel-btn:hover,
+        .minigame-cancel-btn:active {
+            background: #ef4444;
+            color: #fff;
+        }
+
         .minigame-countdown {
             font-size: 48px;
             font-weight: bold;
@@ -529,12 +554,13 @@ function addMinigameStyles() {
 
 /**
  * Show explanation and wait for user to tap to start
- * Returns a Promise that resolves when user taps
+ * Returns a Promise that resolves when user taps, or rejects with 'cancelled' if user cancels
  */
 function showExplanationAndWaitForStart(explanation) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const explanationEl = document.getElementById('minigame-explanation');
         const startPromptEl = document.getElementById('minigame-start-prompt');
+        const cancelBtnEl = document.getElementById('minigame-cancel-btn');
         const countdownEl = document.getElementById('minigame-countdown');
         const canvasEl = document.getElementById('minigame-canvas');
 
@@ -545,23 +571,43 @@ function showExplanationAndWaitForStart(explanation) {
         explanationEl.textContent = explanation;
         explanationEl.classList.add('visible');
         startPromptEl.classList.add('visible');
+        cancelBtnEl.classList.add('visible');
+
+        function cleanup() {
+            explanationEl.classList.remove('visible');
+            startPromptEl.classList.remove('visible');
+            cancelBtnEl.classList.remove('visible');
+            startPromptEl.removeEventListener('click', handleStart);
+            startPromptEl.removeEventListener('touchstart', handleStart);
+            cancelBtnEl.removeEventListener('click', handleCancel);
+            cancelBtnEl.removeEventListener('touchstart', handleCancel);
+            minigameOverlay.removeEventListener('click', handleOverlayClick);
+            minigameOverlay.removeEventListener('touchstart', handleOverlayClick);
+        }
 
         function handleStart(e) {
             if (e) e.preventDefault();
-
-            // Clean up
-            explanationEl.classList.remove('visible');
-            startPromptEl.classList.remove('visible');
-            startPromptEl.removeEventListener('click', handleStart);
-            startPromptEl.removeEventListener('touchstart', handleStart);
-            minigameOverlay.removeEventListener('click', handleOverlayClick);
-            minigameOverlay.removeEventListener('touchstart', handleOverlayClick);
-
+            cleanup();
             playClick();
             resolve();
         }
 
+        function handleCancel(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            cleanup();
+            // Close the minigame overlay
+            minigameOverlay.classList.remove('active');
+            reject('cancelled');
+        }
+
         function handleOverlayClick(e) {
+            // Don't start if clicking on cancel button
+            if (e.target === cancelBtnEl || e.target.closest('.minigame-cancel-btn')) {
+                return;
+            }
             // Allow tapping anywhere on overlay to start
             if (e.target === minigameOverlay || e.target.closest('.minigame-container')) {
                 handleStart(e);
@@ -571,6 +617,8 @@ function showExplanationAndWaitForStart(explanation) {
         // Allow both button click and anywhere tap
         startPromptEl.addEventListener('click', handleStart);
         startPromptEl.addEventListener('touchstart', handleStart);
+        cancelBtnEl.addEventListener('click', handleCancel);
+        cancelBtnEl.addEventListener('touchstart', handleCancel);
         minigameOverlay.addEventListener('click', handleOverlayClick);
         minigameOverlay.addEventListener('touchstart', handleOverlayClick);
     });
@@ -678,9 +726,17 @@ export async function startMinigame(unitClass, context = null) {
     document.getElementById('minigame-result').classList.remove('show');
     document.getElementById('minigame-result').textContent = '';
 
-    // Show detailed explanation and wait for tap to start
+    // Show detailed explanation and wait for tap to start (with cancel option)
     if (desc.detailedExplanation) {
-        await showExplanationAndWaitForStart(desc.detailedExplanation);
+        try {
+            await showExplanationAndWaitForStart(desc.detailedExplanation);
+        } catch (e) {
+            if (e === 'cancelled') {
+                // User cancelled - return special cancelled result
+                return { level: 'CANCELLED', multiplier: { damage: 0, hitBonus: 0 }, cancelled: true };
+            }
+            throw e;
+        }
     }
 
     // Show countdown
@@ -1968,9 +2024,17 @@ export async function startHealingMinigame(context = null) {
     document.getElementById('minigame-result').classList.remove('show');
     document.getElementById('minigame-result').textContent = '';
 
-    // Show detailed explanation and wait for tap to start
+    // Show detailed explanation and wait for tap to start (with cancel option)
     if (HEALING_MINIGAME_DESC.detailedExplanation) {
-        await showExplanationAndWaitForStart(HEALING_MINIGAME_DESC.detailedExplanation);
+        try {
+            await showExplanationAndWaitForStart(HEALING_MINIGAME_DESC.detailedExplanation);
+        } catch (e) {
+            if (e === 'cancelled') {
+                // User cancelled - return special cancelled result
+                return { level: 'CANCELLED', healMultiplier: 0, cancelled: true };
+            }
+            throw e;
+        }
     }
 
     // Show countdown

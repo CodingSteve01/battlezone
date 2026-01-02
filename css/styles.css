@@ -2313,6 +2313,154 @@ button:focus:not(:focus-visible),
     margin-right: 6px;
 }
 
+/* ===== PODIUM DISPLAY ===== */
+.podium-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 0 16px;
+}
+
+.podium-spot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.3s ease;
+}
+
+.podium-spot.empty {
+    width: 90px;
+}
+
+.podium-spot.winner {
+    transform: scale(1.05);
+}
+
+.podium-player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.podium-medal {
+    font-size: 28px;
+    margin-bottom: 4px;
+    animation: bounce 2s infinite;
+}
+
+.position-1 .podium-medal {
+    font-size: 36px;
+}
+
+.podium-sprite {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 6px;
+}
+
+.podium-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.podium-name {
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.podium-score {
+    font-size: 12px;
+    color: var(--dim);
+    font-weight: 600;
+}
+
+.podium-block {
+    width: 90px;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.position-1 .podium-block {
+    height: 80px;
+}
+
+.position-2 .podium-block {
+    height: 55px;
+}
+
+.position-3 .podium-block {
+    height: 35px;
+}
+
+.podium-position {
+    font-size: 24px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Top 3 Awards */
+.top-awards {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.awards-title {
+    font-size: 12px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+.awards-list {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.award-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    animation: awardSlideIn 0.4s ease-out backwards;
+}
+
+.award-badge:nth-child(1) { animation-delay: 0.3s; }
+.award-badge:nth-child(2) { animation-delay: 0.4s; }
+.award-badge:nth-child(3) { animation-delay: 0.5s; }
+
+.award-badge .award-icon {
+    font-size: 20px;
+}
+
+.award-info {
+    text-align: left;
+}
+
+.award-badge .award-title {
+    font-size: 11px;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.award-badge .award-player {
+    font-size: 12px;
+    font-weight: 500;
+}
+
 .gameover-buttons {
     display: flex;
     gap: 12px;
@@ -2524,6 +2672,163 @@ button:focus:not(:focus-visible),
     .event-banner.show {
         transform: translateX(50%) translateY(0);
     }
+}
+
+/* ===== ROUND START SCREEN ===== */
+/* Full-screen overlay showing round status at the start of each round */
+.round-start-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 900;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.round-start-screen.show {
+    opacity: 1;
+}
+
+.round-start-content {
+    text-align: center;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+}
+
+.round-number {
+    font-size: 48px;
+    font-weight: 800;
+    color: #fbbf24;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    margin-bottom: 24px;
+    text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+    animation: roundPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes roundPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+}
+
+.round-players {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.round-player {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.round-player.current {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.round-player.eliminated {
+    opacity: 0.4;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.round-player-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.round-player-info {
+    flex: 1;
+    text-align: left;
+}
+
+.round-player-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--light);
+}
+
+.round-player-units {
+    font-size: 12px;
+    color: var(--dim);
+}
+
+.round-player-turn {
+    font-size: 11px;
+    font-weight: 600;
+    color: #22c55e;
+    padding: 4px 8px;
+    background: rgba(34, 197, 94, 0.2);
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.round-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+.round-zone.warning {
+    background: rgba(234, 179, 8, 0.15);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.round-zone.shrinking {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.round-zone-icon {
+    font-size: 20px;
+}
+
+.round-zone-text {
+    font-size: 13px;
+    color: var(--light);
+}
+
+.round-event {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 10px;
+}
+
+.round-event-icon {
+    font-size: 18px;
+}
+
+.round-event-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #a855f7;
 }
 
 /* ===== NEW TOAST TYPES ===== */

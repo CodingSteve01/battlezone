@@ -1277,3 +1277,64 @@ export function updateSurvivalRounds() {
         }
     }
 }
+
+/**
+ * Calculate total score for a player based on their stats
+ * Points breakdown:
+ * - Kills: 100 points each
+ * - Damage dealt: 1 point per damage
+ * - Healing: 2 points per HP healed
+ * - Survival: 10 points per round survived
+ * - Critical hits: 25 points each
+ * - Specials used: 15 points each
+ * - Accuracy bonus: up to 50 points for 80%+ accuracy
+ */
+export function calculatePlayerScore(player) {
+    const stats = getPlayerStats(player);
+
+    let score = 0;
+
+    // Combat points
+    score += stats.kills * 100;
+    score += stats.damageDealt;
+    score += stats.criticalHits * 25;
+
+    // Support points
+    score += stats.healing * 2;
+    score += stats.specialsUsed * 15;
+
+    // Survival points
+    score += stats.survivalRounds * 10;
+
+    // Accuracy bonus (if at least 3 shots fired)
+    const totalShots = stats.shotsHit + stats.shotsMissed;
+    if (totalShots >= 3) {
+        const accuracy = stats.shotsHit / totalShots;
+        if (accuracy >= 0.8) {
+            score += 50;
+        } else if (accuracy >= 0.6) {
+            score += 25;
+        }
+    }
+
+    return Math.round(score);
+}
+
+/**
+ * Get all player scores sorted by score (descending)
+ * Returns array of { player, score, stats }
+ */
+export function getPlayerRankings() {
+    const rankings = [];
+
+    for (let p = 0; p < state.settings.players; p++) {
+        const stats = getPlayerStats(p);
+        const score = calculatePlayerScore(p);
+        rankings.push({ player: p, score, stats });
+    }
+
+    // Sort by score descending
+    rankings.sort((a, b) => b.score - a.score);
+
+    return rankings;
+}

@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName, getTileScreenPosition } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName, getTileScreenPosition, getPlayerRankings } from './state.js';
 import {
     calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
     canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
@@ -11,6 +11,7 @@ import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 import { isAIPlayer, isSpectatorMode } from './ai.js';
+import { drawUnit } from './assetLoader.js';
 
 // Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
 
@@ -840,6 +841,86 @@ export function showEventBanner(event) {
 }
 
 /**
+ * Show round start screen with game status overview
+ * Displays for a few seconds at the beginning of each round
+ */
+export function showRoundStartScreen(roundInfo) {
+    // Remove existing round screen
+    const existing = document.querySelector('.round-start-screen');
+    if (existing) existing.remove();
+
+    // Build player status HTML
+    const playersHTML = roundInfo.players.map(p => {
+        const statusClass = p.alive ? (p.isCurrentPlayer ? 'current' : '') : 'eliminated';
+        const unitsText = p.alive ? `${p.units} Einheit${p.units !== 1 ? 'en' : ''}` : 'Eliminiert';
+        return `
+            <div class="round-player ${statusClass}">
+                <div class="round-player-color" style="background: ${p.color}"></div>
+                <div class="round-player-info">
+                    <div class="round-player-name">${p.name}</div>
+                    <div class="round-player-units">${unitsText}</div>
+                </div>
+                ${p.isCurrentPlayer ? '<div class="round-player-turn">Am Zug</div>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    // Build zone status HTML
+    let zoneHTML = '';
+    if (roundInfo.zone) {
+        const zoneClass = roundInfo.zone.warning ? 'warning' : (roundInfo.zone.shrinking ? 'shrinking' : '');
+        zoneHTML = `
+            <div class="round-zone ${zoneClass}">
+                <div class="round-zone-icon">${roundInfo.zone.warning ? '⚠️' : (roundInfo.zone.shrinking ? '🔴' : '🟢')}</div>
+                <div class="round-zone-text">${roundInfo.zone.text}</div>
+            </div>
+        `;
+    }
+
+    // Build event HTML
+    let eventHTML = '';
+    if (roundInfo.event) {
+        eventHTML = `
+            <div class="round-event">
+                <span class="round-event-icon">${roundInfo.event.icon}</span>
+                <span class="round-event-name">${roundInfo.event.name}</span>
+            </div>
+        `;
+    }
+
+    // Create the round start screen
+    const screen = document.createElement('div');
+    screen.className = 'round-start-screen';
+    screen.innerHTML = `
+        <div class="round-start-content">
+            <div class="round-number">Runde ${roundInfo.round}</div>
+            <div class="round-players">
+                ${playersHTML}
+            </div>
+            ${zoneHTML}
+            ${eventHTML}
+        </div>
+    `;
+    document.body.appendChild(screen);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        screen.classList.add('show');
+    });
+
+    // Auto remove after delay
+    return new Promise(resolve => {
+        setTimeout(() => {
+            screen.classList.remove('show');
+            setTimeout(() => {
+                screen.remove();
+                resolve();
+            }, 400);
+        }, roundInfo.duration || 2500);
+    });
+}
+
+/**
  * Show power-up pickup notification
  */
 export function showPowerupPickup(powerup, result) {
@@ -1075,30 +1156,132 @@ export function generateAwards(winner) {
 }
 
 /**
- * Display awards in the game over screen
+ * Display podium with player rankings and top 3 awards
  */
 export function displayAwards(winner) {
     const container = document.getElementById('awards-container');
     if (!container) return;
 
+    // Import ranking function
+    const rankings = getPlayerRankings();
     const awards = generateAwards(winner);
 
-    if (awards.length === 0) {
-        container.innerHTML = '<div class="no-awards">Keine besonderen Leistungen</div>';
-        return;
+    // Take only top 3 awards
+    const topAwards = awards.slice(0, 3);
+
+    // Get top 3 players for podium (or fewer if less players)
+    const podiumPlayers = rankings.slice(0, Math.min(3, rankings.length));
+
+    // Build podium HTML
+    let podiumHTML = '<div class="podium-container">';
+
+    // Podium positions: 2nd (left), 1st (center), 3rd (right)
+    const podiumOrder = [1, 0, 2]; // Index into podiumPlayers
+
+    for (const posIndex of podiumOrder) {
+        if (posIndex >= podiumPlayers.length) {
+            // Empty podium spot
+            podiumHTML += '<div class="podium-spot empty"></div>';
+            continue;
+        }
+
+        const ranking = podiumPlayers[posIndex];
+        const position = posIndex + 1;
+        const playerColor = CONFIG.PLAYER_COLORS[ranking.player];
+        const playerName = getPlayerName(ranking.player);
+        const isWinner = ranking.player === winner;
+
+        // Get a representative unit sprite for this player (first alive or any unit)
+        const playerUnits = state.units.filter(u => u.player === ranking.player);
+        const representativeUnit = playerUnits.find(u => u.alive) || playerUnits[0];
+        const unitClass = representativeUnit ? representativeUnit.class : 'assault';
+
+        // Medal icons for positions
+        const medals = ['🥇', '🥈', '🥉'];
+
+        podiumHTML += `
+            <div class="podium-spot position-${position} ${isWinner ? 'winner' : ''}">
+                <div class="podium-player">
+                    <div class="podium-medal">${medals[posIndex]}</div>
+                    <div class="podium-sprite" data-player="${ranking.player}" data-class="${unitClass}">
+                        <canvas class="podium-canvas" width="80" height="80"></canvas>
+                    </div>
+                    <div class="podium-name" style="color: ${playerColor}">${playerName}</div>
+                    <div class="podium-score">${ranking.score} Punkte</div>
+                </div>
+                <div class="podium-block" style="background: linear-gradient(to top, ${playerColor}88, ${playerColor}44)">
+                    <span class="podium-position">${position}</span>
+                </div>
+            </div>
+        `;
     }
 
-    container.innerHTML = awards.map(award => `
-        <div class="award-card">
-            <span class="award-icon">${award.icon}</span>
-            <div class="award-content">
-                <div class="award-title">${award.title}</div>
-                <div class="award-player">
-                    <span class="player-dot" style="background-color: ${award.color}"></span>
-                    ${getPlayerName(award.player)}
+    podiumHTML += '</div>';
+
+    // Top 3 awards section
+    let awardsHTML = '';
+    if (topAwards.length > 0) {
+        awardsHTML = `
+            <div class="top-awards">
+                <div class="awards-title">Herausragende Leistungen</div>
+                <div class="awards-list">
+                    ${topAwards.map(award => `
+                        <div class="award-badge">
+                            <span class="award-icon">${award.icon}</span>
+                            <div class="award-info">
+                                <div class="award-title">${award.title}</div>
+                                <div class="award-player" style="color: ${award.color}">${getPlayerName(award.player)}</div>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
-                <div class="award-value">${award.value}</div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }
+
+    container.innerHTML = podiumHTML + awardsHTML;
+
+    // Draw unit sprites on podium canvases
+    requestAnimationFrame(() => {
+        drawPodiumSprites();
+    });
+}
+
+/**
+ * Draw unit sprites on the podium canvases
+ */
+function drawPodiumSprites() {
+    const canvases = document.querySelectorAll('.podium-canvas');
+
+    canvases.forEach(canvas => {
+        const parent = canvas.closest('.podium-sprite');
+        if (!parent) return;
+
+        const player = parseInt(parent.dataset.player);
+        const unitClass = parent.dataset.class;
+        const playerColor = CONFIG.PLAYER_COLORS[player];
+
+        const ctx = canvas.getContext('2d');
+        const size = 80;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, size, size);
+
+        // Draw unit using assetLoader
+        try {
+            drawUnit(ctx, size / 2, size / 2 + 10, size * 0.45, playerColor, unitClass, 'normal', false, player);
+        } catch {
+            // Fallback on error: draw colored circle with class initial
+            ctx.fillStyle = playerColor;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(unitClass.charAt(0).toUpperCase(), size / 2, size / 2);
+        }
+    });
 }

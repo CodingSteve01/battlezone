@@ -1,7 +1,7 @@
 // ===== CANVAS RENDERING =====
 
 import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition } from './state.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition, arePlayersAllied } from './state.js';
 import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
@@ -3764,6 +3764,54 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 }
 
 /**
+ * Draw a dead unit as a decoration on the map
+ * Shown grayed out with a gravestone marker
+ */
+function drawDeadUnit(unit, cx, cy) {
+    // Safety check
+    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
+        return;
+    }
+
+    const size = state.hexSize * 0.59;
+    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
+
+    ctx.save();
+
+    // Draw unit sprite with heavy desaturation and reduced opacity
+    ctx.globalAlpha = 0.4;
+    ctx.filter = 'grayscale(80%) brightness(0.6)';
+
+    // Draw the unit sprite (lying flat - scale Y to flatten it)
+    ctx.translate(cx, cy + size * 0.2);
+    ctx.scale(1, 0.4); // Flatten vertically to show "fallen"
+    ctx.translate(-cx, -(cy + size * 0.2));
+
+    // Try to use sprite loader for the dead unit
+    try {
+        drawUnitSprite(ctx, cx, cy, size, playerColor, unit.class, 'normal', false, unit.player);
+    } catch {
+        // Fallback: draw colored ellipse
+        ctx.fillStyle = playerColor;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Draw small gravestone/cross marker above
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#6b7280';
+    ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✝', cx, cy - size * 0.3);
+    ctx.restore();
+}
+
+/**
  * Draw unit overlay - all HUD elements (badges, indicators, HP bar) on top of everything
  * Called after all depth-sorted elements to ensure visibility
  */
@@ -3778,40 +3826,23 @@ function drawUnitOverlay(unit, cx, cy) {
 
     ctx.save();
 
-    // Player number badge
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    ctx.arc(cx + size * 0.5, cy - size * 0.6, size * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
-
-    // Level badge (left side)
-    const level = unit.level || 1;
-    if (level > 1) {
-        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
-        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
-
-        ctx.fillStyle = levelColor;
+    // === ENEMY INDICATOR ===
+    // Show a red ring around enemy units to clearly identify them
+    const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
+    if (isEnemy) {
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 0.9;
         ctx.beginPath();
-        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 1;
+        ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
-        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
+        // Small "enemy" marker at top
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(cx, cy - size * 0.85, size * 0.15, 0, Math.PI * 2);
+        ctx.fill();
     }
 
     // Shield indicator (if unit has shield from power-up)
@@ -3940,12 +3971,8 @@ function drawUnitOverlay(unit, cx, cy) {
     ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 2);
     ctx.fill();
 
-    // HP text - smaller, cleaner font
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(barHeight * 0.85)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
+    // NOTE: HP text removed for cleaner HUD - bar color (green/yellow/red)
+    // and fill level intuitively show health status
 }
 
 /**
@@ -4414,8 +4441,12 @@ export function render() {
     const reachableHexes = currentUnit ? getReachableHexes(currentUnit) : new Map();
     const attackableUnits = currentUnit ? getAttackableUnits(currentUnit) : [];
     const blockedTargets = currentUnit ? getBlockedTargets(currentUnit) : [];
+    // Include both alive and dead units that are visible
     const visibleUnits = state.units
         .filter(unit => unit.alive && isUnitVisibleToViewer(unit));
+    // Dead units are always visible (they're decorations now)
+    const deadUnits = state.units
+        .filter(unit => !unit.alive);
     const visibilityClearingMap = buildVisibilityClearingMap(visibleUnits);
 
     // Only show hex grid borders when planning movement or attacking
@@ -4706,6 +4737,24 @@ export function render() {
         drawGhostIndicator(sx, sy, ghost);
     });
 
+    // === DEAD UNITS AS DECORATIONS ===
+    // Dead units are rendered like bushes - always visible, no interaction
+    const deadUnitDrawables = deadUnits.map(unit => {
+        const unitHex = getHex(unit.q, unit.r);
+        const pos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0, tileSize);
+        const sx = state.offsetX + pos.x;
+        const sy = state.offsetY + pos.y;
+
+        return {
+            type: 'dead_unit',
+            x: sx,
+            y: sy,
+            sortY: sy + assetSize * 0.3, // Sort slightly below alive units
+            draw: () => drawDeadUnit(unit, sx, sy),
+            unit: unit
+        };
+    });
+
     // Combine units and foreground elements for 2.5D depth sorting
     // Use isUnitVisibleToViewer for proper fog of war from human player's perspective
     const unitDrawables = visibleUnits.map(unit => {
@@ -4819,12 +4868,19 @@ export function render() {
     });
 
     // Combine all drawable elements and sort by Y position (bottom-to-top)
-    const allDrawables = [...foregroundElements, ...unitDrawables];
+    // Dead units are included as decorations (like bushes)
+    const allDrawables = [...foregroundElements, ...deadUnitDrawables, ...unitDrawables];
     allDrawables.sort((a, b) => a.sortY - b.sortY);
 
     // Draw all elements in sorted order, with transparency for obscuring assets
     allDrawables.forEach(drawable => {
         if (drawable.type === 'unit') {
+            drawable.draw();
+            return;
+        }
+
+        // Dead units are rendered like decorations (no special handling needed)
+        if (drawable.type === 'dead_unit') {
             drawable.draw();
             return;
         }

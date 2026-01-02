@@ -7,10 +7,10 @@ import {
     getPlayerName
 } from './state.js';
 import { CONFIG } from './config.js';
-import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
+import { resetUnitsForTurn, resetSpecialAbilities, killUnit } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
-import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards } from './ui.js';
+import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards, showRoundStartScreen } from './ui.js';
 import { render } from './renderer.js';
 import { centerOnCurrentUnit, centerOnTeam, executeQueuedPathsForPlayer, playGameIntro } from './input.js';
 import { updatePowerupBuffs, spawnNewPowerups } from './powerups.js';
@@ -20,13 +20,13 @@ import { logInfo, logError } from './errorLog.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 // === SHRINKING ZONE CONSTANTS ===
-// AGGRESSIV: Zone schrumpft schnell, um Wegrennen zu verhindern!
+// Zone schrumpft bei Inaktivität, um Camping zu verhindern
 const ZONE_CONFIG = {
-    ROUNDS_BEFORE_SHRINK: 2,      // NUR 2 Runden ohne Kampf bevor Zone schrumpft (vorher 4)
-    SHRINK_AMOUNT: 3,             // 3 Felder pro Schrumpfung (vorher 2) - DRASTISCH
-    MIN_ZONE_RADIUS: 3,           // Minimaler Radius nur 3 Felder (vorher 5) - erzwingt Nahkampf!
-    ZONE_DAMAGE: 25,              // 25 Schaden pro Runde außerhalb (vorher 15) - TÖDLICH
-    REVEAL_INTERVAL: 3,           // Alle 3 Runden (vorher 5) versteckte Einheiten aufdecken
+    ROUNDS_BEFORE_SHRINK: 2,      // 2 Runden ohne Kampf bevor Zone schrumpft
+    SHRINK_AMOUNT: 2,             // 2 Felder pro Schrumpfung (moderater)
+    MIN_ZONE_RADIUS: 5,           // Minimaler Radius 5 Felder (~91 Hexfelder) - genug Platz für Taktik
+    ZONE_DAMAGE: 25,              // 25 Schaden pro Runde außerhalb
+    REVEAL_INTERVAL: 3,           // Alle 3 Runden versteckte Einheiten aufdecken
     WARNING_ROUNDS: 1             // 1 Runde Vorwarnung
 };
 
@@ -274,21 +274,22 @@ export function nextPlayer() {
         clearRoundEvent();
 
         // === SHRINKING ZONE MECHANIK ===
-        // Process zone first - may show warnings/shrink notifications
-        const zoneHadAction = state.zoneShrinkWarning ||
-            (state.round - state.lastCombatRound >= ZONE_CONFIG.ROUNDS_BEFORE_SHRINK);
+        // Store zone state before processing
+        const zoneWasWarning = state.zoneShrinkWarning;
+        const zoneRadiusBefore = state.zoneRadius;
         processZoneMechanic();
+        const zoneShrunk = state.zoneRadius < zoneRadiusBefore;
 
-        // Roll for new round event - delay if zone had action to avoid overlap
+        // Roll for new round event
         const event = rollRoundEvent();
         if (event) {
-            // If zone had action, wait longer before showing event
-            const eventDelay = zoneHadAction ? 2500 : 500;
-            setTimeout(() => {
-                playEvent();
-                showEventBanner(event);
-            }, eventDelay);
+            playEvent();
         }
+
+        // === ROUND START SCREEN ===
+        // Build round info for display
+        const roundInfo = buildRoundInfo(zoneShrunk, zoneWasWarning, event);
+        showRoundStartScreen(roundInfo);
 
         // Spawn new power-ups periodically
         spawnNewPowerups();
@@ -426,6 +427,59 @@ export function checkWinCondition() {
     return false;
 }
 
+// === ROUND START SCREEN ===
+
+/**
+ * Build round info object for the round start screen
+ */
+function buildRoundInfo(zoneShrunk, zoneWasWarning, event) {
+    // Build player info
+    const players = [];
+    for (let p = 0; p < state.settings.players; p++) {
+        const units = getPlayerUnits(p);
+        const aliveUnits = units.filter(u => u.alive);
+        players.push({
+            name: getPlayerName(p),
+            color: CONFIG.PLAYER_COLORS[p],
+            units: aliveUnits.length,
+            alive: aliveUnits.length > 0,
+            isCurrentPlayer: p === 0 // First player starts
+        });
+    }
+
+    // Build zone info
+    let zone = null;
+    if (state.maxZoneRadius > 0) {
+        if (zoneShrunk) {
+            zone = {
+                shrinking: true,
+                warning: false,
+                text: `Zone geschrumpft! Neuer Radius: ${state.zoneRadius} Felder`
+            };
+        } else if (zoneWasWarning) {
+            zone = {
+                shrinking: false,
+                warning: true,
+                text: 'Zone schrumpft bald! Sucht den Feind!'
+            };
+        } else if (state.zoneRadius < state.maxZoneRadius) {
+            zone = {
+                shrinking: false,
+                warning: false,
+                text: `Zone-Radius: ${state.zoneRadius} Felder`
+            };
+        }
+    }
+
+    return {
+        round: state.round,
+        players,
+        zone,
+        event: event ? { icon: event.icon, name: event.name } : null,
+        duration: zoneShrunk ? 3000 : 2500 // Longer display if zone shrunk
+    };
+}
+
 // === SHRINKING ZONE MECHANIK ===
 
 /**
@@ -448,13 +502,7 @@ function processZoneMechanic() {
 
     if (roundsUntilShrink === ZONE_CONFIG.WARNING_ROUNDS && state.zoneRadius > ZONE_CONFIG.MIN_ZONE_RADIUS) {
         state.zoneShrinkWarning = true;
-        // Use event banner for important zone warnings (less intrusive than toast)
-        showEventBanner({
-            name: 'Zone schrumpft!',
-            icon: '⚠️',
-            description: 'Sucht den Feind oder das Spielfeld wird kleiner!',
-            color: '#f59e0b'
-        });
+        // Zone warning is now shown in the round start screen
     }
 
     // === 3. ZONE SCHRUMPFEN ===
@@ -515,14 +563,7 @@ function shrinkZone() {
 
     // Reset Kampf-Timer nach Schrumpfung (gibt Spielern Zeit zu reagieren)
     state.lastCombatRound = state.round;
-
-    // Use compact event banner instead of multiple toasts
-    showEventBanner({
-        name: 'Zone geschrumpft!',
-        icon: '🔴',
-        description: `Neuer Radius: ${state.zoneRadius} Felder`,
-        color: '#ef4444'
-    });
+    // Zone shrink info is now shown in the round start screen
 }
 
 /**
@@ -548,8 +589,7 @@ function applyZoneDamage() {
             unitsHit++;
 
             if (unit.currentHp <= 0) {
-                unit.currentHp = 0;
-                unit.alive = false;
+                killUnit(unit);
                 unitsKilled++;
             }
         }

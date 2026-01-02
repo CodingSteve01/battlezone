@@ -903,16 +903,22 @@ function handleTapOrClick(clientX, clientY) {
 
     const unit = getCurrentUnit();
 
-    // === CONFIRM ATTACK ON TARGETED ENEMY ===
-    // If an enemy is already targeted, clicking anywhere (except on own units) executes the attack
-    if (state.targetedUnit && unit && state.sharedAP >= 1 && !state.minigameInProgress) {
+    // === CANCEL TARGETING ON EMPTY HEX CLICK ===
+    // If an enemy is targeted and clicking on empty hex, cancel the targeting
+    if (state.targetedUnit && !state.minigameInProgress) {
         const targetedEnemy = state.targetedUnit;
 
-        // Check if clicking on own unit - that should select the unit instead
-        if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
-            // Fall through to unit selection logic below
-        } else {
-            // Check if targeted enemy is still in attack range
+        // Clicking on empty hex (no unit) or walkable terrain: cancel targeting
+        if (!hex.unit) {
+            state.targetedUnit = null;
+            state.selectedAction = 'move';
+            updateUI();
+            render();
+            return;
+        }
+
+        // Clicking on the SAME targeted enemy: execute attack
+        if (hex.unit && hex.unit.id === targetedEnemy.id && unit && state.sharedAP >= 1) {
             const attackable = getAttackableUnits(unit);
             const canAttack = attackable.some(u => u.id === targetedEnemy.id);
 
@@ -926,6 +932,13 @@ function handleTapOrClick(clientX, clientY) {
                 (async () => {
                     try {
                         const result = await executeAttackWithMinigame(unit, targetedEnemy);
+                        // If cancelled, just show message and return
+                        if (result.cancelled) {
+                            showToast('Angriff abgebrochen', 'info');
+                            render();
+                            updateUI();
+                            return;
+                        }
                         if (result.killed) {
                             checkWinCondition();
                         }
@@ -944,6 +957,14 @@ function handleTapOrClick(clientX, clientY) {
                 showAttackBlockedFeedback(unit, targetedEnemy);
                 return;
             }
+        }
+
+        // Clicking on own unit - fall through to selection logic below
+        if (hex.unit && hex.unit.player === state.currentPlayer && hex.unit.alive) {
+            // Will be handled by unit selection below - also clears targetedUnit
+        } else if (hex.unit && !areUnitsAllied(unit, hex.unit) && hex.unit.alive) {
+            // Clicking on DIFFERENT enemy - switch targeting to that enemy
+            // Let the enemy click handler below handle this
         }
     }
 
@@ -975,7 +996,13 @@ function handleTapOrClick(clientX, clientY) {
                         // Use async healing minigame
                         (async () => {
                             try {
-                                await useMedicHealingWithMinigame(unit);
+                                const result = await useMedicHealingWithMinigame(unit);
+                                // If cancelled, refund AP and reset usedSpecial
+                                if (result && result.cancelled) {
+                                    state.sharedAP += healCost;
+                                    unit.usedSpecial = false;
+                                    showToast('Heilung abgebrochen', 'info');
+                                }
                             } finally {
                                 state.minigameInProgress = false;  // Always reset
                             }
@@ -1066,6 +1093,14 @@ async function handleEnemyClick(unit, hex) {
             try {
                 // Start the attack minigame and wait for result
                 const result = await executeAttackWithMinigame(unit, enemy);
+
+                // If cancelled, just show message and return
+                if (result.cancelled) {
+                    showToast('Angriff abgebrochen', 'info');
+                    render();
+                    updateUI();
+                    return;
+                }
 
                 if (result.killed) {
                     checkWinCondition();
@@ -2070,6 +2105,14 @@ async function handleAttackClick(unit, hex) {
                     // Execute attack with minigame
                     const result = await executeAttackWithMinigame(unit, hex.unit);
 
+                    // If cancelled, just show message and return
+                    if (result.cancelled) {
+                        showToast('Angriff abgebrochen', 'info');
+                        render();
+                        updateUI();
+                        return;
+                    }
+
                     if (result.killed) {
                         checkWinCondition();
                     }
@@ -2304,6 +2347,13 @@ function setupTargetInfoClick() {
 
             try {
                 const result = await executeAttackWithMinigame(unit, enemy);
+                // If cancelled, just show message and return
+                if (result.cancelled) {
+                    showToast('Angriff abgebrochen', 'info');
+                    render();
+                    updateUI();
+                    return;
+                }
                 if (result.killed) {
                     checkWinCondition();
                 }
