@@ -14,7 +14,7 @@ import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory, isSpectatorMode } from './ai.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
-import { initAssetLoader, isUsingStaticAssets } from './assetLoader.js';
+import { initAssetLoader, isUsingStaticAssets, getUnitSprite } from './assetLoader.js';
 import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial, shouldStartTutorial } from './tutorial.js';
 import { hexToPixel } from './hexMath.js';
 import { initErrorCapture, showLogViewer, getErrorCount, addLogListener, logInfo, logError } from './errorLog.js';
@@ -339,7 +339,7 @@ function updateConfirmButton() {
 }
 
 /**
- * Generate unit selection cards - Shop Style
+ * Generate unit selection cards - Shop Style with Sprite Preview
  */
 function generateUnitCards() {
     const grid = document.getElementById('team-select-grid');
@@ -361,12 +361,18 @@ function generateUnitCards() {
         // Check if this is an elite unit (has special dual-attack capability)
         const isElite = classData.canMelee && classData.canRanged;
 
-        // Compact shop-style card layout with info button
+        // Get player color for glow effect
+        const playerColor = CONFIG.PLAYER_COLORS[currentTeamSelectPlayer] || '#22c55e';
+
+        // New card layout with sprite preview
         card.innerHTML = `
             ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
             <button class="card-info-btn" data-class="${classKey}" title="Details">?</button>
+            <div class="unit-sprite-container">
+                <div class="unit-sprite-glow" style="--player-color: ${playerColor}40;"></div>
+                <canvas class="unit-sprite-canvas" width="104" height="104" data-class="${classKey}"></canvas>
+            </div>
             <div class="card-header">
-                <div class="unit-icon">${classData.icon}</div>
                 <div class="unit-name">${classData.name}</div>
                 <div class="unit-cost cost-${costCategory}">${classData.cost}💰</div>
             </div>
@@ -375,10 +381,15 @@ function generateUnitCards() {
                 <span class="stat-item">⚔️ ${classData.damage}</span>
                 <span class="stat-item">📍 ${classData.move}</span>
                 <span class="stat-item">🎯 ${classData.range}</span>
-                ${classData.meleeBonus ? `<span class="stat-item">🗡️ +${classData.meleeBonus}</span>` : ''}
             </div>
             <div class="unit-special">✨ ${classData.special}</div>
         `;
+
+        // Render sprite to canvas
+        const canvas = card.querySelector('.unit-sprite-canvas');
+        if (canvas) {
+            renderUnitSpriteToCanvas(canvas, classKey, currentTeamSelectPlayer);
+        }
 
         // Card click = select unit
         card.onclick = (e) => {
@@ -403,6 +414,61 @@ function generateUnitCards() {
 
     // Setup detail overlay close handlers
     setupDetailOverlay();
+}
+
+/**
+ * Render a unit sprite to a canvas element for shop preview
+ */
+function renderUnitSpriteToCanvas(canvas, classKey, playerIndex) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const playerColor = CONFIG.PLAYER_COLORS[playerIndex] || '#22c55e';
+
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Try to get sprite
+    const sprite = getUnitSprite(classKey, playerIndex, 'normal');
+
+    if (sprite) {
+        // Calculate drawing dimensions (maintain aspect ratio)
+        const maxSize = Math.min(width, height) * 0.85;
+        const aspectRatio = sprite.width / sprite.height;
+        let drawWidth, drawHeight;
+
+        if (aspectRatio > 1) {
+            drawWidth = maxSize;
+            drawHeight = maxSize / aspectRatio;
+        } else {
+            drawHeight = maxSize;
+            drawWidth = maxSize * aspectRatio;
+        }
+
+        // Position using anchor point - center horizontally, place at bottom
+        const drawX = (width - drawWidth) / 2;
+        const drawY = height - drawHeight - 4; // 4px padding from bottom
+
+        // Draw subtle glow effect
+        ctx.save();
+        ctx.shadowColor = playerColor;
+        ctx.shadowBlur = 12;
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
+        ctx.restore();
+
+        // Draw the actual sprite
+        ctx.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
+    } else {
+        // Fallback: Draw unit icon from config
+        const classData = UNIT_CLASSES[classKey];
+        if (classData && classData.icon) {
+            ctx.font = '36px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(classData.icon, width / 2, height / 2);
+        }
+    }
 }
 
 /**
@@ -627,7 +693,7 @@ function updateCardSelectionState() {
 }
 
 /**
- * Update team preview slots
+ * Update team preview slots with sprite canvases
  */
 function updateTeamPreview() {
     const previewContainer = document.getElementById('team-preview-units');
@@ -636,15 +702,22 @@ function updateTeamPreview() {
     // Clear existing slots
     previewContainer.innerHTML = '';
 
-    // Create slots for selected units
+    // Create slots for selected units with sprite preview
     currentPlayerSelection.forEach((classKey, index) => {
         const classData = UNIT_CLASSES[classKey];
         const slot = document.createElement('div');
         slot.className = 'team-slot filled';
-        slot.innerHTML = `
-            <span class="slot-icon">${classData.icon}</span>
-            <span class="slot-cost">${classData.cost}</span>
-        `;
+
+        // Create canvas for sprite
+        const canvas = document.createElement('canvas');
+        canvas.width = 80;
+        canvas.height = 80;
+        canvas.className = 'team-slot-canvas';
+        slot.appendChild(canvas);
+
+        // Render sprite
+        renderTeamSlotSprite(canvas, classKey, currentTeamSelectPlayer);
+
         slot.style.cursor = 'pointer';
         slot.onclick = () => removeFromSelection(index);
         slot.title = `${classData.name} - Klicken zum Entfernen`;
@@ -659,6 +732,47 @@ function updateTeamPreview() {
         slot.textContent = '+';
         slot.title = 'Einheit hinzufügen';
         previewContainer.appendChild(slot);
+    }
+}
+
+/**
+ * Render sprite for team slot preview (smaller version)
+ */
+function renderTeamSlotSprite(canvas, classKey, playerIndex) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    const sprite = getUnitSprite(classKey, playerIndex, 'normal');
+
+    if (sprite) {
+        const maxSize = Math.min(width, height) * 0.9;
+        const aspectRatio = sprite.width / sprite.height;
+        let drawWidth, drawHeight;
+
+        if (aspectRatio > 1) {
+            drawWidth = maxSize;
+            drawHeight = maxSize / aspectRatio;
+        } else {
+            drawHeight = maxSize;
+            drawWidth = maxSize * aspectRatio;
+        }
+
+        const drawX = (width - drawWidth) / 2;
+        const drawY = height - drawHeight - 2;
+
+        ctx.drawImage(sprite, drawX, drawY, drawWidth, drawHeight);
+    } else {
+        // Fallback: icon
+        const classData = UNIT_CLASSES[classKey];
+        if (classData && classData.icon) {
+            ctx.font = '22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(classData.icon, width / 2, height / 2);
+        }
     }
 }
 
