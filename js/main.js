@@ -1347,6 +1347,9 @@ async function init() {
     // Menu is already shown at the start of init()
     // showScreen() now automatically handles pointer-events on game-area
 
+    // Mark app as fully initialized (used by E2E tests)
+    document.body.dataset.appReady = 'true';
+
     console.log('Shadow Squad initialized');
 }
 
