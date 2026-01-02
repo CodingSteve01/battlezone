@@ -3765,7 +3765,7 @@ function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked 
 
 /**
  * Draw a dead unit as a decoration on the map
- * Shown grayed out with a gravestone marker
+ * Uses the dedicated dead sprite (unit lying on ground)
  */
 function drawDeadUnit(unit, cx, cy) {
     // Safety check
@@ -3778,18 +3778,13 @@ function drawDeadUnit(unit, cx, cy) {
 
     ctx.save();
 
-    // Draw unit sprite with heavy desaturation and reduced opacity
-    ctx.globalAlpha = 0.4;
-    ctx.filter = 'grayscale(80%) brightness(0.6)';
+    // Draw unit sprite with desaturation and reduced opacity
+    ctx.globalAlpha = 0.5;
+    ctx.filter = 'grayscale(70%) brightness(0.7)';
 
-    // Draw the unit sprite (lying flat - scale Y to flatten it)
-    ctx.translate(cx, cy + size * 0.2);
-    ctx.scale(1, 0.4); // Flatten vertically to show "fallen"
-    ctx.translate(-cx, -(cy + size * 0.2));
-
-    // Try to use sprite loader for the dead unit
+    // Draw the dead sprite (unit lying on ground)
     try {
-        drawUnitSprite(ctx, cx, cy, size, playerColor, unit.class, 'normal', false, unit.player);
+        drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, 'dead', false, unit.player);
     } catch {
         // Fallback: draw colored ellipse
         ctx.fillStyle = playerColor;
@@ -3798,16 +3793,6 @@ function drawDeadUnit(unit, cx, cy) {
         ctx.fill();
     }
 
-    ctx.restore();
-
-    // Draw small gravestone/cross marker above
-    ctx.save();
-    ctx.globalAlpha = 0.7;
-    ctx.fillStyle = '#6b7280';
-    ctx.font = `${Math.round(size * 0.4)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('✝', cx, cy - size * 0.3);
     ctx.restore();
 }
 
