@@ -840,6 +840,86 @@ export function showEventBanner(event) {
 }
 
 /**
+ * Show round start screen with game status overview
+ * Displays for a few seconds at the beginning of each round
+ */
+export function showRoundStartScreen(roundInfo) {
+    // Remove existing round screen
+    const existing = document.querySelector('.round-start-screen');
+    if (existing) existing.remove();
+
+    // Build player status HTML
+    const playersHTML = roundInfo.players.map(p => {
+        const statusClass = p.alive ? (p.isCurrentPlayer ? 'current' : '') : 'eliminated';
+        const unitsText = p.alive ? `${p.units} Einheit${p.units !== 1 ? 'en' : ''}` : 'Eliminiert';
+        return `
+            <div class="round-player ${statusClass}">
+                <div class="round-player-color" style="background: ${p.color}"></div>
+                <div class="round-player-info">
+                    <div class="round-player-name">${p.name}</div>
+                    <div class="round-player-units">${unitsText}</div>
+                </div>
+                ${p.isCurrentPlayer ? '<div class="round-player-turn">Am Zug</div>' : ''}
+            </div>
+        `;
+    }).join('');
+
+    // Build zone status HTML
+    let zoneHTML = '';
+    if (roundInfo.zone) {
+        const zoneClass = roundInfo.zone.warning ? 'warning' : (roundInfo.zone.shrinking ? 'shrinking' : '');
+        zoneHTML = `
+            <div class="round-zone ${zoneClass}">
+                <div class="round-zone-icon">${roundInfo.zone.warning ? '⚠️' : (roundInfo.zone.shrinking ? '🔴' : '🟢')}</div>
+                <div class="round-zone-text">${roundInfo.zone.text}</div>
+            </div>
+        `;
+    }
+
+    // Build event HTML
+    let eventHTML = '';
+    if (roundInfo.event) {
+        eventHTML = `
+            <div class="round-event">
+                <span class="round-event-icon">${roundInfo.event.icon}</span>
+                <span class="round-event-name">${roundInfo.event.name}</span>
+            </div>
+        `;
+    }
+
+    // Create the round start screen
+    const screen = document.createElement('div');
+    screen.className = 'round-start-screen';
+    screen.innerHTML = `
+        <div class="round-start-content">
+            <div class="round-number">Runde ${roundInfo.round}</div>
+            <div class="round-players">
+                ${playersHTML}
+            </div>
+            ${zoneHTML}
+            ${eventHTML}
+        </div>
+    `;
+    document.body.appendChild(screen);
+
+    // Animate in
+    requestAnimationFrame(() => {
+        screen.classList.add('show');
+    });
+
+    // Auto remove after delay
+    return new Promise(resolve => {
+        setTimeout(() => {
+            screen.classList.remove('show');
+            setTimeout(() => {
+                screen.remove();
+                resolve();
+            }, 400);
+        }, roundInfo.duration || 2500);
+    });
+}
+
+/**
  * Show power-up pickup notification
  */
 export function showPowerupPickup(powerup, result) {
