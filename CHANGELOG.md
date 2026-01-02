@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.1...shadow-squad-v6.0.2) (2026-01-02)
+
+
+### Bug Fixes
+
+* **ui:** remove redundant enemy dot indicator from unit HUD ([#322](https://github.com/CodingSteve01/battlezone/issues/322)) ([bb51411](https://github.com/CodingSteve01/battlezone/commit/bb51411675090edce67c94983235196c1d967a32))
+
 ## [6.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.0...shadow-squad-v6.0.1) (2026-01-02)
 
 
