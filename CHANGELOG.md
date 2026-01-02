@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.2...shadow-squad-v5.2.3) (2026-01-02)
+
+
+### Bug Fixes
+
+* **assets:** add badge background color and use template sprites for units ([#311](https://github.com/CodingSteve01/battlezone/issues/311)) ([fb215d0](https://github.com/CodingSteve01/battlezone/commit/fb215d0161300c72c0e67d0634f27075963d3b3e))
+
 ## [5.2.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.1...shadow-squad-v5.2.2) (2026-01-02)
 
 
