@@ -4067,8 +4067,7 @@ function scoreSearchPosition(unit, q, r, plan) {
     const zoneShrinkFactor = state.zoneRadius < CONFIG.MAP_SIZES[state.settings.size] ? 2 : 1;
     score -= distFromCenter * (plan.inHuntMode ? 3 : 2) * zoneShrinkFactor;
 
-    // Hills for vision
-    const hex = getHex(q, r);
+    // Hills for vision (hex already declared above)
     if (hex && hex.type === 'hills') {
         // Extra value for scouts and snipers
         const visionBonus = (unit.class === 'scout' || unit.class === 'sniper') ? 40 : 20;

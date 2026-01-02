@@ -11,6 +11,7 @@ import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
 import { isAIPlayer, isSpectatorMode } from './ai.js';
+import { drawUnit } from './assetLoader.js';
 
 // Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
 
@@ -1266,30 +1267,21 @@ function drawPodiumSprites() {
         // Clear canvas
         ctx.clearRect(0, 0, size, size);
 
-        // Try to use sprite loader, fallback to simple drawing
+        // Draw unit using assetLoader
         try {
-            // Draw unit using assetLoader if available
-            if (typeof drawUnitSprite === 'function') {
-                drawUnitSprite(ctx, size / 2, size / 2 + 10, size * 0.45, playerColor, unitClass, 'normal', false, player);
-            } else {
-                // Fallback: draw colored circle with class initial
-                ctx.fillStyle = playerColor;
-                ctx.beginPath();
-                ctx.arc(size / 2, size / 2, size * 0.35, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 24px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(unitClass.charAt(0).toUpperCase(), size / 2, size / 2);
-            }
+            drawUnit(ctx, size / 2, size / 2 + 10, size * 0.45, playerColor, unitClass, 'normal', false, player);
         } catch {
-            // Fallback on error
+            // Fallback on error: draw colored circle with class initial
             ctx.fillStyle = playerColor;
             ctx.beginPath();
             ctx.arc(size / 2, size / 2, size * 0.35, 0, Math.PI * 2);
             ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(unitClass.charAt(0).toUpperCase(), size / 2, size / 2);
         }
     });
 }
