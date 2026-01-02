@@ -28,7 +28,7 @@ const aiThoughts = {
     current: null,          // Current thought being displayed
     queue: [],              // Queue of thoughts to display
     enabled: false,         // Only enabled in spectator mode (all AI players)
-    displayTime: 2000,      // How long each thought is displayed (ms)
+    displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
 };
 
 /**
@@ -88,27 +88,15 @@ function showNextThought() {
 }
 
 /**
- * Display a thought in the UI
+ * Display a thought in the UI (clean subtitle style, no icons)
  */
 function displayThought(thought) {
     const existing = document.querySelector('.ai-thought-bubble');
     if (existing) existing.remove();
 
-    const categoryIcons = {
-        strategy: '🎯',
-        attack: '⚔️',
-        move: '🚶',
-        special: '✨',
-        retreat: '🛡️',
-        general: '💭'
-    };
-
     const bubble = document.createElement('div');
     bubble.className = 'ai-thought-bubble';
-    bubble.innerHTML = `
-        <span class="thought-icon">${categoryIcons[thought.category] || '💭'}</span>
-        <span class="thought-text">${thought.text}</span>
-    `;
+    bubble.innerHTML = `<span class="thought-text">${thought.text}</span>`;
     document.body.appendChild(bubble);
 
     // Animate in
@@ -121,6 +109,28 @@ function displayThought(thought) {
         bubble.classList.remove('visible');
         setTimeout(() => bubble.remove(), 300);
     }, aiThoughts.displayTime - 300);
+}
+
+/**
+ * Add a multi-part thought (splits long text into readable segments)
+ * Each segment is shown sequentially with proper timing
+ */
+function addMultiPartThought(parts, category = 'general') {
+    if (!isSpectatorMode()) return;
+
+    // Filter out empty parts and add each as a separate thought
+    const validParts = parts.filter(p => p && p.trim());
+    validParts.forEach(part => {
+        addAIThought(part.trim(), category);
+    });
+}
+
+/**
+ * Generate varied phrasing for common situations
+ * Returns a randomly selected phrase from the options
+ */
+function variedPhrase(options) {
+    return options[Math.floor(Math.random() * options.length)];
 }
 
 /**
@@ -142,7 +152,7 @@ function clearAIThoughts() {
  */
 function createTeamMemory() {
     return {
-        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence }
+        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence, direction, hp }
         searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
         threatAssessment: new Map(),     // unitId -> threat level
         huntMode: false,                 // True when actively hunting remaining enemies
@@ -157,6 +167,11 @@ function createTeamMemory() {
         // Team coordination
         lastUpdateRound: 0,              // Last round this memory was updated
         teamPlayers: new Set(),          // Players that share this memory
+        // === ERWEITERTES ERINNERUNGSSYSTEM ===
+        attackHistory: new Map(),        // unitId -> [{ fromQ, fromR, round, attackerClass }] - Woher kamen Angriffe
+        movementHistory: new Map(),      // unitId -> [{ fromQ, fromR, toQ, toR, round }] - Letzte Bewegungen
+        predictedPositions: new Map(),   // unitId -> { q, r, confidence } - Vorhergesagte nächste Position
+        flankingTargets: new Map(),      // unitId -> { targetId, flankDirection } - Einkreisungs-Zuweisung
     };
 }
 
@@ -270,20 +285,28 @@ function shouldUseDecoyStrategy(aiUnits, enemies) {
 
 /**
  * Find the best unit to act as decoy/bait
- * Prefer: Assault (tanky), Scout (fast escape)
+ * SICHERHEIT ZUERST: Nur Units mit hoher HP und Überlebensfähigkeit
+ * Prefer: Assault (tanky, 100 HP), Scout (nur mit Sprint verfügbar)
  */
 function findDecoyCandidate(aiUnits) {
-    // Priority order for decoy
-    const decoyPriority = ['assault', 'scout', 'medic'];
+    // Assault ist die erste Wahl wegen hoher HP (100)
+    const assault = aiUnits.find(u =>
+        u.class === 'assault' &&
+        u.currentHp > u.maxHp * 0.7 && // Braucht mindestens 70% HP für Sicherheit
+        u.alive
+    );
+    if (assault) return assault;
 
-    for (const className of decoyPriority) {
-        const candidate = aiUnits.find(u =>
-            u.class === className &&
-            u.currentHp > u.maxHp * 0.5 && // Needs decent HP
-            u.alive
-        );
-        if (candidate) return candidate;
-    }
+    // Scout nur wenn Sprint noch verfügbar ist (für Fluchtmöglichkeit)
+    const scout = aiUnits.find(u =>
+        u.class === 'scout' &&
+        u.currentHp > u.maxHp * 0.7 &&
+        u.alive &&
+        !u.usedSpecial // Sprint muss noch verfügbar sein!
+    );
+    if (scout) return scout;
+
+    // Kein geeigneter Köder gefunden - Sicherheit geht vor
     return null;
 }
 
@@ -309,7 +332,11 @@ function planDecoyStrategy(aiUnits, _enemies) {
     aiMemory.ambushUnits = ambushers.map(u => u.id);
     aiMemory.decoyActive = true;
 
-    addAIThought(`🎯 Köder-Strategie: ${CLASS_NAMES_DE[decoy.class]} lockt Feinde an!`, 'strategy');
+    addMultiPartThought([
+        `Wir starten eine sichere Köder-Taktik.`,
+        `Der ${CLASS_NAMES_DE[decoy.class]} lockt Feinde an, bleibt aber außerhalb der Angriffsreichweite.`,
+        `Die Hinterhalts-Einheiten warten auf den perfekten Moment zum Zuschlagen.`
+    ], 'strategy');
 
     return true;
 }
@@ -329,8 +356,9 @@ function isAmbushUnit(unit) {
 }
 
 /**
- * Score position for decoy unit - move toward enemies to lure them
- * Decoy should be tempting target but have escape route
+ * Score position for decoy unit - lure enemies while STAYING SAFE
+ * SICHERHEIT ZUERST: Köder soll überleben, nicht geopfert werden!
+ * Ideal: AUSSERHALB der Feindreichweite, aber sichtbar und verlockend
  */
 function scoreDecoyPosition(unit, q, r, enemies) {
     let score = 0;
@@ -338,58 +366,87 @@ function scoreDecoyPosition(unit, q, r, enemies) {
 
     if (!hex) return -1000;
 
-    // Find closest enemy
+    // Find closest enemy and calculate threat
     let closestEnemy = null;
     let closestDist = Infinity;
+    let totalThreat = 0;
+
     for (const enemy of enemies) {
         const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
         if (dist < closestDist) {
             closestDist = dist;
             closestEnemy = enemy;
         }
-    }
-
-    if (closestEnemy) {
-        // Decoy wants to be visible and in enemy attack range to lure them
-        // Ideal distance: just outside enemy range or just inside (to be attacked)
-        const enemyRange = closestEnemy.range || 3;
-
-        if (closestDist === enemyRange || closestDist === enemyRange + 1) {
-            // Perfect bait position - enemy can almost reach
-            score += 100;
-        } else if (closestDist < enemyRange) {
-            // In enemy range - dangerous but effective bait
-            score += 60;
-        } else if (closestDist <= enemyRange + 2) {
-            // Close enough to lure
-            score += 40;
-        } else {
-            // Too far to be effective bait
-            score -= closestDist * 5;
+        // Berechne Bedrohung: Feinde die uns erreichen können
+        const enemyRange = enemy.range || 3;
+        if (dist <= enemyRange) {
+            totalThreat += enemy.damage;
         }
     }
 
-    // Check retreat path to allies (ambush units)
+    // === SICHERHEITS-BEWERTUNG (HÖCHSTE PRIORITÄT) ===
+    // VERMEIDE Positionen wo wir von mehreren Feinden angegriffen werden können
+    if (totalThreat > unit.currentHp * 0.5) {
+        score -= 300; // Zu gefährlich! Mehrere Feinde könnten uns erledigen
+    } else if (totalThreat > 0) {
+        score -= totalThreat * 2; // Leichte Strafe für jede Bedrohung
+    }
+
+    if (closestEnemy) {
+        const enemyRange = closestEnemy.range || 3;
+
+        // === SICHERE KÖDER-POSITION ===
+        // Ideal: KNAPP AUSSERHALB der Feindreichweite (sie müssen sich bewegen um anzugreifen)
+        if (closestDist === enemyRange + 1) {
+            // PERFEKT: Knapp außerhalb - Feind muss sich bewegen, wir sind sicher
+            score += 120;
+        } else if (closestDist === enemyRange + 2) {
+            // Gut: Etwas weiter weg, aber immer noch verlockend
+            score += 80;
+        } else if (closestDist === enemyRange) {
+            // GEFÄHRLICH: Gerade noch in Reichweite - nur wenn Deckung vorhanden
+            if (hex.cover) {
+                score += 40; // Mit Deckung akzeptabel
+            } else {
+                score -= 50; // Ohne Deckung zu riskant
+            }
+        } else if (closestDist < enemyRange) {
+            // ZU NAH: Stark bestraft - der Köder soll überleben!
+            score -= 150;
+        } else if (closestDist > enemyRange + 3) {
+            // Zu weit - nicht effektiv als Köder
+            score -= closestDist * 3;
+        }
+    }
+
+    // === FLUCHTWEG-BEWERTUNG ===
+    // Köder MUSS einen sicheren Rückzugsweg zu Verbündeten haben
     const ambushUnits = getPlayerUnits(unit.player).filter(u => isAmbushUnit(u));
     if (ambushUnits.length > 0) {
         const avgAmbushDist = ambushUnits.reduce((sum, a) =>
             sum + hexDistance({ q, r }, { q: a.q, r: a.r }), 0
         ) / ambushUnits.length;
 
-        // Decoy should be between enemies and ambush units (but closer to enemies)
-        if (avgAmbushDist >= 3 && avgAmbushDist <= 6) {
-            score += 30; // Good retreat distance
+        // Köder sollte 3-5 Felder von Verstärkung entfernt sein
+        if (avgAmbushDist >= 3 && avgAmbushDist <= 5) {
+            score += 50; // Ideale Fluchtdistanz - nah genug für Unterstützung
+        } else if (avgAmbushDist <= 2) {
+            score += 30; // Sehr nah - gut für Sicherheit
         } else if (avgAmbushDist > 6) {
-            score -= 20; // Too far from backup
+            score -= 60; // ZU WEIT von Verstärkung - gefährlich!
         }
+    } else {
+        // Ohne Hinterhalts-Einheiten ist die Position sehr riskant
+        score -= 100;
     }
 
-    // Decoy prefers light cover but stays visible
-    if (hex.cover) score += 15; // Some protection is good
-    if (hex.type === 'hills') score += 10; // Visible position
-
-    // Penalty for positions that block ambush units' line of fire
-    // (decoy shouldn't stand between ambush and enemy)
+    // === DECKUNG IST WICHTIG ===
+    if (hex.cover) {
+        score += 40; // Deckung ist jetzt viel wichtiger
+    }
+    if (hex.type === 'hills') {
+        score += 20; // Hügel geben Überblick und defensive Vorteile
+    }
 
     // Zone awareness
     if (!isHexInZone(q, r)) {
@@ -747,32 +804,52 @@ function analyzeAndPlan() {
     // Estimate player position if no enemies visible
     if (visibleEnemies.length === 0) {
         estimatePlayerPosition();
-        addAIThought('Keine Feinde in Sicht. Suche nach Zielen...', 'strategy');
+        addAIThought(variedPhrase([
+            'Keine Feinde in Sicht. Wir schwärmen aus, um das Gelände aufzuklären.',
+            'Der Feind versteckt sich. Zeit, systematisch zu suchen.',
+            'Kein Sichtkontakt. Wir verteilen uns zur Aufklärung.'
+        ]), 'strategy');
     } else {
         aiMemory.lastContactRound = state.round;
         aiMemory.huntMode = false;
-        const threatLevel = visibleEnemies.length > 2 ? 'hohe' : 'moderate';
-        addAIThought(`${visibleEnemies.length} Feinde erkannt! Bewerte ${threatLevel} Bedrohung.`, 'strategy');
+        // Detailliertere Feindanalyse
+        const enemyClasses = visibleEnemies.map(e => CLASS_NAMES_DE[e.class] || e.class);
+        const uniqueClasses = [...new Set(enemyClasses)];
+        const woundedEnemies = visibleEnemies.filter(e => e.currentHp < e.maxHp);
+
+        if (visibleEnemies.length === 1) {
+            const hpInfo = woundedEnemies.length > 0 ? ` Der Gegner ist verwundet.` : '';
+            addAIThought(`Feindkontakt! Ein ${uniqueClasses[0]} wurde entdeckt.${hpInfo}`, 'strategy');
+        } else if (visibleEnemies.length <= 3) {
+            const woundedInfo = woundedEnemies.length > 0 ? ` Davon ${woundedEnemies.length} verwundet.` : '';
+            addAIThought(`${visibleEnemies.length} Gegner gesichtet: ${uniqueClasses.join(', ')}.${woundedInfo}`, 'strategy');
+        } else {
+            addAIThought(`Starke Feindpräsenz! ${visibleEnemies.length} Gegner in Sichtweite. Vorsicht geboten.`, 'strategy');
+        }
     }
 
     // Enter hunt mode if we haven't seen enemies for a while
     if (state.round - aiMemory.lastContactRound >= 2) {
         aiMemory.huntMode = true;
-        addAIThought('Aktiviere Jagdmodus - Feinde werden gesucht!', 'strategy');
+        addAIThought(variedPhrase([
+            'Seit zwei Runden kein Feindkontakt. Wechsle in den Jagdmodus.',
+            'Der Feind hält sich versteckt. Wir beginnen eine systematische Suche.',
+            'Zeit, aktiv nach dem Feind zu suchen. Jagdmodus aktiviert.'
+        ]), 'strategy');
     }
 
     // Decide search pattern based on situation (using all allied units)
     decideSearchPattern(allAlliedUnits, visibleEnemies);
 
-    // Generate thought based on search pattern
-    const patternNames = {
-        'engage': 'Angriff - Feinde im Visier',
-        'expand': 'Expansion - Gebiet erkunden',
-        'sweep': 'Durchkämmen - Koordinierter Vormarsch',
-        'pincer': 'Zangenbewegung - Einkreisung'
+    // Generate thought based on search pattern - nur bei Änderung oder wichtigen Situationen
+    const patternExplanations = {
+        'engage': 'Der Feind ist in Reichweite. Alle Einheiten greifen direkt an.',
+        'expand': 'Wir breiten uns aus, um mehr Gebiet unter Kontrolle zu bringen.',
+        'sweep': 'Koordiniertes Durchkämmen des Geländes von einer Seite zur anderen.',
+        'pincer': 'Zangenbewegung eingeleitet. Wir umzingeln den Feind von zwei Seiten.'
     };
-    if (aiMemory.searchPattern && patternNames[aiMemory.searchPattern]) {
-        addAIThought(`Strategie: ${patternNames[aiMemory.searchPattern]}`, 'strategy');
+    if (aiMemory.searchPattern && patternExplanations[aiMemory.searchPattern] && visibleEnemies.length > 0) {
+        addAIThought(patternExplanations[aiMemory.searchPattern], 'strategy');
     }
 
     // Assign targets using ALL allied units for coordinated focus fire
@@ -791,18 +868,21 @@ function analyzeAndPlan() {
             aiMemory.decoyActive = false;
             aiMemory.decoyUnit = null;
             aiMemory.ambushUnits = [];
-            addAIThought('Köder-Strategie abgebrochen - neu bewerten...', 'strategy');
+            addAIThought('Der Köder ist zu stark beschädigt. Wir brechen die Taktik ab und bewerten die Lage neu.', 'strategy');
         }
     }
 
     // Calculate AP budgets for each unit
     const apBudgets = calculateAPBudgets(aiUnits, state.sharedAP, visibleEnemies);
 
-    // Log AP allocation
-    const budgetInfo = aiUnits.filter(u => u.alive).map(u =>
-        `${CLASS_NAMES_DE[u.class] || u.class}: ${apBudgets.get(u.id) || 0} AP`
-    ).join(', ');
-    addAIThought(`AP-Verteilung: ${budgetInfo}`, 'strategy');
+    // Summarize team readiness (nur bei genügend AP zeigen)
+    const totalAP = state.sharedAP;
+    const aliveUnits = aiUnits.filter(u => u.alive).length;
+    if (totalAP >= aliveUnits * 2 && visibleEnemies.length > 0) {
+        addAIThought(`${aliveUnits} Einheiten einsatzbereit mit ${totalAP} Aktionspunkten. Genug Ressourcen für einen koordinierten Angriff.`, 'strategy');
+    } else if (totalAP < aliveUnits && visibleEnemies.length > 0) {
+        addAIThought('Aktionspunkte knapp. Wir konzentrieren uns auf die wichtigsten Aktionen.', 'strategy');
+    }
 
     return {
         aiUnits,
@@ -817,9 +897,34 @@ function analyzeAndPlan() {
 
 /**
  * Update memory with currently visible enemies
+ * Erweitert: Speichert auch Bewegungshistorie für Positionsvorhersage
  */
 function updateMemoryWithVisibleEnemies(enemies) {
     for (const enemy of enemies) {
+        const previousPos = aiMemory.lastKnownPositions.get(enemy.id);
+
+        // === BEWEGUNGSHISTORIE AKTUALISIEREN ===
+        if (previousPos && (previousPos.q !== enemy.q || previousPos.r !== enemy.r)) {
+            // Feind hat sich bewegt - speichere die Bewegung
+            if (!aiMemory.movementHistory.has(enemy.id)) {
+                aiMemory.movementHistory.set(enemy.id, []);
+            }
+            const history = aiMemory.movementHistory.get(enemy.id);
+            history.push({
+                fromQ: previousPos.q,
+                fromR: previousPos.r,
+                toQ: enemy.q,
+                toR: enemy.r,
+                round: state.round
+            });
+            // Nur die letzten 5 Bewegungen speichern
+            if (history.length > 5) history.shift();
+
+            // Vorhersage der nächsten Position basierend auf Bewegungsrichtung
+            predictEnemyNextPosition(enemy.id, previousPos, enemy);
+        }
+
+        // Aktuelle Position speichern
         aiMemory.lastKnownPositions.set(enemy.id, {
             q: enemy.q,
             r: enemy.r,
@@ -837,9 +942,58 @@ function updateMemoryWithVisibleEnemies(enemies) {
             pos.confidence *= 0.7;  // Reduce confidence each round
             if (pos.confidence < 0.1) {
                 aiMemory.lastKnownPositions.delete(id);
+                aiMemory.movementHistory.delete(id);
+                aiMemory.predictedPositions.delete(id);
             }
         }
     });
+}
+
+/**
+ * Vorhersage der nächsten feindlichen Position basierend auf Bewegungsmuster
+ */
+function predictEnemyNextPosition(enemyId, previousPos, currentPos) {
+    // Berechne Bewegungsvektor
+    const dq = currentPos.q - previousPos.q;
+    const dr = currentPos.r - previousPos.r;
+
+    // Vorhersage: Feind bewegt sich wahrscheinlich weiter in diese Richtung
+    const predictedQ = currentPos.q + dq;
+    const predictedR = currentPos.r + dr;
+
+    // Prüfe ob vorhergesagte Position gültig ist
+    const predictedHex = getHex(predictedQ, predictedR);
+    if (predictedHex && predictedHex.walkable && !predictedHex.unit) {
+        aiMemory.predictedPositions.set(enemyId, {
+            q: predictedQ,
+            r: predictedR,
+            confidence: 0.6,  // 60% Konfidenz für Vorhersage
+            basedOnRound: state.round
+        });
+    } else {
+        // Keine gültige Vorhersage möglich
+        aiMemory.predictedPositions.delete(enemyId);
+    }
+}
+
+/**
+ * Registriere einen empfangenen Angriff für die Erinnerung
+ * Wird aufgerufen wenn eine unserer Einheiten angegriffen wird
+ */
+function recordIncomingAttack(targetUnit, attackerUnit) {
+    if (!aiMemory.attackHistory.has(targetUnit.id)) {
+        aiMemory.attackHistory.set(targetUnit.id, []);
+    }
+    const history = aiMemory.attackHistory.get(targetUnit.id);
+    history.push({
+        fromQ: attackerUnit.q,
+        fromR: attackerUnit.r,
+        round: state.round,
+        attackerClass: attackerUnit.class,
+        attackerId: attackerUnit.id
+    });
+    // Nur die letzten 5 Angriffe speichern
+    if (history.length > 5) history.shift();
 }
 
 /**
@@ -872,7 +1026,8 @@ function learnFromGhostIndicators() {
             });
 
             // Log AI thought about detection
-            addAIThought(`Feindliche Position erkannt! ${ghost.class} griff von Position an.`, 'strategy');
+            const className = CLASS_NAMES_DE[ghost.class] || ghost.class;
+            addAIThought(`Ein getarnter ${className} hat von dort angegriffen. Wir kennen jetzt seine ungefähre Position.`, 'strategy');
         }
     }
 }
@@ -1003,6 +1158,7 @@ function decideSearchPattern(aiUnits, visibleEnemies) {
  */
 function assignTargets(aiUnits, enemies) {
     aiMemory.assignedTargets.clear();
+    aiMemory.flankingTargets.clear();
 
     if (enemies.length === 0) return;
 
@@ -1031,6 +1187,106 @@ function assignTargets(aiUnits, enemies) {
             }
         }
     }
+
+    // === TAKTISCHES EINKESSELN ===
+    // Weise Flankenmanöver zu wenn mehrere Einheiten denselben Feind angreifen
+    planEncirclementManeuvers(aiUnits, enemies);
+}
+
+/**
+ * Plane Einkesselungs-Manöver für koordinierte Angriffe
+ * Weist Einheiten verschiedene Flankenrichtungen zu
+ */
+function planEncirclementManeuvers(aiUnits, enemies) {
+    if (enemies.length === 0 || aiUnits.length < 2) return;
+
+    // Finde den Hauptfeind (höchste Bedrohung)
+    const primaryTarget = enemies.reduce((max, e) => {
+        const threat = aiMemory.threatAssessment.get(e.id) || 0;
+        const maxThreat = max ? (aiMemory.threatAssessment.get(max.id) || 0) : 0;
+        return threat > maxThreat ? e : max;
+    }, null);
+
+    if (!primaryTarget) return;
+
+    // Finde Einheiten die diesem Feind zugewiesen sind
+    const assignedUnits = aiUnits.filter(u =>
+        aiMemory.assignedTargets.get(u.id) === primaryTarget.id
+    );
+
+    if (assignedUnits.length < 2) return;
+
+    // Berechne ideale Flankenrichtungen (6 Hex-Richtungen)
+    const directions = [
+        { dq: 1, dr: 0 },   // Ost
+        { dq: 1, dr: -1 },  // Nord-Ost
+        { dq: 0, dr: -1 },  // Nord-West
+        { dq: -1, dr: 0 },  // West
+        { dq: -1, dr: 1 },  // Süd-West
+        { dq: 0, dr: 1 }    // Süd-Ost
+    ];
+
+    // Bestimme welche Richtungen bereits besetzt sind
+    const occupiedDirections = new Set();
+    for (const unit of assignedUnits) {
+        const dq = unit.q - primaryTarget.q;
+        const dr = unit.r - primaryTarget.r;
+        const angle = Math.atan2(dr, dq);
+        const dirIndex = Math.round((angle + Math.PI) / (Math.PI / 3)) % 6;
+        occupiedDirections.add(dirIndex);
+    }
+
+    // Weise unbesetzten Einheiten Flankenrichtungen zu
+    let dirIndex = 0;
+    for (const unit of assignedUnits) {
+        // Finde eine freie Richtung die nicht bereits zugewiesen ist
+        while (occupiedDirections.has(dirIndex) && dirIndex < 6) {
+            dirIndex++;
+        }
+
+        if (dirIndex < 6) {
+            const dir = directions[dirIndex];
+            aiMemory.flankingTargets.set(unit.id, {
+                targetId: primaryTarget.id,
+                flankDirection: dir,
+                directionIndex: dirIndex
+            });
+            occupiedDirections.add(dirIndex);
+            dirIndex++;
+        }
+    }
+
+    // Generiere AI Thought wenn Einkesselung geplant wird
+    if (aiMemory.flankingTargets.size >= 2) {
+        const targetName = CLASS_NAMES_DE[primaryTarget.class] || primaryTarget.class;
+        const numFlankers = aiMemory.flankingTargets.size;
+        addAIThought(`${numFlankers} Einheiten umzingeln den ${targetName}. Er hat keinen Fluchtweg.`, 'strategy');
+    }
+}
+
+/**
+ * Berechne ob eine Position gut für Flankenangriff ist
+ * Gibt Score-Bonus zurück wenn Position für zugewiesene Flanke günstig ist
+ */
+function getFlankingBonus(unit, targetQ, targetR, enemies) {
+    const flankInfo = aiMemory.flankingTargets.get(unit.id);
+    if (!flankInfo) return 0;
+
+    const target = enemies.find(e => e.id === flankInfo.targetId);
+    if (!target) return 0;
+
+    // Berechne ideale Flankenposition
+    const idealQ = target.q + flankInfo.flankDirection.dq * 2;
+    const idealR = target.r + flankInfo.flankDirection.dr * 2;
+
+    // Bonus basierend auf Nähe zur idealen Flankenposition
+    const distToIdeal = hexDistance({ q: targetQ, r: targetR }, { q: idealQ, r: idealR });
+
+    if (distToIdeal === 0) return 80;  // Perfekte Flankenposition
+    if (distToIdeal === 1) return 50;  // Sehr nah
+    if (distToIdeal === 2) return 25;  // Akzeptabel
+
+    return 0;
 }
 
 // ===== MAIN AI EXECUTION =====
@@ -1294,12 +1550,12 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         if (spectatorMode && enemies.length > 0) {
             if (spottedInfo.isSpotted) {
                 if (spottedInfo.urgency === 'critical') {
-                    addAIThought(`⚠️ ${unitName}: Entdeckt & verwundet - kritische Lage!`, 'strategy');
+                    addAIThought(`${unitName} ist entdeckt und verwundet. Kritische Situation – muss schnell handeln.`, 'strategy');
                 } else if (spottedInfo.shouldSeekCover) {
-                    addAIThought(`👁️ ${unitName}: Vom Feind entdeckt - suche Deckung`, 'strategy');
+                    addAIThought(`${unitName} wurde vom Feind gesichtet. Deckung suchen wäre klug.`, 'strategy');
                 }
             } else if (spottedInfo.canSurpriseAttack) {
-                addAIThought(`🎯 ${unitName}: Unentdeckt - Überraschungsangriff möglich!`, 'strategy');
+                addAIThought(`${unitName} ist noch unentdeckt. Gute Chance für einen Überraschungsangriff.`, 'strategy');
             }
         }
 
@@ -1328,11 +1584,15 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         if (shouldRetreat(unit, enemies) && canSpendAP(1)) {
             // Enhanced retreat thought with reason
             const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
-            let retreatReason = `${hpPercent}% HP`;
-            if (spottedInfo.isSpotted && spottedInfo.closestEnemyDist <= 3) {
-                retreatReason += ', Feind zu nah';
+            let retreatReason = '';
+            if (hpPercent <= 30) {
+                retreatReason = `Nur noch ${hpPercent}% Gesundheit – zu riskant weiterzukämpfen.`;
+            } else if (spottedInfo.isSpotted && spottedInfo.closestEnemyDist <= 3) {
+                retreatReason = `Der Feind ist zu nah. ${unitName} zieht sich zurück, um nicht umzingelt zu werden.`;
+            } else {
+                retreatReason = `${unitName} ist angeschlagen und sucht eine sicherere Position.`;
             }
-            addAIThought(`🛡️ ${unitName}: Rückzug (${retreatReason})`, 'retreat');
+            addAIThought(retreatReason, 'retreat');
             await executeRetreatWithBudget(unit, enemies, spectatorMode, unitBudget - apSpentByUnit);
             return;
         }
@@ -1351,10 +1611,10 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             const targetName = CLASS_NAMES_DE[target.class] || target.class;
             const canKill = target.currentHp <= unit.damage;
             if (canKill) {
-                addAIThought(`💀 ${unitName}: Todesstoß auf ${targetName}!`, 'attack');
+                addAIThought(`${unitName} kann den ${targetName} mit diesem Schuss erledigen. Das ist die Priorität.`, 'attack');
             } else {
-                const damagePercent = Math.round((unit.damage / target.currentHp) * 100);
-                addAIThought(`⚔️ ${unitName}: Fokusfeuer auf ${targetName} (~${damagePercent}% Schaden)`, 'attack');
+                const targetHp = Math.round(target.currentHp);
+                addAIThought(`${unitName} konzentriert Feuer auf den ${targetName}. Noch ${targetHp} HP übrig.`, 'attack');
             }
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
             trackAPSpent(1);
@@ -1365,10 +1625,10 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
                 const targetName = CLASS_NAMES_DE[target.class] || target.class;
                 const canKill = target.currentHp <= unit.damage;
                 if (canKill) {
-                    addAIThought(`💀 ${unitName}: Kann ${targetName} eliminieren!`, 'attack');
+                    addAIThought(`${targetName} ist verwundbar. ${unitName} kann ihn jetzt ausschalten.`, 'attack');
                 } else {
                     const targetHpPercent = Math.round((target.currentHp / target.maxHp) * 100);
-                    addAIThought(`⚔️ ${unitName} → ${targetName} (${targetHpPercent}% HP)`, 'attack');
+                    addAIThought(`${unitName} greift den ${targetName} an, der noch ${targetHpPercent}% HP hat.`, 'attack');
                 }
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
@@ -1378,16 +1638,20 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         // 4. Use special ability if beneficial AND within budget (wenn noch nicht verwendet)
         const specialCost = getSpecialAbilityCost(unit.class);
         if (!preMoveAbilityUsed && canSpendAP(specialCost) && canUseSpecialAbility(unit) && shouldUseSpecial(unit, enemies, plan)) {
-            // Generate special ability thought with reason
+            // Generate special ability thought with context-aware reason
             const specialReasons = {
-                scout: spottedInfo.isSpotted ? 'Sprint für Flucht!' : 'Sprint für Flanke!',
-                assault: 'Powershot für max. Schaden!',
-                medic: 'Team braucht Heilung!',
-                sniper: spottedInfo.isSpotted ? 'Tarnung nach Entdeckung!' : 'Tarnung für Hinterhalt!',
-                commando: 'Stealth für Infiltration!',
-                elitesoldat: 'Taktischer Vorteil!'
+                scout: spottedInfo.isSpotted
+                    ? `${unitName} aktiviert Sprint, um der Gefahr zu entkommen.`
+                    : `${unitName} sprintet, um eine bessere Angriffsposition zu erreichen.`,
+                assault: `${unitName} lädt einen Powershot – der nächste Angriff wird verheerend.`,
+                medic: `Das Team braucht medizinische Versorgung. ${unitName} bereitet die Heilung vor.`,
+                sniper: spottedInfo.isSpotted
+                    ? `${unitName} tarnt sich, um der Entdeckung zu entkommen.`
+                    : `${unitName} geht in Tarnung für einen überraschenden Schuss.`,
+                commando: `${unitName} verschwindet in den Schatten, um unbemerkt zuzuschlagen.`,
+                elitesoldat: `${unitName} aktiviert den taktischen Modus für präzisere Angriffe.`
             };
-            addAIThought(`✨ ${unitName}: ${specialReasons[unit.class] || 'Spezialfähigkeit!'}`, 'special');
+            addAIThought(specialReasons[unit.class] || `${unitName} setzt die Spezialfähigkeit ein.`, 'special');
 
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
@@ -1407,16 +1671,21 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
                 if (spectatorMode && !moveTarget.foresight?.explanation) {
                     // Generate a thought about why we're moving
                     if (enemies.length === 0) {
-                        addAIThought(`🔍 ${unitName}: Erkundet Gebiet`, 'move');
+                        addAIThought(variedPhrase([
+                            `${unitName} erkundet unbekanntes Terrain.`,
+                            `Keine Feinde in Sicht. ${unitName} rückt vor.`,
+                            `${unitName} sucht nach feindlichen Positionen.`
+                        ]), 'move');
                     } else if (spottedInfo.isSpotted && spottedInfo.shouldSeekCover) {
-                        addAIThought(`🏃 ${unitName}: Repositioniert in Deckung`, 'move');
+                        addAIThought(`${unitName} wurde gesehen und sucht jetzt Deckung.`, 'move');
                     } else {
                         const closestEnemy = enemies[0];
                         const distAfter = hexDistance({ q: moveTarget.q, r: moveTarget.r }, { q: closestEnemy.q, r: closestEnemy.r });
+                        const closestEnemyName = CLASS_NAMES_DE[closestEnemy.class] || closestEnemy.class;
                         if (distAfter <= unit.range) {
-                            addAIThought(`🎯 ${unitName}: Bewegt sich in Angriffsreichweite`, 'move');
+                            addAIThought(`${unitName} bewegt sich in Schussreichweite zum ${closestEnemyName}.`, 'move');
                         } else {
-                            addAIThought(`📍 ${unitName}: Taktische Neupositionierung`, 'move');
+                            addAIThought(`${unitName} nähert sich dem Kampfgebiet.`, 'move');
                         }
                     }
                 }
@@ -1432,7 +1701,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             const target = selectBestTarget(unit, attackableAfterMove);
             if (target) {
                 const targetName = CLASS_NAMES_DE[target.class] || target.class;
-                addAIThought(`⚔️ ${unitName}: Folgeangriff auf ${targetName}!`, 'attack');
+                addAIThought(`Nach der Bewegung hat ${unitName} jetzt Sicht auf den ${targetName}. Angriff!`, 'attack');
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
             }
@@ -1763,8 +2032,13 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
         else if (distToAlly <= 2) score -= 12;
     }
 
-    // Flanking bonus
-    if (primaryTarget && allies.length > 0) {
+    // === VERBESSERTER FLANKING-BONUS mit Koordination ===
+    // Nutze das Einkesselungs-System wenn verfügbar
+    const coordFlankBonus = getFlankingBonus(unit, q, r, enemies);
+    if (coordFlankBonus > 0) {
+        score += coordFlankBonus;
+    } else if (primaryTarget && allies.length > 0) {
+        // Fallback: Standard-Flanking basierend auf Winkel zu Verbündeten
         const avgAllyAngle = allies.reduce((sum, a) => {
             return sum + Math.atan2(a.r - primaryTarget.r, a.q - primaryTarget.q);
         }, 0) / allies.length;
@@ -1774,6 +2048,16 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
 
         const flankBonus = unit.class === 'commando' ? 40 : 25;
         if (angleDiff > Math.PI / 3) score += flankBonus;
+    }
+
+    // === NUTZE VORHERGESAGTE FEINDPOSITIONEN ===
+    // Bonus für Positionen die vorhergesagte Bewegungen abfangen
+    for (const [enemyId, prediction] of aiMemory.predictedPositions) {
+        const distToPrediction = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
+        if (distToPrediction <= unit.range && prediction.confidence > 0.4) {
+            // Position kann vorhergesagte Feindposition angreifen
+            score += 25 * prediction.confidence;
+        }
     }
 
     return score;
@@ -1791,58 +2075,73 @@ function getNeighborCoords(q, r) {
 }
 
 /**
- * Execute decoy unit behavior - lure enemies while staying alive
+ * Execute decoy unit behavior - lure enemies while STAYING ALIVE
+ * SICHERHEIT ZUERST: Der Köder soll überleben, nicht geopfert werden!
  */
 async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const actionDelay = spectatorMode ? 500 : 300;
 
-    // Decoy prioritizes survival - retreat if too damaged
-    if (unit.currentHp < unit.maxHp * 0.4) {
-        addAIThought(`${unitName} (Köder): Rückzug - zu viel Schaden!`, 'retreat');
+    // === SICHERHEITS-CHECK: Frühzeitiger Rückzug bei 60% HP ===
+    // Der Köder soll überleben, nicht sterben!
+    if (unit.currentHp < unit.maxHp * 0.6) {
+        addAIThought(`${unitName} hat seine Köder-Aufgabe erfüllt. Sicherer Rückzug bei ${Math.round(unit.currentHp / unit.maxHp * 100)}% HP.`, 'retreat');
         await executeRetreat(unit, enemies, spectatorMode);
         return;
     }
 
-    // 1. Move to lure position FIRST (most important for decoy)
+    // === BEDROHUNGS-ANALYSE ===
+    const closestEnemyDist = enemies.length > 0
+        ? Math.min(...enemies.map(e => hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })))
+        : Infinity;
+
+    // Zähle wie viele Feinde uns angreifen könnten
+    const threateningEnemies = enemies.filter(e => {
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+        return dist <= (e.range || 3);
+    });
+
+    // Bei zu hoher Bedrohung: Sofortiger Rückzug
+    if (threateningEnemies.length >= 2) {
+        addAIThought(`Zu viele Feinde in Reichweite! ${unitName} zieht sich zurück, um nicht umzingelt zu werden.`, 'retreat');
+        await executeRetreat(unit, enemies, spectatorMode);
+        return;
+    }
+
+    // === SCOUT: Sprint ZUERST aktivieren für Sicherheit ===
+    if (unit.class === 'scout' && canUseSpecialAbility(unit) && closestEnemyDist <= 5) {
+        addAIThought(`${unitName} aktiviert Sprint VOR der Köder-Bewegung - für garantierte Fluchtmöglichkeit.`, 'special');
+        useSpecialAbility(unit);
+        renderIfVisible();
+        await delay(actionDelay);
+    }
+
+    // === SICHERE POSITIONIERUNG ===
+    // Bewege in eine Position die lockt, aber SICHER ist
     if (state.sharedAP >= 1) {
-        addAIThought(`${unitName} lockt Feinde an...`, 'move');
+        addAIThought(`${unitName} positioniert sich verlockend, aber außerhalb der direkten Feindreichweite.`, 'move');
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget, spectatorMode);
         }
     }
 
-    // 2. Only attack if it's safe (kill shot or enemy is almost dead)
-    // WICHTIG: canUnitAttack wird über getAttackableUnits geprüft (MAX_ATTACKS_PER_UNIT: 1)
+    // === NUR SICHERE ANGRIFFE ===
+    // Nur angreifen wenn wir sicher eliminieren können
     const attackable = getAttackableUnits(unit);
     if (attackable.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
-        // Only attack if we can kill or target is nearly dead
         const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
         if (killableTarget) {
-            addAIThought(`${unitName}: Gelegenheitsziel!`, 'attack');
+            const targetName = CLASS_NAMES_DE[killableTarget.class] || killableTarget.class;
+            addAIThought(`${targetName} ist verwundbar. ${unitName} nutzt die sichere Gelegenheit zum Eliminieren.`, 'attack');
             await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer, spectatorMode);
         }
+        // KEIN Angriff auf volle HP Ziele - zu riskant, provoziert Gegenschlag
     }
 
-    // 3. Use special only defensively (sprint for escape, etc.)
-    if (canUseSpecialAbility(unit)) {
-        // Scout: Sprint if enemies are close (escape option)
-        // Assault: Don't powershot (save HP as bait)
-        if (unit.class === 'scout') {
-            const closestEnemy = enemies.reduce((min, e) => {
-                const d = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
-                return d < min ? d : min;
-            }, Infinity);
-            if (closestEnemy <= 3) {
-                addAIThought(`${unitName}: Sprint vorbereitet für Flucht!`, 'special');
-                useSpecialAbility(unit);
-                renderIfVisible();
-                await delay(actionDelay);
-            }
-        }
-    }
+    // === ASSAULT: Defensive Haltung ===
+    // Assault-Köder greift NICHT mit Powershot an - spart Ressourcen für Verteidigung
 }
 
 /**
@@ -1857,7 +2156,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
     // 1. Use stealth abilities if available (sniper cloak, commando stealth)
     if (canUseSpecialAbility(unit)) {
         if ((unit.class === 'sniper' || unit.class === 'commando') && !unit.cloaked) {
-            addAIThought(`${unitName}: Tarnung für Hinterhalt!`, 'special');
+            addAIThought(`${unitName} tarnt sich und wartet auf den perfekten Moment zum Zuschlagen.`, 'special');
             useSpecialAbility(unit);
             renderIfVisible();
             await delay(actionDelay);
@@ -1866,7 +2165,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
 
     // 2. Position for ambush if not in attack range
     if (attackable.length === 0 && state.sharedAP >= 1) {
-        addAIThought(`${unitName} positioniert sich für Hinterhalt...`, 'move');
+        addAIThought(`${unitName} bezieht eine versteckte Position für den Hinterhalt.`, 'move');
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget, spectatorMode);
@@ -1880,7 +2179,8 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         // Prioritize enemies that attacked/engaged the decoy
         const target = selectBestTarget(unit, attackableNow);
         if (target) {
-            addAIThought(`${unitName}: Hinterhalt! Angriff auf ${CLASS_NAMES_DE[target.class]}!`, 'attack');
+            const targetName = CLASS_NAMES_DE[target.class] || target.class;
+            addAIThought(`Der Feind ist in die Falle getappt! ${unitName} greift den ${targetName} aus dem Hinterhalt an.`, 'attack');
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
     }
@@ -1891,7 +2191,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
             hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range
         );
         if (inRange.length > 0) {
-            addAIThought(`${unitName}: Powershot! 💥`, 'special');
+            addAIThought(`${unitName} lädt einen verstärkten Schuss aus dem Hinterhalt. Der nächste Treffer wird vernichtend.`, 'special');
             useSpecialAbility(unit);
             renderIfVisible();
             await delay(actionDelay);
@@ -1976,11 +2276,13 @@ async function executeMedicAI(unit, plan, context) {
 
         if (criticallyWounded.length > 0) {
             const criticalName = CLASS_NAMES_DE[mostCritical.class] || mostCritical.class;
-            addAIThought(`💚 ${unitName}: NOTFALL! ${criticalName} kritisch verletzt - heile sofort!`, 'special');
+            const criticalHpPercent = Math.round(mostCritical.currentHp / mostCritical.maxHp * 100);
+            addAIThought(`Notfall! Der ${criticalName} hat nur noch ${criticalHpPercent}% HP. ${unitName} muss jetzt heilen.`, 'special');
         } else if (totalWounded >= 2) {
-            addAIThought(`💚 ${unitName}: ${totalWounded} Verletzte in Reichweite - Massenheilung!`, 'special');
+            addAIThought(`${totalWounded} Teammitglieder sind verletzt. ${unitName} startet eine Massenheilung.`, 'special');
         } else {
-            addAIThought(`💚 ${unitName}: Team braucht Heilung!`, 'special');
+            const targetName = CLASS_NAMES_DE[woundedInRange[0].class] || woundedInRange[0].class;
+            addAIThought(`Der ${targetName} braucht medizinische Versorgung. ${unitName} heilt.`, 'special');
         }
 
         useSpecialAbility(unit);
@@ -2004,7 +2306,7 @@ async function executeMedicAI(unit, plan, context) {
             const targetAlly = woundedOutOfRange[0];
             const targetName = CLASS_NAMES_DE[targetAlly.class] || targetAlly.class;
             const hpPercent = Math.round(targetAlly.currentHp / targetAlly.maxHp * 100);
-            addAIThought(`🏃 ${unitName}: Eile zu ${targetName} (${hpPercent}% HP)`, 'move');
+            addAIThought(`Der ${targetName} ist verletzt und außer Reichweite. ${unitName} eilt zu ihm.`, 'move');
 
             await executeAIMove(unit, moveTarget, spectatorMode);
             trackAPSpent(moveTarget.cost);
@@ -2017,7 +2319,7 @@ async function executeMedicAI(unit, plan, context) {
             );
 
             if (newWoundedInRange.length > 0 && canSpendAP(specialCost) && canUseSpecialAbility(unit)) {
-                addAIThought(`💚 ${unitName}: Jetzt in Reichweite - heile!`, 'special');
+                addAIThought(`Jetzt ist ${unitName} nah genug. Die Heilung beginnt.`, 'special');
                 useSpecialAbility(unit);
                 trackAPSpent(specialCost);
 
@@ -2045,9 +2347,9 @@ async function executeMedicAI(unit, plan, context) {
             if (target) {
                 const targetName = CLASS_NAMES_DE[target.class] || target.class;
                 if (killableTarget) {
-                    addAIThought(`💀 ${unitName}: Gelegenheitsziel - ${targetName} eliminieren!`, 'attack');
+                    addAIThought(`${targetName} ist fast erledigt. Auch der ${unitName} kann zuschlagen.`, 'attack');
                 } else {
-                    addAIThought(`⚔️ ${unitName}: Team gesund - unterstütze mit Feuer`, 'attack');
+                    addAIThought(`Das Team ist gesund. ${unitName} unterstützt mit Feuerunterstützung.`, 'attack');
                 }
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
@@ -2162,9 +2464,9 @@ async function executeSpottedStealthReaction(unit, enemies, _plan, context) {
 
     if (shouldCloak) {
         if (unit.class === 'sniper') {
-            addAIThought(`🔫 ${unitName}: Entdeckt! Aktiviere Tarnung für Rückzug!`, 'special');
+            addAIThought(`${unitName} wurde entdeckt! Aktiviere Tarnung, um den Feind abzuschütteln.`, 'special');
         } else {
-            addAIThought(`🥷 ${unitName}: Entdeckt! Verschwinde im Schatten!`, 'special');
+            addAIThought(`Der Feind hat ${unitName} gesehen. Schnell in die Schatten verschwinden!`, 'special');
         }
 
         useSpecialAbility(unit);
@@ -2179,13 +2481,14 @@ async function executeSpottedStealthReaction(unit, enemies, _plan, context) {
 
         // Nach Tarnung: Rückzug wenn verletzt oder Sniper in Nahkampfgefahr
         if ((hpPercent < 0.5) || (unit.class === 'sniper' && closestEnemyDist <= 2)) {
-            addAIThought(`🏃 ${unitName}: Ziehe mich getarnt zurück!`, 'retreat');
+            addAIThought(`Getarnt nutzt ${unitName} die Chance zum Rückzug.`, 'retreat');
             await executeRetreat(unit, enemies, spectatorMode);
             result.retreated = true;
         }
     } else if (hpPercent < 0.4 && closestEnemyDist <= 3) {
         // Kritisch verletzt und Feind nah - Rückzug ohne Tarnung
-        addAIThought(`⚠️ ${unitName}: Kritisch! Sofortiger Rückzug!`, 'retreat');
+        const hpPercentDisplay = Math.round(hpPercent * 100);
+        addAIThought(`Kritische Lage! ${unitName} hat nur noch ${hpPercentDisplay}% HP. Sofortiger Rückzug!`, 'retreat');
         await executeRetreat(unit, enemies, spectatorMode);
         result.retreated = true;
     }
@@ -2230,9 +2533,9 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
 
         if (needsSprintToReach || needsSprintToEscape) {
             if (needsSprintToEscape) {
-                addAIThought(`🏃 ${unitName}: Sprint für Flucht aktiviert!`, 'special');
+                addAIThought(`${unitName} ist in Gefahr. Sprint aktiviert, um Abstand zu gewinnen.`, 'special');
             } else {
-                addAIThought(`🏃 ${unitName}: Sprint! Schließe Lücke zum Feind!`, 'special');
+                addAIThought(`Der Feind ist zu weit weg. ${unitName} sprintet, um die Lücke zu schließen.`, 'special');
             }
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
@@ -2257,7 +2560,7 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
         const notTooClose = closestEnemyDist > 1; // Nicht bereits in Nahkampf
 
         if (canReachEnemy && notTooClose && !spottedInfo.isSpotted) {
-            addAIThought(`🥷 ${unitName}: Aktiviere Stealth für Hinterhalt!`, 'special');
+            addAIThought(`${unitName} aktiviert Stealth. Unbemerkt nähern, dann zuschlagen.`, 'special');
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
 
@@ -2286,7 +2589,7 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
         );
 
         if (canEngageWithTactical || valuableTargetsNearby) {
-            addAIThought(`🎖️ ${unitName}: Taktischer Modus aktiviert!`, 'special');
+            addAIThought(`${unitName} aktiviert den taktischen Modus für höhere Präzision und Beweglichkeit.`, 'special');
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
 
@@ -2321,7 +2624,11 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
             );
             const targetName = target ? (CLASS_NAMES_DE[target.class] || target.class) : 'Ziel';
 
-            addAIThought(`💥 ${unitName}: Powershot auf ${targetName}!`, 'special');
+            if (canKillWithPowershot) {
+                addAIThought(`Der ${targetName} kann mit einem verstärkten Schuss erledigt werden. ${unitName} lädt Powershot.`, 'special');
+            } else {
+                addAIThought(`Ein hochwertiges Ziel: ${targetName}. ${unitName} bereitet einen Powershot vor.`, 'special');
+            }
             useSpecialAbility(unit);
             trackAPSpent(specialCost);
 
@@ -2372,12 +2679,7 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
     const afterAttackDelay = spectatorMode ? 700 : 500;
     const shortDelay = spectatorMode ? 250 : 100;
 
-    if (canKill) {
-        addAIThought(`${unitName} führt Todesstoß gegen ${targetName} aus!`, 'attack');
-    } else {
-        const hpPercent = Math.round(target.currentHp / target.maxHp * 100);
-        addAIThought(`${unitName} greift ${targetName} an (${hpPercent}% HP)`, 'attack');
-    }
+    // Note: Attack thoughts are generated by the caller, not here, to avoid duplicates
 
     // In spectator mode, scroll to show the attack action with situational zoom
     if (spectatorMode) {
@@ -2396,7 +2698,11 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
 
     // Update memory if enemy killed
     if (!target.alive) {
-        addAIThought(`${targetName} eliminiert! ✓`, 'attack');
+        addAIThought(variedPhrase([
+            `${targetName} wurde ausgeschaltet. Ein Feind weniger.`,
+            `Der ${targetName} ist gefallen. Weiter zum nächsten Ziel.`,
+            `${targetName} eliminiert. Das schwächt den Feind erheblich.`
+        ]), 'attack');
         aiMemory.lastKnownPositions.delete(target.id);
         aiMemory.assignedTargets.forEach((tid, uid) => {
             if (tid === target.id) aiMemory.assignedTargets.delete(uid);
@@ -2478,11 +2784,12 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         exposedWithoutOptions: false,
         killableTargets: [],
         threatsInRange: [],
+        closeRangeThreats: [],  // Feinde die besonders nah sind
         scoreAdjustment: 0,
         explanation: ''
     };
 
-    // Check which enemies we can attack from the new position
+    // === ANALYSIERE ALLE FEINDPOSITIONEN ===
     for (const enemy of enemies) {
         const distToEnemy = hexDistance({ q: targetQ, r: targetR }, { q: enemy.q, r: enemy.r });
 
@@ -2498,32 +2805,71 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         const enemyRange = enemy.range || 3;
         if (distToEnemy <= enemyRange) {
             evaluation.threatsInRange.push(enemy);
+            // Besonders gefährlich wenn in Nahkampfreichweite
+            if (distToEnemy <= 2) {
+                evaluation.closeRangeThreats.push(enemy);
+            }
         }
     }
 
-    // CRITICAL: Moving into danger without AP to attack is DUMB
+    // === KRITISCH: INTELLIGENTES AP-MANAGEMENT ===
+    // Die KI darf NIEMALS in Gefahr laufen ohne die Möglichkeit zurückzuschlagen
+
+    // Szenario 1: In Angriffsreichweite mehrerer Feinde ohne AP für Gegenangriff
     if (evaluation.threatsInRange.length > 0 && apAfterMove < 1) {
         evaluation.exposedWithoutOptions = true;
-        evaluation.scoreAdjustment -= 200; // Heavy penalty!
-        evaluation.explanation = `WARNUNG: Keine AP für Gegenangriff nach Bewegung!`;
+        // STARK erhöhter Penalty - skaliert mit Anzahl der Bedrohungen
+        const basePenalty = 300;
+        const threatMultiplier = evaluation.threatsInRange.length;
+        const closeRangePenalty = evaluation.closeRangeThreats.length * 100;
+        evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty;
+        evaluation.explanation = `⚠️ GEFAHR: ${evaluation.threatsInRange.length} Feinde in Reichweite, keine AP übrig!`;
     }
 
-    // Bonus for kill opportunities
+    // Szenario 2: Nahkampf-Situation ohne Fluchtmöglichkeit
+    if (evaluation.closeRangeThreats.length > 0 && apAfterMove < 2) {
+        // Wenn in Nahkampf ohne AP für Angriff+Rückzug
+        evaluation.scoreAdjustment -= 150;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Nahkampfgefahr ohne Ausweichmöglichkeit`;
+        }
+    }
+
+    // Szenario 3: Bewegung zu weit - keine AP für Angriff obwohl Feind erreichbar wäre
+    if (evaluation.canAttackAfter && apAfterMove < 1) {
+        // Kann angreifen aber hat keine AP dafür - VÖLLIG SINNLOSER ZUG
+        evaluation.scoreAdjustment -= 400;
+        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff!`;
+    }
+
+    // === POSITIVE BEWERTUNGEN ===
+
+    // Bonus für Kill-Möglichkeiten (nur wenn AP vorhanden)
     if (evaluation.killableTargets.length > 0 && apAfterMove >= 1) {
-        evaluation.scoreAdjustment += 50 * evaluation.killableTargets.length;
+        evaluation.scoreAdjustment += 80 * evaluation.killableTargets.length;
         const targetName = CLASS_NAMES_DE[evaluation.killableTargets[0].class] || evaluation.killableTargets[0].class;
-        evaluation.explanation = `Todesstoß möglich gegen ${targetName}!`;
+        evaluation.explanation = `💀 Todesstoß möglich gegen ${targetName}!`;
     }
 
-    // Penalty for exposure without attack opportunity
-    if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
-        evaluation.scoreAdjustment -= 100;
-        evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
-    }
-
-    // Good: Can attack AND have AP left for emergency
+    // Gute Position: Kann angreifen UND hat AP für Notfall/Zweiten Angriff
     if (evaluation.canAttackAfter && apAfterMove >= 2) {
+        evaluation.scoreAdjustment += 50;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Gute taktische Position - Angriff + Reserve`;
+        }
+    }
+
+    // Ideale Position: In Angriffsreichweite, genug AP, und hat noch Fluchtoptionen
+    if (evaluation.canAttackAfter && apAfterMove >= 1 && evaluation.threatsInRange.length <= 1) {
         evaluation.scoreAdjustment += 30;
+    }
+
+    // Penalty für Exposition ohne Angriffsmöglichkeit
+    if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
+        evaluation.scoreAdjustment -= 120;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
+        }
     }
 
     return evaluation;
@@ -2572,9 +2918,7 @@ function shouldRetreat(unit, enemies) {
  * Execute retreat - move away from enemies
  */
 async function executeRetreat(unit, enemies, spectatorMode = false) {
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-    const hpPercent = Math.round(unit.currentHp / unit.maxHp * 100);
-    addAIThought(`${unitName} zieht sich zurück (${hpPercent}% HP)`, 'retreat');
+    // Note: Retreat thoughts are typically generated by the caller with more context
 
     const reachable = getReachableHexes(unit);
     if (reachable.size === 0) return;
@@ -3450,7 +3794,7 @@ async function considerTacticalAbilities(unit, enemies, plan, context) {
         const suppressTarget = selectSuppressionTarget(unit, enemies, plan);
         if (suppressTarget) {
             const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-            addAIThought(`${unitName}: Unterdrückungsfeuer auf strategische Position! 🔥`, 'strategy');
+            addAIThought(`${unitName} legt Unterdrückungsfeuer auf eine strategische Position. Der Feind wird dort gebremst.`, 'strategy');
 
             useSuppression(unit, suppressTarget.q, suppressTarget.r);
             trackAPSpent(2);
@@ -3470,7 +3814,7 @@ async function considerTacticalAbilities(unit, enemies, plan, context) {
         const shouldUseOverwatch = evaluateOverwatchValue(unit, enemies, plan);
         if (shouldUseOverwatch) {
             const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-            addAIThought(`${unitName}: Overwatch aktiviert - bereit für Feindkontakt! 👁️`, 'strategy');
+            addAIThought(`${unitName} geht in Overwatch-Position. Jeder Feind, der sich bewegt, wird beschossen.`, 'strategy');
 
             activateOverwatch(unit);
             trackAPSpent(2);

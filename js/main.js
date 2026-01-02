@@ -269,21 +269,31 @@ function showTeamSelectForPlayer(playerIndex) {
     currentPlayerSelection = [];
     currentBudgetSpent = 0;
 
-    // Update header
+    // Update header - Both legacy and shop-style
     const badge = document.getElementById('team-select-badge');
     const playerNum = document.getElementById('team-select-player');
     const hint = document.querySelector('.team-select-hint');
 
+    const playerColor = CONFIG.PLAYER_COLORS[playerIndex];
+    const playerName = getPlayerName(playerIndex);
+
     if (badge) {
-        badge.style.backgroundColor = CONFIG.PLAYER_COLORS[playerIndex];
+        badge.style.backgroundColor = playerColor;
+        badge.style.boxShadow = `0 0 15px ${playerColor}`;
         badge.textContent = playerIndex + 1;
     }
     if (playerNum) {
-        // Use player name instead of just number
-        playerNum.textContent = getPlayerName(playerIndex);
+        playerNum.textContent = playerName;
     }
     if (hint) {
-        hint.textContent = `${getPlayerName(playerIndex)}: Stelle dein Team zusammen`;
+        hint.textContent = `${playerName}: Stelle dein Team zusammen`;
+    }
+
+    // Update shop budget max
+    const shopBudget = document.getElementById('shop-budget');
+    if (shopBudget) {
+        const maxEl = shopBudget.querySelector('.budget-max');
+        if (maxEl) maxEl.textContent = CONFIG.TEAM_BUDGET;
     }
 
     // Generate unit cards
@@ -306,7 +316,7 @@ function showTeamSelectForPlayer(playerIndex) {
 }
 
 /**
- * Update confirm button state
+ * Update confirm button state - Shop Style
  */
 function updateConfirmButton() {
     const confirmBtn = document.getElementById('team-confirm-btn');
@@ -316,19 +326,20 @@ function updateConfirmButton() {
                        currentBudgetSpent <= CONFIG.TEAM_BUDGET;
         confirmBtn.disabled = !isValid;
 
-        // Update button text to show unit count
+        // Compact button text for shop style
         if (isValid) {
-            confirmBtn.textContent = `Weiter (${currentPlayerSelection.length} Einheiten)`;
+            confirmBtn.textContent = `Los! (${currentPlayerSelection.length})`;
         } else if (currentPlayerSelection.length < CONFIG.MIN_UNITS) {
-            confirmBtn.textContent = `Noch ${CONFIG.MIN_UNITS - currentPlayerSelection.length} Einheit(en) wählen`;
+            const needed = CONFIG.MIN_UNITS - currentPlayerSelection.length;
+            confirmBtn.textContent = `+${needed}`;
         } else {
-            confirmBtn.textContent = 'Budget überschritten!';
+            confirmBtn.textContent = '💰!';
         }
     }
 }
 
 /**
- * Generate unit selection cards
+ * Generate unit selection cards - Shop Style
  */
 function generateUnitCards() {
     const grid = document.getElementById('team-select-grid');
@@ -350,49 +361,190 @@ function generateUnitCards() {
         // Check if this is an elite unit (has special dual-attack capability)
         const isElite = classData.canMelee && classData.canRanged;
 
+        // Compact shop-style card layout with info button
         card.innerHTML = `
-            <div class="unit-cost cost-${costCategory}">${classData.cost} 💰</div>
             ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
-            <div class="unit-icon">${classData.icon}</div>
-            <div class="unit-name">${classData.name}</div>
-            <div class="unit-stats">
-                ❤️ ${classData.hp} HP • ⚔️ ${classData.damage} DMG<br>
-                📍 ${classData.move} Felder • 🎯 ${classData.range} Reichweite
-                ${classData.meleeBonus ? `<br>🗡️ +${classData.meleeBonus} Nahkampf` : ''}
+            <button class="card-info-btn" data-class="${classKey}" title="Details">?</button>
+            <div class="card-header">
+                <div class="unit-icon">${classData.icon}</div>
+                <div class="unit-name">${classData.name}</div>
+                <div class="unit-cost cost-${costCategory}">${classData.cost}💰</div>
             </div>
-            <div class="unit-special">✨ ${classData.special}: ${classData.specialDesc}</div>
+            <div class="unit-stats">
+                <span class="stat-item">❤️ ${classData.hp}</span>
+                <span class="stat-item">⚔️ ${classData.damage}</span>
+                <span class="stat-item">📍 ${classData.move}</span>
+                <span class="stat-item">🎯 ${classData.range}</span>
+                ${classData.meleeBonus ? `<span class="stat-item">🗡️ +${classData.meleeBonus}</span>` : ''}
+            </div>
+            <div class="unit-special">✨ ${classData.special}</div>
         `;
 
-        card.onclick = () => {
+        // Card click = select unit
+        card.onclick = (e) => {
+            // Don't select if clicking info button
+            if (e.target.classList.contains('card-info-btn')) return;
             playClick();
             toggleUnitSelection(classKey, card);
         };
 
-        // Show unit class hint on first interaction
-        card.onmouseenter = () => showUnitClassHint(classKey);
-        card.onfocus = () => showUnitClassHint(classKey);
+        // Info button click = show details
+        const infoBtn = card.querySelector('.card-info-btn');
+        if (infoBtn) {
+            infoBtn.onclick = (e) => {
+                e.stopPropagation();
+                playClick();
+                showUnitDetails(classKey);
+            };
+        }
 
         grid.appendChild(card);
     });
+
+    // Setup detail overlay close handlers
+    setupDetailOverlay();
 }
 
 /**
- * Update budget display
+ * Playstyle descriptions for each unit class
  */
-function updateBudgetDisplay() {
-    let budgetDisplay = document.getElementById('budget-display');
+const UNIT_PLAYSTYLES = {
+    scout: 'Ideal für Aufklärung und Flankenmanöver. Nutze die hohe Bewegungsreichweite, um Feinde zu umgehen und ungeschützte Ziele anzugreifen. Sprint ermöglicht schnelle Repositionierung oder Flucht.',
+    assault: 'Der Frontkämpfer. Hohe HP erlauben es, Schaden einzustecken während du dich dem Feind näherst. Powershot ist perfekt, um schwer gepanzerte Ziele oder Gruppen zu eliminieren.',
+    medic: 'Halte dich hinter der Front und heile verwundete Verbündete. Die Gruppenheilung kann Kämpfe wenden. Vermeide direkte Konfrontation - der Medic ist das wertvollste Teammitglied.',
+    sniper: 'Positioniere dich auf erhöhtem Gelände mit guter Sicht. Tarnung erlaubt sichere Repositionierung oder Hinterhalte. Vermeide Nahkampf um jeden Preis - der Sniper stirbt schnell.',
+    commando: 'Infiltrator und Assassine. Nutze Stealth, um unbemerkt in Angriffsposition zu kommen. Der Melee-Bonus macht den Commando tödlich im Nahkampf. Ideal für Überraschungsangriffe.',
+    elitesoldat: 'Vielseitig einsetzbar - effektiv auf jede Distanz. Der taktische Modus erhöht Präzision UND Bewegung. Teuer, aber kann mehrere Rollen im Team erfüllen.'
+};
 
-    // Create budget display if it doesn't exist
-    if (!budgetDisplay) {
-        const preview = document.querySelector('.team-select-preview');
-        if (preview) {
-            budgetDisplay = document.createElement('div');
-            budgetDisplay.id = 'budget-display';
-            budgetDisplay.className = 'budget-display';
-            preview.insertBefore(budgetDisplay, preview.firstChild);
+/**
+ * Show unit detail overlay
+ */
+function showUnitDetails(classKey) {
+    const classData = UNIT_CLASSES[classKey];
+    if (!classData) return;
+
+    const overlay = document.getElementById('shop-detail-overlay');
+    if (!overlay) return;
+
+    // Populate detail panel
+    document.getElementById('detail-icon').textContent = classData.icon;
+    document.getElementById('detail-name').textContent = classData.name;
+    document.getElementById('detail-cost').textContent = `${classData.cost} 💰`;
+
+    // Stats grid
+    const statsEl = document.getElementById('detail-stats');
+    statsEl.innerHTML = `
+        <div class="shop-detail-stat">
+            <span class="stat-icon">❤️</span>
+            <span class="stat-label">Leben</span>
+            <span class="stat-value">${classData.hp}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">⚔️</span>
+            <span class="stat-label">Schaden</span>
+            <span class="stat-value">${classData.damage}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">📍</span>
+            <span class="stat-label">Bewegung</span>
+            <span class="stat-value">${classData.move}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">🎯</span>
+            <span class="stat-label">Reichweite</span>
+            <span class="stat-value">${classData.range}</span>
+        </div>
+        ${classData.meleeBonus ? `
+        <div class="shop-detail-stat">
+            <span class="stat-icon">🗡️</span>
+            <span class="stat-label">Nahkampf</span>
+            <span class="stat-value">+${classData.meleeBonus}</span>
+        </div>
+        ` : ''}
+        <div class="shop-detail-stat">
+            <span class="stat-icon">👁️</span>
+            <span class="stat-label">Sicht</span>
+            <span class="stat-value">${classData.vision}</span>
+        </div>
+    `;
+
+    // Special ability
+    document.getElementById('detail-special-desc').textContent = classData.special;
+
+    // Playstyle
+    document.getElementById('detail-playstyle').textContent = UNIT_PLAYSTYLES[classKey] || 'Keine Beschreibung verfügbar.';
+
+    // Setup select button
+    const selectBtn = document.getElementById('detail-select-btn');
+    selectBtn.onclick = () => {
+        hideUnitDetails();
+        // Find the card and toggle selection
+        const card = document.querySelector(`.unit-card[data-class="${classKey}"]`);
+        if (card) {
+            toggleUnitSelection(classKey, card);
         }
+    };
+
+    // Show overlay
+    overlay.classList.add('visible');
+}
+
+/**
+ * Hide unit detail overlay
+ */
+function hideUnitDetails() {
+    const overlay = document.getElementById('shop-detail-overlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+    }
+}
+
+/**
+ * Setup detail overlay event handlers
+ */
+function setupDetailOverlay() {
+    const overlay = document.getElementById('shop-detail-overlay');
+    const closeBtn = document.getElementById('shop-detail-close');
+
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            playClick();
+            hideUnitDetails();
+        };
     }
 
+    // Click outside panel to close
+    if (overlay) {
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                hideUnitDetails();
+            }
+        };
+    }
+}
+
+/**
+ * Update budget display - Shop Style
+ */
+function updateBudgetDisplay() {
+    // Update Shop-Style budget display
+    const shopBudget = document.getElementById('shop-budget');
+    if (shopBudget) {
+        const currentEl = shopBudget.querySelector('.budget-current');
+        const maxEl = shopBudget.querySelector('.budget-max');
+        if (currentEl) currentEl.textContent = currentBudgetSpent;
+        if (maxEl) maxEl.textContent = CONFIG.TEAM_BUDGET;
+
+        // Visual feedback for budget status
+        const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
+        shopBudget.classList.remove('budget-warning', 'budget-over');
+        if (remaining < 70) shopBudget.classList.add('budget-warning');
+        if (remaining < 0) shopBudget.classList.add('budget-over');
+    }
+
+    // Legacy support for old budget display
+    let budgetDisplay = document.getElementById('budget-display');
     if (budgetDisplay) {
         const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
         const percentage = (currentBudgetSpent / CONFIG.TEAM_BUDGET) * 100;
