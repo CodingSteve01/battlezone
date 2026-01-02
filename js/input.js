@@ -17,10 +17,10 @@ import { checkWinCondition, endTurn, endGame } from './turns.js';
 import { updateVisibility, getVisibleEnemies } from './fogOfWar.js';
 import { updateUI, showScreen, showToast, showPowerupPickup } from './ui.js';
 import { render, resizeCanvas, getMinimapBounds, getToggleButtonBounds, getCloseButtonBounds, getHeightOverlayButtonBounds, setMinimapActive, isMinimapExpanded, setMinimapExpanded } from './renderer.js';
-import { CONFIG } from './config.js';
+import { CONFIG, UNIT_CLASSES } from './config.js';
 import { checkPowerupPickup, POWERUP_TYPES } from './powerups.js';
 import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClick, resumeAudio } from './audio.js';
-import { isAIPlayer } from './ai.js';
+import { isAIPlayer, isSpectatorMode } from './ai.js';
 import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, shouldStartGuidedTutorial, startGuidedTutorial, notifyTutorialAction, isGuidedTutorialActive } from './tutorial.js';
 
 let canvas;
@@ -962,7 +962,9 @@ function handleTapOrClick(clientX, clientY) {
                         return;
                     }
                     // Show healing option
-                    showToast(`💚 ${unit.name} kann ${allyHex.name} heilen! Tippe nochmal zum Heilen.`, 'info');
+                    const unitName = UNIT_CLASSES[unit.class]?.name || unit.class;
+                    const allyName = UNIT_CLASSES[allyHex.class]?.name || allyHex.class;
+                    showToast(`💚 ${unitName} kann ${allyName} heilen! Tippe nochmal zum Heilen.`, 'info');
                     if (state.pendingHealTarget && state.pendingHealTarget.id === allyHex.id) {
                         // Second tap - use special ability with minigame
                         state.pendingHealTarget = null;
@@ -1001,7 +1003,8 @@ function handleTapOrClick(clientX, clientY) {
             playSelect();
             updateUI();
             render();
-            showToast(`${hex.unit.name} ausgewählt`, 'info');
+            const selectedName = UNIT_CLASSES[hex.unit.class]?.name || hex.unit.class;
+            showToast(`${selectedName} ausgewählt`, 'info');
             // Notify guided tutorial of unit selection
             notifyTutorialAction('unitSelected');
             // Check for tutorial hints after selection
@@ -1875,7 +1878,8 @@ async function executeQueuedPathForUnit(unit) {
     if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
         // Path is blocked or invalid
         clearQueuedPath(unit.id);
-        showToast(`❌ Pfad für ${unit.name} blockiert`, 'warning');
+        const blockedUnitName = UNIT_CLASSES[unit.class]?.name || unit.class;
+        showToast(`❌ Pfad für ${blockedUnitName} blockiert`, 'warning');
         return false;
     }
 

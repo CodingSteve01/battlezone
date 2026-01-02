@@ -10,7 +10,7 @@ import { isUnitOnOverwatch } from './state.js';
 import { render, resizeCanvas } from './renderer.js';
 import { getEffectiveDamage, getXPProgress, getRankName } from './progression.js';
 import { playPowerup, playLevelUp, playSelect } from './audio.js';
-import { isAIPlayer } from './ai.js';
+import { isAIPlayer, isSpectatorMode } from './ai.js';
 
 // Note: updateWaypointUI is called at the end of updateUI() via lazy import to avoid circular deps
 
@@ -62,6 +62,7 @@ function centerOnUnit(unit, duration = 400) {
  * Update all UI elements
  */
 export function updateUI() {
+    const spectator = isSpectatorMode();
     const isAiTurnHidden = isAIPlayer() && state.currentPlayer !== state.viewingPlayer;
     const units = isAiTurnHidden ? getPlayerUnits(state.viewingPlayer) : getPlayerUnits(state.currentPlayer);
     const unit = isAiTurnHidden ? null : getCurrentUnit();
@@ -73,13 +74,28 @@ export function updateUI() {
     updateCompassIndicator();
     updatePlayersAlive();
 
+    // === BEOBACHTER-MODUS: Interaktions-Buttons ausblenden ===
+    const actionRow = document.querySelector('.action-row');
+    const unitTabs = document.getElementById('unit-tabs');
+    if (spectator) {
+        // Im Beobachter-Modus alle Interaktions-Elemente ausblenden
+        if (actionRow) actionRow.style.display = 'none';
+        if (unitTabs) unitTabs.style.display = 'none';
+    } else {
+        // Normal-Modus: Elemente einblenden
+        if (actionRow) actionRow.style.display = '';
+        if (unitTabs) unitTabs.style.display = '';
+    }
+
     const endTurnBtn = document.getElementById('end-turn-btn');
     if (endTurnBtn) {
-        endTurnBtn.disabled = isAiTurnHidden;
+        endTurnBtn.disabled = isAiTurnHidden || spectator;
+        if (spectator) endTurnBtn.style.display = 'none';
+        else endTurnBtn.style.display = '';
     }
     const giveUpBtn = document.getElementById('give-up-btn');
     if (giveUpBtn) {
-        giveUpBtn.disabled = state.gameOver;
+        giveUpBtn.disabled = state.gameOver || spectator;
     }
 
     // Update waypoint cancel button (lazy import to avoid circular deps)

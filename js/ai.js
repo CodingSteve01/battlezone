@@ -28,7 +28,7 @@ const aiThoughts = {
     current: null,          // Current thought being displayed
     queue: [],              // Queue of thoughts to display
     enabled: false,         // Only enabled in spectator mode (all AI players)
-    displayTime: 2000,      // How long each thought is displayed (ms)
+    displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
 };
 
 /**
@@ -142,7 +142,7 @@ function clearAIThoughts() {
  */
 function createTeamMemory() {
     return {
-        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence }
+        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence, direction, hp }
         searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
         threatAssessment: new Map(),     // unitId -> threat level
         huntMode: false,                 // True when actively hunting remaining enemies
@@ -157,6 +157,11 @@ function createTeamMemory() {
         // Team coordination
         lastUpdateRound: 0,              // Last round this memory was updated
         teamPlayers: new Set(),          // Players that share this memory
+        // === ERWEITERTES ERINNERUNGSSYSTEM ===
+        attackHistory: new Map(),        // unitId -> [{ fromQ, fromR, round, attackerClass }] - Woher kamen Angriffe
+        movementHistory: new Map(),      // unitId -> [{ fromQ, fromR, toQ, toR, round }] - Letzte Bewegungen
+        predictedPositions: new Map(),   // unitId -> { q, r, confidence } - Vorhergesagte nächste Position
+        flankingTargets: new Map(),      // unitId -> { targetId, flankDirection } - Einkreisungs-Zuweisung
     };
 }
 
@@ -817,9 +822,34 @@ function analyzeAndPlan() {
 
 /**
  * Update memory with currently visible enemies
+ * Erweitert: Speichert auch Bewegungshistorie für Positionsvorhersage
  */
 function updateMemoryWithVisibleEnemies(enemies) {
     for (const enemy of enemies) {
+        const previousPos = aiMemory.lastKnownPositions.get(enemy.id);
+
+        // === BEWEGUNGSHISTORIE AKTUALISIEREN ===
+        if (previousPos && (previousPos.q !== enemy.q || previousPos.r !== enemy.r)) {
+            // Feind hat sich bewegt - speichere die Bewegung
+            if (!aiMemory.movementHistory.has(enemy.id)) {
+                aiMemory.movementHistory.set(enemy.id, []);
+            }
+            const history = aiMemory.movementHistory.get(enemy.id);
+            history.push({
+                fromQ: previousPos.q,
+                fromR: previousPos.r,
+                toQ: enemy.q,
+                toR: enemy.r,
+                round: state.round
+            });
+            // Nur die letzten 5 Bewegungen speichern
+            if (history.length > 5) history.shift();
+
+            // Vorhersage der nächsten Position basierend auf Bewegungsrichtung
+            predictEnemyNextPosition(enemy.id, previousPos, enemy);
+        }
+
+        // Aktuelle Position speichern
         aiMemory.lastKnownPositions.set(enemy.id, {
             q: enemy.q,
             r: enemy.r,
@@ -837,9 +867,58 @@ function updateMemoryWithVisibleEnemies(enemies) {
             pos.confidence *= 0.7;  // Reduce confidence each round
             if (pos.confidence < 0.1) {
                 aiMemory.lastKnownPositions.delete(id);
+                aiMemory.movementHistory.delete(id);
+                aiMemory.predictedPositions.delete(id);
             }
         }
     });
+}
+
+/**
+ * Vorhersage der nächsten feindlichen Position basierend auf Bewegungsmuster
+ */
+function predictEnemyNextPosition(enemyId, previousPos, currentPos) {
+    // Berechne Bewegungsvektor
+    const dq = currentPos.q - previousPos.q;
+    const dr = currentPos.r - previousPos.r;
+
+    // Vorhersage: Feind bewegt sich wahrscheinlich weiter in diese Richtung
+    const predictedQ = currentPos.q + dq;
+    const predictedR = currentPos.r + dr;
+
+    // Prüfe ob vorhergesagte Position gültig ist
+    const predictedHex = getHex(predictedQ, predictedR);
+    if (predictedHex && predictedHex.walkable && !predictedHex.unit) {
+        aiMemory.predictedPositions.set(enemyId, {
+            q: predictedQ,
+            r: predictedR,
+            confidence: 0.6,  // 60% Konfidenz für Vorhersage
+            basedOnRound: state.round
+        });
+    } else {
+        // Keine gültige Vorhersage möglich
+        aiMemory.predictedPositions.delete(enemyId);
+    }
+}
+
+/**
+ * Registriere einen empfangenen Angriff für die Erinnerung
+ * Wird aufgerufen wenn eine unserer Einheiten angegriffen wird
+ */
+function recordIncomingAttack(targetUnit, attackerUnit) {
+    if (!aiMemory.attackHistory.has(targetUnit.id)) {
+        aiMemory.attackHistory.set(targetUnit.id, []);
+    }
+    const history = aiMemory.attackHistory.get(targetUnit.id);
+    history.push({
+        fromQ: attackerUnit.q,
+        fromR: attackerUnit.r,
+        round: state.round,
+        attackerClass: attackerUnit.class,
+        attackerId: attackerUnit.id
+    });
+    // Nur die letzten 5 Angriffe speichern
+    if (history.length > 5) history.shift();
 }
 
 /**
@@ -1003,6 +1082,7 @@ function decideSearchPattern(aiUnits, visibleEnemies) {
  */
 function assignTargets(aiUnits, enemies) {
     aiMemory.assignedTargets.clear();
+    aiMemory.flankingTargets.clear();
 
     if (enemies.length === 0) return;
 
@@ -1031,6 +1111,105 @@ function assignTargets(aiUnits, enemies) {
             }
         }
     }
+
+    // === TAKTISCHES EINKESSELN ===
+    // Weise Flankenmanöver zu wenn mehrere Einheiten denselben Feind angreifen
+    planEncirclementManeuvers(aiUnits, enemies);
+}
+
+/**
+ * Plane Einkesselungs-Manöver für koordinierte Angriffe
+ * Weist Einheiten verschiedene Flankenrichtungen zu
+ */
+function planEncirclementManeuvers(aiUnits, enemies) {
+    if (enemies.length === 0 || aiUnits.length < 2) return;
+
+    // Finde den Hauptfeind (höchste Bedrohung)
+    const primaryTarget = enemies.reduce((max, e) => {
+        const threat = aiMemory.threatAssessment.get(e.id) || 0;
+        const maxThreat = max ? (aiMemory.threatAssessment.get(max.id) || 0) : 0;
+        return threat > maxThreat ? e : max;
+    }, null);
+
+    if (!primaryTarget) return;
+
+    // Finde Einheiten die diesem Feind zugewiesen sind
+    const assignedUnits = aiUnits.filter(u =>
+        aiMemory.assignedTargets.get(u.id) === primaryTarget.id
+    );
+
+    if (assignedUnits.length < 2) return;
+
+    // Berechne ideale Flankenrichtungen (6 Hex-Richtungen)
+    const directions = [
+        { dq: 1, dr: 0 },   // Ost
+        { dq: 1, dr: -1 },  // Nord-Ost
+        { dq: 0, dr: -1 },  // Nord-West
+        { dq: -1, dr: 0 },  // West
+        { dq: -1, dr: 1 },  // Süd-West
+        { dq: 0, dr: 1 }    // Süd-Ost
+    ];
+
+    // Bestimme welche Richtungen bereits besetzt sind
+    const occupiedDirections = new Set();
+    for (const unit of assignedUnits) {
+        const dq = unit.q - primaryTarget.q;
+        const dr = unit.r - primaryTarget.r;
+        const angle = Math.atan2(dr, dq);
+        const dirIndex = Math.round((angle + Math.PI) / (Math.PI / 3)) % 6;
+        occupiedDirections.add(dirIndex);
+    }
+
+    // Weise unbesetzten Einheiten Flankenrichtungen zu
+    let dirIndex = 0;
+    for (const unit of assignedUnits) {
+        // Finde eine freie Richtung die nicht bereits zugewiesen ist
+        while (occupiedDirections.has(dirIndex) && dirIndex < 6) {
+            dirIndex++;
+        }
+
+        if (dirIndex < 6) {
+            const dir = directions[dirIndex];
+            aiMemory.flankingTargets.set(unit.id, {
+                targetId: primaryTarget.id,
+                flankDirection: dir,
+                directionIndex: dirIndex
+            });
+            occupiedDirections.add(dirIndex);
+            dirIndex++;
+        }
+    }
+
+    // Generiere AI Thought wenn Einkesselung geplant wird
+    if (aiMemory.flankingTargets.size >= 2) {
+        const targetName = CLASS_NAMES_DE[primaryTarget.class] || primaryTarget.class;
+        addAIThought(`🎯 Zangenbewegung gegen ${targetName} eingeleitet!`, 'strategy');
+    }
+}
+
+/**
+ * Berechne ob eine Position gut für Flankenangriff ist
+ * Gibt Score-Bonus zurück wenn Position für zugewiesene Flanke günstig ist
+ */
+function getFlankingBonus(unit, targetQ, targetR, enemies) {
+    const flankInfo = aiMemory.flankingTargets.get(unit.id);
+    if (!flankInfo) return 0;
+
+    const target = enemies.find(e => e.id === flankInfo.targetId);
+    if (!target) return 0;
+
+    // Berechne ideale Flankenposition
+    const idealQ = target.q + flankInfo.flankDirection.dq * 2;
+    const idealR = target.r + flankInfo.flankDirection.dr * 2;
+
+    // Bonus basierend auf Nähe zur idealen Flankenposition
+    const distToIdeal = hexDistance({ q: targetQ, r: targetR }, { q: idealQ, r: idealR });
+
+    if (distToIdeal === 0) return 80;  // Perfekte Flankenposition
+    if (distToIdeal === 1) return 50;  // Sehr nah
+    if (distToIdeal === 2) return 25;  // Akzeptabel
+
+    return 0;
 }
 
 // ===== MAIN AI EXECUTION =====
@@ -1763,8 +1942,13 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
         else if (distToAlly <= 2) score -= 12;
     }
 
-    // Flanking bonus
-    if (primaryTarget && allies.length > 0) {
+    // === VERBESSERTER FLANKING-BONUS mit Koordination ===
+    // Nutze das Einkesselungs-System wenn verfügbar
+    const coordFlankBonus = getFlankingBonus(unit, q, r, enemies);
+    if (coordFlankBonus > 0) {
+        score += coordFlankBonus;
+    } else if (primaryTarget && allies.length > 0) {
+        // Fallback: Standard-Flanking basierend auf Winkel zu Verbündeten
         const avgAllyAngle = allies.reduce((sum, a) => {
             return sum + Math.atan2(a.r - primaryTarget.r, a.q - primaryTarget.q);
         }, 0) / allies.length;
@@ -1774,6 +1958,16 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
 
         const flankBonus = unit.class === 'commando' ? 40 : 25;
         if (angleDiff > Math.PI / 3) score += flankBonus;
+    }
+
+    // === NUTZE VORHERGESAGTE FEINDPOSITIONEN ===
+    // Bonus für Positionen die vorhergesagte Bewegungen abfangen
+    for (const [enemyId, prediction] of aiMemory.predictedPositions) {
+        const distToPrediction = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
+        if (distToPrediction <= unit.range && prediction.confidence > 0.4) {
+            // Position kann vorhergesagte Feindposition angreifen
+            score += 25 * prediction.confidence;
+        }
     }
 
     return score;
@@ -2478,11 +2672,12 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         exposedWithoutOptions: false,
         killableTargets: [],
         threatsInRange: [],
+        closeRangeThreats: [],  // Feinde die besonders nah sind
         scoreAdjustment: 0,
         explanation: ''
     };
 
-    // Check which enemies we can attack from the new position
+    // === ANALYSIERE ALLE FEINDPOSITIONEN ===
     for (const enemy of enemies) {
         const distToEnemy = hexDistance({ q: targetQ, r: targetR }, { q: enemy.q, r: enemy.r });
 
@@ -2498,32 +2693,71 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         const enemyRange = enemy.range || 3;
         if (distToEnemy <= enemyRange) {
             evaluation.threatsInRange.push(enemy);
+            // Besonders gefährlich wenn in Nahkampfreichweite
+            if (distToEnemy <= 2) {
+                evaluation.closeRangeThreats.push(enemy);
+            }
         }
     }
 
-    // CRITICAL: Moving into danger without AP to attack is DUMB
+    // === KRITISCH: INTELLIGENTES AP-MANAGEMENT ===
+    // Die KI darf NIEMALS in Gefahr laufen ohne die Möglichkeit zurückzuschlagen
+
+    // Szenario 1: In Angriffsreichweite mehrerer Feinde ohne AP für Gegenangriff
     if (evaluation.threatsInRange.length > 0 && apAfterMove < 1) {
         evaluation.exposedWithoutOptions = true;
-        evaluation.scoreAdjustment -= 200; // Heavy penalty!
-        evaluation.explanation = `WARNUNG: Keine AP für Gegenangriff nach Bewegung!`;
+        // STARK erhöhter Penalty - skaliert mit Anzahl der Bedrohungen
+        const basePenalty = 300;
+        const threatMultiplier = evaluation.threatsInRange.length;
+        const closeRangePenalty = evaluation.closeRangeThreats.length * 100;
+        evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty;
+        evaluation.explanation = `⚠️ GEFAHR: ${evaluation.threatsInRange.length} Feinde in Reichweite, keine AP übrig!`;
     }
 
-    // Bonus for kill opportunities
+    // Szenario 2: Nahkampf-Situation ohne Fluchtmöglichkeit
+    if (evaluation.closeRangeThreats.length > 0 && apAfterMove < 2) {
+        // Wenn in Nahkampf ohne AP für Angriff+Rückzug
+        evaluation.scoreAdjustment -= 150;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Nahkampfgefahr ohne Ausweichmöglichkeit`;
+        }
+    }
+
+    // Szenario 3: Bewegung zu weit - keine AP für Angriff obwohl Feind erreichbar wäre
+    if (evaluation.canAttackAfter && apAfterMove < 1) {
+        // Kann angreifen aber hat keine AP dafür - VÖLLIG SINNLOSER ZUG
+        evaluation.scoreAdjustment -= 400;
+        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff!`;
+    }
+
+    // === POSITIVE BEWERTUNGEN ===
+
+    // Bonus für Kill-Möglichkeiten (nur wenn AP vorhanden)
     if (evaluation.killableTargets.length > 0 && apAfterMove >= 1) {
-        evaluation.scoreAdjustment += 50 * evaluation.killableTargets.length;
+        evaluation.scoreAdjustment += 80 * evaluation.killableTargets.length;
         const targetName = CLASS_NAMES_DE[evaluation.killableTargets[0].class] || evaluation.killableTargets[0].class;
-        evaluation.explanation = `Todesstoß möglich gegen ${targetName}!`;
+        evaluation.explanation = `💀 Todesstoß möglich gegen ${targetName}!`;
     }
 
-    // Penalty for exposure without attack opportunity
-    if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
-        evaluation.scoreAdjustment -= 100;
-        evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
-    }
-
-    // Good: Can attack AND have AP left for emergency
+    // Gute Position: Kann angreifen UND hat AP für Notfall/Zweiten Angriff
     if (evaluation.canAttackAfter && apAfterMove >= 2) {
+        evaluation.scoreAdjustment += 50;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Gute taktische Position - Angriff + Reserve`;
+        }
+    }
+
+    // Ideale Position: In Angriffsreichweite, genug AP, und hat noch Fluchtoptionen
+    if (evaluation.canAttackAfter && apAfterMove >= 1 && evaluation.threatsInRange.length <= 1) {
         evaluation.scoreAdjustment += 30;
+    }
+
+    // Penalty für Exposition ohne Angriffsmöglichkeit
+    if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
+        evaluation.scoreAdjustment -= 120;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
+        }
     }
 
     return evaluation;
