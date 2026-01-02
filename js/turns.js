@@ -20,13 +20,13 @@ import { logInfo, logError } from './errorLog.js';
 import { playRoundStart, playTurnEnd, playVictory, playDefeat, playEvent, stopAmbient } from './audio.js';
 
 // === SHRINKING ZONE CONSTANTS ===
-// AGGRESSIV: Zone schrumpft schnell, um Wegrennen zu verhindern!
+// Zone schrumpft bei Inaktivität, um Camping zu verhindern
 const ZONE_CONFIG = {
-    ROUNDS_BEFORE_SHRINK: 2,      // NUR 2 Runden ohne Kampf bevor Zone schrumpft (vorher 4)
-    SHRINK_AMOUNT: 3,             // 3 Felder pro Schrumpfung (vorher 2) - DRASTISCH
-    MIN_ZONE_RADIUS: 3,           // Minimaler Radius nur 3 Felder (vorher 5) - erzwingt Nahkampf!
-    ZONE_DAMAGE: 25,              // 25 Schaden pro Runde außerhalb (vorher 15) - TÖDLICH
-    REVEAL_INTERVAL: 3,           // Alle 3 Runden (vorher 5) versteckte Einheiten aufdecken
+    ROUNDS_BEFORE_SHRINK: 2,      // 2 Runden ohne Kampf bevor Zone schrumpft
+    SHRINK_AMOUNT: 2,             // 2 Felder pro Schrumpfung (moderater)
+    MIN_ZONE_RADIUS: 5,           // Minimaler Radius 5 Felder (~91 Hexfelder) - genug Platz für Taktik
+    ZONE_DAMAGE: 25,              // 25 Schaden pro Runde außerhalb
+    REVEAL_INTERVAL: 3,           // Alle 3 Runden versteckte Einheiten aufdecken
     WARNING_ROUNDS: 1             // 1 Runde Vorwarnung
 };
 
