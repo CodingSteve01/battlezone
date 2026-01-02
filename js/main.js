@@ -411,9 +411,9 @@ function generateUnitCards() {
 const UNIT_PLAYSTYLES = {
     scout: 'Ideal für Aufklärung und Flankenmanöver. Nutze die hohe Bewegungsreichweite, um Feinde zu umgehen und ungeschützte Ziele anzugreifen. Sprint ermöglicht schnelle Repositionierung oder Flucht.',
     assault: 'Der Frontkämpfer. Hohe HP erlauben es, Schaden einzustecken während du dich dem Feind näherst. Powershot ist perfekt, um schwer gepanzerte Ziele oder Gruppen zu eliminieren.',
-    medic: 'Halte dich hinter der Front und heile verwundete Verbündete. Die Gruppenheilung kann Kämpfe wenden. Vermeide direkte Konfrontation - der Medic ist das wertvollste Teammitglied.',
-    sniper: 'Positioniere dich auf erhöhtem Gelände mit guter Sicht. Tarnung erlaubt sichere Repositionierung oder Hinterhalte. Vermeide Nahkampf um jeden Preis - der Sniper stirbt schnell.',
-    commando: 'Infiltrator und Assassine. Nutze Stealth, um unbemerkt in Angriffsposition zu kommen. Der Melee-Bonus macht den Commando tödlich im Nahkampf. Ideal für Überraschungsangriffe.',
+    medic: 'Halte dich hinter der Front und heile verwundete Verbündete. Die Gruppenheilung kann Kämpfe wenden. Vermeide direkte Konfrontation - der Sanitäter ist das wertvollste Teammitglied.',
+    sniper: 'Positioniere dich auf erhöhtem Gelände mit guter Sicht. Tarnung erlaubt sichere Repositionierung oder Hinterhalte. Vermeide Nahkampf um jeden Preis - der Scharfschütze stirbt schnell.',
+    commando: 'Infiltrator und Assassine. Nutze Stealth, um unbemerkt in Angriffsposition zu kommen. Der Nahkampf-Bonus macht den Kommando tödlich im Nahkampf. Ideal für Überraschungsangriffe.',
     elitesoldat: 'Vielseitig einsetzbar - effektiv auf jede Distanz. Der taktische Modus erhöht Präzision UND Bewegung. Teuer, aber kann mehrere Rollen im Team erfüllen.'
 };
 

@@ -127,79 +127,79 @@ const TEAM_SELECT_HINTS = {
     budgetTip: {
         id: 'budgetTip',
         title: '💰 Das Budget-System',
-        message: '<b>Günstig (70-80):</b> Scout, Medic - mehr Einheiten möglich<br><b>Mittel (90-110):</b> Assault, Commando, Sniper - solide Wahl<br><b>Elite (150):</b> Kommando-Soldat - teuer aber mächtig!',
+        message: '<b>Günstig (70-80):</b> Späher, Sanitäter - mehr Einheiten möglich<br><b>Mittel (90-110):</b> Sturmsoldat, Kommando, Scharfschütze - solide Wahl<br><b>Elite (150):</b> Elitesoldat - teuer aber mächtig!',
         position: 'center'
     },
     scoutTip: {
         id: 'scoutTip',
-        title: '🧭 Scout - Der Aufklärer',
+        title: '🧭 Späher - Der Aufklärer',
         message: '<b>Stärken:</b> Beste Sichtweite (8 Felder), schnell (5 Bewegung), Sprint-Fähigkeit<br><b>Taktik:</b> Ideal zum Aufdecken von Feinden und Flankenangriffe. Findet versteckte Einheiten!',
         position: 'bottom',
         forClass: 'scout'
     },
     assaultTip: {
         id: 'assaultTip',
-        title: '🪖 Assault - Der Panzer',
+        title: '🪖 Sturmsoldat - Der Panzer',
         message: '<b>Stärken:</b> Höchste HP (120), hoher Schaden (40), Powershot (+25 DMG)<br><b>Taktik:</b> Frontlinie halten, Deckung durchbrechen. Ignoriert 50% der feindlichen Deckung!',
         position: 'bottom',
         forClass: 'assault'
     },
     medicTip: {
         id: 'medicTip',
-        title: '⛑️ Medic - Der Sanitäter',
+        title: '⛑️ Sanitäter - Der Heiler',
         message: '<b>Stärken:</b> Heilt Team (+40 HP), gute Reichweite (3 Felder)<br><b>Taktik:</b> Hinter der Front bleiben. UNVERZICHTBAR für längere Gefechte!',
         position: 'bottom',
         forClass: 'medic'
     },
     sniperTip: {
         id: 'sniperTip',
-        title: '🎯 Sniper - Der Scharfschütze',
+        title: '🎯 Scharfschütze - Der Präzisionsschütze',
         message: '<b>Stärken:</b> Höchster Schaden (65!), größte Reichweite (6), Tarnung<br><b>Taktik:</b> Auf Hügeln positionieren. Kann Feinde mit einem Schuss eliminieren!',
         position: 'bottom',
         forClass: 'sniper'
     },
     commandoTip: {
         id: 'commandoTip',
-        title: '⚔️ Commando - Der Assassine',
+        title: '⚔️ Kommando - Der Assassine',
         message: '<b>Kosten:</b> 90 💰<br><b>Stärken:</b> Brutaler Nahkampf (50+20 Bonus!), Schleichen, schnell<br><b>Taktik:</b> Aus dem Hinterhalt angreifen. Perfekt für Flanken und Hinterhalte!',
         position: 'bottom',
         forClass: 'commando'
     },
     elitesoldatTip: {
         id: 'elitesoldatTip',
-        title: '🎖️ Kommando-Soldat - Die Elite',
-        message: '<b>Kosten:</b> 150 💰 (TEUER!)<br><b>Stärken:</b> Vielseitig! Kann sowohl Nahkampf (+30 Bonus) als auch Fernkampf (Reichweite 3)<br><b>Taktik:</b> Ein Elite-Soldat kann 2 normale Einheiten ersetzen. Perfekt für kleine, starke Teams!',
+        title: '🎖️ Elitesoldat - Die Elite',
+        message: '<b>Kosten:</b> 150 💰 (TEUER!)<br><b>Stärken:</b> Vielseitig! Kann sowohl Nahkampf (+30 Bonus) als auch Fernkampf (Reichweite 3)<br><b>Taktik:</b> Ein Elitesoldat kann 2 normale Einheiten ersetzen. Perfekt für kleine, starke Teams!',
         position: 'bottom',
         forClass: 'elitesoldat'
     },
     synergy_balanced: {
         id: 'synergy_balanced',
         title: '⚖️ Tipp: Ausgewogenes Team (250 💰)',
-        message: '<b>Scout + Assault + Medic</b> = Klassiker!<br>Scout findet Feinde → Assault greift an → Medic heilt. <b>100 Budget übrig</b> für eine weitere Einheit!',
+        message: '<b>Späher + Sturmsoldat + Sanitäter</b> = Klassiker!<br>Späher findet Feinde → Sturmsoldat greift an → Sanitäter heilt. <b>100 Budget übrig</b> für eine weitere Einheit!',
         position: 'center'
     },
     synergy_stealth: {
         id: 'synergy_stealth',
         title: '🌙 Tipp: Schattentaktik (270 💰)',
-        message: '<b>Scout + Sniper + Commando</b> = Hinterhalt!<br>Scout späht aus → Sniper dezimiert → Commando erledigt den Rest. <b>80 Budget übrig</b>!',
+        message: '<b>Späher + Scharfschütze + Kommando</b> = Hinterhalt!<br>Späher späht aus → Scharfschütze dezimiert → Kommando erledigt den Rest. <b>80 Budget übrig</b>!',
         position: 'center'
     },
     synergy_defensive: {
         id: 'synergy_defensive',
         title: '🛡️ Tipp: Defensive Formation (290 💰)',
-        message: '<b>Assault + Medic + Sniper</b> = Festung!<br>Assault hält die Linie → Medic heilt → Sniper kontrolliert das Feld. <b>60 Budget übrig</b>!',
+        message: '<b>Sturmsoldat + Sanitäter + Scharfschütze</b> = Festung!<br>Sturmsoldat hält die Linie → Sanitäter heilt → Scharfschütze kontrolliert das Feld. <b>60 Budget übrig</b>!',
         position: 'center'
     },
     synergy_elite: {
         id: 'synergy_elite',
         title: '🎖️ Tipp: Elite-Trupp (230-300 💰)',
-        message: '<b>Kommando-Soldat + Medic</b> = Qualität über Quantität!<br>Nur 2 Einheiten, aber der Elite-Soldat kann kämpfen wie zwei. <b>Riskant aber mächtig!</b>',
+        message: '<b>Elitesoldat + Sanitäter</b> = Qualität über Quantität!<br>Nur 2 Einheiten, aber der Elitesoldat kann kämpfen wie zwei. <b>Riskant aber mächtig!</b>',
         position: 'center'
     },
     synergy_swarm: {
         id: 'synergy_swarm',
         title: '🐜 Tipp: Schwarm-Taktik (300 💰)',
-        message: '<b>4x günstige Einheiten</b> = Überzahl!<br>Scout + Scout + Medic + Medic oder ähnlich. <b>Mehr Einheiten = mehr Aktionspunkte!</b>',
+        message: '<b>4x günstige Einheiten</b> = Überzahl!<br>Späher + Späher + Sanitäter + Sanitäter oder ähnlich. <b>Mehr Einheiten = mehr Aktionspunkte!</b>',
         position: 'center'
     },
     tactical_ambush: {

@@ -398,7 +398,7 @@ export const TERRAIN = {
 
 export const UNIT_CLASSES = {
     scout: {
-        name: 'Scout',
+        name: 'Späher',
         icon: '🧭',
         cost: 70,           // Günstig - Aufklärer und Unterstützung
         hp: 70,             // Erhöht von 60 - robuster Aufklärer
@@ -412,7 +412,7 @@ export const UNIT_CLASSES = {
         stealthDetectionRange: 3
     },
     assault: {
-        name: 'Assault',
+        name: 'Sturmsoldat',
         icon: '🪖',
         cost: 100,          // Mittel - solider Frontkämpfer
         hp: 120,            // Erhöht von 100 - der Tank des Teams
@@ -426,7 +426,7 @@ export const UNIT_CLASSES = {
         armorPiercing: 0.5  // 50% der Deckungsreduktion ignorieren
     },
     medic: {
-        name: 'Medic',
+        name: 'Sanitäter',
         icon: '⛑️',
         cost: 80,           // Günstig - wichtige Unterstützung
         hp: 90,             // Erhöht von 80 - überlebensfähiger
@@ -440,22 +440,22 @@ export const UNIT_CLASSES = {
         healRange: 4        // Erhöhte Heilreichweite
     },
     sniper: {
-        name: 'Sniper',
+        name: 'Scharfschütze',
         icon: '🎯',
         cost: 110,          // Mittel-hoch - hoher Schaden aber fragil
         hp: 45,             // Leicht erhöht von 40 - etwas robuster
-        damage: 65,         // STARK ERHÖHT von 45 - Sniper soll mit einem Schuss töten können!
+        damage: 65,         // STARK ERHÖHT von 45 - Scharfschütze soll mit einem Schuss töten können!
         range: 6,
         move: 2,
-        vision: 7,          // Reduziert von 8 - Scout ist jetzt bester Spotter
+        vision: 7,          // Reduziert von 8 - Späher ist jetzt bester Spotter
         special: 'Tarnung',
         specialDesc: 'Unsichtbar für 1 Runde',
         stealthDetectionRange: 2,
-        // Sniper-Schwäche: Braucht Zeit zum Nachladen
+        // Scharfschütze-Schwäche: Braucht Zeit zum Nachladen
         reloadPenalty: true // Kann nicht 2x in Folge angreifen (braucht Bewegung dazwischen)
     },
     commando: {
-        name: 'Commando',
+        name: 'Kommando',
         icon: '⚔️',
         cost: 90,           // Mittel - schneller Nahkämpfer
         hp: 75,             // Erhöht von 65 - robuster im Nahkampf
@@ -467,11 +467,11 @@ export const UNIT_CLASSES = {
         specialDesc: 'Tarnung + Bonus-Bewegung',
         stealthDetectionRange: 1,  // Schwer zu entdecken
         meleeBonus: 20,     // Erhöht von 15 - brutaler Nahkampf
-        // Commando-Bonus: Erste Attacke nach Stealth macht Bonusschaden
+        // Kommando-Bonus: Erste Attacke nach Stealth macht Bonusschaden
         ambushBonus: 15     // Extra Schaden aus dem Hinterhalt
     },
     elitesoldat: {
-        name: 'Kommando-Soldat',
+        name: 'Elitesoldat',
         icon: '🎖️',
         cost: 150,          // TEUER - Elite-Einheit mit Vielseitigkeit
         hp: 100,            // Robust - kann einiges einstecken

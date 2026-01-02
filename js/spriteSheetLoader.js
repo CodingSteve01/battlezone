@@ -366,9 +366,26 @@ async function extractSpritesFromSheet(type, sheetImg, definition) {
             const unitClass = sprite.metadata?.unitClass;
             const state = sprite.metadata?.state || 'normal';
             const player = sprite.metadata?.player;
+            const isTemplate = sprite.metadata?.isTemplate;
 
-            if (unitClass && player !== undefined) {
-                // New format: sprites already have player index
+            if (unitClass && isTemplate) {
+                // Template format: colorize at load time for all players
+                // This is more efficient than storing 4 separate sprites
+                const colors = CONFIG.PLAYER_COLORS;
+                for (let p = 0; p < colors.length; p++) {
+                    const colored = colorizeCanvas(canvas, colors[p]);
+                    const coloredBitmap = await createImageBitmap(colored);
+                    const key = `${unitClass}_${state}_${p}`;
+                    spriteRegistry.units.set(key, coloredBitmap);
+                    if (sprite.anchor) {
+                        anchorRegistry.set(key, sprite.anchor);
+                    }
+                    if (contentScaleRegistry.has(sprite.id)) {
+                        contentScaleRegistry.set(key, contentScaleRegistry.get(sprite.id));
+                    }
+                }
+            } else if (unitClass && player !== undefined) {
+                // Legacy format: sprites already have player index
                 const key = `${unitClass}_${state}_${player}`;
                 spriteRegistry.units.set(key, bitmap);
                 // Also store anchor and content scale for unit key
