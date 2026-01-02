@@ -282,6 +282,8 @@ async function generateBushes() {
 }
 
 // Character generation
+// Now generates only template sprites (with magenta accents) that get colorized at runtime
+// This reduces asset size by ~75% (24 sprites instead of 96 for 4 players)
 async function generateCharacters() {
     const settings = getSettings();
     const preview = document.getElementById('charactersPreview');
@@ -290,30 +292,30 @@ async function generateCharacters() {
 
     const classes = ['scout', 'assault', 'medic', 'sniper', 'commando', 'elitesoldat'];
     const poses = ['normal', 'cover', 'attack', 'dead'];
-    const players = 4;
 
-    const total = classes.length * poses.length * players;
+    const total = classes.length * poses.length;
     let count = 0;
 
-    updateStatus('Generating character sprites...');
+    updateStatus('Generating character template sprites...');
 
     for (const cls of classes) {
         for (const pose of poses) {
-            for (let p = 0; p < players; p++) {
-                const canvas = CharacterGenerator.generate(cls, pose, p, settings.charSize, settings.charSize);
-                const label = `${cls}_${pose}_p${p}`;
+            // Generate template sprite with magenta accents (useTemplate: true)
+            const canvas = CharacterGenerator.generate(cls, pose, 0, settings.charSize, settings.charSize, {
+                useTemplate: true
+            });
+            const label = `${cls}_${pose}_template`;
 
-                addPreviewItem(preview, canvas, label);
-                generatedAssets.characters.push({ canvas, label, unitClass: cls, state: pose, player: p });
+            addPreviewItem(preview, canvas, label);
+            generatedAssets.characters.push({ canvas, label, unitClass: cls, state: pose, isTemplate: true });
 
-                count++;
-                updateProgress((count / total) * 100);
-                await new Promise(r => setTimeout(r, 10));
-            }
+            count++;
+            updateProgress((count / total) * 100);
+            await new Promise(r => setTimeout(r, 10));
         }
     }
 
-    updateStatus(`Generated ${count} character sprites`);
+    updateStatus(`Generated ${count} character template sprites (colorized at runtime)`);
     showTab('characters');
 }
 
@@ -645,7 +647,8 @@ function createCroppedSpriteSheet(assets, columns) {
                     variant: asset.variant,
                     unitClass: asset.unitClass,
                     state: asset.state,
-                    player: asset.player,
+                    // For templates, isTemplate is true; for player-specific sprites, player index is stored
+                    ...(asset.isTemplate ? { isTemplate: true } : { player: asset.player }),
                     originalSize: asset.originalSize
                 }
             });
