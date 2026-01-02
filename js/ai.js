@@ -915,6 +915,22 @@ function analyzeAndPlan() {
         addAIThought('Aktionspunkte knapp. Wir konzentrieren uns auf die wichtigsten Aktionen.', 'strategy');
     }
 
+    // === STRATEGISCHE MEDIC-KOORDINATION ===
+    // Prüfe ob verbündete Spieler verletzte Einheiten haben, die wir heilen können
+    const medicCoordination = planMedicCoordination(aiUnits, allAlliedUnits, alliedAIPlayers);
+    if (medicCoordination) {
+        return {
+            aiUnits,
+            visibleEnemies,
+            knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
+            inHuntMode: aiMemory.huntMode,
+            searchPattern: aiMemory.searchPattern,
+            decoyActive: aiMemory.decoyActive,
+            apBudgets,
+            medicCoordination  // Include medic assignments
+        };
+    }
+
     return {
         aiUnits,
         visibleEnemies,
@@ -923,6 +939,100 @@ function analyzeAndPlan() {
         searchPattern: aiMemory.searchPattern,
         decoyActive: aiMemory.decoyActive,
         apBudgets
+    };
+}
+
+/**
+ * Plan strategic medic coordination across allied players
+ * Assigns medics to heal wounded allied units from other players
+ */
+function planMedicCoordination(ourUnits, allAlliedUnits, alliedPlayers) {
+    if (alliedPlayers.length === 0) return null;
+
+    const ourMedics = ourUnits.filter(u => u.alive && u.class === 'medic');
+    if (ourMedics.length === 0) return null;
+
+    const healRange = 4;
+    const assignments = new Map();  // medicId -> { target, player, priority }
+
+    // Find all wounded allied units from OTHER players
+    const woundedAllies = allAlliedUnits.filter(u =>
+        u.alive &&
+        u.player !== state.currentPlayer &&  // From allied player, not our team
+        u.currentHp < u.maxHp * 0.7
+    );
+
+    if (woundedAllies.length === 0) return null;
+
+    // Sort by urgency (lowest HP first)
+    woundedAllies.sort((a, b) =>
+        (a.currentHp / a.maxHp) - (b.currentHp / b.maxHp)
+    );
+
+    // Assign medics to wounded allies
+    for (const medic of ourMedics) {
+        // Find the closest critically wounded ally
+        let bestTarget = null;
+        let bestScore = -Infinity;
+
+        for (const ally of woundedAllies) {
+            // Skip if already assigned to another medic
+            const alreadyAssigned = Array.from(assignments.values())
+                .some(a => a.target.id === ally.id);
+            if (alreadyAssigned) continue;
+
+            const dist = hexDistance({ q: medic.q, r: medic.r }, { q: ally.q, r: ally.r });
+            const hpPercent = ally.currentHp / ally.maxHp;
+            const isReachable = dist <= medic.move + healRange;
+
+            // Score based on urgency and reachability
+            let score = 0;
+            if (dist <= healRange) {
+                score += 100;  // Can heal immediately
+            } else if (isReachable) {
+                score += 50;   // Can reach this turn
+            } else {
+                score += 10;   // Will take multiple turns
+            }
+
+            // Urgency bonus
+            score += (1 - hpPercent) * 50;
+
+            // Critical HP bonus
+            if (hpPercent < 0.4) score += 30;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestTarget = ally;
+            }
+        }
+
+        if (bestTarget) {
+            const dist = hexDistance({ q: medic.q, r: medic.r }, { q: bestTarget.q, r: bestTarget.r });
+            assignments.set(medic.id, {
+                target: bestTarget,
+                player: bestTarget.player,
+                priority: bestScore,
+                canHealNow: dist <= healRange
+            });
+        }
+    }
+
+    if (assignments.size === 0) return null;
+
+    // Announce strategic medic coordination
+    const criticalAllies = woundedAllies.filter(a => a.currentHp / a.maxHp < 0.4);
+    if (criticalAllies.length > 0) {
+        const playerNames = [...new Set(criticalAllies.map(a => getPlayerName(a.player)))].join(' & ');
+        addAIThought(`🏥 Verbündete von ${playerNames} sind kritisch verletzt! Medics werden zur Unterstützung geschickt.`, 'strategy');
+    } else if (assignments.size > 0) {
+        const targetPlayers = [...new Set(Array.from(assignments.values()).map(a => getPlayerName(a.player)))].join(' & ');
+        addAIThought(`🏥 Medic-Unterstützung für ${targetPlayers} geplant.`, 'strategy');
+    }
+
+    return {
+        assignments,
+        woundedAllies
     };
 }
 
@@ -2351,6 +2461,52 @@ async function executeMedicAI(unit, plan, context) {
     // Hole ALLE verbündeten Einheiten (inkl. von verbündeten Spielern)
     const allies = getAllAlliedAIUnits();
     const healRange = 4; // Aus config
+
+    // Check if this medic has a strategic assignment from coordination planning
+    const medicAssignment = plan.medicCoordination?.assignments?.get(unit.id);
+    if (medicAssignment) {
+        const assignedTarget = medicAssignment.target;
+        const assignedPlayerName = getPlayerName(medicAssignment.player);
+        const targetName = CLASS_NAMES_DE[assignedTarget.class] || assignedTarget.class || 'Verbündeter';
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: assignedTarget.q, r: assignedTarget.r });
+
+        // If assigned target is in range, prioritize healing them
+        if (dist <= healRange && canSpendAP(getSpecialAbilityCost('medic')) && canUseSpecialAbility(unit)) {
+            addAIThought(`🏥 ${unitName} führt geplante Heilung an ${assignedPlayerName}'s ${targetName} durch!`, 'special');
+            useSpecialAbility(unit);
+            trackAPSpent(getSpecialAbilityCost('medic'));
+            if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                updateUI();
+                render();
+            }
+            await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+            return { handled: true };
+        }
+
+        // If assigned target is reachable, move towards them first
+        if (!medicAssignment.canHealNow && dist > healRange && canSpendAP(1)) {
+            const moveTarget = selectMedicMoveTarget(unit, [assignedTarget], plan, unitBudget - apSpentByUnit);
+            if (moveTarget) {
+                addAIThought(`🏥 ${unitName} bewegt sich zu ${assignedPlayerName}'s ${targetName} - koordinierte Unterstützung!`, 'move');
+                await executeAIMove(unit, moveTarget, spectatorMode);
+                trackAPSpent(moveTarget.cost);
+
+                // Check if we can now heal after moving
+                const newDist = hexDistance({ q: unit.q, r: unit.r }, { q: assignedTarget.q, r: assignedTarget.r });
+                if (newDist <= healRange && canSpendAP(getSpecialAbilityCost('medic')) && canUseSpecialAbility(unit)) {
+                    addAIThought(`🏥 ${unitName} ist jetzt in Reichweite - Heilung startet!`, 'special');
+                    useSpecialAbility(unit);
+                    trackAPSpent(getSpecialAbilityCost('medic'));
+                    if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {
+                        updateUI();
+                        render();
+                    }
+                    await delay(isUnitVisibleToViewer(unit) ? actionDelayBase : shortDelay);
+                }
+                return { handled: true };
+            }
+        }
+    }
 
     // Finde verletzte Verbündete in Heilreichweite
     const woundedInRange = allies.filter(a =>
