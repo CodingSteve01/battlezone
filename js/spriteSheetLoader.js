@@ -479,7 +479,8 @@ function removeBackground(ctx, width, height, settings) {
 }
 
 /**
- * Apply color tinting to a canvas
+ * Apply color replacement to a canvas (replaces magenta template pixels with player color)
+ * Used during sprite sheet extraction for template sprites
  */
 function colorizeCanvas(sourceCanvas, color) {
     const canvas = document.createElement('canvas');
@@ -488,11 +489,60 @@ function colorizeCanvas(sourceCanvas, color) {
     const ctx = canvas.getContext('2d');
 
     ctx.drawImage(sourceCanvas, 0, 0);
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.3;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Get image data for pixel manipulation
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // Parse target color
+    const targetRGB = hexToRgb(color);
+    if (!targetRGB) {
+        console.warn('[colorizeCanvas] Invalid color:', color);
+        return canvas;
+    }
+
+    // Template colors to replace (magenta tones)
+    const templateColors = [
+        { r: 255, g: 0, b: 255 },    // Primary: #FF00FF
+        { r: 204, g: 0, b: 204 },    // Secondary: #CC00CC (darker)
+        { r: 255, g: 102, b: 255 },  // Highlight: #FF66FF (lighter)
+    ];
+
+    // Calculate variants of target color (similar brightness ratios)
+    const targetVariants = [
+        targetRGB,                                           // Primary
+        { r: Math.floor(targetRGB.r * 0.8), g: Math.floor(targetRGB.g * 0.8), b: Math.floor(targetRGB.b * 0.8) }, // Secondary (darker)
+        { r: Math.min(255, Math.floor(targetRGB.r * 1.3)), g: Math.min(255, Math.floor(targetRGB.g * 1.3)), b: Math.min(255, Math.floor(targetRGB.b * 1.3)) }  // Highlight (lighter)
+    ];
+
+    const tolerance = 30;
+
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+
+        if (a === 0) continue; // Skip transparent pixels
+
+        // Check if this pixel matches any template color (with tolerance)
+        for (let t = 0; t < templateColors.length; t++) {
+            const template = templateColors[t];
+
+            if (Math.abs(r - template.r) <= tolerance &&
+                Math.abs(g - template.g) <= tolerance &&
+                Math.abs(b - template.b) <= tolerance) {
+                // Replace with corresponding target variant
+                const target = targetVariants[t];
+                data[i] = target.r;
+                data[i + 1] = target.g;
+                data[i + 2] = target.b;
+                break;
+            }
+        }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
     return canvas;
 }
 
