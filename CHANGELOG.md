@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.3.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.4...shadow-squad-v5.3.0) (2026-01-02)
+
+
+### Features
+
+* **ui:** optimize shop UI with unit sprites and better layout ([#317](https://github.com/CodingSteve01/battlezone/issues/317)) ([f0178a6](https://github.com/CodingSteve01/battlezone/commit/f0178a6edcf6eea835564508d1ea894f17820a76))
+
 ## [5.2.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.3...shadow-squad-v5.2.4) (2026-01-02)
 
 
