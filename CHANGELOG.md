@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.2.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.1...shadow-squad-v5.2.2) (2026-01-02)
+
+
+### Bug Fixes
+
+* **ui:** fix menu navigation and improve AI intelligence ([#308](https://github.com/CodingSteve01/battlezone/issues/308)) ([35682d7](https://github.com/CodingSteve01/battlezone/commit/35682d7d28cd8730be7b6ab9e1ebe73ad2110a40))
+
+
+### Miscellaneous
+
+* **assets:** Update generated sprite sheets ([#310](https://github.com/CodingSteve01/battlezone/issues/310)) ([29a7991](https://github.com/CodingSteve01/battlezone/commit/29a799105132631197aa3542805d9e2302739561))
+
 ## [5.2.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.2.0...shadow-squad-v5.2.1) (2026-01-01)
 
 
