@@ -3568,17 +3568,13 @@ button:focus:not(:focus-visible),
     transform: translateX(-50%) translateY(0);
 }
 
-.ai-thought-bubble .thought-icon {
-    font-size: 22px;
-    flex-shrink: 0;
-}
-
 .ai-thought-bubble .thought-text {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
-    color: #e0f2fe;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    line-height: 1.4;
+    color: #f0f9ff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.7);
+    line-height: 1.5;
+    letter-spacing: 0.2px;
 }
 
 /* ===== COMPASS INDICATOR ===== */
