@@ -3773,13 +3773,12 @@ function drawDeadUnit(unit, cx, cy) {
         return;
     }
 
-    const size = state.hexSize * 0.59;
+    const size = state.hexSize * 0.49;  // Reduced ~17% from 0.59 for proper dead unit proportions
     const playerColor = CONFIG.PLAYER_COLORS[unit.player];
 
     ctx.save();
 
-    // Draw unit sprite with desaturation and reduced opacity
-    ctx.globalAlpha = 0.5;
+    // Draw unit sprite with desaturation (no transparency - dead units should be fully visible)
     ctx.filter = 'grayscale(70%) brightness(0.7)';
 
     // Draw the dead sprite (unit lying on ground)
@@ -3845,20 +3844,19 @@ function drawUnitOverlay(unit, cx, cy) {
         speechBubbleOffset += size * 0.6;  // Offset next bubble
     }
 
-    // Cloak indicator (visible to owner) with speech bubble
-    if (unit.cloaked && unit.player === state.viewingPlayer) {
+    // "Spotted!" indicator - MOST IMPORTANT, draw first (highest position)
+    // This takes priority over other status indicators
+    if (unit.spotted && unit.player === state.currentPlayer) {
         ctx.globalAlpha = 1;
-        ctx.shadowColor = '#a855f7';
-        ctx.shadowBlur = 15;
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Entdeckt!', '#ef4444', size * 0.8);
+        speechBubbleOffset += size * 0.6;
+    }
 
-        // Draw speech bubble for stealth status - offset if cover bubble already shown
+    // Cloak indicator (visible to owner) - only show if not spotted (spotted is more important)
+    if (unit.cloaked && unit.player === state.viewingPlayer && !unit.spotted) {
+        ctx.globalAlpha = 1;
         drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Getarnt!', '#a855f7', size * 0.8);
-
-        ctx.font = `${Math.round(size * 0.45)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('👁️‍🗨️', cx, cy - size - 5);
-        ctx.shadowBlur = 0;
+        speechBubbleOffset += size * 0.6;
     }
 
     // Revealed after attack indicator
@@ -3876,23 +3874,17 @@ function drawUnitOverlay(unit, cx, cy) {
     // Note: Sprint/Powershot/DamageBoost indicators removed - the action buttons
     // already show when abilities are active, no need for redundant unit overlays
 
-    // "Spotted!" indicator - higher position, smaller size
-    if (unit.spotted && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'Entdeckt!', '#ef4444', size * 0.8);
-    }
-
     ctx.restore();
 
     // HP bar with gradient - positioned ABOVE the unit
     // Ensure hpPct is a valid number between 0 and 1
     const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
     const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
-    // Compact, proportional bar sizing
-    const barWidth = size * 1.2;
-    const barHeight = 6;
+    // Compact, proportional bar sizing - reduced for cleaner look
+    const barWidth = size * 0.8;
+    const barHeight = 4;
     // Position above unit (negative offset from center)
-    const barY = cy - size * 1.15;
+    const barY = cy - size * 1.1;
 
     // Bar background - subtle with slight shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
