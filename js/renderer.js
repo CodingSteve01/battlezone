@@ -3828,6 +3828,7 @@ function drawUnitOverlay(unit, cx, cy) {
 
     // === ENEMY INDICATOR ===
     // Show a red ring around enemy units to clearly identify them
+    // The ring alone is sufficient - additional markers create visual clutter
     const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
     if (isEnemy) {
         ctx.strokeStyle = '#ef4444';
@@ -3837,12 +3838,6 @@ function drawUnitOverlay(unit, cx, cy) {
         ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
-
-        // Small "enemy" marker at top
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(cx, cy - size * 0.85, size * 0.15, 0, Math.PI * 2);
-        ctx.fill();
     }
 
     // Shield indicator (if unit has shield from power-up)
