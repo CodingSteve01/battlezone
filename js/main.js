@@ -269,21 +269,31 @@ function showTeamSelectForPlayer(playerIndex) {
     currentPlayerSelection = [];
     currentBudgetSpent = 0;
 
-    // Update header
+    // Update header - Both legacy and shop-style
     const badge = document.getElementById('team-select-badge');
     const playerNum = document.getElementById('team-select-player');
     const hint = document.querySelector('.team-select-hint');
 
+    const playerColor = CONFIG.PLAYER_COLORS[playerIndex];
+    const playerName = getPlayerName(playerIndex);
+
     if (badge) {
-        badge.style.backgroundColor = CONFIG.PLAYER_COLORS[playerIndex];
+        badge.style.backgroundColor = playerColor;
+        badge.style.boxShadow = `0 0 15px ${playerColor}`;
         badge.textContent = playerIndex + 1;
     }
     if (playerNum) {
-        // Use player name instead of just number
-        playerNum.textContent = getPlayerName(playerIndex);
+        playerNum.textContent = playerName;
     }
     if (hint) {
-        hint.textContent = `${getPlayerName(playerIndex)}: Stelle dein Team zusammen`;
+        hint.textContent = `${playerName}: Stelle dein Team zusammen`;
+    }
+
+    // Update shop budget max
+    const shopBudget = document.getElementById('shop-budget');
+    if (shopBudget) {
+        const maxEl = shopBudget.querySelector('.budget-max');
+        if (maxEl) maxEl.textContent = CONFIG.TEAM_BUDGET;
     }
 
     // Generate unit cards
@@ -306,7 +316,7 @@ function showTeamSelectForPlayer(playerIndex) {
 }
 
 /**
- * Update confirm button state
+ * Update confirm button state - Shop Style
  */
 function updateConfirmButton() {
     const confirmBtn = document.getElementById('team-confirm-btn');
@@ -316,19 +326,20 @@ function updateConfirmButton() {
                        currentBudgetSpent <= CONFIG.TEAM_BUDGET;
         confirmBtn.disabled = !isValid;
 
-        // Update button text to show unit count
+        // Compact button text for shop style
         if (isValid) {
-            confirmBtn.textContent = `Weiter (${currentPlayerSelection.length} Einheiten)`;
+            confirmBtn.textContent = `Los! (${currentPlayerSelection.length})`;
         } else if (currentPlayerSelection.length < CONFIG.MIN_UNITS) {
-            confirmBtn.textContent = `Noch ${CONFIG.MIN_UNITS - currentPlayerSelection.length} Einheit(en) wählen`;
+            const needed = CONFIG.MIN_UNITS - currentPlayerSelection.length;
+            confirmBtn.textContent = `+${needed}`;
         } else {
-            confirmBtn.textContent = 'Budget überschritten!';
+            confirmBtn.textContent = '💰!';
         }
     }
 }
 
 /**
- * Generate unit selection cards
+ * Generate unit selection cards - Shop Style
  */
 function generateUnitCards() {
     const grid = document.getElementById('team-select-grid');
@@ -350,17 +361,22 @@ function generateUnitCards() {
         // Check if this is an elite unit (has special dual-attack capability)
         const isElite = classData.canMelee && classData.canRanged;
 
+        // Compact shop-style card layout
         card.innerHTML = `
-            <div class="unit-cost cost-${costCategory}">${classData.cost} 💰</div>
             ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
-            <div class="unit-icon">${classData.icon}</div>
-            <div class="unit-name">${classData.name}</div>
-            <div class="unit-stats">
-                ❤️ ${classData.hp} HP • ⚔️ ${classData.damage} DMG<br>
-                📍 ${classData.move} Felder • 🎯 ${classData.range} Reichweite
-                ${classData.meleeBonus ? `<br>🗡️ +${classData.meleeBonus} Nahkampf` : ''}
+            <div class="card-header">
+                <div class="unit-icon">${classData.icon}</div>
+                <div class="unit-name">${classData.name}</div>
+                <div class="unit-cost cost-${costCategory}">${classData.cost}💰</div>
             </div>
-            <div class="unit-special">✨ ${classData.special}: ${classData.specialDesc}</div>
+            <div class="unit-stats">
+                <span class="stat-item">❤️ ${classData.hp}</span>
+                <span class="stat-item">⚔️ ${classData.damage}</span>
+                <span class="stat-item">📍 ${classData.move}</span>
+                <span class="stat-item">🎯 ${classData.range}</span>
+                ${classData.meleeBonus ? `<span class="stat-item">🗡️ +${classData.meleeBonus}</span>` : ''}
+            </div>
+            <div class="unit-special">✨ ${classData.special}</div>
         `;
 
         card.onclick = () => {
@@ -368,31 +384,31 @@ function generateUnitCards() {
             toggleUnitSelection(classKey, card);
         };
 
-        // Show unit class hint on first interaction
-        card.onmouseenter = () => showUnitClassHint(classKey);
-        card.onfocus = () => showUnitClassHint(classKey);
-
         grid.appendChild(card);
     });
 }
 
 /**
- * Update budget display
+ * Update budget display - Shop Style
  */
 function updateBudgetDisplay() {
-    let budgetDisplay = document.getElementById('budget-display');
+    // Update Shop-Style budget display
+    const shopBudget = document.getElementById('shop-budget');
+    if (shopBudget) {
+        const currentEl = shopBudget.querySelector('.budget-current');
+        const maxEl = shopBudget.querySelector('.budget-max');
+        if (currentEl) currentEl.textContent = currentBudgetSpent;
+        if (maxEl) maxEl.textContent = CONFIG.TEAM_BUDGET;
 
-    // Create budget display if it doesn't exist
-    if (!budgetDisplay) {
-        const preview = document.querySelector('.team-select-preview');
-        if (preview) {
-            budgetDisplay = document.createElement('div');
-            budgetDisplay.id = 'budget-display';
-            budgetDisplay.className = 'budget-display';
-            preview.insertBefore(budgetDisplay, preview.firstChild);
-        }
+        // Visual feedback for budget status
+        const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
+        shopBudget.classList.remove('budget-warning', 'budget-over');
+        if (remaining < 70) shopBudget.classList.add('budget-warning');
+        if (remaining < 0) shopBudget.classList.add('budget-over');
     }
 
+    // Legacy support for old budget display
+    let budgetDisplay = document.getElementById('budget-display');
     if (budgetDisplay) {
         const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
         const percentage = (currentBudgetSpent / CONFIG.TEAM_BUDGET) * 100;

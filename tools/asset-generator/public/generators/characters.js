@@ -75,11 +75,24 @@ const CharacterGenerator = {
         dead: { stance: 'fallen', bodyTilt: 90, legSpread: 15, armAngle: -30, shoulderDrop: 0 }
     },
 
+    // Template color for player-specific accents (replaced at runtime)
+    // Using magenta-pink tones that are easy to detect and replace
+    templateColor: {
+        name: 'template',
+        primary: '#FF00FF',    // Pure magenta - easy to detect
+        secondary: '#CC00CC',  // Darker magenta
+        highlight: '#FF66FF'   // Lighter magenta
+    },
+
     playerColors: [
         { name: 'green', primary: '#22c55e', secondary: '#16a34a', highlight: '#4ade80' },
         { name: 'red', primary: '#ef4444', secondary: '#dc2626', highlight: '#f87171' },
         { name: 'blue', primary: '#3b82f6', secondary: '#2563eb', highlight: '#60a5fa' },
-        { name: 'yellow', primary: '#eab308', secondary: '#ca8a04', highlight: '#facc15' }
+        { name: 'yellow', primary: '#eab308', secondary: '#ca8a04', highlight: '#facc15' },
+        { name: 'cyan', primary: '#06b6d4', secondary: '#0891b2', highlight: '#22d3ee' },
+        { name: 'orange', primary: '#f97316', secondary: '#ea580c', highlight: '#fb923c' },
+        { name: 'purple', primary: '#a855f7', secondary: '#9333ea', highlight: '#c084fc' },
+        { name: 'pink', primary: '#ec4899', secondary: '#db2777', highlight: '#f472b6' }
     ],
 
     skinTones: [
@@ -115,11 +128,21 @@ const CharacterGenerator = {
         // Default: no team indicator for standalone sprite generation
         const showTeamIndicator = options.showTeamIndicator === true;
 
+        // Support for template generation (uses magenta for player accents)
+        const useTemplate = options.useTemplate === true;
+
         const classConfig = this.classes[classType] || this.classes.scout;
         const poseConfig = this.poses[pose] || this.poses.normal;
-        const playerColor = this.playerColors[playerIndex % this.playerColors.length];
 
-        const seed = classType.charCodeAt(0) * 10000 + pose.charCodeAt(0) * 100 + playerIndex;
+        // Use template color if generating template, otherwise player color
+        const playerColor = useTemplate
+            ? this.templateColor
+            : this.playerColors[playerIndex % this.playerColors.length];
+
+        // For templates, use a fixed seed so all templates look the same
+        const seed = useTemplate
+            ? classType.charCodeAt(0) * 10000 + pose.charCodeAt(0) * 100
+            : classType.charCodeAt(0) * 10000 + pose.charCodeAt(0) * 100 + playerIndex;
         const rand = this.seededRandom(seed);
 
         // Pick consistent skin tone based on seed
@@ -129,6 +152,13 @@ const CharacterGenerator = {
         this.drawCharacter(ctx, classConfig, poseConfig, playerColor, skinTone, uniform, rand, width, height, showTeamIndicator);
 
         return canvas;
+    },
+
+    /**
+     * Generate a template sprite (with magenta accents to be recolored at runtime)
+     */
+    generateTemplate(classType, pose, width = 130, height = 130, options = {}) {
+        return this.generate(classType, pose, 0, width, height, { ...options, useTemplate: true });
     },
 
     seededRandom(seed) {

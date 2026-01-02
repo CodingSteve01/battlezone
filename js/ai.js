@@ -752,32 +752,40 @@ function analyzeAndPlan() {
     // Estimate player position if no enemies visible
     if (visibleEnemies.length === 0) {
         estimatePlayerPosition();
-        addAIThought('Keine Feinde in Sicht. Suche nach Zielen...', 'strategy');
+        addAIThought('🔍 Kein Feind sichtbar - schwärme aus zur Aufklärung', 'strategy');
     } else {
         aiMemory.lastContactRound = state.round;
         aiMemory.huntMode = false;
-        const threatLevel = visibleEnemies.length > 2 ? 'hohe' : 'moderate';
-        addAIThought(`${visibleEnemies.length} Feinde erkannt! Bewerte ${threatLevel} Bedrohung.`, 'strategy');
+        // Detailliertere Feindanalyse
+        const enemyClasses = visibleEnemies.map(e => CLASS_NAMES_DE[e.class] || e.class);
+        const uniqueClasses = [...new Set(enemyClasses)];
+        if (visibleEnemies.length === 1) {
+            addAIThought(`⚠️ Feindkontakt: ${uniqueClasses[0]} gesichtet!`, 'strategy');
+        } else if (visibleEnemies.length <= 3) {
+            addAIThought(`⚠️ ${visibleEnemies.length} Feinde erkannt: ${uniqueClasses.join(', ')}`, 'strategy');
+        } else {
+            addAIThought(`🚨 Starke Feindpräsenz! ${visibleEnemies.length} Gegner in Sicht`, 'strategy');
+        }
     }
 
     // Enter hunt mode if we haven't seen enemies for a while
     if (state.round - aiMemory.lastContactRound >= 2) {
         aiMemory.huntMode = true;
-        addAIThought('Aktiviere Jagdmodus - Feinde werden gesucht!', 'strategy');
+        addAIThought('🎯 Jagdmodus aktiviert - systematische Suche eingeleitet', 'strategy');
     }
 
     // Decide search pattern based on situation (using all allied units)
     decideSearchPattern(allAlliedUnits, visibleEnemies);
 
-    // Generate thought based on search pattern
-    const patternNames = {
-        'engage': 'Angriff - Feinde im Visier',
-        'expand': 'Expansion - Gebiet erkunden',
-        'sweep': 'Durchkämmen - Koordinierter Vormarsch',
-        'pincer': 'Zangenbewegung - Einkreisung'
+    // Generate thought based on search pattern - nur bei Änderung oder wichtigen Situationen
+    const patternExplanations = {
+        'engage': '⚔️ Direkte Konfrontation - alle Einheiten zum Angriff!',
+        'expand': '📍 Breite Aufstellung - Gebiet unter Kontrolle bringen',
+        'sweep': '🔄 Koordiniertes Durchkämmen von links nach rechts',
+        'pincer': '🦀 Zangenbewegung eingeleitet - Feind einkreisen!'
     };
-    if (aiMemory.searchPattern && patternNames[aiMemory.searchPattern]) {
-        addAIThought(`Strategie: ${patternNames[aiMemory.searchPattern]}`, 'strategy');
+    if (aiMemory.searchPattern && patternExplanations[aiMemory.searchPattern] && visibleEnemies.length > 0) {
+        addAIThought(patternExplanations[aiMemory.searchPattern], 'strategy');
     }
 
     // Assign targets using ALL allied units for coordinated focus fire
@@ -803,11 +811,14 @@ function analyzeAndPlan() {
     // Calculate AP budgets for each unit
     const apBudgets = calculateAPBudgets(aiUnits, state.sharedAP, visibleEnemies);
 
-    // Log AP allocation
-    const budgetInfo = aiUnits.filter(u => u.alive).map(u =>
-        `${CLASS_NAMES_DE[u.class] || u.class}: ${apBudgets.get(u.id) || 0} AP`
-    ).join(', ');
-    addAIThought(`AP-Verteilung: ${budgetInfo}`, 'strategy');
+    // Summarize team readiness (nur bei genügend AP zeigen)
+    const totalAP = state.sharedAP;
+    const aliveUnits = aiUnits.filter(u => u.alive).length;
+    if (totalAP >= aliveUnits * 2 && visibleEnemies.length > 0) {
+        addAIThought(`💪 ${aliveUnits} Einheiten bereit, ${totalAP} AP verfügbar`, 'strategy');
+    } else if (totalAP < aliveUnits && visibleEnemies.length > 0) {
+        addAIThought(`⚡ Wenig AP - priorisiere wichtigste Aktionen`, 'strategy');
+    }
 
     return {
         aiUnits,
