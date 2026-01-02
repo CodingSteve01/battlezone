@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.0...shadow-squad-v6.0.1) (2026-01-02)
+
+
+### Bug Fixes
+
+* **ai:** improve AI aggression and simplify unit HUD ([#320](https://github.com/CodingSteve01/battlezone/issues/320)) ([f1e97ea](https://github.com/CodingSteve01/battlezone/commit/f1e97ea58227daaf5cf4dcb541a3c24a7a140ac9))
+
 ## [6.0.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v5.3.0...shadow-squad-v6.0.0) (2026-01-02)
 
 
