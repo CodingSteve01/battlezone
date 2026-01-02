@@ -1087,7 +1087,7 @@ const AWARDS = [
     {
         id: 'pacifist',
         icon: '🕊️',
-        titles: ['Friedenstaube', 'Pazifist', 'Gandhi Award', 'Gewaltfreier Widerstand'],
+        titles: ['Friedenstaube', 'Pazifist', 'Diplomat', 'Gewaltfreier Widerstand'],
         stat: 'damageDealt',
         condition: (stats) => stats.kills === 0 && stats.damageDealt < 20 && stats.hexesMoved >= 5,
         getValue: () => 'Kampf vermieden'
