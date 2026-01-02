@@ -792,6 +792,21 @@ function analyzeAndPlan() {
     const allAlliedUnits = getAllAlliedAIUnits();  // All units from allied AIs
     const visibleEnemies = findAllVisibleEnemies();
 
+    // Check for allied AI coordination
+    const alliedAIPlayers = [];
+    for (let p = 0; p < state.settings.players; p++) {
+        if (p !== state.currentPlayer && isAIPlayer(p) && arePlayersAllied(state.currentPlayer, p)) {
+            alliedAIPlayers.push(p);
+        }
+    }
+
+    // Announce allied coordination at start of turn
+    if (alliedAIPlayers.length > 0 && visibleEnemies.length > 0) {
+        const allyNames = alliedAIPlayers.map(p => getPlayerName(p)).join(' & ');
+        const totalAlliedUnits = allAlliedUnits.length;
+        addAIThought(`🤝 Koordination mit ${allyNames}! ${totalAlliedUnits} Einheiten arbeiten zusammen.`, 'strategy');
+    }
+
     // Update AI memory with visible enemies
     updateMemoryWithVisibleEnemies(visibleEnemies);
 
@@ -813,7 +828,7 @@ function analyzeAndPlan() {
         aiMemory.lastContactRound = state.round;
         aiMemory.huntMode = false;
         // Detailliertere Feindanalyse
-        const enemyClasses = visibleEnemies.map(e => CLASS_NAMES_DE[e.class] || e.class);
+        const enemyClasses = visibleEnemies.map(e => CLASS_NAMES_DE[e.class] || e.class || 'Unbekannt');
         const uniqueClasses = [...new Set(enemyClasses)];
         const woundedEnemies = visibleEnemies.filter(e => e.currentHp < e.maxHp);
 
@@ -1026,7 +1041,7 @@ function learnFromGhostIndicators() {
             });
 
             // Log AI thought about detection
-            const className = CLASS_NAMES_DE[ghost.class] || ghost.class;
+            const className = CLASS_NAMES_DE[ghost.class] || ghost.class || 'Einheit';
             addAIThought(`Ein getarnter ${className} hat von dort angegriffen. Wir kennen jetzt seine ungefähre Position.`, 'strategy');
         }
     }
@@ -1188,6 +1203,29 @@ function assignTargets(aiUnits, enemies) {
         }
     }
 
+    // Check for coordinated attacks from multiple allied players
+    const coordinatedTargets = new Map(); // enemyId -> [players]
+    for (const [unitId, enemyId] of aiMemory.assignedTargets) {
+        const unit = aiUnits.find(u => u.id === unitId);
+        if (!unit) continue;
+        if (!coordinatedTargets.has(enemyId)) {
+            coordinatedTargets.set(enemyId, new Set());
+        }
+        coordinatedTargets.get(enemyId).add(unit.player);
+    }
+
+    // Announce coordinated attack if multiple allied players target same enemy
+    for (const [enemyId, players] of coordinatedTargets) {
+        if (players.size >= 2) {
+            const enemy = enemies.find(e => e.id === enemyId);
+            if (enemy) {
+                const targetName = CLASS_NAMES_DE[enemy.class] || enemy.class || 'Feind';
+                const playerNames = Array.from(players).map(p => getPlayerName(p)).join(' & ');
+                addAIThought(`📍 Ziel erfasst: ${playerNames} konzentrieren Feuer auf den ${targetName}!`, 'strategy');
+            }
+        }
+    }
+
     // === TAKTISCHES EINKESSELN ===
     // Weise Flankenmanöver zu wenn mehrere Einheiten denselben Feind angreifen
     planEncirclementManeuvers(aiUnits, enemies);
@@ -1258,7 +1296,7 @@ function planEncirclementManeuvers(aiUnits, enemies) {
 
     // Generiere AI Thought wenn Einkesselung geplant wird
     if (aiMemory.flankingTargets.size >= 2) {
-        const targetName = CLASS_NAMES_DE[primaryTarget.class] || primaryTarget.class;
+        const targetName = CLASS_NAMES_DE[primaryTarget.class] || primaryTarget.class || 'Feind';
         const numFlankers = aiMemory.flankingTargets.size;
         addAIThought(`${numFlankers} Einheiten umzingeln den ${targetName}. Er hat keinen Fluchtweg.`, 'strategy');
     }
@@ -1541,7 +1579,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
 
         // === INTELLIGENT TACTICAL DECISION TREE ===
         // Neu: Klassenspezifische Entscheidungslogik mit Vorausplanung
-        const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+        const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
 
         // Get spotted awareness for tactical decisions
         const spottedInfo = getSpottedAwareness(unit, enemies);
@@ -1608,7 +1646,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1) && canUnitAttack(unit)) {
             const target = attackable.find(t => t.id === assignedTargetId);
             // Enhanced attack thought with evaluation
-            const targetName = CLASS_NAMES_DE[target.class] || target.class;
+            const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
             const canKill = target.currentHp <= unit.damage;
             if (canKill) {
                 addAIThought(`${unitName} kann den ${targetName} mit diesem Schuss erledigen. Das ist die Priorität.`, 'attack');
@@ -1622,7 +1660,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
             // 3. Attack best available target
             const target = selectBestTarget(unit, attackable);
             if (target) {
-                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
                 const canKill = target.currentHp <= unit.damage;
                 if (canKill) {
                     addAIThought(`${targetName} ist verwundbar. ${unitName} kann ihn jetzt ausschalten.`, 'attack');
@@ -1681,7 +1719,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
                     } else {
                         const closestEnemy = enemies[0];
                         const distAfter = hexDistance({ q: moveTarget.q, r: moveTarget.r }, { q: closestEnemy.q, r: closestEnemy.r });
-                        const closestEnemyName = CLASS_NAMES_DE[closestEnemy.class] || closestEnemy.class;
+                        const closestEnemyName = CLASS_NAMES_DE[closestEnemy.class] || closestEnemy.class || 'Feind';
                         if (distAfter <= unit.range) {
                             addAIThought(`${unitName} bewegt sich in Schussreichweite zum ${closestEnemyName}.`, 'move');
                         } else {
@@ -1700,7 +1738,7 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         if (attackableAfterMove.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             const target = selectBestTarget(unit, attackableAfterMove);
             if (target) {
-                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
                 addAIThought(`Nach der Bewegung hat ${unitName} jetzt Sicht auf den ${targetName}. Angriff!`, 'attack');
                 await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
                 trackAPSpent(1);
@@ -1893,7 +1931,7 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
     // Generate AI thought about the chosen move
     const bestMove = candidates[0];
     if (bestMove.foresight && bestMove.foresight.explanation && isSpectatorMode()) {
-        const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+        const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
         addAIThought(`${unitName}: ${bestMove.foresight.explanation}`, 'move');
     }
 
@@ -2080,7 +2118,7 @@ function getNeighborCoords(q, r) {
  */
 async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
     const actionDelay = spectatorMode ? 500 : 300;
 
     // === SICHERHEITS-CHECK: Frühzeitiger Rückzug bei 60% HP ===
@@ -2133,7 +2171,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer,
     if (attackable.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
         const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
         if (killableTarget) {
-            const targetName = CLASS_NAMES_DE[killableTarget.class] || killableTarget.class;
+            const targetName = CLASS_NAMES_DE[killableTarget.class] || killableTarget.class || 'Feind';
             addAIThought(`${targetName} ist verwundbar. ${unitName} nutzt die sichere Gelegenheit zum Eliminieren.`, 'attack');
             await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer, spectatorMode);
         }
@@ -2149,7 +2187,7 @@ async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer,
  */
 async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
     const attackable = getAttackableUnits(unit);
     const actionDelay = spectatorMode ? 500 : 300;
 
@@ -2179,7 +2217,7 @@ async function executeAmbushBehavior(unit, plan, renderIfVisible, hasHumanViewer
         // Prioritize enemies that attacked/engaged the decoy
         const target = selectBestTarget(unit, attackableNow);
         if (target) {
-            const targetName = CLASS_NAMES_DE[target.class] || target.class;
+            const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
             addAIThought(`Der Feind ist in die Falle getappt! ${unitName} greift den ${targetName} aus dem Hinterhalt an.`, 'attack');
             await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
         }
@@ -2229,7 +2267,7 @@ async function executeMedicAI(unit, plan, context) {
     const { canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
             renderIfVisible, actionDelayBase, shortDelay, unitBudget, apSpentByUnit } = context;
     const _enemies = plan.visibleEnemies; // Für zukünftige Nutzung bei Feind-Meidung
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
 
     // Hole ALLE verbündeten Einheiten (inkl. von verbündeten Spielern)
     const allies = getAllAlliedAIUnits();
@@ -2275,13 +2313,13 @@ async function executeMedicAI(unit, plan, context) {
         const mostCritical = criticallyWounded[0] || woundedInRange[0];
 
         if (criticallyWounded.length > 0) {
-            const criticalName = CLASS_NAMES_DE[mostCritical.class] || mostCritical.class;
+            const criticalName = CLASS_NAMES_DE[mostCritical.class] || mostCritical.class || 'Verbündeter';
             const criticalHpPercent = Math.round(mostCritical.currentHp / mostCritical.maxHp * 100);
             addAIThought(`Notfall! Der ${criticalName} hat nur noch ${criticalHpPercent}% HP. ${unitName} muss jetzt heilen.`, 'special');
         } else if (totalWounded >= 2) {
             addAIThought(`${totalWounded} Teammitglieder sind verletzt. ${unitName} startet eine Massenheilung.`, 'special');
         } else {
-            const targetName = CLASS_NAMES_DE[woundedInRange[0].class] || woundedInRange[0].class;
+            const targetName = CLASS_NAMES_DE[woundedInRange[0].class] || woundedInRange[0].class || 'Verbündeter';
             addAIThought(`Der ${targetName} braucht medizinische Versorgung. ${unitName} heilt.`, 'special');
         }
 
@@ -2304,7 +2342,7 @@ async function executeMedicAI(unit, plan, context) {
         const moveTarget = selectMedicMoveTarget(unit, woundedOutOfRange, plan, remainingBudget);
         if (moveTarget) {
             const targetAlly = woundedOutOfRange[0];
-            const targetName = CLASS_NAMES_DE[targetAlly.class] || targetAlly.class;
+            const targetName = CLASS_NAMES_DE[targetAlly.class] || targetAlly.class || 'Verbündeter';
             const hpPercent = Math.round(targetAlly.currentHp / targetAlly.maxHp * 100);
             addAIThought(`Der ${targetName} ist verletzt und außer Reichweite. ${unitName} eilt zu ihm.`, 'move');
 
@@ -2345,7 +2383,7 @@ async function executeMedicAI(unit, plan, context) {
         if (killableTarget || noHealingNeeded) {
             const target = killableTarget || selectBestTarget(unit, attackable);
             if (target) {
-                const targetName = CLASS_NAMES_DE[target.class] || target.class;
+                const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
                 if (killableTarget) {
                     addAIThought(`${targetName} ist fast erledigt. Auch der ${unitName} kann zuschlagen.`, 'attack');
                 } else {
@@ -2432,7 +2470,7 @@ function selectMedicMoveTarget(unit, woundedAllies, plan, maxAP) {
 async function executeSpottedStealthReaction(unit, enemies, _plan, context) {
     const { canSpendAP, trackAPSpent, hasHumanViewer, spectatorMode,
             actionDelayBase, shortDelay } = context;
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
 
     const result = { retreated: false, cloaked: false };
 
@@ -2506,7 +2544,7 @@ async function executeSpottedStealthReaction(unit, enemies, _plan, context) {
 async function usePreMoveAbility(unit, enemies, _plan, context) {
     const { canSpendAP, trackAPSpent, hasHumanViewer,
             actionDelayBase, shortDelay, spottedInfo } = context;
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
 
     const specialCost = getSpecialAbilityCost(unit.class);
     if (!canSpendAP(specialCost) || !canUseSpecialAbility(unit)) {
@@ -2622,7 +2660,7 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
                 (e.currentHp <= unit.damage + 25 && e.currentHp > unit.damage) ||
                 e.class === 'medic' || e.class === 'sniper'
             );
-            const targetName = target ? (CLASS_NAMES_DE[target.class] || target.class) : 'Ziel';
+            const targetName = target ? (CLASS_NAMES_DE[target.class] || target.class || 'Feind') : 'Ziel';
 
             if (canKillWithPowershot) {
                 addAIThought(`Der ${targetName} kann mit einem verstärkten Schuss erledigt werden. ${unitName} lädt Powershot.`, 'special');
@@ -2670,8 +2708,8 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
     }
 
     // Generate attack thought for spectator mode
-    const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
-    const targetName = CLASS_NAMES_DE[target.class] || target.class;
+    const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
+    const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
     const canKill = target.currentHp <= unit.damage;
 
     // Delay multipliers for spectator mode
@@ -3794,7 +3832,7 @@ async function considerTacticalAbilities(unit, enemies, plan, context) {
     if (canSpendAP(2) && canUseSuppression(unit)) {
         const suppressTarget = selectSuppressionTarget(unit, enemies, plan);
         if (suppressTarget) {
-            const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+            const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
             addAIThought(`${unitName} legt Unterdrückungsfeuer auf eine strategische Position. Der Feind wird dort gebremst.`, 'strategy');
 
             useSuppression(unit, suppressTarget.q, suppressTarget.r);
@@ -3814,7 +3852,7 @@ async function considerTacticalAbilities(unit, enemies, plan, context) {
     if (canSpendAP(2) && canUseOverwatch(unit)) {
         const shouldUseOverwatch = evaluateOverwatchValue(unit, enemies, plan);
         if (shouldUseOverwatch) {
-            const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
+            const unitName = CLASS_NAMES_DE[unit.class] || unit.class || 'Einheit';
             addAIThought(`${unitName} geht in Overwatch-Position. Jeder Feind, der sich bewegt, wird beschossen.`, 'strategy');
 
             activateOverwatch(unit);
