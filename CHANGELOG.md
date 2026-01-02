@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.2...shadow-squad-v6.0.3) (2026-01-02)
+
+
+### Bug Fixes
+
+* **ui:** fix dead unit display and remove cloak emoji indicator ([#324](https://github.com/CodingSteve01/battlezone/issues/324)) ([24b1d16](https://github.com/CodingSteve01/battlezone/commit/24b1d161328f36c4d76e36fa2878295f1f357d0b))
+
 ## [6.0.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.1...shadow-squad-v6.0.2) (2026-01-02)
 
 
