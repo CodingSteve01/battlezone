@@ -3778,41 +3778,8 @@ function drawUnitOverlay(unit, cx, cy) {
 
     ctx.save();
 
-    // Player number badge
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    ctx.arc(cx + size * 0.5, cy - size * 0.6, size * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(unit.player + 1, cx + size * 0.5, cy - size * 0.6);
-
-    // Level badge (left side)
-    const level = unit.level || 1;
-    if (level > 1) {
-        const levelColors = ['#9ca3af', '#22c55e', '#3b82f6', '#a855f7', '#eab308'];
-        const levelColor = levelColors[Math.min(level - 1, levelColors.length - 1)];
-
-        ctx.fillStyle = levelColor;
-        ctx.beginPath();
-        ctx.arc(cx - size * 0.5, cy - size * 0.6, size * 0.22, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${Math.round(size * 0.24)}px sans-serif`;
-        ctx.fillText(level, cx - size * 0.5, cy - size * 0.6);
-    }
+    // NOTE: Player number badge and level badge removed for cleaner HUD
+    // All detailed info is shown in the unit tabs at the bottom of the screen
 
     // Shield indicator (if unit has shield from power-up)
     if (unit.shield) {
@@ -3940,12 +3907,8 @@ function drawUnitOverlay(unit, cx, cy) {
     ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 2);
     ctx.fill();
 
-    // HP text - smaller, cleaner font
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `bold ${Math.round(barHeight * 0.85)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${unit.currentHp}/${unit.maxHp}`, cx, barY + barHeight / 2);
+    // NOTE: HP text removed for cleaner HUD - bar color (green/yellow/red)
+    // and fill level intuitively show health status
 }
 
 /**

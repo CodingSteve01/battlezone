@@ -859,15 +859,34 @@ function analyzeAndPlan() {
         }
     }
 
-    // Enter hunt mode if we haven't seen enemies for a while
-    if (state.round - aiMemory.lastContactRound >= 2) {
+    // Enter hunt mode faster - after just 1 round without contact
+    // Also count total remaining enemies for endgame aggression
+    const totalEnemiesOnMap = state.units.filter(u =>
+        u.alive && !arePlayersAllied(state.currentPlayer, u.player)
+    ).length;
+
+    // Endgame mode: Very few enemies left - be extremely aggressive
+    const isEndgame = totalEnemiesOnMap <= 2 && totalEnemiesOnMap > 0;
+
+    if (state.round - aiMemory.lastContactRound >= 1) {
         aiMemory.huntMode = true;
-        addAIThought(variedPhrase([
-            'Seit zwei Runden kein Feindkontakt. Wechsle in den Jagdmodus.',
-            'Der Feind hält sich versteckt. Wir beginnen eine systematische Suche.',
-            'Zeit, aktiv nach dem Feind zu suchen. Jagdmodus aktiviert.'
-        ]), 'strategy');
+        if (isEndgame) {
+            addAIThought(variedPhrase([
+                `Nur noch ${totalEnemiesOnMap} Feind${totalEnemiesOnMap > 1 ? 'e' : ''} übrig! Alle Einheiten: Aufspüren und eliminieren!`,
+                `Endspiel! Der letzte Widerstand muss gebrochen werden. Voller Angriff!`,
+                `Fast geschafft! Wir jagen die letzten Überlebenden.`
+            ]), 'strategy');
+        } else {
+            addAIThought(variedPhrase([
+                'Kein Sichtkontakt. Jagdmodus aktiviert - wir schwärmen aus.',
+                'Der Feind versteckt sich. Alle Einheiten: Aktiv suchen!',
+                'Zeit zu jagen. Wir verteilen uns und finden sie.'
+            ]), 'strategy');
+        }
     }
+
+    // Store endgame status for use in movement scoring
+    aiMemory.isEndgame = isEndgame;
 
     // Decide search pattern based on situation (using all allied units)
     decideSearchPattern(allAlliedUnits, visibleEnemies);
@@ -3804,9 +3823,21 @@ function scoreCombatPosition(unit, q, r, enemies, plan) {
 
 /**
  * Score position for hunting known enemy positions
+ * IMPROVED: More aggressive pursuit - close distance quickly
  */
 function scoreHuntPosition(unit, q, r, plan) {
     let score = 0;
+    const hex = getHex(q, r);
+
+    // === ENDGAME AGGRESSION ===
+    if (aiMemory.isEndgame) {
+        score += 30; // Base aggression bonus in endgame
+    }
+
+    // === ZONE AWARENESS ===
+    if (!isHexInZone(q, r)) {
+        return -500;
+    }
 
     // Move towards highest confidence last known position
     const positions = plan.knownEnemyPositions
@@ -3816,24 +3847,47 @@ function scoreHuntPosition(unit, q, r, plan) {
         const target = positions[0];
         const dist = hexDistance({ q, r }, { q: target.q, r: target.r });
 
-        // Closer is better, but not too close (might be ambush)
-        if (dist <= 3) {
-            score += (10 - dist) * 20;
-        } else {
-            score -= dist * 5;
+        // AGGRESSIVE: Get as close as possible
+        // The closer, the better - we want to find and engage!
+        score += (15 - dist) * 25; // Strong pull toward target
+
+        // Bonus for being in attack range of last known position
+        if (dist <= unit.range) {
+            score += 80;
         }
     }
 
-    // Also consider estimated player center
+    // Also consider estimated player center - pursue aggressively
     if (aiMemory.playerCenterEstimate) {
         const distToCenter = hexDistance({ q, r }, aiMemory.playerCenterEstimate);
-        score -= distToCenter * 3;
+        score -= distToCenter * 5; // INCREASED pursuit weight
+    }
+
+    // === SPREAD OUT FROM ALLIES DURING HUNT ===
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
+    for (const ally of allies) {
+        const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+        if (distToAlly <= 2) {
+            score -= 40; // Penalty for clustering
+        } else if (distToAlly >= 3 && distToAlly <= 6) {
+            score += 20; // Bonus for good spread
+        }
+    }
+
+    // === REWARD ACTUAL MOVEMENT ===
+    const moveDist = hexDistance({ q, r }, { q: unit.q, r: unit.r });
+    if (moveDist >= 2) {
+        score += moveDist * 12; // Bonus for covering ground
     }
 
     // Prefer high ground for vision
-    const hex = getHex(q, r);
     if (hex && hex.type === 'hills') {
-        score += 30;
+        score += 50;
+    }
+
+    // Prefer cover positions (but not at cost of speed)
+    if (hex && hex.cover) {
+        score += 15;
     }
 
     return score;
@@ -3841,47 +3895,66 @@ function scoreHuntPosition(unit, q, r, plan) {
 
 /**
  * Score position for systematic search
- * IMPROVED: Zone-aware - don't search outside shrinking zone or towards edges
+ * IMPROVED: More aggressive search - spread out, cover ground, hunt actively
  */
 function scoreSearchPosition(unit, q, r, plan) {
     let score = 0;
     const hexKey = `${q},${r}`;
 
     // === CRITICAL: ZONE AWARENESS FOR SEARCH ===
-    // Don't waste time searching areas outside the zone or near the edge
     const targetInZone = isHexInZone(q, r);
     if (!targetInZone) {
-        // Position is outside zone - enemies can't be there (they'd take damage)
-        score -= 500; // Heavy penalty - searching here is pointless
-        return score; // Early return - no point calculating more
+        score -= 500;
+        return score;
     }
 
-    // Calculate distance from zone center (0,0) and zone edge
+    // Calculate distance from zone center and edge
     const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
     const distFromZoneEdge = state.zoneRadius - distFromCenter;
 
-    // Penalty for being near zone edge - enemies are unlikely to be there
+    // Light penalty for being near zone edge
     if (distFromZoneEdge <= 2) {
-        score -= 40; // Edge of zone - enemies probably moved inward
-    } else if (distFromZoneEdge <= 4) {
-        score -= 15; // Near edge
+        score -= 20;
     }
 
-    // Exploration bonuses
+    // === ENDGAME AGGRESSION: Move toward map center aggressively ===
+    if (aiMemory.isEndgame) {
+        // In endgame, enemies are likely hiding near center - rush there!
+        score -= distFromCenter * 8; // Strong bonus for central positions
+        score += 50; // Base aggression bonus
+    }
+
+    // === STRONG EXPLORATION BONUS - PRIORITIZE UNEXPLORED AREAS ===
     const aiExplored = state.playerExploredHexes[state.currentPlayer];
     if (!aiExplored || !aiExplored.has(hexKey)) {
-        score += 40;  // Big bonus for unexplored territory
+        score += 80;  // INCREASED: Big bonus for unexplored territory
     }
 
     // Recently searched penalty
     if (aiMemory.searchedAreas.has(hexKey)) {
-        score -= 30;
+        score -= 40;
     }
 
-    // Enemy spawn centers - but ONLY if they're still in the zone!
+    // === SPREAD OUT FROM ALLIES - DON'T CLUSTER ===
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
+    for (const ally of allies) {
+        const distToAlly = hexDistance({ q, r }, { q: ally.q, r: ally.r });
+        if (distToAlly <= 2) {
+            score -= 60; // Strong penalty for clustering during search
+        } else if (distToAlly >= 4 && distToAlly <= 7) {
+            score += 30; // Bonus for good spread (not too close, not too far)
+        }
+    }
+
+    // === MOVEMENT BONUS - REWARD ACTUAL MOVEMENT ===
+    const currentDist = hexDistance({ q, r }, { q: unit.q, r: unit.r });
+    if (currentDist >= 2) {
+        score += currentDist * 15; // Bonus for covering ground
+    }
+
+    // Enemy spawn centers - move toward them in hunt mode
     const enemySpawnCenters = getEnemySpawnCenters();
     if (enemySpawnCenters.length > 0) {
-        // Filter spawn centers to only those still in the zone
         const validSpawnCenters = enemySpawnCenters.filter(pos => isHexInZone(pos.q, pos.r));
 
         if (validSpawnCenters.length > 0) {
@@ -3889,41 +3962,45 @@ function scoreSearchPosition(unit, q, r, plan) {
             const minSpawnDist = Math.min(...validSpawnCenters.map(pos =>
                 hexDistance({ q, r }, pos)
             ));
+            // INCREASED weight for hunt mode
             const spawnWeight = Math.max(0, radius - minSpawnDist);
-            score += spawnWeight * (plan.inHuntMode ? 3 : 2);
+            score += spawnWeight * (plan.inHuntMode ? 5 : 3);
         }
     }
 
-    // Search pattern specific scoring - ZONE-AWARE
+    // === HIGH GROUND BONUS - Get vision advantage ===
+    const hex = getHex(q, r);
+    if (hex && hex.type === 'hills') {
+        score += 40; // Hills give vision advantage during search
+    }
+
+    // Search pattern specific scoring
     switch (plan.searchPattern) {
         case 'expand': {
-            // CHANGED: Don't expand toward edges - expand toward unexplored areas WITHIN zone
-            // Move toward center of zone if zone is shrinking, otherwise explore
+            // Spread out to cover maximum ground
             if (state.zoneRadius < CONFIG.MAP_SIZES[state.settings.size]) {
-                // Zone is shrinking - move toward center, not edges
+                // Zone shrinking - still move, but toward center
                 const currentDistFromCenter = Math.max(Math.abs(unit.q), Math.abs(unit.r), Math.abs(-unit.q - unit.r));
                 if (distFromCenter < currentDistFromCenter) {
-                    score += 20; // Moving toward center is good
+                    score += 30;
                 }
             } else {
-                // Zone not shrinking yet - can explore outward but stay in zone
+                // Full zone - spread out to unexplored areas
                 const distFromStart = Math.sqrt(q * q + r * r);
-                const currentDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
-                if (distFromStart > currentDist && distFromZoneEdge > 3) {
-                    score += 15;
+                const currentStartDist = Math.sqrt(unit.q * unit.q + unit.r * unit.r);
+                if (distFromStart > currentStartDist && distFromZoneEdge > 3) {
+                    score += 25;
                 }
             }
             break;
         }
 
         case 'sweep': {
-            // Move in coordinated line (with ALL allied units) - but toward zone center
-            const allies = getAllAlliedAIUnits();
-            const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
-            // Stay roughly aligned with allies
-            score -= Math.abs(r - avgAllyR) * 5;
-            // Push toward center, not just "forward"
+            // Coordinated sweep - but keep moving!
+            const avgAllyR = allies.reduce((sum, u) => sum + u.r, 0) / (allies.length || 1);
+            score -= Math.abs(r - avgAllyR) * 3; // Lighter alignment penalty
             score -= distFromCenter * 2;
+            score += currentDist * 10; // Reward movement
             break;
         }
 
@@ -3931,19 +4008,18 @@ function scoreSearchPosition(unit, q, r, plan) {
             // Move to flank estimated enemy position
             if (aiMemory.playerCenterEstimate) {
                 const estPos = aiMemory.playerCenterEstimate;
-                // Only consider estimate if it's in the zone
                 if (isHexInZone(Math.round(estPos.q), Math.round(estPos.r))) {
                     const distToEst = hexDistance({ q, r }, estPos);
-                    // Get closer but approach from sides
+                    // Get closer aggressively
                     if (distToEst > 2) {
-                        score -= distToEst * 3;
+                        score -= distToEst * 5; // INCREASED pursuit weight
                     }
-                    // Bonus for being at angles
+                    // Flanking angle bonus
                     const angle = Math.atan2(r - estPos.r, q - estPos.q);
                     const unitIndex = getPlayerUnits(unit.player).indexOf(unit);
-                    const targetAngle = (unitIndex / getPlayerUnits(unit.player).length) * 2 * Math.PI;
+                    const targetAngle = (unitIndex / Math.max(1, getPlayerUnits(unit.player).length)) * 2 * Math.PI;
                     const angleDiff = Math.abs(angle - targetAngle);
-                    score += (Math.PI - angleDiff) * 10;
+                    score += (Math.PI - angleDiff) * 12;
                 }
             }
             break;
