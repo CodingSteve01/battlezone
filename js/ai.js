@@ -2645,13 +2645,14 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
 }
 
 // German class names for display
+// Note: These should match UNIT_CLASSES[key].name from config.js
 const CLASS_NAMES_DE = {
     scout: 'Späher',
     assault: 'Sturmsoldat',
     medic: 'Sanitäter',
     sniper: 'Scharfschütze',
     commando: 'Kommando',
-    elitesoldat: 'Kommando-Soldat'
+    elitesoldat: 'Elitesoldat'
 };
 
 /**
