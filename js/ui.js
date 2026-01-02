@@ -991,85 +991,94 @@ export function selectAction(action) {
 // === SIEGEREHRUNG / AWARDS ===
 
 /**
- * Award definitions with fun titles
+ * Award definitions with fun, varied titles
+ * Each award has multiple title variants for variety
  */
 const AWARDS = [
     {
         id: 'terminator',
         icon: '💀',
-        title: 'Terminator',
+        titles: ['Sensenmann', 'Terminator', 'Todesengel', 'Henker'],
         stat: 'kills',
-        condition: (stats) => stats.kills > 0,
-        getValue: (stats) => `${stats.kills} Kills`
+        condition: (stats) => stats.kills >= 2,
+        getValue: (stats) => `${stats.kills} Eliminierungen`
+    },
+    {
+        id: 'firstblood',
+        icon: '🩸',
+        titles: ['First Blood', 'Erster Treffer', 'Schnellstarter'],
+        stat: 'kills',
+        condition: (stats) => stats.kills >= 1,
+        getValue: (stats) => `${stats.kills} Kill${stats.kills > 1 ? 's' : ''}`
     },
     {
         id: 'marathon',
         icon: '🏃',
-        title: 'Marathon-Läufer',
+        titles: ['Marathon-Held', 'Roadrunner', 'Wandervogel', 'Langstreckenläufer'],
         stat: 'hexesMoved',
-        condition: (stats) => stats.hexesMoved > 5,
-        getValue: (stats) => `${stats.hexesMoved} Felder`
+        condition: (stats) => stats.hexesMoved >= 8,
+        getValue: (stats) => `${stats.hexesMoved} Felder gelaufen`
     },
     {
         id: 'tank',
         icon: '🛡️',
-        title: 'Panzer',
+        titles: ['Unkaputtbar', 'Stehaufmännchen', 'Eiserner Wille', 'Härtetest bestanden'],
         stat: 'damageTaken',
-        condition: (stats) => stats.damageTaken > 50,
-        getValue: (stats) => `${stats.damageTaken} Schaden überlebt`
+        condition: (stats) => stats.damageTaken >= 40,
+        getValue: (stats) => `${stats.damageTaken} HP eingesteckt`
     },
     {
         id: 'destroyer',
         icon: '💥',
-        title: 'Zerstörer',
+        titles: ['Zerstörungswut', 'Abrissbirne', 'Schadensmaschine', 'Feuerteufel'],
         stat: 'damageDealt',
-        condition: (stats) => stats.damageDealt > 50,
-        getValue: (stats) => `${stats.damageDealt} Schaden`
+        condition: (stats) => stats.damageDealt >= 60,
+        getValue: (stats) => `${stats.damageDealt} Schaden ausgeteilt`
     },
     {
         id: 'sniper',
-        icon: '🎯',
-        title: 'Scharfschütze',
+        icon: '🔭',
+        titles: ['Fernschütze', 'Adlerauge', 'Scharfschützen-Elite', 'Weitsicht'],
         stat: 'longestKillDistance',
         condition: (stats) => stats.longestKillDistance >= 4,
-        getValue: (stats) => `Kill aus ${stats.longestKillDistance} Feldern`
+        getValue: (stats) => `Kill aus ${stats.longestKillDistance} Feldern Entfernung`
     },
     {
         id: 'medic',
         icon: '💚',
-        title: 'Sanitäter des Jahres',
+        titles: ['Engel in Weiß', 'Lebensretter', 'Sanitäter des Jahres', 'Heilende Hände'],
         stat: 'healing',
-        condition: (stats) => stats.healing > 0,
+        condition: (stats) => stats.healing >= 20,
         getValue: (stats) => `${stats.healing} HP geheilt`
     },
     {
         id: 'lucky',
         icon: '🍀',
-        title: 'Glückspilz',
+        titles: ['Glückspilz', 'Sonntagskind', 'Fortuna lächelt', 'Würfelglück'],
         stat: 'criticalHits',
         condition: (stats) => stats.criticalHits >= 2,
         getValue: (stats) => `${stats.criticalHits} kritische Treffer`
     },
     {
         id: 'unlucky',
-        icon: '😅',
-        title: 'Pechvogel',
+        icon: '🎰',
+        titles: ['Pechvogel', 'Schussliger Schütze', 'Daneben ist auch vorbei', 'Zielfernrohr kaputt?'],
         stat: 'shotsMissed',
-        condition: (stats) => stats.shotsMissed >= 3 && stats.shotsMissed > stats.shotsHit,
+        condition: (stats) => stats.shotsMissed >= 4 && stats.shotsMissed > stats.shotsHit,
         getValue: (stats) => `${stats.shotsMissed} Fehlschüsse`
     },
     {
         id: 'tactician',
         icon: '🧠',
-        title: 'Taktiker',
+        titles: ['Taktikfuchs', 'Stratege', 'Meister der Spezialitäten', 'Multitalent'],
         stat: 'specialsUsed',
         condition: (stats) => stats.specialsUsed >= 3,
-        getValue: (stats) => `${stats.specialsUsed} Spezialfähigkeiten`
+        getValue: (stats) => `${stats.specialsUsed} Spezialfähigkeiten eingesetzt`
     },
     {
         id: 'survivor',
-        icon: '⏱️',
-        title: 'Überlebenskünstler',
+        icon: '⏳',
+        titles: ['Überlebenskünstler', 'Zähes Biest', 'Steh-auf-Männchen', 'Nicht kleinzukriegen'],
         stat: 'survivalRounds',
         condition: (stats, allStats, playerIndex, winner) =>
             playerIndex !== winner && stats.survivalRounds >= state.round - 2,
@@ -1077,28 +1086,60 @@ const AWARDS = [
     },
     {
         id: 'pacifist',
-        icon: '☮️',
-        title: 'Pazifist',
+        icon: '🕊️',
+        titles: ['Friedenstaube', 'Pazifist', 'Gandhi Award', 'Gewaltfreier Widerstand'],
         stat: 'damageDealt',
-        condition: (stats) => stats.kills === 0 && stats.damageDealt < 30 && stats.hexesMoved > 10,
-        getValue: (stats) => 'Kampf vermieden'
+        condition: (stats) => stats.kills === 0 && stats.damageDealt < 20 && stats.hexesMoved >= 5,
+        getValue: () => 'Kampf vermieden'
     },
     {
         id: 'accurate',
         icon: '🎯',
-        title: 'Präzisionsschütze',
+        titles: ['Präzisionsarbeit', 'Treffsicher', 'Kein Schuss daneben', 'Augenmaß'],
         stat: 'accuracy',
         condition: (stats) => {
             const total = stats.shotsHit + stats.shotsMissed;
-            return total >= 3 && (stats.shotsHit / total) >= 0.8;
+            return total >= 3 && (stats.shotsHit / total) >= 0.75;
         },
         getValue: (stats) => {
             const total = stats.shotsHit + stats.shotsMissed;
             const accuracy = Math.round((stats.shotsHit / total) * 100);
             return `${accuracy}% Trefferquote`;
         }
+    },
+    {
+        id: 'rambo',
+        icon: '💪',
+        titles: ['Einzelkämpfer', 'Rambo', 'Ein-Mann-Armee', 'Solo-Mission'],
+        stat: 'kills',
+        condition: (stats) => stats.kills >= 3 && stats.unitsLost === 0,
+        getValue: (stats) => `${stats.kills} Kills ohne Verluste`
+    },
+    {
+        id: 'glass_cannon',
+        icon: '🔥',
+        titles: ['Glaskanone', 'Alles oder nichts', 'High Risk, High Reward'],
+        stat: 'damageDealt',
+        condition: (stats) => stats.damageDealt >= 80 && stats.damageTaken >= 60,
+        getValue: (stats) => `${stats.damageDealt} ausgeteilt, ${stats.damageTaken} eingesteckt`
+    },
+    {
+        id: 'camper',
+        icon: '⛺',
+        titles: ['Camper Award', 'Stubenhocker', 'Bewegungsmuffel', 'Festung'],
+        stat: 'hexesMoved',
+        condition: (stats) => stats.hexesMoved <= 3 && stats.kills >= 1,
+        getValue: (stats) => `Nur ${stats.hexesMoved} Felder bewegt`
     }
 ];
+
+/**
+ * Pick a random title from the award's title variants
+ */
+function getRandomTitle(award, seed = 0) {
+    const index = Math.abs(seed) % award.titles.length;
+    return award.titles[index];
+}
 
 /**
  * Generate awards based on player statistics
@@ -1113,7 +1154,11 @@ export function generateAwards(winner) {
         allStats.push(getPlayerStats(p));
     }
 
+    // Use round number as seed for title variety
+    const titleSeed = state.round + (winner || 0);
+
     // Find best player for each award category
+    let awardIndex = 0;
     for (const award of AWARDS) {
         let bestPlayer = -1;
         let bestValue = -Infinity;
@@ -1144,44 +1189,130 @@ export function generateAwards(winner) {
             const stats = allStats[bestPlayer];
             awards.push({
                 icon: award.icon,
-                title: award.title,
+                title: getRandomTitle(award, titleSeed + awardIndex),
                 player: bestPlayer,
                 value: award.getValue(stats),
                 color: CONFIG.PLAYER_COLORS[bestPlayer]
             });
         }
+        awardIndex++;
     }
 
     return awards;
 }
 
 /**
- * Display podium with player rankings and top 3 awards
+ * Get MVP unit for a player (unit with most damage dealt)
+ */
+function getPlayerMVP(playerIndex) {
+    const playerUnits = state.units.filter(u => u.player === playerIndex);
+    if (playerUnits.length === 0) return null;
+
+    // Calculate score for each unit based on their contributions
+    let bestUnit = null;
+    let bestScore = -1;
+
+    for (const unit of playerUnits) {
+        // Score based on damage, kills, survival
+        let score = 0;
+        score += (unit.damageDealt || 0);
+        score += (unit.kills || 0) * 30;
+        score += unit.alive ? 20 : 0;
+        score += (unit.healingDone || 0) * 0.5;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestUnit = unit;
+        }
+    }
+
+    return bestUnit;
+}
+
+/**
+ * Get unit title based on performance
+ */
+function getUnitTitle(unit) {
+    if (!unit) return 'Unbekannt';
+
+    const kills = unit.kills || 0;
+    const damage = unit.damageDealt || 0;
+    const healing = unit.healingDone || 0;
+
+    // Class-specific titles
+    const classTitles = {
+        scout: ['Aufklärer', 'Pfadfinder', 'Späher', 'Kundschafter'],
+        assault: ['Sturmtrupp', 'Frontsoldat', 'Berserker', 'Brecher'],
+        medic: ['Sanitäter', 'Feldarzt', 'Heiler', 'Lebensretter'],
+        sniper: ['Scharfschütze', 'Präzisionsschütze', 'Jäger', 'Silentium'],
+        ninja: ['Schatten', 'Geist', 'Phantom', 'Assassine']
+    };
+
+    // Performance-based titles override class titles
+    if (kills >= 3) return 'Held des Tages';
+    if (kills >= 2) return 'Kampfveteran';
+    if (damage >= 100) return 'Zerstörer';
+    if (healing >= 50) return 'Engel';
+    if (!unit.alive) return 'Gefallen';
+
+    // Random class title
+    const titles = classTitles[unit.class] || ['Soldat'];
+    return titles[Math.floor(Math.random() * titles.length)];
+}
+
+/**
+ * Calculate game statistics
+ */
+function getGameStatistics() {
+    let totalDamage = 0;
+    let totalHealing = 0;
+    let totalKills = 0;
+    let totalMoves = 0;
+
+    for (let p = 0; p < state.settings.players; p++) {
+        const stats = getPlayerStats(p);
+        totalDamage += stats.damageDealt;
+        totalHealing += stats.healing;
+        totalKills += stats.kills;
+        totalMoves += stats.hexesMoved;
+    }
+
+    return {
+        rounds: state.round,
+        totalDamage,
+        totalHealing,
+        totalKills,
+        totalMoves
+    };
+}
+
+/**
+ * Display podium with player rankings, unit MVPs, and game statistics
  */
 export function displayAwards(winner) {
     const container = document.getElementById('awards-container');
     if (!container) return;
 
-    // Import ranking function
     const rankings = getPlayerRankings();
     const awards = generateAwards(winner);
+    const gameStats = getGameStatistics();
 
-    // Take only top 3 awards
-    const topAwards = awards.slice(0, 3);
+    // Take top 4 awards for variety
+    const topAwards = awards.slice(0, 4);
 
-    // Get top 3 players for podium (or fewer if less players)
+    // Get top 3 players for podium
     const podiumPlayers = rankings.slice(0, Math.min(3, rankings.length));
 
-    // Build podium HTML
-    let podiumHTML = '<div class="podium-container">';
+    // ===== PODIUM SECTION =====
+    let podiumHTML = '<div class="victory-podium">';
 
-    // Podium positions: 2nd (left), 1st (center), 3rd (right)
-    const podiumOrder = [1, 0, 2]; // Index into podiumPlayers
+    const podiumOrder = [1, 0, 2]; // 2nd, 1st, 3rd
+    const medals = ['🥇', '🥈', '🥉'];
+    const podiumHeights = [70, 90, 50]; // Heights for positions 1, 2, 3
 
     for (const posIndex of podiumOrder) {
         if (posIndex >= podiumPlayers.length) {
-            // Empty podium spot
-            podiumHTML += '<div class="podium-spot empty"></div>';
+            podiumHTML += '<div class="podium-slot empty"></div>';
             continue;
         }
 
@@ -1190,47 +1321,77 @@ export function displayAwards(winner) {
         const playerColor = CONFIG.PLAYER_COLORS[ranking.player];
         const playerName = getPlayerName(ranking.player);
         const isWinner = ranking.player === winner;
-
-        // Get a representative unit sprite for this player (first alive or any unit)
-        const playerUnits = state.units.filter(u => u.player === ranking.player);
-        const representativeUnit = playerUnits.find(u => u.alive) || playerUnits[0];
-        const unitClass = representativeUnit ? representativeUnit.class : 'assault';
-
-        // Medal icons for positions
-        const medals = ['🥇', '🥈', '🥉'];
+        const mvpUnit = getPlayerMVP(ranking.player);
+        const unitClass = mvpUnit ? mvpUnit.class : 'assault';
 
         podiumHTML += `
-            <div class="podium-spot position-${position} ${isWinner ? 'winner' : ''}">
-                <div class="podium-player">
-                    <div class="podium-medal">${medals[posIndex]}</div>
-                    <div class="podium-sprite" data-player="${ranking.player}" data-class="${unitClass}">
-                        <canvas class="podium-canvas" width="80" height="80"></canvas>
+            <div class="podium-slot position-${position} ${isWinner ? 'champion' : ''}">
+                <div class="podium-figure">
+                    <div class="podium-medal-badge">${medals[posIndex]}</div>
+                    <div class="podium-unit" data-player="${ranking.player}" data-class="${unitClass}">
+                        <canvas class="podium-canvas" width="100" height="100"></canvas>
                     </div>
-                    <div class="podium-name" style="color: ${playerColor}">${playerName}</div>
-                    <div class="podium-score">${ranking.score} Punkte</div>
+                    <div class="podium-details">
+                        <span class="podium-player-name" style="color: ${playerColor}">${playerName}</span>
+                        <span class="podium-points">${ranking.score} Pkt</span>
+                    </div>
                 </div>
-                <div class="podium-block" style="background: linear-gradient(to top, ${playerColor}88, ${playerColor}44)">
-                    <span class="podium-position">${position}</span>
+                <div class="podium-pedestal" style="height: ${podiumHeights[posIndex]}px; --player-color: ${playerColor}">
+                    <span class="pedestal-rank">${position}</span>
                 </div>
             </div>
         `;
     }
-
     podiumHTML += '</div>';
 
-    // Top 3 awards section
+    // ===== UNIT MVP SECTION =====
+    let mvpHTML = '<div class="mvp-section">';
+    mvpHTML += '<div class="section-header">Team-Helden</div>';
+    mvpHTML += '<div class="mvp-grid">';
+
+    for (let p = 0; p < state.settings.players; p++) {
+        const mvp = getPlayerMVP(p);
+        if (!mvp) continue;
+
+        const playerColor = CONFIG.PLAYER_COLORS[p];
+        const playerName = getPlayerName(p);
+        const unitTitle = getUnitTitle(mvp);
+        const kills = mvp.kills || 0;
+        const damage = mvp.damageDealt || 0;
+
+        mvpHTML += `
+            <div class="mvp-card" style="--card-color: ${playerColor}">
+                <div class="mvp-unit-sprite" data-player="${p}" data-class="${mvp.class}">
+                    <canvas class="mvp-canvas" width="64" height="64"></canvas>
+                </div>
+                <div class="mvp-info">
+                    <div class="mvp-title">${unitTitle}</div>
+                    <div class="mvp-player" style="color: ${playerColor}">${playerName}</div>
+                    <div class="mvp-stats">
+                        ${kills > 0 ? `<span>💀 ${kills}</span>` : ''}
+                        ${damage > 0 ? `<span>💥 ${damage}</span>` : ''}
+                        ${!mvp.alive ? '<span>☠️</span>' : '<span>❤️</span>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    mvpHTML += '</div></div>';
+
+    // ===== AWARDS SECTION =====
     let awardsHTML = '';
     if (topAwards.length > 0) {
         awardsHTML = `
-            <div class="top-awards">
-                <div class="awards-title">Herausragende Leistungen</div>
-                <div class="awards-list">
+            <div class="awards-section">
+                <div class="section-header">Auszeichnungen</div>
+                <div class="awards-grid">
                     ${topAwards.map(award => `
-                        <div class="award-badge">
-                            <span class="award-icon">${award.icon}</span>
-                            <div class="award-info">
-                                <div class="award-title">${award.title}</div>
-                                <div class="award-player" style="color: ${award.color}">${getPlayerName(award.player)}</div>
+                        <div class="award-card">
+                            <span class="award-icon-large">${award.icon}</span>
+                            <div class="award-details">
+                                <div class="award-name">${award.title}</div>
+                                <div class="award-recipient" style="color: ${award.color}">${getPlayerName(award.player)}</div>
+                                <div class="award-value">${award.value}</div>
                             </div>
                         </div>
                     `).join('')}
@@ -1239,11 +1400,41 @@ export function displayAwards(winner) {
         `;
     }
 
-    container.innerHTML = podiumHTML + awardsHTML;
+    // ===== GAME STATISTICS =====
+    const statsHTML = `
+        <div class="game-stats-section">
+            <div class="section-header">Spielstatistik</div>
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-icon">⏱️</span>
+                    <span class="stat-value">${gameStats.rounds}</span>
+                    <span class="stat-label">Runden</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">💥</span>
+                    <span class="stat-value">${gameStats.totalDamage}</span>
+                    <span class="stat-label">Schaden</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">💀</span>
+                    <span class="stat-value">${gameStats.totalKills}</span>
+                    <span class="stat-label">Kills</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-icon">💚</span>
+                    <span class="stat-value">${gameStats.totalHealing}</span>
+                    <span class="stat-label">Heilung</span>
+                </div>
+            </div>
+        </div>
+    `;
 
-    // Draw unit sprites on podium canvases
+    container.innerHTML = podiumHTML + mvpHTML + awardsHTML + statsHTML;
+
+    // Draw unit sprites
     requestAnimationFrame(() => {
         drawPodiumSprites();
+        drawMVPSprites();
     });
 }
 
@@ -1254,7 +1445,8 @@ function drawPodiumSprites() {
     const canvases = document.querySelectorAll('.podium-canvas');
 
     canvases.forEach(canvas => {
-        const parent = canvas.closest('.podium-sprite');
+        // Try both old and new class names for the parent
+        const parent = canvas.closest('.podium-unit') || canvas.closest('.podium-sprite');
         if (!parent) return;
 
         const player = parseInt(parent.dataset.player);
@@ -1262,14 +1454,14 @@ function drawPodiumSprites() {
         const playerColor = CONFIG.PLAYER_COLORS[player];
 
         const ctx = canvas.getContext('2d');
-        const size = 80;
+        const size = canvas.width;
 
         // Clear canvas
         ctx.clearRect(0, 0, size, size);
 
         // Draw unit using assetLoader
         try {
-            drawUnit(ctx, size / 2, size / 2 + 10, size * 0.45, playerColor, unitClass, 'normal', false, player);
+            drawUnit(ctx, size / 2, size / 2 + size * 0.12, size * 0.42, playerColor, unitClass, 'normal', false, player);
         } catch {
             // Fallback on error: draw colored circle with class initial
             ctx.fillStyle = playerColor;
@@ -1278,7 +1470,46 @@ function drawPodiumSprites() {
             ctx.fill();
 
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 24px sans-serif';
+            ctx.font = `bold ${size * 0.3}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(unitClass.charAt(0).toUpperCase(), size / 2, size / 2);
+        }
+    });
+}
+
+/**
+ * Draw unit sprites on the MVP canvases
+ */
+function drawMVPSprites() {
+    const canvases = document.querySelectorAll('.mvp-canvas');
+
+    canvases.forEach(canvas => {
+        const parent = canvas.closest('.mvp-unit-sprite');
+        if (!parent) return;
+
+        const player = parseInt(parent.dataset.player);
+        const unitClass = parent.dataset.class;
+        const playerColor = CONFIG.PLAYER_COLORS[player];
+
+        const ctx = canvas.getContext('2d');
+        const size = canvas.width;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, size, size);
+
+        // Draw unit using assetLoader
+        try {
+            drawUnit(ctx, size / 2, size / 2 + size * 0.1, size * 0.4, playerColor, unitClass, 'normal', false, player);
+        } catch {
+            // Fallback
+            ctx.fillStyle = playerColor;
+            ctx.beginPath();
+            ctx.arc(size / 2, size / 2, size * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${size * 0.35}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(unitClass.charAt(0).toUpperCase(), size / 2, size / 2);
