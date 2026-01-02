@@ -3844,11 +3844,19 @@ function drawUnitOverlay(unit, cx, cy) {
         speechBubbleOffset += size * 0.6;  // Offset next bubble
     }
 
-    // Cloak indicator (visible to owner) - speech bubble only, no emoji/dot
-    if (unit.cloaked && unit.player === state.viewingPlayer) {
+    // "Spotted!" indicator - MOST IMPORTANT, draw first (highest position)
+    // This takes priority over other status indicators
+    if (unit.spotted && unit.player === state.currentPlayer) {
         ctx.globalAlpha = 1;
-        // Draw speech bubble for stealth status - offset if cover bubble already shown
+        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Entdeckt!', '#ef4444', size * 0.8);
+        speechBubbleOffset += size * 0.6;
+    }
+
+    // Cloak indicator (visible to owner) - only show if not spotted (spotted is more important)
+    if (unit.cloaked && unit.player === state.viewingPlayer && !unit.spotted) {
+        ctx.globalAlpha = 1;
         drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Getarnt!', '#a855f7', size * 0.8);
+        speechBubbleOffset += size * 0.6;
     }
 
     // Revealed after attack indicator
@@ -3866,23 +3874,17 @@ function drawUnitOverlay(unit, cx, cy) {
     // Note: Sprint/Powershot/DamageBoost indicators removed - the action buttons
     // already show when abilities are active, no need for redundant unit overlays
 
-    // "Spotted!" indicator - higher position, smaller size
-    if (unit.spotted && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8, 'Entdeckt!', '#ef4444', size * 0.8);
-    }
-
     ctx.restore();
 
     // HP bar with gradient - positioned ABOVE the unit
     // Ensure hpPct is a valid number between 0 and 1
     const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
     const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
-    // Compact, proportional bar sizing
-    const barWidth = size * 1.2;
-    const barHeight = 6;
+    // Compact, proportional bar sizing - reduced for cleaner look
+    const barWidth = size * 0.8;
+    const barHeight = 4;
     // Position above unit (negative offset from center)
-    const barY = cy - size * 1.15;
+    const barY = cy - size * 1.1;
 
     // Bar background - subtle with slight shadow
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
