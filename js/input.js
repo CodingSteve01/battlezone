@@ -932,6 +932,13 @@ function handleTapOrClick(clientX, clientY) {
                 (async () => {
                     try {
                         const result = await executeAttackWithMinigame(unit, targetedEnemy);
+                        // If cancelled, just show message and return
+                        if (result.cancelled) {
+                            showToast('Angriff abgebrochen', 'info');
+                            render();
+                            updateUI();
+                            return;
+                        }
                         if (result.killed) {
                             checkWinCondition();
                         }
@@ -989,7 +996,13 @@ function handleTapOrClick(clientX, clientY) {
                         // Use async healing minigame
                         (async () => {
                             try {
-                                await useMedicHealingWithMinigame(unit);
+                                const result = await useMedicHealingWithMinigame(unit);
+                                // If cancelled, refund AP and reset usedSpecial
+                                if (result && result.cancelled) {
+                                    state.sharedAP += healCost;
+                                    unit.usedSpecial = false;
+                                    showToast('Heilung abgebrochen', 'info');
+                                }
                             } finally {
                                 state.minigameInProgress = false;  // Always reset
                             }
@@ -1080,6 +1093,14 @@ async function handleEnemyClick(unit, hex) {
             try {
                 // Start the attack minigame and wait for result
                 const result = await executeAttackWithMinigame(unit, enemy);
+
+                // If cancelled, just show message and return
+                if (result.cancelled) {
+                    showToast('Angriff abgebrochen', 'info');
+                    render();
+                    updateUI();
+                    return;
+                }
 
                 if (result.killed) {
                     checkWinCondition();
@@ -2084,6 +2105,14 @@ async function handleAttackClick(unit, hex) {
                     // Execute attack with minigame
                     const result = await executeAttackWithMinigame(unit, hex.unit);
 
+                    // If cancelled, just show message and return
+                    if (result.cancelled) {
+                        showToast('Angriff abgebrochen', 'info');
+                        render();
+                        updateUI();
+                        return;
+                    }
+
                     if (result.killed) {
                         checkWinCondition();
                     }
@@ -2318,6 +2347,13 @@ function setupTargetInfoClick() {
 
             try {
                 const result = await executeAttackWithMinigame(unit, enemy);
+                // If cancelled, just show message and return
+                if (result.cancelled) {
+                    showToast('Angriff abgebrochen', 'info');
+                    render();
+                    updateUI();
+                    return;
+                }
                 if (result.killed) {
                     checkWinCondition();
                 }

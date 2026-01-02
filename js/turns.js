@@ -7,7 +7,7 @@ import {
     getPlayerName
 } from './state.js';
 import { CONFIG } from './config.js';
-import { resetUnitsForTurn, resetSpecialAbilities } from './units.js';
+import { resetUnitsForTurn, resetSpecialAbilities, killUnit } from './units.js';
 import { updateVisibility, getVisibleEnemies, revealAllEnemies } from './fogOfWar.js';
 import { checkGameOver, updateAllHoldPositions } from './combat.js';
 import { showScreen, updateUI, showToast, showEventBanner, updatePlayersAlive, displayAwards } from './ui.js';
@@ -548,8 +548,7 @@ function applyZoneDamage() {
             unitsHit++;
 
             if (unit.currentHp <= 0) {
-                unit.currentHp = 0;
-                unit.alive = false;
+                killUnit(unit);
                 unitsKilled++;
             }
         }

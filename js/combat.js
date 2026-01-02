@@ -506,6 +506,12 @@ export async function executeAttackWithMinigame(attacker, defender) {
 
         // Start the minigame for this unit class with context
         const minigameResult = await startMinigame(attacker.class, context);
+
+        // Check if user cancelled the minigame
+        if (minigameResult.cancelled) {
+            return { hit: false, damage: 0, killed: false, cancelled: true };
+        }
+
         // Execute the attack with the minigame result
         return executeAttack(attacker, defender, minigameResult);
     } else {
@@ -1041,8 +1047,13 @@ export async function useMedicHealingWithMinigame(unit) {
     // Start healing minigame
     const result = await startHealingMinigame(context);
 
+    // Check if user cancelled the minigame
+    if (result.cancelled) {
+        return { cancelled: true };
+    }
+
     // Apply healing with minigame result
-    const healMultiplier = result.multiplier.healMultiplier;
+    const healMultiplier = result.multiplier?.healMultiplier ?? result.healMultiplier ?? 1.0;
     return useMedicSpecialInternal(unit, healMultiplier);
 }
 
