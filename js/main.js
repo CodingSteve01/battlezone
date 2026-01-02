@@ -361,9 +361,10 @@ function generateUnitCards() {
         // Check if this is an elite unit (has special dual-attack capability)
         const isElite = classData.canMelee && classData.canRanged;
 
-        // Compact shop-style card layout
+        // Compact shop-style card layout with info button
         card.innerHTML = `
             ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
+            <button class="card-info-btn" data-class="${classKey}" title="Details">?</button>
             <div class="card-header">
                 <div class="unit-icon">${classData.icon}</div>
                 <div class="unit-name">${classData.name}</div>
@@ -379,13 +380,148 @@ function generateUnitCards() {
             <div class="unit-special">✨ ${classData.special}</div>
         `;
 
-        card.onclick = () => {
+        // Card click = select unit
+        card.onclick = (e) => {
+            // Don't select if clicking info button
+            if (e.target.classList.contains('card-info-btn')) return;
             playClick();
             toggleUnitSelection(classKey, card);
         };
 
+        // Info button click = show details
+        const infoBtn = card.querySelector('.card-info-btn');
+        if (infoBtn) {
+            infoBtn.onclick = (e) => {
+                e.stopPropagation();
+                playClick();
+                showUnitDetails(classKey);
+            };
+        }
+
         grid.appendChild(card);
     });
+
+    // Setup detail overlay close handlers
+    setupDetailOverlay();
+}
+
+/**
+ * Playstyle descriptions for each unit class
+ */
+const UNIT_PLAYSTYLES = {
+    scout: 'Ideal für Aufklärung und Flankenmanöver. Nutze die hohe Bewegungsreichweite, um Feinde zu umgehen und ungeschützte Ziele anzugreifen. Sprint ermöglicht schnelle Repositionierung oder Flucht.',
+    assault: 'Der Frontkämpfer. Hohe HP erlauben es, Schaden einzustecken während du dich dem Feind näherst. Powershot ist perfekt, um schwer gepanzerte Ziele oder Gruppen zu eliminieren.',
+    medic: 'Halte dich hinter der Front und heile verwundete Verbündete. Die Gruppenheilung kann Kämpfe wenden. Vermeide direkte Konfrontation - der Medic ist das wertvollste Teammitglied.',
+    sniper: 'Positioniere dich auf erhöhtem Gelände mit guter Sicht. Tarnung erlaubt sichere Repositionierung oder Hinterhalte. Vermeide Nahkampf um jeden Preis - der Sniper stirbt schnell.',
+    commando: 'Infiltrator und Assassine. Nutze Stealth, um unbemerkt in Angriffsposition zu kommen. Der Melee-Bonus macht den Commando tödlich im Nahkampf. Ideal für Überraschungsangriffe.',
+    elitesoldat: 'Vielseitig einsetzbar - effektiv auf jede Distanz. Der taktische Modus erhöht Präzision UND Bewegung. Teuer, aber kann mehrere Rollen im Team erfüllen.'
+};
+
+/**
+ * Show unit detail overlay
+ */
+function showUnitDetails(classKey) {
+    const classData = UNIT_CLASSES[classKey];
+    if (!classData) return;
+
+    const overlay = document.getElementById('shop-detail-overlay');
+    if (!overlay) return;
+
+    // Populate detail panel
+    document.getElementById('detail-icon').textContent = classData.icon;
+    document.getElementById('detail-name').textContent = classData.name;
+    document.getElementById('detail-cost').textContent = `${classData.cost} 💰`;
+
+    // Stats grid
+    const statsEl = document.getElementById('detail-stats');
+    statsEl.innerHTML = `
+        <div class="shop-detail-stat">
+            <span class="stat-icon">❤️</span>
+            <span class="stat-label">Leben</span>
+            <span class="stat-value">${classData.hp}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">⚔️</span>
+            <span class="stat-label">Schaden</span>
+            <span class="stat-value">${classData.damage}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">📍</span>
+            <span class="stat-label">Bewegung</span>
+            <span class="stat-value">${classData.move}</span>
+        </div>
+        <div class="shop-detail-stat">
+            <span class="stat-icon">🎯</span>
+            <span class="stat-label">Reichweite</span>
+            <span class="stat-value">${classData.range}</span>
+        </div>
+        ${classData.meleeBonus ? `
+        <div class="shop-detail-stat">
+            <span class="stat-icon">🗡️</span>
+            <span class="stat-label">Nahkampf</span>
+            <span class="stat-value">+${classData.meleeBonus}</span>
+        </div>
+        ` : ''}
+        <div class="shop-detail-stat">
+            <span class="stat-icon">👁️</span>
+            <span class="stat-label">Sicht</span>
+            <span class="stat-value">${classData.vision}</span>
+        </div>
+    `;
+
+    // Special ability
+    document.getElementById('detail-special-desc').textContent = classData.special;
+
+    // Playstyle
+    document.getElementById('detail-playstyle').textContent = UNIT_PLAYSTYLES[classKey] || 'Keine Beschreibung verfügbar.';
+
+    // Setup select button
+    const selectBtn = document.getElementById('detail-select-btn');
+    selectBtn.onclick = () => {
+        hideUnitDetails();
+        // Find the card and toggle selection
+        const card = document.querySelector(`.unit-card[data-class="${classKey}"]`);
+        if (card) {
+            toggleUnitSelection(classKey, card);
+        }
+    };
+
+    // Show overlay
+    overlay.classList.add('visible');
+}
+
+/**
+ * Hide unit detail overlay
+ */
+function hideUnitDetails() {
+    const overlay = document.getElementById('shop-detail-overlay');
+    if (overlay) {
+        overlay.classList.remove('visible');
+    }
+}
+
+/**
+ * Setup detail overlay event handlers
+ */
+function setupDetailOverlay() {
+    const overlay = document.getElementById('shop-detail-overlay');
+    const closeBtn = document.getElementById('shop-detail-close');
+
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            playClick();
+            hideUnitDetails();
+        };
+    }
+
+    // Click outside panel to close
+    if (overlay) {
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                hideUnitDetails();
+            }
+        };
+    }
 }
 
 /**

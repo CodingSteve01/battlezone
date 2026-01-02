@@ -3436,6 +3436,188 @@ button:focus:not(:focus-visible),
     box-shadow: none;
 }
 
+/* ===== SHOP DETAIL OVERLAY ===== */
+.shop-detail-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.shop-detail-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.shop-detail-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    width: min(90vw, 340px);
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.shop-detail-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 32px;
+    height: 32px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.shop-detail-close:hover {
+    background: var(--red);
+    color: white;
+    border-color: var(--red);
+}
+
+.shop-detail-header {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.shop-detail-icon {
+    font-size: 48px;
+    width: 64px;
+    height: 64px;
+    background: var(--bg-tertiary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shop-detail-title h3 {
+    font-size: 20px;
+    margin: 0 0 4px 0;
+    color: var(--text-primary);
+}
+
+.shop-detail-cost {
+    font-size: 16px;
+    color: var(--yellow);
+    font-weight: 600;
+}
+
+.shop-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.shop-detail-stat {
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.shop-detail-stat .stat-icon {
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.shop-detail-stat .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.shop-detail-stat .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.shop-detail-special,
+.shop-detail-description {
+    margin-bottom: 16px;
+}
+
+.shop-detail-special h4,
+.shop-detail-description h4 {
+    font-size: 12px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 8px 0;
+}
+
+.shop-detail-special p,
+.shop-detail-description p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.shop-detail-select {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    margin-top: 8px;
+}
+
+/* Add info button to unit cards */
+.shop-screen .unit-card .card-info-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 24px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    z-index: 5;
+}
+
+.shop-screen .unit-card .card-info-btn:hover {
+    opacity: 1;
+    background: var(--cyan);
+    color: white;
+    border-color: var(--cyan);
+}
+
 /* ===== IMPROVED MENU ===== */
 .mode-btn {
     display: flex;

@@ -285,20 +285,28 @@ function shouldUseDecoyStrategy(aiUnits, enemies) {
 
 /**
  * Find the best unit to act as decoy/bait
- * Prefer: Assault (tanky), Scout (fast escape)
+ * SICHERHEIT ZUERST: Nur Units mit hoher HP und Überlebensfähigkeit
+ * Prefer: Assault (tanky, 100 HP), Scout (nur mit Sprint verfügbar)
  */
 function findDecoyCandidate(aiUnits) {
-    // Priority order for decoy
-    const decoyPriority = ['assault', 'scout', 'medic'];
+    // Assault ist die erste Wahl wegen hoher HP (100)
+    const assault = aiUnits.find(u =>
+        u.class === 'assault' &&
+        u.currentHp > u.maxHp * 0.7 && // Braucht mindestens 70% HP für Sicherheit
+        u.alive
+    );
+    if (assault) return assault;
 
-    for (const className of decoyPriority) {
-        const candidate = aiUnits.find(u =>
-            u.class === className &&
-            u.currentHp > u.maxHp * 0.5 && // Needs decent HP
-            u.alive
-        );
-        if (candidate) return candidate;
-    }
+    // Scout nur wenn Sprint noch verfügbar ist (für Fluchtmöglichkeit)
+    const scout = aiUnits.find(u =>
+        u.class === 'scout' &&
+        u.currentHp > u.maxHp * 0.7 &&
+        u.alive &&
+        !u.usedSpecial // Sprint muss noch verfügbar sein!
+    );
+    if (scout) return scout;
+
+    // Kein geeigneter Köder gefunden - Sicherheit geht vor
     return null;
 }
 
@@ -325,9 +333,9 @@ function planDecoyStrategy(aiUnits, _enemies) {
     aiMemory.decoyActive = true;
 
     addMultiPartThought([
-        `Wir starten eine Köder-Taktik.`,
-        `Der ${CLASS_NAMES_DE[decoy.class]} wird sich exponieren, um Feinde anzulocken.`,
-        `Die anderen Einheiten lauern im Hinterhalt.`
+        `Wir starten eine sichere Köder-Taktik.`,
+        `Der ${CLASS_NAMES_DE[decoy.class]} lockt Feinde an, bleibt aber außerhalb der Angriffsreichweite.`,
+        `Die Hinterhalts-Einheiten warten auf den perfekten Moment zum Zuschlagen.`
     ], 'strategy');
 
     return true;
@@ -348,8 +356,9 @@ function isAmbushUnit(unit) {
 }
 
 /**
- * Score position for decoy unit - move toward enemies to lure them
- * Decoy should be tempting target but have escape route
+ * Score position for decoy unit - lure enemies while STAYING SAFE
+ * SICHERHEIT ZUERST: Köder soll überleben, nicht geopfert werden!
+ * Ideal: AUSSERHALB der Feindreichweite, aber sichtbar und verlockend
  */
 function scoreDecoyPosition(unit, q, r, enemies) {
     let score = 0;
@@ -357,58 +366,87 @@ function scoreDecoyPosition(unit, q, r, enemies) {
 
     if (!hex) return -1000;
 
-    // Find closest enemy
+    // Find closest enemy and calculate threat
     let closestEnemy = null;
     let closestDist = Infinity;
+    let totalThreat = 0;
+
     for (const enemy of enemies) {
         const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
         if (dist < closestDist) {
             closestDist = dist;
             closestEnemy = enemy;
         }
-    }
-
-    if (closestEnemy) {
-        // Decoy wants to be visible and in enemy attack range to lure them
-        // Ideal distance: just outside enemy range or just inside (to be attacked)
-        const enemyRange = closestEnemy.range || 3;
-
-        if (closestDist === enemyRange || closestDist === enemyRange + 1) {
-            // Perfect bait position - enemy can almost reach
-            score += 100;
-        } else if (closestDist < enemyRange) {
-            // In enemy range - dangerous but effective bait
-            score += 60;
-        } else if (closestDist <= enemyRange + 2) {
-            // Close enough to lure
-            score += 40;
-        } else {
-            // Too far to be effective bait
-            score -= closestDist * 5;
+        // Berechne Bedrohung: Feinde die uns erreichen können
+        const enemyRange = enemy.range || 3;
+        if (dist <= enemyRange) {
+            totalThreat += enemy.damage;
         }
     }
 
-    // Check retreat path to allies (ambush units)
+    // === SICHERHEITS-BEWERTUNG (HÖCHSTE PRIORITÄT) ===
+    // VERMEIDE Positionen wo wir von mehreren Feinden angegriffen werden können
+    if (totalThreat > unit.currentHp * 0.5) {
+        score -= 300; // Zu gefährlich! Mehrere Feinde könnten uns erledigen
+    } else if (totalThreat > 0) {
+        score -= totalThreat * 2; // Leichte Strafe für jede Bedrohung
+    }
+
+    if (closestEnemy) {
+        const enemyRange = closestEnemy.range || 3;
+
+        // === SICHERE KÖDER-POSITION ===
+        // Ideal: KNAPP AUSSERHALB der Feindreichweite (sie müssen sich bewegen um anzugreifen)
+        if (closestDist === enemyRange + 1) {
+            // PERFEKT: Knapp außerhalb - Feind muss sich bewegen, wir sind sicher
+            score += 120;
+        } else if (closestDist === enemyRange + 2) {
+            // Gut: Etwas weiter weg, aber immer noch verlockend
+            score += 80;
+        } else if (closestDist === enemyRange) {
+            // GEFÄHRLICH: Gerade noch in Reichweite - nur wenn Deckung vorhanden
+            if (hex.cover) {
+                score += 40; // Mit Deckung akzeptabel
+            } else {
+                score -= 50; // Ohne Deckung zu riskant
+            }
+        } else if (closestDist < enemyRange) {
+            // ZU NAH: Stark bestraft - der Köder soll überleben!
+            score -= 150;
+        } else if (closestDist > enemyRange + 3) {
+            // Zu weit - nicht effektiv als Köder
+            score -= closestDist * 3;
+        }
+    }
+
+    // === FLUCHTWEG-BEWERTUNG ===
+    // Köder MUSS einen sicheren Rückzugsweg zu Verbündeten haben
     const ambushUnits = getPlayerUnits(unit.player).filter(u => isAmbushUnit(u));
     if (ambushUnits.length > 0) {
         const avgAmbushDist = ambushUnits.reduce((sum, a) =>
             sum + hexDistance({ q, r }, { q: a.q, r: a.r }), 0
         ) / ambushUnits.length;
 
-        // Decoy should be between enemies and ambush units (but closer to enemies)
-        if (avgAmbushDist >= 3 && avgAmbushDist <= 6) {
-            score += 30; // Good retreat distance
+        // Köder sollte 3-5 Felder von Verstärkung entfernt sein
+        if (avgAmbushDist >= 3 && avgAmbushDist <= 5) {
+            score += 50; // Ideale Fluchtdistanz - nah genug für Unterstützung
+        } else if (avgAmbushDist <= 2) {
+            score += 30; // Sehr nah - gut für Sicherheit
         } else if (avgAmbushDist > 6) {
-            score -= 20; // Too far from backup
+            score -= 60; // ZU WEIT von Verstärkung - gefährlich!
         }
+    } else {
+        // Ohne Hinterhalts-Einheiten ist die Position sehr riskant
+        score -= 100;
     }
 
-    // Decoy prefers light cover but stays visible
-    if (hex.cover) score += 15; // Some protection is good
-    if (hex.type === 'hills') score += 10; // Visible position
-
-    // Penalty for positions that block ambush units' line of fire
-    // (decoy shouldn't stand between ambush and enemy)
+    // === DECKUNG IST WICHTIG ===
+    if (hex.cover) {
+        score += 40; // Deckung ist jetzt viel wichtiger
+    }
+    if (hex.type === 'hills') {
+        score += 20; // Hügel geben Überblick und defensive Vorteile
+    }
 
     // Zone awareness
     if (!isHexInZone(q, r)) {
@@ -2037,59 +2075,73 @@ function getNeighborCoords(q, r) {
 }
 
 /**
- * Execute decoy unit behavior - lure enemies while staying alive
+ * Execute decoy unit behavior - lure enemies while STAYING ALIVE
+ * SICHERHEIT ZUERST: Der Köder soll überleben, nicht geopfert werden!
  */
 async function executeDecoyBehavior(unit, plan, renderIfVisible, hasHumanViewer, spectatorMode = false) {
     const enemies = plan.visibleEnemies;
     const unitName = CLASS_NAMES_DE[unit.class] || unit.class;
     const actionDelay = spectatorMode ? 500 : 300;
 
-    // Decoy prioritizes survival - retreat if too damaged
-    if (unit.currentHp < unit.maxHp * 0.4) {
-        addAIThought(`Der ${unitName} als Köder hat zu viel Schaden genommen. Strategischer Rückzug.`, 'retreat');
+    // === SICHERHEITS-CHECK: Frühzeitiger Rückzug bei 60% HP ===
+    // Der Köder soll überleben, nicht sterben!
+    if (unit.currentHp < unit.maxHp * 0.6) {
+        addAIThought(`${unitName} hat seine Köder-Aufgabe erfüllt. Sicherer Rückzug bei ${Math.round(unit.currentHp / unit.maxHp * 100)}% HP.`, 'retreat');
         await executeRetreat(unit, enemies, spectatorMode);
         return;
     }
 
-    // 1. Move to lure position FIRST (most important for decoy)
+    // === BEDROHUNGS-ANALYSE ===
+    const closestEnemyDist = enemies.length > 0
+        ? Math.min(...enemies.map(e => hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })))
+        : Infinity;
+
+    // Zähle wie viele Feinde uns angreifen könnten
+    const threateningEnemies = enemies.filter(e => {
+        const dist = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+        return dist <= (e.range || 3);
+    });
+
+    // Bei zu hoher Bedrohung: Sofortiger Rückzug
+    if (threateningEnemies.length >= 2) {
+        addAIThought(`Zu viele Feinde in Reichweite! ${unitName} zieht sich zurück, um nicht umzingelt zu werden.`, 'retreat');
+        await executeRetreat(unit, enemies, spectatorMode);
+        return;
+    }
+
+    // === SCOUT: Sprint ZUERST aktivieren für Sicherheit ===
+    if (unit.class === 'scout' && canUseSpecialAbility(unit) && closestEnemyDist <= 5) {
+        addAIThought(`${unitName} aktiviert Sprint VOR der Köder-Bewegung - für garantierte Fluchtmöglichkeit.`, 'special');
+        useSpecialAbility(unit);
+        renderIfVisible();
+        await delay(actionDelay);
+    }
+
+    // === SICHERE POSITIONIERUNG ===
+    // Bewege in eine Position die lockt, aber SICHER ist
     if (state.sharedAP >= 1) {
-        addAIThought(`${unitName} exponiert sich, um die Aufmerksamkeit der Feinde auf sich zu ziehen.`, 'move');
+        addAIThought(`${unitName} positioniert sich verlockend, aber außerhalb der direkten Feindreichweite.`, 'move');
         const moveTarget = selectStrategicMoveTarget(unit, plan);
         if (moveTarget) {
             await executeAIMove(unit, moveTarget, spectatorMode);
         }
     }
 
-    // 2. Only attack if it's safe (kill shot or enemy is almost dead)
-    // WICHTIG: canUnitAttack wird über getAttackableUnits geprüft (MAX_ATTACKS_PER_UNIT: 1)
+    // === NUR SICHERE ANGRIFFE ===
+    // Nur angreifen wenn wir sicher eliminieren können
     const attackable = getAttackableUnits(unit);
     if (attackable.length > 0 && state.sharedAP >= 1 && canUnitAttack(unit)) {
-        // Only attack if we can kill or target is nearly dead
         const killableTarget = attackable.find(t => t.currentHp <= unit.damage);
         if (killableTarget) {
             const targetName = CLASS_NAMES_DE[killableTarget.class] || killableTarget.class;
-            addAIThought(`Während der Köder-Rolle: ${targetName} ist fast erledigt. Gelegenheit nutzen!`, 'attack');
+            addAIThought(`${targetName} ist verwundbar. ${unitName} nutzt die sichere Gelegenheit zum Eliminieren.`, 'attack');
             await executeAttackSequence(unit, killableTarget, renderIfVisible, hasHumanViewer, spectatorMode);
         }
+        // KEIN Angriff auf volle HP Ziele - zu riskant, provoziert Gegenschlag
     }
 
-    // 3. Use special only defensively (sprint for escape, etc.)
-    if (canUseSpecialAbility(unit)) {
-        // Scout: Sprint if enemies are close (escape option)
-        // Assault: Don't powershot (save HP as bait)
-        if (unit.class === 'scout') {
-            const closestEnemy = enemies.reduce((min, e) => {
-                const d = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
-                return d < min ? d : min;
-            }, Infinity);
-            if (closestEnemy <= 3) {
-                addAIThought(`Feind rückt näher. ${unitName} bereitet Sprint vor, falls Flucht nötig wird.`, 'special');
-                useSpecialAbility(unit);
-                renderIfVisible();
-                await delay(actionDelay);
-            }
-        }
-    }
+    // === ASSAULT: Defensive Haltung ===
+    // Assault-Köder greift NICHT mit Powershot an - spart Ressourcen für Verteidigung
 }
 
 /**
