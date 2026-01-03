@@ -2380,46 +2380,66 @@ export function recordIncomingAttack(targetUnit, attackerUnit) {
  */
 function calculateAttackHistoryDanger(q, r) {
     let danger = 0;
+    let attackCount = 0; // Zähle wie oft wir aus dieser Richtung angegriffen wurden
 
     // Check all recorded attacks against our units
     for (const [_unitId, attacks] of aiMemory.attackHistory) {
         for (const attack of attacks) {
             // Danger decreases with age (rounds since attack)
             const roundsAgo = state.round - attack.round;
-            if (roundsAgo > 3) continue; // Ignore very old attacks
+            if (roundsAgo > 4) continue; // Etwas länger merken (war 3)
 
-            const ageFactor = 1 - (roundsAgo * 0.25); // 100%, 75%, 50%, 25%
+            // Stärkerer Zeitfaktor - neuere Angriffe sind VIEL gefährlicher
+            const ageFactor = roundsAgo === 0 ? 1.5 : (1 - (roundsAgo * 0.2)); // 150%, 80%, 60%, 40%, 20%
 
             // Calculate distance from attack origin
             const distFromAttack = hexDistance({ q, r }, { q: attack.fromQ, r: attack.fromR });
 
-            // Very high danger at the exact attack position
+            // === MASSIV ERHÖHTE STRAFEN ===
+            // Exakte Position: EXTREM gefährlich - dort ist definitiv ein Feind!
             if (distFromAttack === 0) {
-                danger += 150 * ageFactor;
+                danger += 500 * ageFactor; // WAR: 150
+                attackCount++;
             }
-            // High danger near the attack position (potential ambush area)
+            // Direkt daneben (1-2 Hexes): Sehr hohe Gefahr
             else if (distFromAttack <= 2) {
-                danger += (100 - distFromAttack * 30) * ageFactor;
+                danger += (350 - distFromAttack * 75) * ageFactor; // WAR: 100-70
+                attackCount++;
             }
-            // Moderate danger in the general direction
+            // Nah dran (3-4 Hexes): Erhöhte Vorsicht
             else if (distFromAttack <= 4) {
-                danger += (40 - distFromAttack * 8) * ageFactor;
+                danger += (150 - distFromAttack * 25) * ageFactor; // WAR: 40-16
+            }
+            // Auch weiter entfernt noch etwas Vorsicht (5-6 Hexes)
+            else if (distFromAttack <= 6) {
+                danger += (60 - distFromAttack * 8) * ageFactor;
             }
 
             // Extra danger if attack came from forest/cover (likely ambush!)
             const attackHex = getHex(attack.fromQ, attack.fromR);
             if (attackHex && (attackHex.type === 'forest' || attackHex.cover)) {
                 // The whole forest area is dangerous - there might be more enemies
-                if (distFromAttack <= 3) {
-                    danger += 60 * ageFactor;
+                if (distFromAttack <= 4) {
+                    danger += 150 * ageFactor; // WAR: 60
                 }
             }
 
             // High-damage attackers make the area more dangerous
             if (attack.attackerClass === 'sniper' || attack.attackerClass === 'assault') {
-                danger += 30 * ageFactor;
+                danger += 80 * ageFactor; // WAR: 30
             }
         }
+    }
+
+    // === KUMULATIVE STRAFE: Mehrfache Angriffe aus derselben Richtung ===
+    // Wenn wir mehrmals aus dieser Richtung angegriffen wurden, ist es ein HINTERHALT!
+    if (attackCount >= 2) {
+        danger *= 1.5; // 50% mehr Gefahr bei wiederholten Angriffen
+        danger += 200; // Extra Strafe für bekannten Hinterhalt
+    }
+    if (attackCount >= 3) {
+        danger *= 1.5; // Nochmal 50% mehr
+        danger += 300; // Das ist definitiv ein Hinterhalt!
     }
 
     return danger;
@@ -2898,18 +2918,106 @@ function getFlankingBonus(unit, targetQ, targetR, enemies) {
     const target = enemies.find(e => e.id === flankInfo.targetId);
     if (!target) return 0;
 
-    // Berechne ideale Flankenposition
-    const idealQ = target.q + flankInfo.flankDirection.dq * 2;
-    const idealR = target.r + flankInfo.flankDirection.dr * 2;
+    // Berechne ideale Flankenposition (2-3 Hexes vom Ziel entfernt)
+    const idealDist = unit.range || 2; // In Angriffsreichweite
+    const idealQ = target.q + flankInfo.flankDirection.dq * idealDist;
+    const idealR = target.r + flankInfo.flankDirection.dr * idealDist;
 
     // Bonus basierend auf Nähe zur idealen Flankenposition
     const distToIdeal = hexDistance({ q: targetQ, r: targetR }, { q: idealQ, r: idealR });
 
-    if (distToIdeal === 0) return 80;  // Perfekte Flankenposition
-    if (distToIdeal === 1) return 50;  // Sehr nah
-    if (distToIdeal === 2) return 25;  // Akzeptabel
+    // MASSIV ERHÖHTE BONI für Einkreisung
+    if (distToIdeal === 0) return 200;  // Perfekte Flankenposition (war 80)
+    if (distToIdeal === 1) return 140;  // Sehr nah (war 50)
+    if (distToIdeal === 2) return 80;   // Akzeptabel (war 25)
+    if (distToIdeal === 3) return 40;   // Noch nutzbar
 
     return 0;
+}
+
+/**
+ * Prüfe ob Einkreisung bereit ist für koordinierten Angriff
+ * Returns true wenn genug Einheiten in Position sind
+ */
+function isEncirclementReady(targetId) {
+    const flankingUnits = [];
+    const target = state.units.find(u => u.id === targetId);
+    if (!target) return false;
+
+    for (const [unitId, flankInfo] of aiMemory.flankingTargets) {
+        if (flankInfo.targetId !== targetId) continue;
+
+        const unit = state.units.find(u => u.id === unitId && u.alive);
+        if (!unit) continue;
+
+        // Prüfe ob Einheit in Angriffsreichweite ist
+        const distToTarget = hexDistance(
+            { q: unit.q, r: unit.r },
+            { q: target.q, r: target.r }
+        );
+
+        if (distToTarget <= unit.range) {
+            flankingUnits.push(unit);
+        }
+    }
+
+    // Einkreisung ist bereit wenn mindestens 2 Einheiten in Position sind
+    // und sie von verschiedenen Richtungen kommen
+    if (flankingUnits.length >= 2) {
+        // Prüfe ob verschiedene Winkel
+        const angles = flankingUnits.map(u => {
+            return Math.atan2(u.r - target.r, u.q - target.q);
+        });
+
+        // Mindestens 60° Unterschied zwischen Angreifern
+        for (let i = 0; i < angles.length - 1; i++) {
+            const angleDiff = Math.abs(angles[i] - angles[i + 1]);
+            if (angleDiff > Math.PI / 3) {
+                return true; // Gute Einkreisung!
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Sollte Einheit auf Einkreisung warten?
+ * Verhindert dass eine Einheit alleine angreift wenn Einkreisung geplant ist
+ */
+function shouldWaitForEncirclement(unit, target) {
+    const flankInfo = aiMemory.flankingTargets.get(unit.id);
+    if (!flankInfo || flankInfo.targetId !== target.id) return false;
+
+    // Wie viele Einheiten sind für diese Einkreisung eingeplant?
+    let plannedFlankers = 0;
+    let readyFlankers = 0;
+
+    for (const [unitId, info] of aiMemory.flankingTargets) {
+        if (info.targetId !== target.id) continue;
+        plannedFlankers++;
+
+        const flanker = state.units.find(u => u.id === unitId && u.alive);
+        if (!flanker) continue;
+
+        const dist = hexDistance(
+            { q: flanker.q, r: flanker.r },
+            { q: target.q, r: target.r }
+        );
+
+        if (dist <= flanker.range) {
+            readyFlankers++;
+        }
+    }
+
+    // Warte wenn weniger als die Hälfte der geplanten Einheiten bereit ist
+    // ABER nicht wenn wir schon 2+ bereit haben
+    if (readyFlankers >= 2) return false;
+    if (plannedFlankers >= 2 && readyFlankers < plannedFlankers / 2) {
+        return true; // Warte auf mehr Einheiten
+    }
+
+    return false;
 }
 
 // ===== MAIN AI EXECUTION =====
@@ -3230,17 +3338,28 @@ async function performUnitAI(unit, plan, spectatorMode = false) {
         // WICHTIG: canUnitAttack prüft MAX_ATTACKS_PER_UNIT (gleiche Regel wie für Menschen)
         if (assignedTargetId && attackable.some(t => t.id === assignedTargetId) && canSpendAP(1) && canUnitAttack(unit)) {
             const target = attackable.find(t => t.id === assignedTargetId);
-            // Enhanced attack thought with evaluation
-            const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
             const canKill = target.currentHp <= unit.damage;
-            if (canKill) {
-                addAIThought(`${unitName} kann den ${targetName} mit diesem Schuss erledigen. Das ist die Priorität.`, 'attack');
+
+            // === KOORDINIERTE EINKREISUNG ===
+            // Warte auf andere Flanker AUSSER wir können den Feind töten
+            if (!canKill && shouldWaitForEncirclement(unit, target)) {
+                const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
+                addAIThought(`${unitName} wartet auf Verstärkung für koordinierten Angriff auf ${targetName}.`, 'strategy');
+                // Nicht angreifen - stattdessen in Position bleiben oder gehen
             } else {
-                const targetHp = Math.round(target.currentHp);
-                addAIThought(`${unitName} konzentriert Feuer auf den ${targetName}. Noch ${targetHp} HP übrig.`, 'attack');
+                // Enhanced attack thought with evaluation
+                const targetName = CLASS_NAMES_DE[target.class] || target.class || 'Feind';
+                if (canKill) {
+                    addAIThought(`${unitName} kann den ${targetName} mit diesem Schuss erledigen. Das ist die Priorität.`, 'attack');
+                } else if (isEncirclementReady(target.id)) {
+                    addAIThought(`⚔️ Einkreisung komplett! ${unitName} greift den ${targetName} koordiniert an!`, 'attack');
+                } else {
+                    const targetHp = Math.round(target.currentHp);
+                    addAIThought(`${unitName} konzentriert Feuer auf den ${targetName}. Noch ${targetHp} HP übrig.`, 'attack');
+                }
+                await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
+                trackAPSpent(1);
             }
-            await executeAttackSequence(unit, target, renderIfVisible, hasHumanViewer, spectatorMode);
-            trackAPSpent(1);
         } else if (attackable.length > 0 && canSpendAP(1) && canUnitAttack(unit)) {
             // 3. Attack best available target
             const target = selectBestTarget(unit, attackable);
