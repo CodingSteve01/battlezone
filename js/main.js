@@ -410,9 +410,31 @@ function generateUnitCards() {
 
     grid.innerHTML = '';
 
-    // Generate cards for all variants of all classes
+    // Generate grouped cards for each class
     Object.entries(UNIT_CLASSES).forEach(([classKey, baseClassData]) => {
         const variants = UNIT_VARIANTS[classKey] || { standard: { name: baseClassData.name, badge: null, costMod: 0, statMods: {} } };
+
+        // Check if this is an elite unit (has special dual-attack capability)
+        const isElite = baseClassData.canMelee && baseClassData.canRanged;
+
+        // Create group container
+        const group = document.createElement('div');
+        group.className = 'unit-class-group';
+        group.dataset.class = classKey;
+
+        // Create group header with class name
+        const header = document.createElement('div');
+        header.className = 'unit-class-header';
+        header.innerHTML = `
+            <span class="class-icon">${baseClassData.icon}</span>
+            <span class="class-name">${baseClassData.name}</span>
+            ${isElite ? '<span class="elite-tag">ELITE</span>' : ''}
+        `;
+        group.appendChild(header);
+
+        // Create variants container
+        const variantsContainer = document.createElement('div');
+        variantsContainer.className = 'unit-variants-row';
 
         Object.entries(variants).forEach(([variantKey, variantData]) => {
             // Get modified stats for this variant
@@ -434,9 +456,6 @@ function generateUnitCards() {
             if (unitData.cost >= 140) costCategory = 'expensive';
             else if (unitData.cost <= 80) costCategory = 'cheap';
 
-            // Check if this is an elite unit (has special dual-attack capability)
-            const isElite = baseClassData.canMelee && baseClassData.canRanged;
-
             // Get player color for glow effect
             const playerColor = CONFIG.PLAYER_COLORS[currentTeamSelectPlayer] || '#22c55e';
 
@@ -445,14 +464,13 @@ function generateUnitCards() {
                 ? `<div class="variant-badge" style="--badge-color: ${variantData.badgeColor || '#fff'}">${variantData.badge}</div>`
                 : '';
 
-            // Build bonus description
+            // Build bonus description - shorter for grouped layout
             const bonusHtml = variantData.bonusDesc
                 ? `<div class="variant-bonus">${variantData.bonusDesc}</div>`
                 : '';
 
-            // New card layout with sprite preview, cart controls and variant info
+            // Compact card layout for grouped view
             card.innerHTML = `
-                ${isElite && variantKey === 'standard' ? '<div class="unit-elite-badge">ELITE</div>' : ''}
                 ${variantBadgeHtml}
                 <button class="card-info-btn" data-unit-key="${unitKey}" title="Details anzeigen">i</button>
                 <div class="unit-sprite-container">
@@ -460,7 +478,7 @@ function generateUnitCards() {
                     <canvas class="unit-sprite-canvas" width="104" height="104" data-class="${classKey}"></canvas>
                 </div>
                 <div class="card-header">
-                    <div class="unit-name">${unitData.name}</div>
+                    <div class="unit-name">${variantKey === 'standard' ? 'Standard' : variantData.name || unitData.name}</div>
                     <div class="unit-cost cost-${costCategory}">${unitData.cost}💰</div>
                 </div>
                 <div class="unit-stats">
@@ -470,7 +488,6 @@ function generateUnitCards() {
                     <span class="stat-item">🎯 ${unitData.range}</span>
                 </div>
                 ${bonusHtml}
-                <div class="unit-special">✨ ${baseClassData.special}</div>
                 <div class="cart-controls">
                     <button class="cart-btn cart-remove" data-unit-key="${unitKey}" title="Entfernen">−</button>
                     <span class="cart-count" data-unit-key="${unitKey}">0</span>
@@ -523,8 +540,11 @@ function generateUnitCards() {
                 };
             }
 
-            grid.appendChild(card);
+            variantsContainer.appendChild(card);
         });
+
+        group.appendChild(variantsContainer);
+        grid.appendChild(group);
     });
 
     // Setup detail overlay close handlers
@@ -963,58 +983,119 @@ function updateCardSelectionState() {
 }
 
 /**
- * Update team preview slots with sprite canvases
- * Now uses unitKey format (classKey:variantKey)
+ * Update shopping cart display
+ * Shows selected units as list items with remove buttons
  */
 function updateTeamPreview() {
-    const previewContainer = document.getElementById('team-preview-units');
-    if (!previewContainer) return;
+    const cartContainer = document.getElementById('cart-items');
+    const cartCountBadge = document.getElementById('cart-count-badge');
+    const cartTotal = document.getElementById('cart-total');
 
-    // Clear existing slots
-    previewContainer.innerHTML = '';
+    if (!cartContainer) return;
 
-    // Create slots for selected units with sprite preview
-    currentPlayerSelection.forEach((unitKey, index) => {
-        const { classKey, variantKey } = parseUnitKey(unitKey);
-        const unitData = getUnitWithVariant(classKey, variantKey);
-        const variantData = unitData?.variantData;
+    // Clear existing items
+    cartContainer.innerHTML = '';
 
-        const slot = document.createElement('div');
-        slot.className = 'team-slot filled';
+    if (currentPlayerSelection.length === 0) {
+        // Show empty state
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'cart-empty';
+        emptyMsg.textContent = 'Noch keine Einheiten gewählt';
+        cartContainer.appendChild(emptyMsg);
+    } else {
+        // Group units by unitKey to show counts
+        const unitCounts = {};
+        currentPlayerSelection.forEach((unitKey, index) => {
+            if (!unitCounts[unitKey]) {
+                unitCounts[unitKey] = { count: 0, indices: [] };
+            }
+            unitCounts[unitKey].count++;
+            unitCounts[unitKey].indices.push(index);
+        });
 
-        // Create canvas for sprite
-        const canvas = document.createElement('canvas');
-        canvas.width = 80;
-        canvas.height = 80;
-        canvas.className = 'team-slot-canvas';
-        slot.appendChild(canvas);
+        // Create cart items
+        Object.entries(unitCounts).forEach(([unitKey, data]) => {
+            const { classKey, variantKey } = parseUnitKey(unitKey);
+            const baseClass = UNIT_CLASSES[classKey];
+            const unitData = getUnitWithVariant(classKey, variantKey);
+            const variantData = unitData?.variantData;
 
-        // Add variant badge if not standard
-        if (variantData && variantData.badge) {
-            const badge = document.createElement('div');
-            badge.className = 'slot-variant-badge';
-            badge.textContent = variantData.badge;
-            badge.style.color = variantData.badgeColor || '#fff';
-            slot.appendChild(badge);
-        }
+            const item = document.createElement('div');
+            item.className = 'cart-item';
 
-        // Render sprite (use base class sprite)
-        renderTeamSlotSprite(canvas, classKey, currentTeamSelectPlayer);
+            // Unit icon
+            const icon = document.createElement('span');
+            icon.className = 'cart-item-icon';
+            icon.textContent = baseClass?.icon || '👤';
+            item.appendChild(icon);
 
-        slot.style.cursor = 'pointer';
-        slot.onclick = () => removeFromSelection(index);
-        slot.title = `${unitData?.name || classKey} - Klicken zum Entfernen`;
-        previewContainer.appendChild(slot);
-    });
+            // Unit info (name + variant badge)
+            const info = document.createElement('div');
+            info.className = 'cart-item-info';
 
-    // Add empty slots up to max units
-    const emptySlots = CONFIG.MAX_UNITS - currentPlayerSelection.length;
-    for (let i = 0; i < emptySlots; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'team-slot empty';
-        slot.textContent = '+';
-        slot.title = 'Einheit hinzufügen';
-        previewContainer.appendChild(slot);
+            const nameRow = document.createElement('div');
+            nameRow.className = 'cart-item-name';
+            if (variantData && variantData.badge) {
+                nameRow.innerHTML = `<span style="color:${variantData.badgeColor}">${variantData.badge}</span> ${unitData.name}`;
+            } else {
+                nameRow.textContent = unitData?.name || classKey;
+            }
+            info.appendChild(nameRow);
+
+            // Cost per unit
+            const costInfo = document.createElement('div');
+            costInfo.className = 'cart-item-cost';
+            costInfo.textContent = `${unitData.cost} 💰`;
+            info.appendChild(costInfo);
+
+            item.appendChild(info);
+
+            // Quantity controls
+            const qtyControls = document.createElement('div');
+            qtyControls.className = 'cart-item-qty';
+
+            const minusBtn = document.createElement('button');
+            minusBtn.className = 'cart-qty-btn';
+            minusBtn.textContent = '−';
+            minusBtn.onclick = () => {
+                playClick();
+                removeFromCart(unitKey);
+            };
+            qtyControls.appendChild(minusBtn);
+
+            const qtyDisplay = document.createElement('span');
+            qtyDisplay.className = 'cart-qty-count';
+            qtyDisplay.textContent = data.count;
+            qtyControls.appendChild(qtyDisplay);
+
+            const plusBtn = document.createElement('button');
+            plusBtn.className = 'cart-qty-btn';
+            plusBtn.textContent = '+';
+            plusBtn.onclick = () => {
+                playClick();
+                addToCart(unitKey);
+            };
+            // Disable if can't add more
+            const canAdd = canAddUnit(unitKey);
+            if (!canAdd) {
+                plusBtn.disabled = true;
+                plusBtn.classList.add('disabled');
+            }
+            qtyControls.appendChild(plusBtn);
+
+            item.appendChild(qtyControls);
+            cartContainer.appendChild(item);
+        });
+    }
+
+    // Update count badge
+    if (cartCountBadge) {
+        cartCountBadge.textContent = `${currentPlayerSelection.length}/${CONFIG.MAX_UNITS}`;
+    }
+
+    // Update total
+    if (cartTotal) {
+        cartTotal.textContent = `${currentBudgetSpent} 💰`;
     }
 }
 
@@ -1063,12 +1144,12 @@ function renderTeamSlotSprite(canvas, classKey, playerIndex) {
  * Remove unit from selection by index
  */
 function removeFromSelection(index) {
-    const removedClass = currentPlayerSelection[index];
-    const unitClass = UNIT_CLASSES[removedClass];
+    const unitKey = currentPlayerSelection[index];
+    if (!unitKey) return;
 
-    if (unitClass) {
-        currentBudgetSpent -= unitClass.cost;
-    }
+    // Use the same cost calculation as removeFromCart (supports variants)
+    const cost = getUnitCost(unitKey);
+    currentBudgetSpent -= cost;
 
     currentPlayerSelection.splice(index, 1);
     updateCardSelectionState();
