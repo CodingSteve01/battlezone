@@ -1,8 +1,17 @@
 // ===== INPUT MODULE INDEX =====
-// Re-exports all input functionality
+// Re-exports camera and other input functionality
 
-export * from './camera.js';
-export * from './events.js';
-
-// Selection will be added later
-// export * from './selection.js';
+export {
+    initCamera,
+    getUnitTilePosition,
+    updateCameraOffset,
+    limitCameraBounds,
+    applyZoom,
+    calculateSituationalZoom,
+    getRelevantUnitsForZoom,
+    scrollToPosition,
+    scrollToUnit,
+    followUnitInstant,
+    scrollToUnitWithZoom,
+    centerOnTeam
+} from './camera.js';

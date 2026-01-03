@@ -1,10 +1,49 @@
 // ===== COMBAT MODULE INDEX =====
-// Re-exports all combat functionality
+// Re-exports all combat functionality from submodules
 
-export * from './damage.js';
-export * from './abilities.js';
-export * from './ambush.js';
-export * from './suppression.js';
+// Calculations
+export {
+    hasLineOfSight,
+    calculateLineOfSightCover,
+    calculateCoverEffectiveness,
+    calculateHitChance,
+    getCoverInfo,
+    calculateCoverDamageReduction
+} from './calculations.js';
 
-// Main attack execution will be imported from the original combat.js
-// to avoid breaking existing imports during migration
+// Special Abilities
+export {
+    getSpecialAbilityCost,
+    canUseSpecialAbility,
+    useSpecialAbility,
+    useMedicHealingWithMinigame
+} from './abilities.js';
+
+// Tactical Systems
+export {
+    // Ambush
+    canPrepareAmbush,
+    prepareAmbush,
+    checkAmbushTriggers,
+    executeAmbushAttack,
+    resetAmbushStatus,
+    // Overwatch
+    canUseOverwatch,
+    activateOverwatch,
+    checkOverwatchTriggers,
+    executeOverwatchAttack,
+    // Suppression
+    canUseSuppression,
+    useSuppression,
+    getSuppressionPenalty,
+    getSuppressionMoveCost,
+    // Coordinated
+    getEligibleCoordinators,
+    executeCoordinatedAttack,
+    // Hold Position
+    calculateHoldPositionDefense,
+    onUnitMoved,
+    updateAllHoldPositions,
+    // Setup
+    setExecuteAttack
+} from './tactical.js';

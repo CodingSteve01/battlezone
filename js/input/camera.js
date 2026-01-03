@@ -1,233 +1,168 @@
 // ===== CAMERA CONTROL =====
-// Pan, zoom, and viewport management
+// Camera movement, zoom, and unit following
 
-import { state, zoomLevelToScale, scaleToZoomLevel, getTileSize } from '../state.js';
-import { hexToPixel } from '../hexMath.js';
+import { state, getHex, getPlayerUnits, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileSizeForHexSize, getTileZOffset, getTileScreenPosition } from '../state.js';
+import { hexDistance } from '../hexMath.js';
 import { render, resizeCanvas } from '../renderer.js';
+import { CONFIG } from '../config.js';
+
+// Camera helpers - these need canvas reference
+let canvas = null;
 
 /**
- * Limit camera to map boundaries
+ * Initialize camera module with canvas reference
  */
-export function limitCameraBounds() {
-    const mapRadius = state.mapRadius || 12;
-    const hexSize = getTileSize();
-    const maxOffset = mapRadius * hexSize * 2;
-
-    state.cameraX = Math.max(-maxOffset, Math.min(maxOffset, state.cameraX));
-    state.cameraY = Math.max(-maxOffset, Math.min(maxOffset, state.cameraY));
+export function initCamera(canvasRef) {
+    canvas = canvasRef;
 }
 
 /**
- * Update screen offset from camera position
+ * Get unit position in tile coordinates
+ */
+export function getUnitTilePosition(unit, tileSize = getTileSize()) {
+    const hex = getHex(unit.q, unit.r);
+    return getTileScreenPosition(unit.q, unit.r, hex?.height ?? 0, tileSize);
+}
+
+/**
+ * Update camera offset from camera position
  */
 export function updateCameraOffset() {
-    const canvas = document.getElementById('gameCanvas');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    state.offsetX = Math.round(state.cameraX + rect.width / 2);
+    state.offsetY = Math.round(state.cameraY + rect.height / 2);
+}
+
+/**
+ * Limit camera bounds to map extents
+ */
+export function limitCameraBounds() {
     if (!canvas) return;
 
-    const scale = zoomLevelToScale(state.zoomLevel);
-    state.offsetX = canvas.width / 2 - state.cameraX * scale;
-    state.offsetY = canvas.height / 2 - state.cameraY * scale;
-}
+    const hexCount = state.hexes.length;
+    if (hexCount === 0) return;
 
-/**
- * Center view on a specific unit
- */
-export function centerOnUnit(unit) {
-    if (!unit) return;
+    const tileSize = getTileSize();
+    const rect = canvas.getBoundingClientRect();
+    const padding = tileSize * 2;
 
-    const hexSize = getTileSize();
-    const pos = hexToPixel(unit.q, unit.r, hexSize);
-
-    state.cameraX = pos.x;
-    state.cameraY = pos.y;
-
-    limitCameraBounds();
-    updateCameraOffset();
-    render();
-}
-
-/**
- * Center view on current player's team
- */
-export function centerOnTeam(playerIndex = state.currentPlayer) {
-    const units = state.units.filter(u => u.player === playerIndex && u.alive);
-    if (units.length === 0) return;
-
-    const hexSize = getTileSize();
-    let sumX = 0, sumY = 0;
-
-    for (const unit of units) {
-        const pos = hexToPixel(unit.q, unit.r, hexSize);
-        sumX += pos.x;
-        sumY += pos.y;
-    }
-
-    state.cameraX = sumX / units.length;
-    state.cameraY = sumY / units.length;
-
-    // Calculate appropriate zoom to show all units
-    if (units.length > 1) {
-        let maxDist = 0;
-        for (const unit of units) {
-            const pos = hexToPixel(unit.q, unit.r, hexSize);
-            const dist = Math.sqrt(
-                Math.pow(pos.x - state.cameraX, 2) +
-                Math.pow(pos.y - state.cameraY, 2)
-            );
-            maxDist = Math.max(maxDist, dist);
-        }
-
-        const canvas = document.getElementById('gameCanvas');
-        if (canvas) {
-            const targetScale = Math.min(canvas.width, canvas.height) / (maxDist * 3);
-            const targetZoom = scaleToZoomLevel(targetScale);
-            state.zoomLevel = Math.max(0.5, Math.min(2, targetZoom));
-        }
-    }
-
-    limitCameraBounds();
-    updateCameraOffset();
-    render();
-}
-
-/**
- * Apply zoom centered on a specific point
- */
-export function applyZoom(delta, centerX, centerY) {
-    const canvas = document.getElementById('gameCanvas');
-    if (!canvas) return;
-
-    const oldScale = zoomLevelToScale(state.zoomLevel);
-
-    // Calculate new zoom level
-    const zoomFactor = delta > 0 ? 0.9 : 1.1;
-    state.zoomLevel = Math.max(0.3, Math.min(3, state.zoomLevel * zoomFactor));
-
-    const newScale = zoomLevelToScale(state.zoomLevel);
-
-    // Adjust camera to keep zoom centered on mouse position
-    const worldX = (centerX - state.offsetX) / oldScale;
-    const worldY = (centerY - state.offsetY) / oldScale;
-
-    state.cameraX = worldX - (centerX - canvas.width / 2) / newScale;
-    state.cameraY = worldY - (centerY - canvas.height / 2) / newScale;
-
-    limitCameraBounds();
-    updateCameraOffset();
-    resizeCanvas();
-    render();
-}
-
-/**
- * Smoothly scroll to a position
- */
-export function scrollToPosition(targetX, targetY, duration = 500) {
-    return new Promise(resolve => {
-        const startX = state.cameraX;
-        const startY = state.cameraY;
-        const startTime = performance.now();
-
-        function animate(currentTime) {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(1, elapsed / duration);
-
-            // Easing function
-            const eased = 1 - Math.pow(1 - progress, 3);
-
-            state.cameraX = startX + (targetX - startX) * eased;
-            state.cameraY = startY + (targetY - startY) * eased;
-
-            limitCameraBounds();
-            updateCameraOffset();
-            render();
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                resolve();
-            }
-        }
-
-        requestAnimationFrame(animate);
-    });
-}
-
-/**
- * Smoothly scroll to center on a unit
- */
-export function scrollToUnit(unit, duration = 500) {
-    if (!unit) return Promise.resolve();
-
-    const hexSize = getTileSize();
-    const pos = hexToPixel(unit.q, unit.r, hexSize);
-
-    return scrollToPosition(pos.x, pos.y, duration);
-}
-
-/**
- * Instantly snap camera to unit position
- */
-export function followUnitInstant(unit) {
-    if (!unit) return;
-
-    const hexSize = getTileSize();
-    const pos = hexToPixel(unit.q, unit.r, hexSize);
-
-    state.cameraX = pos.x;
-    state.cameraY = pos.y;
-
-    limitCameraBounds();
-    updateCameraOffset();
-}
-
-/**
- * Calculate appropriate zoom level based on unit distribution
- */
-export function calculateSituationalZoom(units, padding = 1.5) {
-    if (!units || units.length === 0) return state.zoomLevel;
-
-    const hexSize = getTileSize();
-    const canvas = document.getElementById('gameCanvas');
-    if (!canvas) return state.zoomLevel;
-
-    // Find bounding box of all units
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
 
-    for (const unit of units) {
-        const pos = hexToPixel(unit.q, unit.r, hexSize);
+    for (const hex of state.hexes) {
+        const pos = getTileScreenPosition(hex.q, hex.r, hex.height ?? 0);
         minX = Math.min(minX, pos.x);
         maxX = Math.max(maxX, pos.x);
         minY = Math.min(minY, pos.y);
         maxY = Math.max(maxY, pos.y);
     }
 
-    const width = (maxX - minX) * padding;
-    const height = (maxY - minY) * padding;
+    const mapWidth = maxX - minX + padding * 2;
+    const mapHeight = maxY - minY + padding * 2;
+    const mapCenterX = (minX + maxX) / 2;
+    const mapCenterY = (minY + maxY) / 2;
 
-    const scaleX = canvas.width / Math.max(width, 100);
-    const scaleY = canvas.height / Math.max(height, 100);
-    const targetScale = Math.min(scaleX, scaleY);
+    const maxCameraX = Math.max(0, (mapWidth - rect.width) / 2);
+    const maxCameraY = Math.max(0, (mapHeight - rect.height) / 2);
 
-    return Math.max(0.5, Math.min(2, scaleToZoomLevel(targetScale)));
+    state.cameraX = Math.max(-maxCameraX - mapCenterX, Math.min(maxCameraX - mapCenterX, state.cameraX));
+    state.cameraY = Math.max(-maxCameraY - mapCenterY, Math.min(maxCameraY - mapCenterY, state.cameraY));
 }
 
 /**
- * Get relevant units for situational zoom
+ * Apply zoom centered on screen position
  */
-export function getRelevantUnitsForZoom(focusUnit, viewingPlayer) {
-    const relevantUnits = [focusUnit];
+export function applyZoom(zoomDelta, screenX, screenY) {
+    if (!canvas) return;
 
-    // Add nearby enemies
+    const oldZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
+    const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, oldZoom + zoomDelta));
+
+    if (newZoom === oldZoom) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const canvasCenterX = rect.width / 2;
+    const canvasCenterY = rect.height / 2;
+    const relX = screenX - rect.left - canvasCenterX;
+    const relY = screenY - rect.top - canvasCenterY;
+
+    const zoomRatio = newZoom / oldZoom;
+
+    state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
+    state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
+
+    state.zoomLevel = newZoom;
+
+    updateCameraOffset();
+    resizeCanvas();
+    limitCameraBounds();
+    updateCameraOffset();
+}
+
+/**
+ * Calculate optimal zoom to show all relevant units
+ */
+export function calculateSituationalZoom(focusUnit, relevantUnits = []) {
+    if (!focusUnit || !canvas) return scaleToZoomLevel(0.85);
+
+    const unitsToShow = [focusUnit, ...relevantUnits].filter(u => u && u.hp > 0);
+
+    if (unitsToShow.length <= 1) {
+        return scaleToZoomLevel(0.9);
+    }
+
+    let minQ = Infinity, maxQ = -Infinity;
+    let minR = Infinity, maxR = -Infinity;
+
+    for (const unit of unitsToShow) {
+        minQ = Math.min(minQ, unit.q);
+        maxQ = Math.max(maxQ, unit.q);
+        minR = Math.min(minR, unit.r);
+        maxR = Math.max(maxR, unit.r);
+    }
+
+    const spreadQ = maxQ - minQ;
+    const spreadR = maxR - minR;
+    const maxSpread = Math.max(spreadQ, spreadR);
+
+    const viewportWidth = canvas.width || 800;
+    const viewportHeight = canvas.height || 600;
+    const minViewportDim = Math.min(viewportWidth, viewportHeight);
+
+    const hexPixelSize = getTileSizeForHexSize(CONFIG.BASE_HEX_SIZE) * 2;
+    const requiredPixels = (maxSpread + 2) * hexPixelSize;
+
+    const zoomToFit = minViewportDim / requiredPixels;
+
+    const minZoom = zoomLevelToScale(state.minZoom || 0.5);
+    const maxZoom = Math.min(zoomLevelToScale(state.maxZoom || 2.0), 1.0);
+
+    const clampedScale = Math.max(minZoom, Math.min(maxZoom, zoomToFit * 0.8));
+    return scaleToZoomLevel(clampedScale);
+}
+
+/**
+ * Get units relevant for situational zoom
+ */
+export function getRelevantUnitsForZoom(activeUnit, playerIndex) {
+    if (!activeUnit) return [];
+
+    const relevantUnits = [];
+    const maxRelevantDistance = 8;
+
     for (const unit of state.units) {
-        if (!unit.alive) continue;
-        if (unit.player === focusUnit.player) continue;
+        if (unit === activeUnit || unit.hp <= 0) continue;
 
-        const dx = unit.q - focusUnit.q;
-        const dy = unit.r - focusUnit.r;
-        const dist = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dx + dy));
+        const dist = hexDistance(activeUnit, unit);
+        if (dist > maxRelevantDistance) continue;
 
-        if (dist <= 6) {
+        if (unit.player !== activeUnit.player) {
+            const hex = getHex(unit.q, unit.r);
+            if (hex && hex.visible && hex.visible[playerIndex]) {
+                relevantUnits.push(unit);
+            }
+        } else if (dist <= 4) {
             relevantUnits.push(unit);
         }
     }
@@ -236,35 +171,21 @@ export function getRelevantUnitsForZoom(focusUnit, viewingPlayer) {
 }
 
 /**
- * Smoothly scroll and zoom to show unit with context
+ * Smoothly scroll to a position
  */
-export async function scrollToUnitWithZoom(unit, duration = 500, targetZoom = null, relevantUnits = null) {
-    if (!unit) return;
-
-    const hexSize = getTileSize();
-    const pos = hexToPixel(unit.q, unit.r, hexSize);
-
-    // Calculate zoom if not specified
-    if (targetZoom === null) {
-        const units = relevantUnits || getRelevantUnitsForZoom(unit, state.viewingPlayer);
-        targetZoom = calculateSituationalZoom(units);
-    }
-
-    // Animate both position and zoom
-    const startX = state.cameraX;
-    const startY = state.cameraY;
-    const startZoom = state.zoomLevel;
-    const startTime = performance.now();
-
+export function scrollToPosition(targetCameraX, targetCameraY, duration = 300) {
     return new Promise(resolve => {
-        function animate(currentTime) {
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(1, elapsed / duration);
-            const eased = 1 - Math.pow(1 - progress, 3);
+        const startCameraX = state.cameraX;
+        const startCameraY = state.cameraY;
+        const startTime = Date.now();
 
-            state.cameraX = startX + (pos.x - startX) * eased;
-            state.cameraY = startY + (pos.y - startY) * eased;
-            state.zoomLevel = startZoom + (targetZoom - startZoom) * eased;
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const ease = 1 - Math.pow(1 - progress, 3);
+
+            state.cameraX = startCameraX + (targetCameraX - startCameraX) * ease;
+            state.cameraY = startCameraY + (targetCameraY - startCameraY) * ease;
 
             limitCameraBounds();
             updateCameraOffset();
@@ -282,22 +203,172 @@ export async function scrollToUnitWithZoom(unit, duration = 500, targetZoom = nu
 }
 
 /**
- * Animate zoom level transition
+ * Smoothly scroll to unit
  */
-export function animateZoom(targetZoom, duration = 300) {
-    const startZoom = state.zoomLevel;
-    const startTime = performance.now();
+export function scrollToUnit(unit, duration = 500) {
+    if (!unit) return;
 
+    const targetPos = getUnitTilePosition(unit);
+    return scrollToPosition(-targetPos.x, -targetPos.y, duration);
+}
+
+/**
+ * Instantly follow a unit
+ */
+export function followUnitInstant(unit) {
+    if (!unit) return;
+
+    const targetPos = getUnitTilePosition(unit);
+    state.cameraX = -targetPos.x;
+    state.cameraY = -targetPos.y;
+
+    limitCameraBounds();
+    updateCameraOffset();
+}
+
+/**
+ * Scroll to unit with dynamic zoom
+ */
+export function scrollToUnitWithZoom(unit, duration = 600, targetZoom = null, relevantUnits = null) {
     return new Promise(resolve => {
-        function animate(currentTime) {
-            const elapsed = currentTime - startTime;
+        if (!unit) {
+            resolve();
+            return;
+        }
+
+        const safeCurrentZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
+
+        let idealZoom;
+        if (targetZoom !== null) {
+            idealZoom = targetZoom;
+        } else if (relevantUnits !== null) {
+            idealZoom = calculateSituationalZoom(unit, relevantUnits);
+        } else {
+            idealZoom = safeCurrentZoom;
+        }
+
+        const minZoom = state.minZoom || 0.5;
+        const maxZoom = state.maxZoom || 2.0;
+        const clampedZoom = Math.min(Math.max(idealZoom, minZoom), maxZoom);
+
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(clampedZoom);
+        const targetTileSize = getTileSizeForHexSize(targetHexSize);
+        const targetPos = getUnitTilePosition(unit, targetTileSize);
+        const targetCameraX = -targetPos.x;
+        const targetCameraY = -targetPos.y;
+
+        const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+        const startZoom = safeCurrentZoom;
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
             const progress = Math.min(1, elapsed / duration);
-            const eased = 1 - Math.pow(1 - progress, 2);
 
-            state.zoomLevel = startZoom + (targetZoom - startZoom) * eased;
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 
+            state.zoomLevel = startZoom + (clampedZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
+
+            const currentPos = getUnitTilePosition(unit);
+            state.cameraX = startCameraX + (-currentPos.x - startCameraX) * ease;
+            state.cameraY = startCameraY + (-currentPos.y - startCameraY) * ease;
+
+            limitCameraBounds();
             updateCameraOffset();
-            resizeCanvas();
+            render();
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                resolve();
+            }
+        }
+
+        requestAnimationFrame(animate);
+    });
+}
+
+/**
+ * Center view on team with situational zoom
+ */
+export function centerOnTeam(playerIndex, duration = 600) {
+    return new Promise(resolve => {
+        const playerUnits = getPlayerUnits(playerIndex);
+
+        if (playerUnits.length === 0) {
+            resolve();
+            return;
+        }
+
+        const visibleEnemies = [];
+        for (const unit of state.units) {
+            if (unit.player === playerIndex || unit.hp <= 0) continue;
+            const hex = getHex(unit.q, unit.r);
+            if (hex && hex.visible && hex.visible[playerIndex]) {
+                visibleEnemies.push(unit);
+            }
+        }
+
+        const referenceUnit = playerUnits[0];
+        const allRelevantUnits = [...playerUnits.slice(1), ...visibleEnemies];
+        const situationalZoom = calculateSituationalZoom(referenceUnit, allRelevantUnits);
+        const situationalScale = zoomLevelToScale(situationalZoom);
+
+        const targetZoomScale = Math.max(0.7, Math.min(0.95, situationalScale));
+        const targetZoom = scaleToZoomLevel(targetZoomScale);
+        const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(targetZoom);
+        const targetTileSize = getTileSizeForHexSize(targetHexSize);
+
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
+
+        for (const unit of playerUnits) {
+            const pos = getUnitTilePosition(unit, targetTileSize);
+            minX = Math.min(minX, pos.x);
+            maxX = Math.max(maxX, pos.x);
+            minY = Math.min(minY, pos.y);
+            maxY = Math.max(maxY, pos.y);
+        }
+
+        const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
+        const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
+        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
+        const startTime = Date.now();
+
+        function animate() {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(1, elapsed / duration);
+
+            const ease = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+            state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
+            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
+
+            let newMinX = Infinity, newMaxX = -Infinity;
+            let newMinY = Infinity, newMaxY = -Infinity;
+
+            for (const unit of playerUnits) {
+                const pos = getUnitTilePosition(unit);
+                newMinX = Math.min(newMinX, pos.x);
+                newMaxX = Math.max(newMaxX, pos.x);
+                newMinY = Math.min(newMinY, pos.y);
+                newMaxY = Math.max(newMaxY, pos.y);
+            }
+
+            const newCenterX = (newMinX + newMaxX) / 2;
+            const newCenterY = (newMinY + newMaxY) / 2;
+
+            state.cameraX = startCameraX + (-newCenterX - startCameraX) * ease;
+            state.cameraY = startCameraY + (-newCenterY - startCameraY) * ease;
+
+            limitCameraBounds();
+            updateCameraOffset();
             render();
 
             if (progress < 1) {

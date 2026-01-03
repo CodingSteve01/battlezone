@@ -1,20 +1,32 @@
 // ===== SPECIAL ABILITIES =====
-// Unit class-specific special abilities
+// Unit special abilities for all classes
 
-import { state, getPlayerUnits } from '../state.js';
+import {
+    state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack,
+    recordSpecialUsed, getAlliedPlayers, getTileScreenPosition
+} from '../state.js';
+import { UNIT_CLASSES } from '../config.js';
 import { hexDistance } from '../hexMath.js';
-import { UNIT_CLASSES, CONFIG } from '../config.js';
-import { updateUI, showToast } from '../ui.js';
-import { render } from '../renderer.js';
-import { updateVisibility } from '../fogOfWar.js';
-import { addXP } from '../progression.js';
+import { showToast, showFloatingDamage } from '../ui.js';
+import { awardXP, XP_REWARDS } from '../progression.js';
+import { playHeal, playSprint, playPowershot, playCloak } from '../audio.js';
+import { particles } from '../particles.js';
+import { recordHealing } from '../state.js';
+import { areMinigamesEnabled, startHealingMinigame } from '../minigames.js';
 
 /**
  * Get AP cost for special ability
  */
-export function getSpecialAbilityCost(unit) {
-    const classInfo = UNIT_CLASSES[unit.class];
-    return classInfo?.specialCost || 2;
+export function getSpecialAbilityCost(unitClass) {
+    switch (unitClass) {
+        case 'scout': return 1;
+        case 'assault': return 1;
+        case 'medic': return 2;
+        case 'sniper': return 2;
+        case 'commando': return 2;
+        case 'elitesoldat': return 1;
+        default: return 2;
+    }
 }
 
 /**
@@ -24,120 +36,46 @@ export function canUseSpecialAbility(unit) {
     if (!unit || !unit.alive) return false;
     if (unit.usedSpecial) return false;
 
-    const cost = getSpecialAbilityCost(unit);
+    const cost = getSpecialAbilityCost(unit.class);
     if (state.sharedAP < cost) return false;
 
-    // Class-specific checks
     switch (unit.class) {
-        case 'medic':
-            // Check if there are wounded allies nearby
-            return hasWoundedAlliesInRange(unit);
-        case 'sniper':
-            return !unit.cloaked; // Can't cloak if already cloaked
-        case 'commando':
-            return !unit.cloaked;
-        default:
-            return true;
-    }
-}
-
-/**
- * Check if medic has wounded allies in range
- */
-function hasWoundedAlliesInRange(medic) {
-    const healRange = 4;
-    const allies = getPlayerUnits(medic.player);
-
-    for (const ally of allies) {
-        if (!ally.alive) continue;
-        if (ally.currentHp >= ally.maxHp) continue;
-
-        const dist = hexDistance(
-            { q: medic.q, r: medic.r },
-            { q: ally.q, r: ally.r }
-        );
-
-        if (dist <= healRange) return true;
-    }
-
-    return false;
-}
-
-/**
- * Use special ability (main dispatcher)
- */
-export async function useSpecialAbility(unit, context = {}) {
-    if (!canUseSpecialAbility(unit)) {
-        showToast('Fähigkeit nicht verfügbar', 'error');
-        return null;
-    }
-
-    const cost = getSpecialAbilityCost(unit);
-
-    switch (unit.class) {
-        case 'scout':
-            return useScoutSpecial(unit, cost);
         case 'assault':
-            return useAssaultSpecial(unit, cost);
-        case 'medic':
-            return useMedicSpecial(unit, cost, context);
+            if (!canUnitAttack(unit)) return false;
+            break;
         case 'sniper':
-            return useSniperSpecial(unit, cost);
+            if (unit.cloaked) return false;
+            break;
         case 'commando':
-            return useCommandoSpecial(unit, cost);
-        case 'elitesoldat':
-            return useEliteSpecial(unit, cost);
-        default:
-            return null;
+            if (unit.cloaked) return false;
+            break;
     }
+
+    return true;
 }
 
 /**
- * Scout: Sprint (+3 movement this turn)
+ * Internal medic healing implementation
  */
-function useScoutSpecial(unit, cost) {
-    unit.usedSpecial = true;
-    unit.sprintActive = true;
-    unit.move += 3;
+function useMedicSpecialInternal(unit, healMultiplier = 1.0) {
+    const alliedPlayers = getAlliedPlayers(unit.player);
+    const allies = [];
+    for (const player of alliedPlayers) {
+        allies.push(...getPlayerUnits(player));
+    }
 
-    state.sharedAP -= cost;
-    updateUI();
-    render();
-
-    showToast(`${unit.name || 'Späher'} aktiviert Sprint! +3 Bewegung`, 'success');
-    return { success: true, type: 'sprint' };
-}
-
-/**
- * Assault: Powershot (+20 damage next attack)
- */
-function useAssaultSpecial(unit, cost) {
-    unit.usedSpecial = true;
-    unit.powershotActive = true;
-    unit.damage += 20;
-
-    state.sharedAP -= cost;
-    updateUI();
-    render();
-
-    showToast(`${unit.name || 'Sturmsoldatin'} lädt Powershot! +20 Schaden`, 'success');
-    return { success: true, type: 'powershot' };
-}
-
-/**
- * Medic: Heal nearby allies
- */
-async function useMedicSpecial(unit, cost, context = {}) {
-    const healRange = 4;
-    const healAmount = 30;
-    const allies = getPlayerUnits(unit.player);
-    let healedCount = 0;
     let totalHealed = 0;
+    playHeal();
 
-    for (const ally of allies) {
-        if (!ally.alive) continue;
-        if (ally.currentHp >= ally.maxHp) continue;
+    const medicHex = getHex(unit.q, unit.r);
+    const medicPos = getTileScreenPosition(unit.q, unit.r, medicHex?.height ?? 0);
+    particles.healEffect(medicPos.x, medicPos.y - 10);
 
+    const baseHealAmount = UNIT_CLASSES.medic.healAmount || 40;
+    const healAmount = Math.round(baseHealAmount * healMultiplier);
+    const healRange = UNIT_CLASSES.medic.healRange || 4;
+
+    allies.forEach(ally => {
         const dist = hexDistance(
             { q: unit.q, r: unit.r },
             { q: ally.q, r: ally.r }
@@ -145,131 +83,180 @@ async function useMedicSpecial(unit, cost, context = {}) {
 
         if (dist <= healRange) {
             const actualHeal = Math.min(healAmount, ally.maxHp - ally.currentHp);
-            ally.currentHp += actualHeal;
-            totalHealed += actualHeal;
-            healedCount++;
-        }
-    }
+            if (actualHeal > 0) {
+                ally.currentHp += actualHeal;
+                totalHealed += actualHeal;
 
-    if (healedCount > 0) {
-        unit.usedSpecial = true;
-        state.sharedAP -= cost;
+                const allyHex = getHex(ally.q, ally.r);
+                const allyPos = getTileScreenPosition(ally.q, ally.r, allyHex?.height ?? 0);
+                particles.burst('heal', allyPos.x, allyPos.y - 10, 8);
 
-        // XP for healing
-        addXP(unit, Math.floor(totalHealed / 2));
-
-        updateUI();
-        render();
-
-        showToast(`${unit.name || 'Sanitäter'} heilt ${healedCount} Verbündete! (+${totalHealed} HP)`, 'success');
-        return { success: true, type: 'heal', healedCount, totalHealed };
-    }
-
-    showToast('Keine verwundeten Verbündeten in Reichweite', 'warning');
-    return null;
-}
-
-/**
- * Sniper: Cloak (become invisible)
- */
-function useSniperSpecial(unit, cost) {
-    unit.usedSpecial = true;
-    unit.cloaked = true;
-    unit.cloakTurns = 3;
-
-    state.sharedAP -= cost;
-    updateVisibility();
-    updateUI();
-    render();
-
-    showToast(`${unit.name || 'Scharfschützin'} aktiviert Tarnung!`, 'success');
-    return { success: true, type: 'cloak' };
-}
-
-/**
- * Commando: Stealth + bonus move
- */
-function useCommandoSpecial(unit, cost) {
-    unit.usedSpecial = true;
-    unit.cloaked = true;
-    unit.cloakTurns = 2;
-    unit.move += 2;
-
-    state.sharedAP -= cost;
-    updateVisibility();
-    updateUI();
-    render();
-
-    showToast(`${unit.name || 'Kommando'} aktiviert Stealth! +2 Bewegung`, 'success');
-    return { success: true, type: 'stealth' };
-}
-
-/**
- * Elite: Tactical Mode (+damage, +range, reduced movement)
- */
-function useEliteSpecial(unit, cost) {
-    unit.usedSpecial = true;
-    unit.tacticalMode = true;
-    unit.damage += 15;
-    unit.range += 1;
-    unit.move = Math.max(1, unit.move - 2);
-
-    state.sharedAP -= cost;
-    updateUI();
-    render();
-
-    showToast(`${unit.name || 'Elitesoldat'} aktiviert taktischen Modus!`, 'success');
-    return { success: true, type: 'tactical' };
-}
-
-/**
- * Reset special ability states at start of turn
- */
-export function resetSpecialAbilities(playerIndex) {
-    for (const unit of state.units) {
-        if (unit.player !== playerIndex) continue;
-        if (!unit.alive) continue;
-
-        // Reset single-turn abilities
-        if (unit.sprintActive) {
-            unit.sprintActive = false;
-            const baseMove = UNIT_CLASSES[unit.class]?.move || 3;
-            unit.move = baseMove;
-        }
-
-        if (unit.powershotActive) {
-            unit.powershotActive = false;
-            const baseDamage = UNIT_CLASSES[unit.class]?.damage || 20;
-            unit.damage = baseDamage;
-        }
-
-        // Decrement cloak turns
-        if (unit.cloaked && unit.cloakTurns !== undefined) {
-            unit.cloakTurns--;
-            if (unit.cloakTurns <= 0) {
-                unit.cloaked = false;
-                unit.cloakTurns = 0;
+                const canvas = document.getElementById('game-canvas');
+                if (canvas) {
+                    const rect = canvas.getBoundingClientRect();
+                    const screenX = rect.left + state.offsetX + allyPos.x;
+                    const screenY = rect.top + state.offsetY + allyPos.y - 20;
+                    showFloatingDamage(screenX, screenY, actualHeal, false, true);
+                }
             }
         }
+    });
 
-        // Reset tactical mode
-        if (unit.tacticalMode) {
-            unit.tacticalMode = false;
-            const classInfo = UNIT_CLASSES[unit.class];
-            unit.damage = classInfo?.damage || 20;
-            unit.range = classInfo?.range || 3;
-            unit.move = classInfo?.move || 3;
-        }
+    if (totalHealed > 0) {
+        awardXP(unit, XP_REWARDS.HEAL, 'heal');
+        recordHealing(unit.player, totalHealed);
     }
+
+    if (healMultiplier >= 1.5) {
+        showToast(`💚 PERFEKT! ${totalHealed} HP geheilt!`, 'special');
+    } else if (healMultiplier >= 1.0) {
+        showToast(`💚 ${totalHealed} HP geheilt!`, 'special');
+    } else {
+        showToast(`💚 ${totalHealed} HP geheilt (${Math.round(healMultiplier * 100)}%)`, 'info');
+    }
+
+    return totalHealed;
 }
 
 /**
- * Break cloak when attacking
+ * Medic healing - synchronous version
  */
-export function breakCloak(unit) {
-    if (unit.cloaked) {
-        unit.cloaked = false;
-        unit.cloakTurns = 0;
-        updateVisibility();
+function useMedicSpecial(unit) {
+    useMedicSpecialInternal(unit, 1.0);
+    return true;
+}
+
+/**
+ * Medic healing with minigame - async version
+ */
+export async function useMedicHealingWithMinigame(unit) {
+    if (!areMinigamesEnabled()) {
+        return useMedicSpecialInternal(unit, 1.0);
+    }
+
+    const allies = getPlayerUnits(unit.player);
+    const woundedAllies = allies.filter(a => a.currentHp < a.maxHp * 0.6);
+    const enemiesNearby = state.units.filter(u =>
+        u.alive &&
+        u.player !== unit.player &&
+        hexDistance({ q: unit.q, r: unit.r }, { q: u.q, r: u.r }) <= 3
+    );
+
+    const context = {
+        attackerHP: unit.currentHp / unit.maxHp,
+        alliesInRange: woundedAllies.length,
+        enemiesInRange: enemiesNearby.length
+    };
+
+    const result = await startHealingMinigame(context);
+
+    if (result.cancelled) {
+        return { cancelled: true };
+    }
+
+    const healMultiplier = result.multiplier?.healMultiplier ?? result.healMultiplier ?? 1.0;
+    return useMedicSpecialInternal(unit, healMultiplier);
+}
+
+/**
+ * Scout sprint ability
+ */
+function useScoutSpecial(unit) {
+    unit.move += 3;
+    playSprint();
+
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
+    showToast('🎯 Sprint aktiviert!', 'special');
+    return true;
+}
+
+/**
+ * Assault powershot ability
+ */
+function useAssaultSpecial(unit) {
+    unit.damage += 25;
+    playPowershot();
+
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
+    particles.powershotEffect(unitPos.x, unitPos.y - 10, 0);
+
+    showToast('💥 Powershot bereit! (+25 Schaden)', 'special');
+    return true;
+}
+
+/**
+ * Sniper cloak ability
+ */
+function useSniperSpecial(unit) {
+    unit.cloaked = true;
+    playCloak();
+
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
+    particles.cloakEffect(unitPos.x, unitPos.y - 10);
+
+    showToast('🔫 Getarnt!', 'special');
+    return true;
+}
+
+/**
+ * Commando stealth + movement ability
+ */
+function useCommandoSpecial(unit) {
+    unit.cloaked = true;
+    unit.move += 2;
+    playCloak();
+
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
+    particles.cloakEffect(unitPos.x, unitPos.y - 10);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
+    showToast('🥷 Schleichen aktiviert!', 'special');
+    return true;
+}
+
+/**
+ * Elite soldier tactical mode ability
+ */
+function useEliteSpecial(unit) {
+    unit.damage += 15;
+    unit.move += 2;
+    unit.tacticalMode = true;
+
+    const unitHex = getHex(unit.q, unit.r);
+    const unitPos = getTileScreenPosition(unit.q, unit.r, unitHex?.height ?? 0);
+    particles.powershotEffect(unitPos.x, unitPos.y - 10, 0);
+    particles.sprintEffect(unitPos.x, unitPos.y);
+
+    playPowershot();
+    showToast('🎖️ Taktischer Modus! +15 DMG, +2 Bewegung', 'special');
+    return true;
+}
+
+/**
+ * Use special ability
+ */
+export function useSpecialAbility(unit) {
+    if (!canUseSpecialAbility(unit)) return false;
+
+    const cost = getSpecialAbilityCost(unit.class);
+    spendSharedAP(cost);
+    unit.usedSpecial = true;
+
+    recordSpecialUsed(unit.player);
+
+    switch (unit.class) {
+        case 'medic': return useMedicSpecial(unit);
+        case 'scout': return useScoutSpecial(unit);
+        case 'assault': return useAssaultSpecial(unit);
+        case 'sniper': return useSniperSpecial(unit);
+        case 'commando': return useCommandoSpecial(unit);
+        case 'elitesoldat': return useEliteSpecial(unit);
+        default: return false;
     }
 }
