@@ -137,10 +137,14 @@ test.describe('Shop Screen', () => {
         const cartCount = firstCard.locator('.cart-count');
         await expect(cartCount).toHaveText('1');
 
-        // Team preview should show the selected unit (uses .team-slot.filled class)
-        const teamPreview = page.locator('#team-preview-units');
-        const filledSlots = teamPreview.locator('.team-slot.filled');
-        await expect(filledSlots).toHaveCount(1, { timeout: 2000 });
+        // Shopping cart should show the selected unit as cart item
+        const cartItems = page.locator('#cart-items');
+        const cartItem = cartItems.locator('.cart-item');
+        await expect(cartItem).toHaveCount(1, { timeout: 2000 });
+
+        // Cart count badge should show 1/6
+        const cartCountBadge = page.locator('#cart-count-badge');
+        await expect(cartCountBadge).toHaveText('1/6');
 
         expect(errors).toEqual([]);
     });

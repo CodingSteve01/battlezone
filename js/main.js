@@ -983,58 +983,119 @@ function updateCardSelectionState() {
 }
 
 /**
- * Update team preview slots with sprite canvases
- * Now uses unitKey format (classKey:variantKey)
+ * Update shopping cart display
+ * Shows selected units as list items with remove buttons
  */
 function updateTeamPreview() {
-    const previewContainer = document.getElementById('team-preview-units');
-    if (!previewContainer) return;
+    const cartContainer = document.getElementById('cart-items');
+    const cartCountBadge = document.getElementById('cart-count-badge');
+    const cartTotal = document.getElementById('cart-total');
 
-    // Clear existing slots
-    previewContainer.innerHTML = '';
+    if (!cartContainer) return;
 
-    // Create slots for selected units with sprite preview
-    currentPlayerSelection.forEach((unitKey, index) => {
-        const { classKey, variantKey } = parseUnitKey(unitKey);
-        const unitData = getUnitWithVariant(classKey, variantKey);
-        const variantData = unitData?.variantData;
+    // Clear existing items
+    cartContainer.innerHTML = '';
 
-        const slot = document.createElement('div');
-        slot.className = 'team-slot filled';
+    if (currentPlayerSelection.length === 0) {
+        // Show empty state
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'cart-empty';
+        emptyMsg.textContent = 'Noch keine Einheiten gewählt';
+        cartContainer.appendChild(emptyMsg);
+    } else {
+        // Group units by unitKey to show counts
+        const unitCounts = {};
+        currentPlayerSelection.forEach((unitKey, index) => {
+            if (!unitCounts[unitKey]) {
+                unitCounts[unitKey] = { count: 0, indices: [] };
+            }
+            unitCounts[unitKey].count++;
+            unitCounts[unitKey].indices.push(index);
+        });
 
-        // Create canvas for sprite
-        const canvas = document.createElement('canvas');
-        canvas.width = 80;
-        canvas.height = 80;
-        canvas.className = 'team-slot-canvas';
-        slot.appendChild(canvas);
+        // Create cart items
+        Object.entries(unitCounts).forEach(([unitKey, data]) => {
+            const { classKey, variantKey } = parseUnitKey(unitKey);
+            const baseClass = UNIT_CLASSES[classKey];
+            const unitData = getUnitWithVariant(classKey, variantKey);
+            const variantData = unitData?.variantData;
 
-        // Add variant badge if not standard
-        if (variantData && variantData.badge) {
-            const badge = document.createElement('div');
-            badge.className = 'slot-variant-badge';
-            badge.textContent = variantData.badge;
-            badge.style.color = variantData.badgeColor || '#fff';
-            slot.appendChild(badge);
-        }
+            const item = document.createElement('div');
+            item.className = 'cart-item';
 
-        // Render sprite (use base class sprite)
-        renderTeamSlotSprite(canvas, classKey, currentTeamSelectPlayer);
+            // Unit icon
+            const icon = document.createElement('span');
+            icon.className = 'cart-item-icon';
+            icon.textContent = baseClass?.icon || '👤';
+            item.appendChild(icon);
 
-        slot.style.cursor = 'pointer';
-        slot.onclick = () => removeFromSelection(index);
-        slot.title = `${unitData?.name || classKey} - Klicken zum Entfernen`;
-        previewContainer.appendChild(slot);
-    });
+            // Unit info (name + variant badge)
+            const info = document.createElement('div');
+            info.className = 'cart-item-info';
 
-    // Add empty slots up to max units
-    const emptySlots = CONFIG.MAX_UNITS - currentPlayerSelection.length;
-    for (let i = 0; i < emptySlots; i++) {
-        const slot = document.createElement('div');
-        slot.className = 'team-slot empty';
-        slot.textContent = '+';
-        slot.title = 'Einheit hinzufügen';
-        previewContainer.appendChild(slot);
+            const nameRow = document.createElement('div');
+            nameRow.className = 'cart-item-name';
+            if (variantData && variantData.badge) {
+                nameRow.innerHTML = `<span style="color:${variantData.badgeColor}">${variantData.badge}</span> ${unitData.name}`;
+            } else {
+                nameRow.textContent = unitData?.name || classKey;
+            }
+            info.appendChild(nameRow);
+
+            // Cost per unit
+            const costInfo = document.createElement('div');
+            costInfo.className = 'cart-item-cost';
+            costInfo.textContent = `${unitData.cost} 💰`;
+            info.appendChild(costInfo);
+
+            item.appendChild(info);
+
+            // Quantity controls
+            const qtyControls = document.createElement('div');
+            qtyControls.className = 'cart-item-qty';
+
+            const minusBtn = document.createElement('button');
+            minusBtn.className = 'cart-qty-btn';
+            minusBtn.textContent = '−';
+            minusBtn.onclick = () => {
+                playClick();
+                removeFromCart(unitKey);
+            };
+            qtyControls.appendChild(minusBtn);
+
+            const qtyDisplay = document.createElement('span');
+            qtyDisplay.className = 'cart-qty-count';
+            qtyDisplay.textContent = data.count;
+            qtyControls.appendChild(qtyDisplay);
+
+            const plusBtn = document.createElement('button');
+            plusBtn.className = 'cart-qty-btn';
+            plusBtn.textContent = '+';
+            plusBtn.onclick = () => {
+                playClick();
+                addToCart(unitKey);
+            };
+            // Disable if can't add more
+            const canAdd = canAddUnit(unitKey);
+            if (!canAdd) {
+                plusBtn.disabled = true;
+                plusBtn.classList.add('disabled');
+            }
+            qtyControls.appendChild(plusBtn);
+
+            item.appendChild(qtyControls);
+            cartContainer.appendChild(item);
+        });
+    }
+
+    // Update count badge
+    if (cartCountBadge) {
+        cartCountBadge.textContent = `${currentPlayerSelection.length}/${CONFIG.MAX_UNITS}`;
+    }
+
+    // Update total
+    if (cartTotal) {
+        cartTotal.textContent = `${currentBudgetSpent} 💰`;
     }
 }
 
