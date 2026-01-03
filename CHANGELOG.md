@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.4.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.4.0...shadow-squad-v6.4.1) (2026-01-03)
+
+
+### Performance Improvements
+
+* **minigames:** add delta-time system for frame-rate independent movement ([#336](https://github.com/CodingSteve01/battlezone/issues/336)) ([d402cb0](https://github.com/CodingSteve01/battlezone/commit/d402cb0af0dec95b44f0b5d28f87d1217a647fdd))
+
 ## [6.4.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.3.0...shadow-squad-v6.4.0) (2026-01-03)
 
 
