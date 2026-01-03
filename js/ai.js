@@ -913,21 +913,23 @@ function analyzeAndPlan() {
     }
 
     // Enter hunt mode faster - after just 1 round without contact
-    // Also count total remaining enemies for endgame aggression
-    const totalEnemiesOnMap = state.units.filter(u =>
-        u.alive && !arePlayersAllied(state.currentPlayer, u.player)
-    ).length;
+    // FAIR PLAY: Only count enemies we've actually seen recently (within 5 rounds)
+    // Don't cheat by knowing about invisible enemies!
+    const knownEnemyCount = Array.from(aiMemory.lastKnownPositions.values())
+        .filter(pos => state.round - pos.round <= 5 && pos.confidence > 0.2)
+        .length;
 
-    // Endgame mode: Very few enemies left - be extremely aggressive
-    const isEndgame = totalEnemiesOnMap <= 2 && totalEnemiesOnMap > 0;
+    // Endgame mode: Based on what we KNOW, not what actually exists
+    // If we've seen very few enemies recently, assume we're in endgame
+    const isEndgame = knownEnemyCount <= 2 && knownEnemyCount > 0 && state.round > 5;
 
     if (state.round - aiMemory.lastContactRound >= 1) {
         aiMemory.huntMode = true;
         if (isEndgame) {
             addAIThought(variedPhrase([
-                `Nur noch ${totalEnemiesOnMap} Feind${totalEnemiesOnMap > 1 ? 'e' : ''} übrig! Alle Einheiten: Aufspüren und eliminieren!`,
-                `Endspiel! Der letzte Widerstand muss gebrochen werden. Voller Angriff!`,
-                `Fast geschafft! Wir jagen die letzten Überlebenden.`
+                `Nur noch wenige Feinde bekannt! Alle Einheiten: Aufspüren und eliminieren!`,
+                `Das Ende naht! Der letzte Widerstand muss gebrochen werden. Voller Angriff!`,
+                `Fast geschafft! Wir jagen die letzten bekannten Gegner.`
             ]), 'strategy');
         } else {
             addAIThought(variedPhrase([
@@ -990,11 +992,20 @@ function analyzeAndPlan() {
     // === STRATEGISCHE MEDIC-KOORDINATION ===
     // Prüfe ob verbündete Spieler verletzte Einheiten haben, die wir heilen können
     const medicCoordination = planMedicCoordination(aiUnits, allAlliedUnits, alliedAIPlayers);
+
+    // Get phantom enemies for strategic movement (fair play - last known positions only)
+    const phantomEnemies = getPhantomEnemiesFromMemory();
+
+    // Get visible powerups for strategic collection
+    const visiblePowerups = getVisiblePowerups();
+
     if (medicCoordination) {
         return {
             aiUnits,
             visibleEnemies,
+            phantomEnemies,  // For strategic movement only, not attacks
             knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
+            visiblePowerups,  // Powerups the AI can see
             inHuntMode: aiMemory.huntMode,
             searchPattern: aiMemory.searchPattern,
             decoyActive: aiMemory.decoyActive,
@@ -1006,12 +1017,143 @@ function analyzeAndPlan() {
     return {
         aiUnits,
         visibleEnemies,
+        phantomEnemies,  // For strategic movement only, not attacks
         knownEnemyPositions: Array.from(aiMemory.lastKnownPositions.values()),
+        visiblePowerups,  // Powerups the AI can see
         inHuntMode: aiMemory.huntMode,
         searchPattern: aiMemory.searchPattern,
         decoyActive: aiMemory.decoyActive,
         apBudgets
     };
+}
+
+/**
+ * Get powerups visible to the AI (in explored or visible hexes)
+ * FAIR PLAY: Only returns powerups the AI has actually discovered
+ */
+function getVisiblePowerups() {
+    if (!state.powerups) return [];
+
+    return state.powerups.filter(p => {
+        if (p.collected) return false;
+
+        // Check if the hex is visible or explored by any allied player
+        const key = `${p.q},${p.r}`;
+        for (let player = 0; player < state.settings.players; player++) {
+            if (player === state.currentPlayer || arePlayersAllied(state.currentPlayer, player)) {
+                const visible = state.playerVisibleHexes[player];
+                const explored = state.playerExploredHexes[player];
+                if ((visible && visible.has(key)) || (explored && explored.has(key))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    });
+}
+
+/**
+ * Calculate the strategic value of a powerup for a specific unit
+ * Returns a score that influences movement decisions
+ */
+function scorePowerupValue(powerup, unit, enemies, plan) {
+    const healthPercent = unit.currentHp / unit.maxHp;
+    let score = 0;
+
+    switch (powerup.type) {
+        case 'health':
+            // Health packs are EXTREMELY valuable when damaged
+            if (healthPercent < 0.3) {
+                score = 250;  // Critical - survival priority
+            } else if (healthPercent < 0.5) {
+                score = 180;  // Seriously wounded
+            } else if (healthPercent < 0.7) {
+                score = 120;  // Wounded - good to grab
+            } else if (healthPercent < 0.9) {
+                score = 60;   // Slightly damaged
+            } else {
+                score = 25;   // Full health - only if convenient
+            }
+            break;
+
+        case 'ap':
+            // AP powerups are always valuable - team resource
+            score = 130;
+            // Even more valuable if team is low on AP
+            if (state.sharedAP < 3) {
+                score = 200;  // Critical AP shortage
+            } else if (state.sharedAP < 6) {
+                score = 160;
+            }
+            break;
+
+        case 'damage':
+            // Damage boost is great for combat units about to attack
+            if (enemies.length > 0) {
+                // Combat situation - damage is very valuable
+                if (unit.class === 'sniper' || unit.class === 'assault') {
+                    score = 150;  // High damage dealers benefit most
+                } else if (unit.class === 'commando') {
+                    score = 130;
+                } else {
+                    score = 80;
+                }
+            } else {
+                // No enemies visible - less urgent
+                score = 50;
+            }
+            break;
+
+        case 'shield':
+            // Shield is great for fragile units or when in danger
+            if (enemies.length > 0) {
+                const closestEnemyDist = Math.min(...enemies.map(e =>
+                    hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r })
+                ));
+                if (closestEnemyDist <= 4) {
+                    // Enemy close - shield is very valuable
+                    if (unit.class === 'medic' || unit.class === 'sniper') {
+                        score = 180;  // Fragile units NEED shields
+                    } else {
+                        score = 120;
+                    }
+                } else {
+                    score = 70;
+                }
+            } else {
+                score = 40;
+            }
+            break;
+
+        case 'speed':
+            // Speed is good for scouts and in hunt mode
+            if (plan.inHuntMode) {
+                if (unit.class === 'scout') {
+                    score = 140;  // Scout in hunt mode - speed is crucial
+                } else {
+                    score = 90;
+                }
+            } else if (enemies.length === 0) {
+                // Exploring - speed helps
+                score = 80;
+            } else {
+                // Combat - speed is less important
+                score = 50;
+            }
+            break;
+
+        default:
+            score = 40;
+    }
+
+    // Bonus if we're safe to collect (no enemies nearby)
+    if (enemies.length === 0 || enemies.every(e =>
+        hexDistance({ q: powerup.q, r: powerup.r }, { q: e.q, r: e.r }) > 5
+    )) {
+        score += 20;  // Safe collection
+    }
+
+    return score;
 }
 
 /**
@@ -1251,6 +1393,8 @@ function learnFromGhostIndicators() {
 function updateThreatAssessment(enemies) {
     aiMemory.threatAssessment.clear();
 
+    const aiUnits = getPlayerUnits(state.currentPlayer);
+
     for (const enemy of enemies) {
         let threat = 0;
 
@@ -1265,17 +1409,74 @@ function updateThreatAssessment(enemies) {
         };
         threat += classThreat[enemy.class] || 50;
 
-        // HP factor - low HP enemies are less threatening but good targets
-        const hpPercent = enemy.currentHp / enemy.maxHp;
-        threat *= hpPercent;
+        // === NEWLY DISCOVERED ENEMY BONUS ===
+        // Enemies we just discovered get higher priority (react to new intel!)
+        const previousInfo = aiMemory.lastKnownPositions.get(enemy.id);
+        if (!previousInfo || state.round - previousInfo.round >= 2) {
+            threat += 30;  // Newly spotted or re-spotted after losing track
+        }
 
-        // Position factor - enemies near our units are more threatening
-        const aiUnits = getPlayerUnits(state.currentPlayer);
+        // === TERRAIN ADVANTAGE MODIFIER ===
+        // Enemies in advantageous terrain are more threatening
+        const enemyHex = getHex(enemy.q, enemy.r);
+        if (enemyHex) {
+            if (enemyHex.type === 'hills') {
+                threat += 20;  // Elevated position is dangerous
+                if (enemy.class === 'sniper') {
+                    threat += 30;  // Sniper on hill is VERY dangerous
+                }
+            }
+            if (enemyHex.cover) {
+                threat += 10;  // Enemy in cover is harder to kill
+            }
+        }
+
+        // === ONE-SHOT THREAT ===
+        // Can this enemy kill one of our units in one hit?
+        const canOneShot = aiUnits.some(u =>
+            u.currentHp <= enemy.damage * 1.2 && // Include crit potential
+            hexDistance({ q: u.q, r: u.r }, { q: enemy.q, r: enemy.r }) <= (enemy.range || 3) + (enemy.move || 3)
+        );
+        if (canOneShot) {
+            threat += 40;  // High priority - they can kill us!
+        }
+
+        // === WOUNDED ENEMY - GOOD TARGET ===
+        // Low HP enemies are less threatening but VERY good targets
+        const hpPercent = enemy.currentHp / enemy.maxHp;
+        if (hpPercent < 0.3) {
+            threat += 50;  // Almost dead - finish them off!
+        } else if (hpPercent < 0.5) {
+            threat += 30;  // Wounded - good target
+        } else {
+            threat *= hpPercent;  // Original HP-based threat reduction
+        }
+
+        // === PROXIMITY THREAT ===
+        // Enemies near our units are more threatening
         const minDist = Math.min(...aiUnits.map(u =>
             hexDistance({ q: u.q, r: u.r }, { q: enemy.q, r: enemy.r })
         ));
-        if (minDist <= 2) threat *= 1.5;
-        else if (minDist <= 4) threat *= 1.2;
+        if (minDist <= 2) threat *= 1.5;      // Very close - immediate danger
+        else if (minDist <= 4) threat *= 1.2; // Close
+        else if (minDist >= 8) threat *= 0.8; // Far away - less urgent
+
+        // === SPECIAL ABILITY STATUS ===
+        // Cloaked enemies are sneaky and dangerous
+        if (enemy.cloaked || enemy.stealthActive) {
+            threat += 25;  // Stealth is dangerous
+        }
+
+        // === MEDIC PRIORITY ===
+        // Enemy medics can heal their team - kill them first!
+        if (enemy.class === 'medic') {
+            const enemyWoundedCount = state.units.filter(u =>
+                u.alive && arePlayersAllied(enemy.player, u.player) && u.currentHp < u.maxHp * 0.7
+            ).length;
+            if (enemyWoundedCount > 0) {
+                threat += 25;  // Medic can heal their wounded - kill them first!
+            }
+        }
 
         aiMemory.threatAssessment.set(enemy.id, threat);
     }
@@ -2180,18 +2381,23 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
 
-        // === POWERUP BONUS ===
-        // Prioritize positions with powerups
+        // === POWERUP BONUS (ENHANCED) ===
+        // Prioritize positions with powerups - much more aggressively!
         const powerup = getPowerupAt(q, r);
         if (powerup) {
-            // High bonus for powerups, scaled by unit health
-            const healthPercent = unit.currentHp / unit.maxHp;
-            if (powerup.type === 'health' && healthPercent < 0.7) {
-                score += 80;  // Extra bonus for health when damaged
-            } else if (powerup.type === 'ap') {
-                score += 70;  // AP powerups are valuable
-            } else {
-                score += 50;  // Other powerups still valuable
+            score += scorePowerupValue(powerup, unit, enemies, plan);
+        }
+
+        // === NEARBY POWERUP AWARENESS ===
+        // Also consider moving TOWARD visible powerups even if not directly on them
+        if (plan.visiblePowerups && plan.visiblePowerups.length > 0) {
+            const nearbyPowerup = plan.visiblePowerups.find(p =>
+                hexDistance({ q, r }, { q: p.q, r: p.r }) <= 2 &&
+                hexDistance({ q, r }, { q: p.q, r: p.r }) < hexDistance({ q: unit.q, r: unit.r }, { q: p.q, r: p.r })
+            );
+            if (nearbyPowerup && !powerup) {
+                // Getting closer to a powerup
+                score += 30;
             }
         }
 
@@ -2364,13 +2570,46 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
     const safeZoneInfo = getSafeZoneBonus(unit, q, r, enemies);
     score += safeZoneInfo.bonus;
 
-    // === PREFER POSITIONS WITH COVER ===
+    // === TERRAIN STRATEGY (CLASS-SPECIFIC) ===
     if (hex) {
+        // Cover is valuable for all units
         if (hex.cover) {
-            score += 50; // Increased cover bonus
+            let coverBonus = 50;
+            // Fragile units REALLY want cover
+            if (unit.class === 'sniper' || unit.class === 'medic') {
+                coverBonus = 80;
+            }
+            // Assault is tanky, cares less about cover
+            else if (unit.class === 'assault') {
+                coverBonus = 30;
+            }
+            score += coverBonus;
         }
+
+        // Hills provide range and vision bonuses
         if (hex.type === 'hills') {
-            score += 30;
+            let hillBonus = 30;
+            // Snipers LOVE hills - extended range and vision
+            if (unit.class === 'sniper') {
+                hillBonus = 100;  // Snipers should actively seek hills
+            }
+            // Scouts also benefit from elevation (vision)
+            else if (unit.class === 'scout') {
+                hillBonus = 50;
+            }
+            // Medics can see wounded allies from hills
+            else if (unit.class === 'medic') {
+                hillBonus = 40;
+            }
+            score += hillBonus;
+        }
+
+        // Forest provides cover AND concealment
+        if (hex.type === 'forest') {
+            // Commandos and scouts excel in forest
+            if (unit.class === 'commando' || unit.class === 'scout') {
+                score += 40;  // Ambush potential
+            }
         }
     }
 
@@ -3462,41 +3701,56 @@ function isUnitVisibleToAlliedTeam(unit) {
 /**
  * Find all enemies visible to the allied team
  * Allied AIs share vision - if ANY ally can see an enemy, all can target it
- * Also includes enemies from shared memory (intel sharing)
- * Schließt Verbündete aus (nur echte Feinde werden zurückgegeben)
+ * FAIR PLAY: Only returns enemies that are ACTUALLY visible right now
+ * Memory-based positions are used for MOVEMENT only, not for targeting
  */
 function findAllVisibleEnemies() {
+    // FAIR PLAY: Only return enemies the AI can ACTUALLY see right now
+    // No memory-based "known" enemies for targeting - that would be cheating!
     const visibleEnemies = state.units.filter(u =>
         u.alive &&
         !arePlayersAllied(state.currentPlayer, u.player) &&
         isUnitVisibleToAlliedTeam(u)  // Use shared vision
     );
 
-    // Also check for known enemy positions from memory (intel sharing)
-    const knownEnemies = [];
+    return visibleEnemies;
+}
+
+/**
+ * Get "phantom" enemies from memory for strategic movement planning
+ * These are NOT real enemies - just remembered positions with uncertainty
+ * Used only for movement decisions, never for direct attacks
+ * FAIR PLAY: Uses LAST KNOWN position, not actual current position
+ */
+function getPhantomEnemiesFromMemory() {
+    const phantoms = [];
+
     for (const [unitId, posInfo] of aiMemory.lastKnownPositions) {
-        // Skip if enemy is already in visible list
-        if (visibleEnemies.some(e => e.id === unitId)) continue;
+        // Only use recent memories with reasonable confidence
+        if (state.round - posInfo.round > 3 || posInfo.confidence < 0.3) continue;
 
-        // Check if the info is recent enough (within last 2 rounds)
-        if (state.round - posInfo.round <= 2 && posInfo.confidence > 0.5) {
-            const enemy = state.units.find(u => u.id === unitId && u.alive);
-            if (enemy && !arePlayersAllied(state.currentPlayer, enemy.player)) {
-                // This enemy was recently spotted by an ally - include them
-                knownEnemies.push(enemy);
-            }
-        }
+        // Check if this enemy is currently visible - if so, skip (we have real info)
+        const realEnemy = state.units.find(u => u.id === unitId && u.alive);
+        if (realEnemy && isUnitVisibleToAlliedTeam(realEnemy)) continue;
+
+        // Create a phantom enemy at the LAST KNOWN position (not current!)
+        // This is fair - the AI only knows where the enemy WAS
+        phantoms.push({
+            id: unitId,
+            q: posInfo.q,  // Last known position
+            r: posInfo.r,  // Last known position
+            class: posInfo.unitClass || 'unknown',
+            currentHp: posInfo.hp || 50,  // Estimated HP from last sighting
+            maxHp: posInfo.maxHp || 100,
+            damage: 30,  // Assumed average damage
+            range: 3,    // Assumed average range
+            isPhantom: true,  // Mark as phantom - cannot be directly attacked
+            confidence: posInfo.confidence,
+            lastSeenRound: posInfo.round
+        });
     }
 
-    // Combine visible and known enemies (unique)
-    const allEnemies = [...visibleEnemies];
-    for (const known of knownEnemies) {
-        if (!allEnemies.some(e => e.id === known.id)) {
-            allEnemies.push(known);
-        }
-    }
-
-    return allEnemies;
+    return phantoms;
 }
 
 /**
@@ -3769,18 +4023,23 @@ function selectStrategicMoveTarget(unit, plan) {
         if (hex.cover) score += 15;
         score -= terrainData.moveCost * 3;
 
-        // === POWERUP BONUS ===
-        // Prioritize positions with powerups
+        // === POWERUP BONUS (ENHANCED) ===
+        // Prioritize positions with powerups - much more aggressively!
         const powerup = getPowerupAt(q, r);
         if (powerup) {
-            // High bonus for powerups, scaled by unit health
-            const healthPercent = unit.currentHp / unit.maxHp;
-            if (powerup.type === 'health' && healthPercent < 0.7) {
-                score += 80;  // Extra bonus for health when damaged
-            } else if (powerup.type === 'ap') {
-                score += 70;  // AP powerups are valuable
-            } else {
-                score += 50;  // Other powerups still valuable
+            score += scorePowerupValue(powerup, unit, enemies, plan);
+        }
+
+        // === NEARBY POWERUP AWARENESS ===
+        // Also consider moving TOWARD visible powerups even if not directly on them
+        if (plan.visiblePowerups && plan.visiblePowerups.length > 0) {
+            const nearbyPowerup = plan.visiblePowerups.find(p =>
+                hexDistance({ q, r }, { q: p.q, r: p.r }) <= 2 &&
+                hexDistance({ q, r }, { q: p.q, r: p.r }) < hexDistance({ q: unit.q, r: unit.r }, { q: p.q, r: p.r })
+            );
+            if (nearbyPowerup && !powerup) {
+                // Getting closer to a powerup
+                score += 30;
             }
         }
 
