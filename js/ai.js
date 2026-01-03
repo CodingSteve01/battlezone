@@ -172,6 +172,14 @@ function createTeamMemory() {
         movementHistory: new Map(),      // unitId -> [{ fromQ, fromR, toQ, toR, round }] - Letzte Bewegungen
         predictedPositions: new Map(),   // unitId -> { q, r, confidence } - Vorhergesagte nächste Position
         flankingTargets: new Map(),      // unitId -> { targetId, flankDirection } - Einkreisungs-Zuweisung
+        // === ADVANCED TACTICS SYSTEM ===
+        protectorAssignments: new Map(), // protectorId -> protectedId (tank guards fragile unit)
+        scoutSniperLinks: new Map(),     // scoutId -> sniperId (scout spots for sniper)
+        formationPositions: new Map(),   // unitId -> { role, relativePos } (formation slot)
+        controlledHills: new Set(),      // "q,r" keys of hills we're trying to control
+        coveredRetreatActive: false,     // Is a covered retreat in progress?
+        retreatingUnits: new Set(),      // Units currently retreating
+        coveringUnits: new Set(),        // Units providing cover fire
     };
 }
 
@@ -961,6 +969,10 @@ function analyzeAndPlan() {
     // This ensures allied AIs don't duplicate target assignments
     assignTargets(allAlliedUnits, visibleEnemies);
 
+    // === ADVANCED TACTICS PLANNING ===
+    // Plan sophisticated team coordination tactics
+    planAdvancedTactics(aiUnits, visibleEnemies);
+
     // Check if decoy strategy should be used
     if (!aiMemory.decoyActive && shouldUseDecoyStrategy(aiUnits, visibleEnemies)) {
         planDecoyStrategy(aiUnits, visibleEnemies);
@@ -1154,6 +1166,518 @@ function scorePowerupValue(powerup, unit, enemies, plan) {
     }
 
     return score;
+}
+
+// ===== ADVANCED TACTICS SYSTEM =====
+// These functions implement sophisticated team coordination
+
+/**
+ * SCOUT-SNIPER COORDINATION
+ * Scouts have better vision - they should position to spot enemies for snipers
+ * Sniper then shoots the spotted targets from safety
+ */
+function planScoutSniperCoordination(aiUnits) {
+    aiMemory.scoutSniperLinks.clear();
+
+    const scouts = aiUnits.filter(u => u.alive && u.class === 'scout');
+    const snipers = aiUnits.filter(u => u.alive && u.class === 'sniper');
+
+    if (scouts.length === 0 || snipers.length === 0) return;
+
+    // Pair each sniper with a scout
+    for (const sniper of snipers) {
+        // Find closest scout not already assigned
+        let bestScout = null;
+        let bestDist = Infinity;
+
+        for (const scout of scouts) {
+            // Check if scout is already linked
+            let alreadyLinked = false;
+            for (const linkedSniper of aiMemory.scoutSniperLinks.values()) {
+                if (linkedSniper === scout.id) {
+                    alreadyLinked = true;
+                    break;
+                }
+            }
+            if (alreadyLinked) continue;
+
+            const dist = hexDistance({ q: scout.q, r: scout.r }, { q: sniper.q, r: sniper.r });
+            // Scout should be 2-5 hexes ahead of sniper (not too far, not too close)
+            if (dist >= 2 && dist <= 6 && dist < bestDist) {
+                bestDist = dist;
+                bestScout = scout;
+            }
+        }
+
+        if (bestScout) {
+            aiMemory.scoutSniperLinks.set(bestScout.id, sniper.id);
+            addAIThought(`Scout-Sniper Team: ${CLASS_NAMES_DE.scout} späht für ${CLASS_NAMES_DE.sniper} voraus.`, 'strategy');
+        }
+    }
+}
+
+/**
+ * Get the sniper that a scout is spotting for
+ */
+function getLinkedSniper(scoutId) {
+    const sniperId = aiMemory.scoutSniperLinks.get(scoutId);
+    if (!sniperId) return null;
+    return getPlayerUnits(state.currentPlayer).find(u => u.id === sniperId && u.alive);
+}
+
+/**
+ * Score position for scout in scout-sniper coordination
+ * Scout should be ahead of sniper, with good vision, spotting enemies
+ */
+function scoreScoutSpotterPosition(scout, q, r, enemies, linkedSniper) {
+    let score = 0;
+    const hex = getHex(q, r);
+
+    if (!hex) return -1000;
+
+    // Scout should be AHEAD of sniper (closer to enemies)
+    if (linkedSniper && enemies.length > 0) {
+        const closestEnemy = enemies.reduce((closest, e) => {
+            const dist = hexDistance({ q, r }, { q: e.q, r: e.r });
+            return dist < closest.dist ? { enemy: e, dist } : closest;
+        }, { enemy: null, dist: Infinity });
+
+        if (closestEnemy.enemy) {
+            const sniperToEnemy = hexDistance(
+                { q: linkedSniper.q, r: linkedSniper.r },
+                { q: closestEnemy.enemy.q, r: closestEnemy.enemy.r }
+            );
+            const scoutToEnemy = closestEnemy.dist;
+
+            // Scout should be closer to enemy than sniper
+            if (scoutToEnemy < sniperToEnemy) {
+                score += 60;  // Good spotting position
+            }
+
+            // Scout should stay within sniper's attack range from enemy
+            // So sniper can shoot what scout sees
+            if (sniperToEnemy <= linkedSniper.range + 1) {
+                score += 40;  // Sniper can hit what we spot
+            }
+        }
+    }
+
+    // Vision bonus - hills give better spotting
+    if (hex.type === 'hills') {
+        score += 70;  // Excellent spotting position
+    }
+
+    // Stay in scout's vision range of sniper (for coordination)
+    if (linkedSniper) {
+        const distToSniper = hexDistance({ q, r }, { q: linkedSniper.q, r: linkedSniper.r });
+        if (distToSniper <= 4) {
+            score += 30;  // Good communication range
+        } else if (distToSniper > 7) {
+            score -= 40;  // Too far from sniper
+        }
+    }
+
+    // Cover is nice but not essential for scout (they're mobile)
+    if (hex.cover) {
+        score += 20;
+    }
+
+    return score;
+}
+
+/**
+ * PROTECTOR SYSTEM
+ * Tanky units (Assault) should protect fragile units (Medic, Sniper)
+ * Protector stays close and between protected unit and enemies
+ */
+function planProtectorAssignments(aiUnits, enemies) {
+    aiMemory.protectorAssignments.clear();
+
+    // Find protectors (tanky units) and protected (fragile units)
+    const protectors = aiUnits.filter(u =>
+        u.alive && (u.class === 'assault' || u.class === 'commando') &&
+        u.currentHp > u.maxHp * 0.4  // Protector must be healthy enough
+    );
+
+    const fragileUnits = aiUnits.filter(u =>
+        u.alive && (u.class === 'medic' || u.class === 'sniper') &&
+        !aiMemory.protectorAssignments.has(u.id)  // Not already protected
+    );
+
+    if (protectors.length === 0 || fragileUnits.length === 0) return;
+
+    // Prioritize protecting medics (force multiplier)
+    const sortedFragile = [...fragileUnits].sort((a, b) => {
+        if (a.class === 'medic' && b.class !== 'medic') return -1;
+        if (b.class === 'medic' && a.class !== 'medic') return 1;
+        // Then by HP (lower HP = needs more protection)
+        return (a.currentHp / a.maxHp) - (b.currentHp / b.maxHp);
+    });
+
+    for (const fragile of sortedFragile) {
+        // Find closest available protector
+        let bestProtector = null;
+        let bestScore = -Infinity;
+
+        for (const protector of protectors) {
+            // Check if already assigned
+            if (Array.from(aiMemory.protectorAssignments.keys()).includes(protector.id)) continue;
+
+            const dist = hexDistance({ q: protector.q, r: protector.r }, { q: fragile.q, r: fragile.r });
+            let score = 100 - dist * 10;  // Closer is better
+
+            // Assault is better protector than commando (tankier)
+            if (protector.class === 'assault') score += 30;
+
+            // Healthier protector is better
+            score += (protector.currentHp / protector.maxHp) * 20;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestProtector = protector;
+            }
+        }
+
+        if (bestProtector) {
+            aiMemory.protectorAssignments.set(bestProtector.id, fragile.id);
+
+            if (enemies.length > 0) {
+                const protectorName = CLASS_NAMES_DE[bestProtector.class] || bestProtector.class;
+                const fragileName = CLASS_NAMES_DE[fragile.class] || fragile.class;
+                addAIThought(`${protectorName} übernimmt den Schutz des ${fragileName}.`, 'strategy');
+            }
+        }
+    }
+}
+
+/**
+ * Get the unit this protector is assigned to protect
+ */
+function getProtectedUnit(protectorId) {
+    const protectedId = aiMemory.protectorAssignments.get(protectorId);
+    if (!protectedId) return null;
+    return getPlayerUnits(state.currentPlayer).find(u => u.id === protectedId && u.alive);
+}
+
+/**
+ * Score position for protector - should be between protected unit and enemies
+ */
+function scoreProtectorPosition(protector, q, r, enemies, protectedUnit) {
+    let score = 0;
+    const hex = getHex(q, r);
+
+    if (!hex || !protectedUnit) return -1000;
+
+    // Must stay close to protected unit (2-3 hexes)
+    const distToProtected = hexDistance({ q, r }, { q: protectedUnit.q, r: protectedUnit.r });
+    if (distToProtected <= 2) {
+        score += 80;  // Ideal protection distance
+    } else if (distToProtected <= 3) {
+        score += 50;
+    } else if (distToProtected <= 4) {
+        score += 20;
+    } else {
+        score -= (distToProtected - 4) * 30;  // Penalty for being too far
+    }
+
+    // Should be BETWEEN protected unit and enemies
+    if (enemies.length > 0) {
+        const closestEnemy = enemies.reduce((closest, e) => {
+            const dist = hexDistance({ q: protectedUnit.q, r: protectedUnit.r }, { q: e.q, r: e.r });
+            return dist < closest.dist ? { enemy: e, dist } : closest;
+        }, { enemy: null, dist: Infinity });
+
+        if (closestEnemy.enemy) {
+            const protectorToEnemy = hexDistance({ q, r }, { q: closestEnemy.enemy.q, r: closestEnemy.enemy.r });
+            const protectedToEnemy = closestEnemy.dist;
+
+            // Protector should be closer to enemy than protected unit
+            if (protectorToEnemy < protectedToEnemy) {
+                score += 60;  // Good blocking position!
+
+                // Check if protector is roughly in line between protected and enemy
+                // (simplified: protector closer to enemy path)
+                const midQ = (protectedUnit.q + closestEnemy.enemy.q) / 2;
+                const midR = (protectedUnit.r + closestEnemy.enemy.r) / 2;
+                const distToMidpoint = hexDistance({ q, r }, { q: Math.round(midQ), r: Math.round(midR) });
+                if (distToMidpoint <= 2) {
+                    score += 40;  // Right in the path!
+                }
+            }
+        }
+    }
+
+    // Protector can take hits, but cover still helps
+    if (hex.cover) {
+        score += 25;
+    }
+
+    return score;
+}
+
+/**
+ * COVERED RETREAT SYSTEM
+ * When units need to retreat, others provide suppression/covering fire
+ */
+function planCoveredRetreat(aiUnits, enemies) {
+    // Check if any unit desperately needs to retreat
+    const needsRetreat = aiUnits.filter(u =>
+        u.alive &&
+        u.currentHp < u.maxHp * 0.35 &&  // Critically wounded
+        enemies.some(e => hexDistance({ q: u.q, r: u.r }, { q: e.q, r: e.r }) <= (e.range || 3) + 2)
+    );
+
+    if (needsRetreat.length === 0) {
+        aiMemory.coveredRetreatActive = false;
+        aiMemory.retreatingUnits.clear();
+        aiMemory.coveringUnits.clear();
+        return;
+    }
+
+    // Find units that can provide cover (healthy, have AP, in range of enemies)
+    const canCover = aiUnits.filter(u =>
+        u.alive &&
+        u.currentHp > u.maxHp * 0.5 &&
+        !needsRetreat.includes(u) &&
+        (u.class === 'assault' || u.class === 'sniper' || u.class === 'commando')
+    );
+
+    if (canCover.length === 0) return;
+
+    // Activate covered retreat
+    aiMemory.coveredRetreatActive = true;
+    aiMemory.retreatingUnits = new Set(needsRetreat.map(u => u.id));
+    aiMemory.coveringUnits = new Set(canCover.map(u => u.id));
+
+    const retreatNames = needsRetreat.map(u => CLASS_NAMES_DE[u.class] || u.class).join(', ');
+    addAIThought(`Gedeckter Rückzug! ${retreatNames} zieht sich zurück, Deckungsfeuer wird gegeben.`, 'strategy');
+}
+
+/**
+ * Check if unit should provide covering fire during retreat
+ */
+function shouldProvideCoveringFire(unit) {
+    return aiMemory.coveredRetreatActive && aiMemory.coveringUnits.has(unit.id);
+}
+
+/**
+ * Check if unit is retreating under cover
+ */
+function isRetreatingUnderCover(unit) {
+    return aiMemory.coveredRetreatActive && aiMemory.retreatingUnits.has(unit.id);
+}
+
+/**
+ * FORMATION SYSTEM
+ * Units move in formation: Scouts forward, Assault middle, Medic/Sniper back
+ */
+function planFormation(aiUnits, enemies) {
+    aiMemory.formationPositions.clear();
+
+    if (aiUnits.length < 3) return;  // Need at least 3 units for formation
+
+    // Calculate team center
+    const centerQ = aiUnits.reduce((sum, u) => sum + u.q, 0) / aiUnits.length;
+    const centerR = aiUnits.reduce((sum, u) => sum + u.r, 0) / aiUnits.length;
+
+    // Determine formation direction (toward enemies or toward center)
+    let dirQ = 0, dirR = 0;
+    if (enemies.length > 0) {
+        const enemyCenterQ = enemies.reduce((sum, e) => sum + e.q, 0) / enemies.length;
+        const enemyCenterR = enemies.reduce((sum, e) => sum + e.r, 0) / enemies.length;
+        dirQ = enemyCenterQ - centerQ;
+        dirR = enemyCenterR - centerR;
+    } else {
+        // Move toward map center if no enemies
+        dirQ = -centerQ;
+        dirR = -centerR;
+    }
+
+    // Normalize direction
+    const dirLen = Math.sqrt(dirQ * dirQ + dirR * dirR);
+    if (dirLen > 0) {
+        dirQ /= dirLen;
+        dirR /= dirLen;
+    }
+
+    // Assign formation roles
+    for (const unit of aiUnits) {
+        let role = 'middle';
+        let relativePos = { forward: 0, side: 0 };
+
+        switch (unit.class) {
+            case 'scout':
+                role = 'vanguard';
+                relativePos = { forward: 3, side: 0 };  // 3 hexes ahead
+                break;
+            case 'assault':
+                role = 'front';
+                relativePos = { forward: 1, side: Math.random() > 0.5 ? 1 : -1 };
+                break;
+            case 'commando':
+                role = 'flank';
+                relativePos = { forward: 1, side: 2 };  // On the flank
+                break;
+            case 'sniper':
+                role = 'rear';
+                relativePos = { forward: -2, side: 0 };  // Behind
+                break;
+            case 'medic':
+                role = 'protected';
+                relativePos = { forward: -1, side: 0 };  // Behind front line
+                break;
+            default:
+                role = 'middle';
+                relativePos = { forward: 0, side: 0 };
+        }
+
+        aiMemory.formationPositions.set(unit.id, {
+            role,
+            relativePos,
+            direction: { q: dirQ, r: dirR }
+        });
+    }
+}
+
+/**
+ * Get formation bonus for a position
+ */
+function getFormationBonus(unit, q, r) {
+    const formation = aiMemory.formationPositions.get(unit.id);
+    if (!formation) return 0;
+
+    // Calculate where unit should be based on formation
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
+    if (allies.length === 0) return 0;
+
+    const teamCenterQ = allies.reduce((sum, u) => sum + u.q, 0) / allies.length;
+    const teamCenterR = allies.reduce((sum, u) => sum + u.r, 0) / allies.length;
+
+    // Calculate ideal position based on formation role
+    const idealQ = teamCenterQ + formation.direction.q * formation.relativePos.forward;
+    const idealR = teamCenterR + formation.direction.r * formation.relativePos.forward;
+
+    const distToIdeal = hexDistance({ q, r }, { q: Math.round(idealQ), r: Math.round(idealR) });
+
+    // Bonus for being close to ideal formation position
+    if (distToIdeal <= 1) return 40;
+    if (distToIdeal <= 2) return 25;
+    if (distToIdeal <= 3) return 10;
+    return -distToIdeal * 5;  // Penalty for being far from formation
+}
+
+/**
+ * HILL CONTROL STRATEGY
+ * Identify and prioritize controlling hills for strategic advantage
+ */
+function planHillControl(aiUnits, enemies) {
+    aiMemory.controlledHills.clear();
+
+    // Find all hills on the map that are relevant (in zone, not too far)
+    const relevantHills = [];
+    const searchRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
+
+    for (let q = -searchRadius; q <= searchRadius; q++) {
+        for (let r = -searchRadius; r <= searchRadius; r++) {
+            const hex = getHex(q, r);
+            if (!hex || hex.type !== 'hills') continue;
+            if (!isHexInZone(q, r)) continue;
+
+            // Calculate strategic value of this hill
+            let value = 50;  // Base value
+
+            // Higher value if enemies are visible from here
+            if (enemies.length > 0) {
+                const canSeeEnemies = enemies.filter(e =>
+                    hexDistance({ q, r }, { q: e.q, r: e.r }) <= 7  // Vision range
+                ).length;
+                value += canSeeEnemies * 20;
+            }
+
+            // Higher value if near center
+            const distFromCenter = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+            value += (searchRadius - distFromCenter) * 5;
+
+            // Check if enemy is on this hill (contested)
+            const enemyOnHill = enemies.find(e => e.q === q && e.r === r);
+            if (enemyOnHill) {
+                value += 30;  // High priority to contest!
+            }
+
+            // Check if we already have a unit there
+            const friendlyOnHill = aiUnits.find(u => u.q === q && u.r === r);
+            if (friendlyOnHill) {
+                aiMemory.controlledHills.add(`${q},${r}`);
+                value -= 20;  // Lower priority since we have it
+            }
+
+            relevantHills.push({ q, r, value, hex });
+        }
+    }
+
+    // Sort by value and mark top hills as control targets
+    relevantHills.sort((a, b) => b.value - a.value);
+    const hillsToControl = Math.min(3, Math.ceil(aiUnits.length / 2));
+
+    for (let i = 0; i < hillsToControl && i < relevantHills.length; i++) {
+        const hill = relevantHills[i];
+        aiMemory.controlledHills.add(`${hill.q},${hill.r}`);
+    }
+
+    if (aiMemory.controlledHills.size > 0 && enemies.length > 0) {
+        addAIThought(`Strategische Höhen identifiziert. Wir sichern die Hügel für taktischen Vorteil.`, 'strategy');
+    }
+}
+
+/**
+ * Get bonus for moving toward or holding a strategic hill
+ */
+function getHillControlBonus(unit, q, r) {
+    const key = `${q},${r}`;
+    const hex = getHex(q, r);
+
+    // Big bonus for actually being on a target hill
+    if (hex && hex.type === 'hills' && aiMemory.controlledHills.has(key)) {
+        // Snipers get huge bonus for hills
+        if (unit.class === 'sniper') return 120;
+        if (unit.class === 'scout') return 80;
+        return 50;
+    }
+
+    // Smaller bonus for moving toward target hills
+    for (const hillKey of aiMemory.controlledHills) {
+        const [hq, hr] = hillKey.split(',').map(Number);
+        const distToHill = hexDistance({ q, r }, { q: hq, r: hr });
+        const currentDist = hexDistance({ q: unit.q, r: unit.r }, { q: hq, r: hr });
+
+        if (distToHill < currentDist && distToHill <= 3) {
+            // Moving closer to a strategic hill
+            return 25;
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Master function to plan all advanced tactics
+ * Called at the start of AI turn during analyzeAndPlan
+ */
+function planAdvancedTactics(aiUnits, enemies) {
+    // 1. Scout-Sniper coordination
+    planScoutSniperCoordination(aiUnits);
+
+    // 2. Protector assignments (tanks guard fragile units)
+    planProtectorAssignments(aiUnits, enemies);
+
+    // 3. Covered retreat check
+    planCoveredRetreat(aiUnits, enemies);
+
+    // 4. Formation planning
+    planFormation(aiUnits, enemies);
+
+    // 5. Hill control strategy
+    planHillControl(aiUnits, enemies);
 }
 
 /**
@@ -2670,13 +3194,50 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
 
     // === NUTZE VORHERGESAGTE FEINDPOSITIONEN ===
     // Bonus für Positionen die vorhergesagte Bewegungen abfangen
-    for (const [enemyId, prediction] of aiMemory.predictedPositions) {
+    for (const [_enemyId, prediction] of aiMemory.predictedPositions) {
         const distToPrediction = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
         if (distToPrediction <= unit.range && prediction.confidence > 0.4) {
             // Position kann vorhergesagte Feindposition angreifen
             score += 25 * prediction.confidence;
         }
     }
+
+    // === ADVANCED TACTICS BONUSES ===
+
+    // Scout-Sniper coordination: Scout positions to spot for sniper
+    if (unit.class === 'scout') {
+        const linkedSniper = getLinkedSniper(unit.id);
+        if (linkedSniper) {
+            score += scoreScoutSpotterPosition(unit, q, r, enemies, linkedSniper);
+        }
+    }
+
+    // Protector positioning: Tank stays between protected unit and enemies
+    const protectedUnit = getProtectedUnit(unit.id);
+    if (protectedUnit) {
+        score += scoreProtectorPosition(unit, q, r, enemies, protectedUnit);
+    }
+
+    // Covered retreat: Retreating units prioritize safety, covering units hold position
+    if (isRetreatingUnderCover(unit)) {
+        // Bonus for getting far from enemies
+        const avgEnemyDist = enemies.reduce((sum, e) =>
+            sum + hexDistance({ q, r }, { q: e.q, r: e.r }), 0
+        ) / Math.max(1, enemies.length);
+        score += avgEnemyDist * 15;  // Strong bonus for distance when retreating
+    } else if (shouldProvideCoveringFire(unit)) {
+        // Covering units should stay in attack range of enemies
+        const enemiesInRange = enemies.filter(e =>
+            hexDistance({ q, r }, { q: e.q, r: e.r }) <= unit.range
+        ).length;
+        score += enemiesInRange * 30;  // Bonus for being able to cover
+    }
+
+    // Formation bonus: Encourage maintaining formation
+    score += getFormationBonus(unit, q, r);
+
+    // Hill control: Bonus for controlling strategic hills
+    score += getHillControlBonus(unit, q, r);
 
     return score;
 }
