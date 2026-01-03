@@ -616,8 +616,9 @@ function hideAIThinking() {
 // ===== STRATEGIC PLANNING =====
 
 /**
- * Calculate AP budget per unit to ensure all units can act
- * This prevents one unit from consuming all AP
+ * Calculate AP budget per unit - AGGRESSIVE VERSION
+ * Focus AP on units that can deal damage NOW, not equal distribution
+ * Human players concentrate resources on critical actions - AI should too
  */
 function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
     const apBudgets = new Map();
@@ -626,15 +627,15 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
 
     if (unitCount === 0) return apBudgets;
 
-    // Base AP per unit (ensure everyone gets something)
-    const baseAPPerUnit = Math.floor(totalAP / unitCount);
     let remainingAP = totalAP;
 
-    // Priority scoring for AP allocation
+    // Priority scoring for AP allocation - MUCH more aggressive priorities
     const priorities = [];
 
     for (const unit of aliveUnits) {
         let priority = 1.0;
+        let killableTarget = null;
+        let highValueTarget = null;
 
         // Check if unit can attack any visible enemy
         const canAttack = visibleEnemies.some(e =>
@@ -647,57 +648,102 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
             return dist <= unit.range + unit.move;
         });
 
-        // Higher priority for units that can attack now
+        // MASSIVELY higher priority for units that can attack now
         if (canAttack) {
-            priority += 1.5;
-            // Even higher for kill shots
-            const killable = visibleEnemies.find(e =>
+            priority += 3.0;  // Was 1.5 - DOUBLED for aggression
+
+            // Kill shots get HIGHEST priority - eliminate threats!
+            killableTarget = visibleEnemies.find(e =>
                 hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range &&
                 e.currentHp <= unit.damage
             );
-            if (killable) priority += 1.0;
-        } else if (canReachAndAttack) {
-            priority += 0.8;
-        }
+            if (killableTarget) {
+                priority += 5.0;  // Was 1.0 - Kills are CRITICAL
+                // Bonus for killing high-value targets
+                if (killableTarget.class === 'medic') priority += 2.0;
+                if (killableTarget.class === 'sniper') priority += 1.5;
+            }
 
-        // Medics get priority if allies are wounded
-        if (unit.class === 'medic') {
-            const woundedAllies = aliveUnits.filter(a =>
-                a.currentHp < a.maxHp * 0.6
+            // High-value targets in range (medic, sniper)
+            highValueTarget = visibleEnemies.find(e =>
+                hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range &&
+                (e.class === 'medic' || e.class === 'sniper')
             );
-            if (woundedAllies.length > 0) priority += 0.5;
+            if (highValueTarget && !killableTarget) {
+                priority += 2.0;  // NEW: Prioritize high-value targets
+            }
+        } else if (canReachAndAttack) {
+            priority += 2.0;  // Was 0.8 - More aggressive pursuit
+
+            // Can we reach and KILL someone?
+            const reachableKill = visibleEnemies.find(e => {
+                const dist = hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r });
+                return dist <= unit.range + unit.move && e.currentHp <= unit.damage;
+            });
+            if (reachableKill) {
+                priority += 3.0;  // NEW: Pursue kills aggressively
+            }
         }
 
-        // Lower priority for units that should retreat
-        if (shouldRetreat(unit, visibleEnemies)) {
-            priority -= 0.3;
+        // High-damage units get priority when enemies visible
+        if (visibleEnemies.length > 0) {
+            if (unit.class === 'sniper') priority += 1.5;  // NEW: Snipers are deadly
+            if (unit.class === 'assault') priority += 1.0;  // NEW: Assault = damage dealer
+            if (unit.class === 'commando') priority += 1.0; // NEW: Commando = assassin
         }
 
-        // Assigned target bonus
+        // Medics get priority if allies are wounded - but LESS than attackers
+        if (unit.class === 'medic') {
+            const criticalAllies = aliveUnits.filter(a =>
+                a.currentHp < a.maxHp * 0.4
+            );
+            const woundedAllies = aliveUnits.filter(a =>
+                a.currentHp < a.maxHp * 0.7
+            );
+            if (criticalAllies.length > 0) priority += 2.0;  // Critical = high priority
+            else if (woundedAllies.length >= 2) priority += 1.0;
+        }
+
+        // REMOVED: Lower priority for retreat - retreating units still need AP!
+        // Was: if (shouldRetreat(unit, visibleEnemies)) priority -= 0.3;
+
+        // Assigned target bonus - higher for focus fire
         if (aiMemory.assignedTargets.has(unit.id)) {
-            priority += 0.4;
+            priority += 1.0;  // Was 0.4
         }
 
-        priorities.push({ unit, priority, canAttack, canReachAndAttack });
+        priorities.push({
+            unit,
+            priority,
+            canAttack,
+            canReachAndAttack,
+            hasKillShot: !!killableTarget,
+            hasHighValue: !!highValueTarget
+        });
     }
 
-    // Sort by priority
+    // Sort by priority - highest priority units get most AP
     priorities.sort((a, b) => b.priority - a.priority);
 
-    // Allocate AP based on priority
-    for (const { unit, priority: _priority, canAttack, canReachAndAttack } of priorities) {
-        // Calculate unit's AP budget
+    // AGGRESSIVE AP allocation - give attackers what they need FIRST
+    for (const { unit, canAttack, canReachAndAttack, hasKillShot, hasHighValue } of priorities) {
         let unitBudget;
 
-        if (canAttack) {
-            // Unit can attack - give enough AP for attack + possible second action
-            unitBudget = Math.min(remainingAP, Math.max(2, baseAPPerUnit + 1));
+        if (hasKillShot) {
+            // Kill shot available - give ALL the AP needed
+            unitBudget = Math.min(remainingAP, 4);  // Max budget for kills
+        } else if (canAttack && hasHighValue) {
+            // High-value target in range - prioritize
+            unitBudget = Math.min(remainingAP, 3);
+        } else if (canAttack) {
+            // Can attack - give enough for attack + ability + move
+            unitBudget = Math.min(remainingAP, 3);  // Was 2
         } else if (canReachAndAttack) {
-            // Unit can reach and attack - give enough for move + attack
-            unitBudget = Math.min(remainingAP, Math.max(3, baseAPPerUnit + 1));
+            // Can reach and attack - give enough for full action
+            unitBudget = Math.min(remainingAP, 4);  // Was 3 - need move + attack + maybe ability
         } else {
-            // Unit needs to explore/position - give base allocation
-            unitBudget = Math.min(remainingAP, Math.max(1, baseAPPerUnit));
+            // Exploration/positioning - minimal AP
+            unitBudget = Math.min(remainingAP, 2);  // Was 1 - at least allow some action
         }
 
         // Ensure minimum 1 AP for each unit (for at least moving)
@@ -726,6 +772,7 @@ function calculateAPBudgets(aiUnits, totalAP, visibleEnemies) {
 /**
  * Check if a position is exposed to enemy attacks
  * Returns exposure score (higher = more dangerous)
+ * REBALANCED: Less punishing - AI needs to take risks to win
  */
 function calculatePositionExposure(q, r, enemies, unit) {
     let exposure = 0;
@@ -734,41 +781,43 @@ function calculatePositionExposure(q, r, enemies, unit) {
         const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
         const enemyRange = enemy.range || 3;
 
-        // Position is in enemy attack range - very exposed
+        // Position is in enemy attack range - exposed but manageable
         if (dist <= enemyRange) {
-            // Weight by enemy damage
-            exposure += enemy.damage * 1.5;
+            // REDUCED: Weight by enemy damage (was 1.5, now 0.8)
+            exposure += enemy.damage * 0.8;
 
-            // Extra exposure if enemy is close (melee threat)
+            // Extra exposure if enemy is close (melee threat) - reduced
             if (dist <= 2) {
-                exposure += enemy.damage * 0.5;
+                exposure += enemy.damage * 0.3;  // Was 0.5
             }
 
-            // High-damage enemies are more threatening
+            // High-damage enemies are more threatening - but less penalty
             if (enemy.class === 'sniper' || enemy.class === 'assault') {
-                exposure += 20;
+                exposure += 10;  // Was 20
             }
         } else if (dist <= enemyRange + enemy.move) {
-            // Enemy could reach and attack next turn
-            exposure += enemy.damage * 0.4;
+            // Enemy could reach and attack next turn - minimal penalty
+            exposure += enemy.damage * 0.2;  // Was 0.4
         }
     }
 
-    // Check terrain for cover reduction
+    // Check terrain for cover reduction - MORE effective
     const hex = getHex(q, r);
     if (hex && hex.cover) {
-        exposure *= 0.6; // Cover reduces exposure by 40%
+        exposure *= 0.4;  // Was 0.6 - cover is MORE protective
     }
     if (hex && hex.type === 'hills') {
-        exposure *= 0.85; // Hills provide some defense
+        exposure *= 0.7;  // Was 0.85 - hills are better
     }
 
-    // Adjust for unit class - some units can handle exposure better
+    // Adjust for unit class - REBALANCED
     if (unit) {
         if (unit.class === 'assault') {
-            exposure *= 0.7; // Assault is tanky
+            exposure *= 0.5;  // Was 0.7 - Assault can take MORE risks
+        } else if (unit.class === 'commando') {
+            exposure *= 0.6;  // NEW: Commando is also aggressive
         } else if (unit.class === 'sniper' || unit.class === 'medic') {
-            exposure *= 1.3; // These are fragile
+            exposure *= 1.1;  // Was 1.3 - still careful but not terrified
         }
     }
 
@@ -1202,7 +1251,9 @@ function analyzeAndPlan() {
     // If we've seen very few enemies recently, assume we're in endgame
     const isEndgame = knownEnemyCount <= 2 && knownEnemyCount > 0 && state.round > 5;
 
-    if (state.round - aiMemory.lastContactRound >= 1) {
+    // AGGRESSIVE: Hunt mode activates IMMEDIATELY when no enemies visible
+    // Don't waste turns waiting - go find them NOW!
+    if (visibleEnemies.length === 0 || state.round - aiMemory.lastContactRound >= 0) {
         aiMemory.huntMode = true;
         if (isEndgame) {
             addAIThought(variedPhrase([
@@ -1210,11 +1261,11 @@ function analyzeAndPlan() {
                 `Das Ende naht! Der letzte Widerstand muss gebrochen werden. Voller Angriff!`,
                 `Fast geschafft! Wir jagen die letzten bekannten Gegner.`
             ]), 'strategy');
-        } else {
+        } else if (visibleEnemies.length === 0) {
             addAIThought(variedPhrase([
-                'Kein Sichtkontakt. Jagdmodus aktiviert - wir schwärmen aus.',
-                'Der Feind versteckt sich. Alle Einheiten: Aktiv suchen!',
-                'Zeit zu jagen. Wir verteilen uns und finden sie.'
+                'Kein Sichtkontakt. Sofortige Jagd - wir finden sie!',
+                'Der Feind versteckt sich. Aggressive Suche eingeleitet!',
+                'Keine Zeit zu warten. Wir jagen sie aktiv!'
             ]), 'strategy');
         }
     }
@@ -2983,19 +3034,33 @@ function isEncirclementReady(targetId) {
 
 /**
  * Sollte Einheit auf Einkreisung warten?
- * Verhindert dass eine Einheit alleine angreift wenn Einkreisung geplant ist
+ * REBALANCED: Almost always attack - waiting loses tempo!
+ * Coordination is nice but direct damage wins games
  */
 function shouldWaitForEncirclement(unit, target) {
+    // AGGRESSIVE: High-damage units NEVER wait - they attack!
+    if (unit.class === 'sniper' || unit.class === 'assault' || unit.class === 'commando') {
+        return false;  // These units always attack when they can
+    }
+
+    // AGGRESSIVE: If target is weak, attack NOW
+    if (target.currentHp < target.maxHp * 0.5) {
+        return false;  // Finish them!
+    }
+
+    // AGGRESSIVE: If we can kill, attack NOW
+    if (target.currentHp <= unit.damage) {
+        return false;  // Kill shot - take it!
+    }
+
     const flankInfo = aiMemory.flankingTargets.get(unit.id);
     if (!flankInfo || flankInfo.targetId !== target.id) return false;
 
     // Wie viele Einheiten sind für diese Einkreisung eingeplant?
-    let plannedFlankers = 0;
     let readyFlankers = 0;
 
     for (const [unitId, info] of aiMemory.flankingTargets) {
         if (info.targetId !== target.id) continue;
-        plannedFlankers++;
 
         const flanker = state.units.find(u => u.id === unitId && u.alive);
         if (!flanker) continue;
@@ -3010,14 +3075,11 @@ function shouldWaitForEncirclement(unit, target) {
         }
     }
 
-    // Warte wenn weniger als die Hälfte der geplanten Einheiten bereit ist
-    // ABER nicht wenn wir schon 2+ bereit haben
-    if (readyFlankers >= 2) return false;
-    if (plannedFlankers >= 2 && readyFlankers < plannedFlankers / 2) {
-        return true; // Warte auf mehr Einheiten
-    }
+    // ONLY wait if we're totally alone - otherwise just attack!
+    // Was: wait if less than half ready. Now: only if no one else ready
+    if (readyFlankers >= 1) return false;  // Anyone ready? Attack!
 
-    return false;
+    return false;  // Actually, never wait - just attack!
 }
 
 // ===== MAIN AI EXECUTION =====
@@ -3688,8 +3750,8 @@ function selectStrategicMoveTargetWithBudget(unit, plan, maxAP) {
 }
 
 /**
- * Score combat position with STRONG exposure penalty
- * This prevents AI from walking directly in front of enemies
+ * Score combat position - REBALANCED FOR AGGRESSION
+ * Prioritize attack opportunities over safety
  */
 function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
     let score = 0;
@@ -3713,14 +3775,20 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
     if (primaryTarget) {
         const distToTarget = hexDistance({ q, r }, { q: primaryTarget.q, r: primaryTarget.r });
 
-        // === KLASSENSPEZIFISCHE IDEALE DISTANZ ===
+        // === KILL OPPORTUNITY - HIGHEST PRIORITY ===
+        // If we can kill from this position, MASSIVE bonus
+        if (distToTarget <= unit.range && primaryTarget.currentHp <= unit.damage) {
+            score += 300;  // Kill positions are CRITICAL
+        }
+
+        // === KLASSENSPEZIFISCHE IDEALE DISTANZ - REDUCED PENALTIES ===
         let idealDist = unit.range;
         let minSafeDist = 1;
 
         switch (unit.class) {
             case 'sniper':
                 idealDist = unit.range;
-                minSafeDist = 4;
+                minSafeDist = 3;  // Was 4 - snipers can be closer
                 break;
             case 'commando':
                 idealDist = 1;
@@ -3732,44 +3800,42 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
                 break;
             case 'scout':
                 idealDist = 3;
-                minSafeDist = 2;
+                minSafeDist = 1;  // Was 2 - scouts are aggressive
                 break;
             case 'medic':
                 idealDist = 4;
-                minSafeDist = 3;
+                minSafeDist = 2;  // Was 3 - medics can fight too
                 break;
         }
 
-        // Score based on distance to ideal range
+        // Score based on distance to ideal range - REDUCED penalty
         const distDiff = Math.abs(distToTarget - idealDist);
-        score -= distDiff * 15;
+        score -= distDiff * 8;  // Was 15
 
-        // Bonus for being in attack range
+        // INCREASED bonus for being in attack range
         if (distToTarget <= unit.range) {
-            score += 60;
-            if (distToTarget === idealDist) score += 30;
+            score += 120;  // Was 60 - DOUBLED
+            if (distToTarget === idealDist) score += 50;  // Was 30
         }
 
-        // Penalty for being too close (except commando)
+        // REDUCED penalty for being too close
         if (distToTarget < minSafeDist) {
-            score -= (minSafeDist - distToTarget) * 30;
+            score -= (minSafeDist - distToTarget) * 15;  // Was 30
         }
     }
 
-    // === CRITICAL: EXPOSURE PENALTY ===
-    // This is the key fix - heavily penalize exposed positions
+    // === EXPOSURE PENALTY - SIGNIFICANTLY REDUCED ===
     const exposure = calculatePositionExposure(q, r, enemies, unit);
 
-    // Scale penalty based on unit's HP - wounded units are more careful
+    // Much lower scaling - taking risks is OK
     const hpRatio = unit.currentHp / unit.maxHp;
-    const exposurePenalty = exposure * (hpRatio < 0.5 ? 2.5 : 1.5);
+    const exposurePenalty = exposure * (hpRatio < 0.3 ? 1.0 : 0.5);  // Was 2.5/1.5
 
-    // Only penalize exposure if we're not in a strong position
-    // Assault units can tolerate more exposure
+    // All units can handle exposure better now
     if (unit.class !== 'assault' && unit.class !== 'commando') {
-        score -= exposurePenalty;
+        score -= exposurePenalty * 0.6;  // Was 1.0
     } else {
-        score -= exposurePenalty * 0.5;
+        score -= exposurePenalty * 0.3;  // Was 0.5
     }
 
     // === ATTACK HISTORY DANGER ===
@@ -4761,112 +4827,126 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
 
     // === MEHRSTUFIGE GEFAHRENANALYSE ===
     // Berechne wie gefährlich die Position in den nächsten 2-3 Zügen wird
+    // REBALANCED: Less punishing to encourage aggressive play
     const futureDanger = calculateFutureDanger(targetQ, targetR, enemies);
-    if (futureDanger > unit.currentHp * 0.5) {
-        // Position wird in naher Zukunft sehr gefährlich
-        evaluation.scoreAdjustment -= futureDanger * 0.5;
+    if (futureDanger > unit.currentHp * 0.7) {  // Was 0.5 - higher threshold
+        // Position wird in naher Zukunft sehr gefährlich - but don't overpenalize
+        evaluation.scoreAdjustment -= futureDanger * 0.2;  // Was 0.5
         if (!evaluation.explanation && futureDanger > unit.currentHp) {
-            evaluation.explanation = `⚠️ Position wird in 2-3 Zügen sehr gefährlich!`;
+            evaluation.explanation = `⚠️ Position wird in 2-3 Zügen gefährlich`;
         }
     }
 
-    // === KRITISCH: INTELLIGENTES AP-MANAGEMENT ===
-    // Die KI darf NIEMALS in Gefahr laufen ohne die Möglichkeit zurückzuschlagen
-    // MASSIV VERSTÄRKTE PENALTIES - Die KI soll NICHT in den Tod laufen!
+    // === AP-MANAGEMENT - REBALANCED FOR AGGRESSION ===
+    // Still penalize bad moves, but MUCH less severely
+    // Human players take calculated risks - AI should too
 
-    // Szenario 1: In Angriffsreichweite von Feinden ohne AP für Gegenangriff
-    // Dies ist quasi ein Todesurteil - EXTREMER PENALTY!
+    // Szenario 1: In Angriffsreichweite ohne AP - still bad but less extreme
     if (evaluation.threatsInRange.length > 0 && apAfterMove < 1) {
         evaluation.exposedWithoutOptions = true;
-        // MASSIVER Penalty - das ist der schlimmste taktische Fehler
-        const basePenalty = 500;  // Erhöht von 300
+        // REDUCED penalties - sometimes charging in is worth it
+        const basePenalty = 100;  // Was 500 - massively reduced
         const threatMultiplier = evaluation.threatsInRange.length;
-        const closeRangePenalty = evaluation.closeRangeThreats.length * 200;  // Erhöht von 100
-        // Berücksichtige potentiellen Schaden der nächsten Runde
-        const expectedDamage = evaluation.threatsInRange.reduce((sum, e) => sum + (e.damage || 30), 0);
-        const survivalPenalty = expectedDamage > unit.currentHp ? 300 : 0; // Extra wenn wir sterben würden
-        evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty + survivalPenalty;
-        evaluation.explanation = `☠️ TÖDLICHE GEFAHR: ${evaluation.threatsInRange.length} Feinde, keine AP zum Kämpfen!`;
-    }
+        const closeRangePenalty = evaluation.closeRangeThreats.length * 40;  // Was 200
 
-    // Szenario 2: Nahkampf-Situation ohne Fluchtmöglichkeit
-    // Nahkampf ohne Gegenoptionen = sichere Niederlage
-    if (evaluation.closeRangeThreats.length > 0 && apAfterMove < 2) {
-        // Wenn in Nahkampf ohne AP für Angriff+Rückzug - SEHR gefährlich
-        evaluation.scoreAdjustment -= 250;  // Erhöht von 150
-        // Extra Strafe pro nahkampf-bedrohung
-        evaluation.scoreAdjustment -= evaluation.closeRangeThreats.length * 100;
-        if (!evaluation.explanation) {
-            evaluation.explanation = `⚠️ Nahkampfgefahr ohne Ausweichmöglichkeit - wir werden sterben!`;
+        // BUT: If we can KILL someone, the penalty is much lower
+        if (evaluation.killableTargets.length > 0) {
+            // Kill opportunity - worth the risk!
+            evaluation.scoreAdjustment -= basePenalty * 0.3;
+            evaluation.explanation = `⚔️ Risikoangriff für Kill!`;
+        } else {
+            evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty;
+            evaluation.explanation = `⚠️ Riskant: ${evaluation.threatsInRange.length} Feinde in Reichweite`;
         }
     }
 
-    // Szenario 3: Bewegung zu weit - keine AP für Angriff obwohl Feind erreichbar wäre
-    if (evaluation.canAttackAfter && apAfterMove < 1) {
-        // Kann angreifen aber hat keine AP dafür - VÖLLIG SINNLOSER ZUG
-        evaluation.scoreAdjustment -= 500;  // Erhöht von 400
-        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff - Selbstmord!`;
+    // Szenario 2: Nahkampf ohne Flucht - reduced penalty
+    if (evaluation.closeRangeThreats.length > 0 && apAfterMove < 2 && !evaluation.killableTargets.length) {
+        // Only penalize if we can't kill anyone
+        evaluation.scoreAdjustment -= 60;  // Was 250
+        evaluation.scoreAdjustment -= evaluation.closeRangeThreats.length * 25;  // Was 100
+        if (!evaluation.explanation) {
+            evaluation.explanation = `⚠️ Nahkampfsituation`;
+        }
     }
 
-    // NEUES Szenario 4: Outnumbered in Angriffsreichweite
-    // Selbst MIT AP zum Angreifen: wenn wir in nächster Runde von 2+ Feinden attackiert werden können
-    // und diese uns töten können, ist das ein sehr schlechter Zug
+    // Szenario 3: Bewegung ohne Angriffs-AP - BUT offset by kill potential
+    if (evaluation.canAttackAfter && apAfterMove < 1) {
+        if (evaluation.killableTargets.length === 0) {
+            // Can't kill = bad move
+            evaluation.scoreAdjustment -= 150;  // Was 500 - reduced
+            evaluation.explanation = `Feind erreichbar, aber keine AP`;
+        }
+        // If we CAN kill someone, no penalty - it's worth it
+    }
+
+    // Szenario 4: Outnumbered - REDUCED penalty, encourage fighting
     if (evaluation.threatsInRange.length >= 2 && apAfterMove >= 1) {
         const expectedDamage = evaluation.threatsInRange.reduce((sum, e) => sum + (e.damage || 30), 0);
-        // Wir greifen einen an (töten ihn vielleicht), aber die anderen töten uns
         const damageAfterKill = expectedDamage - (evaluation.killableTargets.length > 0 ? (evaluation.killableTargets[0].damage || 30) : 0);
-        if (damageAfterKill >= unit.currentHp * 0.8) {
-            // Nach unserem Angriff werden wir wahrscheinlich sterben
-            evaluation.scoreAdjustment -= 200;
+        if (damageAfterKill >= unit.currentHp) {
+            // We'll probably die - but small penalty, sometimes worth trading
+            evaluation.scoreAdjustment -= 50;  // Was 200
             if (!evaluation.explanation) {
-                evaluation.explanation = `⚠️ Überzahl: ${evaluation.threatsInRange.length} Feinde können uns in der nächsten Runde töten!`;
+                evaluation.explanation = `Überzahl - aber Kampf lohnt sich vielleicht`;
             }
         }
     }
 
-    // NEUES Szenario 5: Direkt neben Feind stehen bleiben
-    // Der Spieler kann in seiner nächsten Runde frei angreifen
+    // Szenario 5: Neben Feind ohne Angriffsmöglichkeit - only if no kill
     if (evaluation.closeRangeThreats.length > 0 && !evaluation.canAttackAfter) {
-        // Wir stehen neben einem Feind aber können ihn nicht angreifen?! Todesurteil.
-        evaluation.scoreAdjustment -= 400;
-        evaluation.explanation = `☠️ Direkt neben Feind ohne Angriffsmöglichkeit - sicherer Tod!`;
+        evaluation.scoreAdjustment -= 80;  // Was 400
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Ungünstige Position`;
+        }
     }
 
-    // === POSITIVE BEWERTUNGEN ===
+    // === POSITIVE BEWERTUNGEN - MASSIVELY INCREASED ===
 
-    // Bonus für Kill-Möglichkeiten (nur wenn AP vorhanden)
+    // KILL SHOTS: HIGHEST PRIORITY - the key to winning!
     if (evaluation.killableTargets.length > 0 && apAfterMove >= 1) {
-        evaluation.scoreAdjustment += 80 * evaluation.killableTargets.length;
+        // MASSIVE bonus for kills - this is what wins games!
+        evaluation.scoreAdjustment += 250 * evaluation.killableTargets.length;  // Was 80
         const targetName = CLASS_NAMES_DE[evaluation.killableTargets[0].class] || evaluation.killableTargets[0].class;
+        // Extra bonus for high-value kills
+        if (evaluation.killableTargets.some(t => t.class === 'medic')) {
+            evaluation.scoreAdjustment += 150;  // Killing medics is HUGE
+        }
+        if (evaluation.killableTargets.some(t => t.class === 'sniper')) {
+            evaluation.scoreAdjustment += 100;  // Killing snipers is important
+        }
         evaluation.explanation = `💀 Todesstoß möglich gegen ${targetName}!`;
     }
 
-    // Gute Position: Kann angreifen UND hat AP für Notfall/Zweiten Angriff
-    if (evaluation.canAttackAfter && apAfterMove >= 2) {
-        evaluation.scoreAdjustment += 50;
+    // Attack opportunity: Bonus for being able to attack
+    if (evaluation.canAttackAfter && apAfterMove >= 1) {
+        evaluation.scoreAdjustment += 100;  // Was only 30-50, now much higher
         if (!evaluation.explanation) {
-            evaluation.explanation = `Gute taktische Position - Angriff + Reserve`;
+            evaluation.explanation = `Gute Angriffsposition`;
         }
     }
 
-    // Ideale Position: In Angriffsreichweite, genug AP, und hat noch Fluchtoptionen
-    if (evaluation.canAttackAfter && apAfterMove >= 1 && evaluation.threatsInRange.length <= 1) {
-        evaluation.scoreAdjustment += 30;
+    // Extra bonus with AP reserve
+    if (evaluation.canAttackAfter && apAfterMove >= 2) {
+        evaluation.scoreAdjustment += 40;
+        if (!evaluation.explanation) {
+            evaluation.explanation = `Taktische Position mit Reserve`;
+        }
     }
 
-    // Opportunity window: Angriff ohne erwartete Gegenwehr
+    // Safe attack window - bonus but not required
     if (evaluation.canAttackAfter && apAfterMove >= 1 &&
         evaluation.threatsInRange.length === 0 &&
         evaluation.predictedThreats.length === 0) {
-        evaluation.scoreAdjustment += 90;
+        evaluation.scoreAdjustment += 60;  // Was 90 - still good but not mandatory
         if (!evaluation.explanation) {
-            evaluation.explanation = '⚡ Sicheres Schussfenster ohne Gegenschlag';
+            evaluation.explanation = '⚡ Sicheres Schussfenster';
         }
     }
 
-    // Predicted threats reduce the value of a move
+    // Predicted threats - REDUCED penalty
     if (evaluation.predictedThreats.length > 0) {
-        evaluation.scoreAdjustment -= evaluation.predictedThreats.length * 60;
+        evaluation.scoreAdjustment -= evaluation.predictedThreats.length * 20;  // Was 60
         if (!evaluation.explanation) {
             evaluation.explanation = '⚠️ Erwartete Feindbewegung in Schussreichweite';
         }
@@ -4887,7 +4967,8 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
 
 /**
  * Check if unit should retreat
- * Now includes spotted-awareness
+ * REBALANCED: Much less likely to retreat - fight to the end!
+ * Retreating loses tempo and lets enemies dictate the fight
  */
 function shouldRetreat(unit, enemies) {
     if (enemies.length === 0) return false;
@@ -4895,28 +4976,35 @@ function shouldRetreat(unit, enemies) {
     const hpPercent = unit.currentHp / unit.maxHp;
     const spottedInfo = getSpottedAwareness(unit, enemies);
 
-    // Medics should retreat earlier (they're valuable)
-    if (unit.class === 'medic' && hpPercent < 0.5) return true;
+    // AGGRESSIVE: Check if we can kill anyone - if yes, DON'T retreat!
+    const canKillSomeone = enemies.some(e =>
+        hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= unit.range &&
+        e.currentHp <= unit.damage
+    );
+    if (canKillSomeone) return false;  // Kill opportunity = no retreat!
 
-    // Snipers/Commandos: retreat if spotted and damaged
+    // Medics retreat at MUCH lower threshold
+    if (unit.class === 'medic' && hpPercent < 0.25) return true;  // Was 0.5
+
+    // Snipers/Commandos: only retreat when nearly dead
     if ((unit.class === 'sniper' || unit.class === 'commando') && spottedInfo.isSpotted) {
-        if (hpPercent < 0.6) return true;
-        if (spottedInfo.closestEnemyDist <= 2) return true; // Too close!
+        if (hpPercent < 0.25) return true;  // Was 0.6
+        // Don't retreat just for being close - fight back!
     }
 
-    // Snipers shouldn't be in close combat
+    // Snipers in melee - only retreat if dying
     if (unit.class === 'sniper') {
-        if (spottedInfo.closestEnemyDist <= 2 && hpPercent < 0.6) return true;
+        if (spottedInfo.closestEnemyDist <= 2 && hpPercent < 0.2) return true;  // Was 0.6
     }
 
-    // General retreat threshold
-    if (hpPercent < 0.3) return true;
+    // General retreat threshold - MUCH lower
+    if (hpPercent < 0.15) return true;  // Was 0.3 - fight until nearly dead!
 
-    // Surrounded by multiple enemies
+    // Surrounded - only retreat if severely outnumbered AND low HP
     const nearbyEnemies = enemies.filter(e =>
         hexDistance({ q: unit.q, r: unit.r }, { q: e.q, r: e.r }) <= 3
     );
-    if (nearbyEnemies.length >= 3 && hpPercent < 0.5) return true;
+    if (nearbyEnemies.length >= 4 && hpPercent < 0.3) return true;  // Was 3 enemies, 0.5 HP
 
     // NEW: Spotted and wounded = retreat
     if (spottedInfo.isSpotted && spottedInfo.urgency === 'critical') return true;
