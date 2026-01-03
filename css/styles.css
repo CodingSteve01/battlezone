@@ -4287,6 +4287,61 @@ button:focus:not(:focus-visible),
     font-size: 24px;
 }
 
+/* ===== VARIANT BADGES ===== */
+.variant-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--badge-color, #fff);
+    text-shadow: 0 0 6px var(--badge-color, #fff), 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 5;
+}
+
+.variant-card {
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+}
+
+.variant-card:hover {
+    border-color: rgba(255,255,255,0.3);
+}
+
+.variant-bonus {
+    font-size: 10px;
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.15);
+    padding: 3px 6px;
+    border-radius: 4px;
+    margin: 4px 0;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* Slot variant badge in team preview */
+.slot-variant-badge {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 0 4px currentColor, 0 1px 2px rgba(0,0,0,0.8);
+    z-index: 10;
+}
+
+/* Detail variant badge */
+.detail-variant-badge {
+    font-size: 1.2em;
+    margin-right: 4px;
+    text-shadow: 0 0 8px currentColor;
+}
+
 /* Shop Bottom Bar - Fixed at bottom with safe area support */
 .shop-bottom-bar {
     display: flex;

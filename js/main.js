@@ -1,7 +1,7 @@
 // ===== MAIN ENTRY POINT =====
 
 import { state, resetState, initZone, getPlayerName, ZOOM_REFERENCE } from './state.js';
-import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
+import { CONFIG, UNIT_CLASSES, UNIT_VARIANTS, getUnitWithVariant, TERRAIN } from './config.js';
 import { generateMap } from './map.js';
 import { createUnits } from './units.js';
 import { startTurn } from './turns.js';
@@ -187,6 +187,7 @@ function calculateTeamCost(team) {
 /**
  * Generate a balanced team for AI respecting budget
  * Wählt ein intelligentes Team basierend auf KI-Persönlichkeit und Budget
+ * Returns unitKeys (classKey:variantKey format)
  */
 function generateAITeam() {
     // Select a personality based on weighted random
@@ -239,10 +240,38 @@ function generateAITeam() {
         selectedTeam = [...selectedTeam].sort(() => Math.random() - 0.5);
     }
 
-    // Log AI team selection for debugging
-    console.log(`[AI] ${selectedPersonality.name}: ${selectedTeam.join(', ')} (${calculateTeamCost(selectedTeam)}/${CONFIG.TEAM_BUDGET})`);
+    // Convert to unitKey format and potentially upgrade to variants
+    // AI has 30% chance to use a variant if budget allows
+    const unitKeysTeam = selectedTeam.map(classKey => {
+        const variants = UNIT_VARIANTS[classKey];
+        if (!variants || Math.random() > 0.3) {
+            return `${classKey}:standard`;
+        }
 
-    return selectedTeam;
+        // Get available variant keys (excluding standard)
+        const variantKeys = Object.keys(variants).filter(k => k !== 'standard');
+        if (variantKeys.length === 0) {
+            return `${classKey}:standard`;
+        }
+
+        // Pick a random variant
+        const variantKey = variantKeys[Math.floor(Math.random() * variantKeys.length)];
+        return `${classKey}:${variantKey}`;
+    });
+
+    // Check if the team with variants is still within budget
+    const totalCost = unitKeysTeam.reduce((sum, unitKey) => sum + getUnitCost(unitKey), 0);
+    if (totalCost > CONFIG.TEAM_BUDGET) {
+        // Fall back to standard variants
+        const standardTeam = selectedTeam.map(classKey => `${classKey}:standard`);
+        console.log(`[AI] ${selectedPersonality.name}: ${standardTeam.join(', ')} (${calculateTeamCost(selectedTeam)}/${CONFIG.TEAM_BUDGET})`);
+        return standardTeam;
+    }
+
+    // Log AI team selection for debugging
+    console.log(`[AI] ${selectedPersonality.name}: ${unitKeysTeam.join(', ')} (${totalCost}/${CONFIG.TEAM_BUDGET})`);
+
+    return unitKeysTeam;
 }
 
 /**
@@ -269,11 +298,11 @@ function isSelectionValid(selection) {
 /**
  * Check if can add a unit (budget and max units check)
  */
-function canAddUnit(classKey) {
-    const unitClass = UNIT_CLASSES[classKey];
-    if (!unitClass) return false;
+function canAddUnit(unitKey) {
+    const cost = getUnitCost(unitKey);
+    if (cost === 0) return false;
 
-    const newCost = currentBudgetSpent + unitClass.cost;
+    const newCost = currentBudgetSpent + cost;
     const newCount = currentPlayerSelection.length + 1;
 
     return newCost <= CONFIG.TEAM_BUDGET && newCount <= CONFIG.MAX_UNITS;
@@ -373,7 +402,7 @@ function updateConfirmButton() {
 
 /**
  * Generate unit selection cards - Shop Style with Sprite Preview
- * Redesigned with explicit +/- cart controls
+ * Redesigned with explicit +/- cart controls and VARIANTS
  */
 function generateUnitCards() {
     const grid = document.getElementById('team-select-grid');
@@ -381,95 +410,120 @@ function generateUnitCards() {
 
     grid.innerHTML = '';
 
-    Object.entries(UNIT_CLASSES).forEach(([classKey, classData]) => {
-        const card = document.createElement('div');
-        card.className = 'unit-card';
-        card.dataset.class = classKey;
-        card.dataset.cost = classData.cost;
+    // Generate cards for all variants of all classes
+    Object.entries(UNIT_CLASSES).forEach(([classKey, baseClassData]) => {
+        const variants = UNIT_VARIANTS[classKey] || { standard: { name: baseClassData.name, badge: null, costMod: 0, statMods: {} } };
 
-        // Determine cost category for styling
-        let costCategory = 'normal';
-        if (classData.cost >= 140) costCategory = 'expensive';
-        else if (classData.cost <= 80) costCategory = 'cheap';
+        Object.entries(variants).forEach(([variantKey, variantData]) => {
+            // Get modified stats for this variant
+            const unitData = getUnitWithVariant(classKey, variantKey);
+            const unitKey = `${classKey}:${variantKey}`;
 
-        // Check if this is an elite unit (has special dual-attack capability)
-        const isElite = classData.canMelee && classData.canRanged;
+            const card = document.createElement('div');
+            card.className = 'unit-card';
+            if (variantKey !== 'standard') {
+                card.classList.add('variant-card');
+            }
+            card.dataset.class = classKey;
+            card.dataset.variant = variantKey;
+            card.dataset.unitKey = unitKey;
+            card.dataset.cost = unitData.cost;
 
-        // Get player color for glow effect
-        const playerColor = CONFIG.PLAYER_COLORS[currentTeamSelectPlayer] || '#22c55e';
+            // Determine cost category for styling
+            let costCategory = 'normal';
+            if (unitData.cost >= 140) costCategory = 'expensive';
+            else if (unitData.cost <= 80) costCategory = 'cheap';
 
-        // New card layout with sprite preview and cart controls
-        card.innerHTML = `
-            ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
-            <button class="card-info-btn" data-class="${classKey}" title="Details anzeigen">i</button>
-            <div class="unit-sprite-container">
-                <div class="unit-sprite-glow" style="--player-color: ${playerColor}40;"></div>
-                <canvas class="unit-sprite-canvas" width="104" height="104" data-class="${classKey}"></canvas>
-            </div>
-            <div class="card-header">
-                <div class="unit-name">${classData.name}</div>
-                <div class="unit-cost cost-${costCategory}">${classData.cost}💰</div>
-            </div>
-            <div class="unit-stats">
-                <span class="stat-item">❤️ ${classData.hp}</span>
-                <span class="stat-item">⚔️ ${classData.damage}</span>
-                <span class="stat-item">📍 ${classData.move}</span>
-                <span class="stat-item">🎯 ${classData.range}</span>
-            </div>
-            <div class="unit-special">✨ ${classData.special}</div>
-            <div class="cart-controls">
-                <button class="cart-btn cart-remove" data-class="${classKey}" title="Entfernen">−</button>
-                <span class="cart-count" data-class="${classKey}">0</span>
-                <button class="cart-btn cart-add" data-class="${classKey}" title="Hinzufügen">+</button>
-            </div>
-        `;
+            // Check if this is an elite unit (has special dual-attack capability)
+            const isElite = baseClassData.canMelee && baseClassData.canRanged;
 
-        // Render sprite to canvas
-        const canvas = card.querySelector('.unit-sprite-canvas');
-        if (canvas) {
-            renderUnitSpriteToCanvas(canvas, classKey, currentTeamSelectPlayer);
-        }
+            // Get player color for glow effect
+            const playerColor = CONFIG.PLAYER_COLORS[currentTeamSelectPlayer] || '#22c55e';
 
-        // Add button click = add one unit
-        const addBtn = card.querySelector('.cart-add');
-        if (addBtn) {
-            addBtn.onclick = (e) => {
-                e.stopPropagation();
+            // Build variant badge HTML
+            const variantBadgeHtml = variantData.badge
+                ? `<div class="variant-badge" style="--badge-color: ${variantData.badgeColor || '#fff'}">${variantData.badge}</div>`
+                : '';
+
+            // Build bonus description
+            const bonusHtml = variantData.bonusDesc
+                ? `<div class="variant-bonus">${variantData.bonusDesc}</div>`
+                : '';
+
+            // New card layout with sprite preview, cart controls and variant info
+            card.innerHTML = `
+                ${isElite && variantKey === 'standard' ? '<div class="unit-elite-badge">ELITE</div>' : ''}
+                ${variantBadgeHtml}
+                <button class="card-info-btn" data-unit-key="${unitKey}" title="Details anzeigen">i</button>
+                <div class="unit-sprite-container">
+                    <div class="unit-sprite-glow" style="--player-color: ${playerColor}40;"></div>
+                    <canvas class="unit-sprite-canvas" width="104" height="104" data-class="${classKey}"></canvas>
+                </div>
+                <div class="card-header">
+                    <div class="unit-name">${unitData.name}</div>
+                    <div class="unit-cost cost-${costCategory}">${unitData.cost}💰</div>
+                </div>
+                <div class="unit-stats">
+                    <span class="stat-item">❤️ ${unitData.hp}</span>
+                    <span class="stat-item">⚔️ ${unitData.damage}</span>
+                    <span class="stat-item">📍 ${unitData.move}</span>
+                    <span class="stat-item">🎯 ${unitData.range}</span>
+                </div>
+                ${bonusHtml}
+                <div class="unit-special">✨ ${baseClassData.special}</div>
+                <div class="cart-controls">
+                    <button class="cart-btn cart-remove" data-unit-key="${unitKey}" title="Entfernen">−</button>
+                    <span class="cart-count" data-unit-key="${unitKey}">0</span>
+                    <button class="cart-btn cart-add" data-unit-key="${unitKey}" title="Hinzufügen">+</button>
+                </div>
+            `;
+
+            // Render sprite to canvas (use base class sprite)
+            const canvas = card.querySelector('.unit-sprite-canvas');
+            if (canvas) {
+                renderUnitSpriteToCanvas(canvas, classKey, currentTeamSelectPlayer);
+            }
+
+            // Add button click = add one unit
+            const addBtn = card.querySelector('.cart-add');
+            if (addBtn) {
+                addBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    playClick();
+                    addToCart(unitKey);
+                };
+            }
+
+            // Remove button click = remove one unit
+            const removeBtn = card.querySelector('.cart-remove');
+            if (removeBtn) {
+                removeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    playClick();
+                    removeFromCart(unitKey);
+                };
+            }
+
+            // Card click (not on buttons) = show details
+            card.onclick = (e) => {
+                if (e.target.classList.contains('cart-btn') ||
+                    e.target.classList.contains('cart-count') ||
+                    e.target.classList.contains('card-info-btn')) return;
                 playClick();
-                addToCart(classKey);
+                showUnitDetails(unitKey);
             };
-        }
 
-        // Remove button click = remove one unit
-        const removeBtn = card.querySelector('.cart-remove');
-        if (removeBtn) {
-            removeBtn.onclick = (e) => {
-                e.stopPropagation();
-                playClick();
-                removeFromCart(classKey);
-            };
-        }
+            // Info button click = show details
+            if (infoBtn) {
+                infoBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    playClick();
+                    showUnitDetails(unitKey);
+                };
+            }
 
-        // Card click (not on buttons) = show details
-        card.onclick = (e) => {
-            if (e.target.classList.contains('cart-btn') ||
-                e.target.classList.contains('cart-count') ||
-                e.target.classList.contains('card-info-btn')) return;
-            playClick();
-            showUnitDetails(classKey);
-        };
-
-        // Info button click = show details
-        const infoBtn = card.querySelector('.card-info-btn');
-        if (infoBtn) {
-            infoBtn.onclick = (e) => {
-                e.stopPropagation();
-                playClick();
-                showUnitDetails(classKey);
-            };
-        }
-
-        grid.appendChild(card);
+            grid.appendChild(card);
+        });
     });
 
     // Setup detail overlay close handlers
@@ -477,15 +531,38 @@ function generateUnitCards() {
 }
 
 /**
- * Add one unit to cart
+ * Parse unit key into class and variant
  */
-function addToCart(classKey) {
-    const unitClass = UNIT_CLASSES[classKey];
-    if (!unitClass) return;
+function parseUnitKey(unitKey) {
+    if (!unitKey) return { classKey: null, variantKey: 'standard' };
+    if (unitKey.includes(':')) {
+        const [classKey, variantKey] = unitKey.split(':');
+        return { classKey, variantKey: variantKey || 'standard' };
+    }
+    // Legacy: just class name without variant
+    return { classKey: unitKey, variantKey: 'standard' };
+}
 
-    if (canAddUnit(classKey)) {
-        currentPlayerSelection.push(classKey);
-        currentBudgetSpent += unitClass.cost;
+/**
+ * Get unit cost for a unitKey (class:variant)
+ */
+function getUnitCost(unitKey) {
+    const { classKey, variantKey } = parseUnitKey(unitKey);
+    const unitData = getUnitWithVariant(classKey, variantKey);
+    return unitData ? unitData.cost : 0;
+}
+
+/**
+ * Add one unit to cart (supports unitKey format class:variant)
+ */
+function addToCart(unitKey) {
+    const { classKey, variantKey } = parseUnitKey(unitKey);
+    const unitData = getUnitWithVariant(classKey, variantKey);
+    if (!unitData) return;
+
+    if (canAddUnit(unitKey)) {
+        currentPlayerSelection.push(unitKey);
+        currentBudgetSpent += unitData.cost;
         updateCardSelectionState();
         updateTeamPreview();
         updateBudgetDisplay();
@@ -498,15 +575,13 @@ function addToCart(classKey) {
 }
 
 /**
- * Remove one unit from cart by class
+ * Remove one unit from cart by unitKey (class:variant)
  */
-function removeFromCart(classKey) {
-    const index = currentPlayerSelection.lastIndexOf(classKey);
+function removeFromCart(unitKey) {
+    const index = currentPlayerSelection.lastIndexOf(unitKey);
     if (index !== -1) {
-        const unitClass = UNIT_CLASSES[classKey];
-        if (unitClass) {
-            currentBudgetSpent -= unitClass.cost;
-        }
+        const cost = getUnitCost(unitKey);
+        currentBudgetSpent -= cost;
         currentPlayerSelection.splice(index, 1);
         updateCardSelectionState();
         updateTeamPreview();
@@ -584,67 +659,88 @@ const UNIT_PLAYSTYLES = {
 
 /**
  * Show unit detail overlay with cart controls
+ * Now supports unitKey format (classKey:variantKey)
  */
-function showUnitDetails(classKey) {
-    const classData = UNIT_CLASSES[classKey];
-    if (!classData) return;
+function showUnitDetails(unitKey) {
+    const { classKey, variantKey } = parseUnitKey(unitKey);
+    const baseClassData = UNIT_CLASSES[classKey];
+    const unitData = getUnitWithVariant(classKey, variantKey);
+    if (!unitData || !baseClassData) return;
 
     const overlay = document.getElementById('shop-detail-overlay');
     if (!overlay) return;
 
-    // Store current class for cart operations
-    overlay.dataset.currentClass = classKey;
+    // Store current unitKey for cart operations
+    overlay.dataset.currentClass = unitKey;
+
+    const variantData = unitData.variantData;
 
     // Populate detail panel
-    document.getElementById('detail-icon').textContent = classData.icon;
-    document.getElementById('detail-name').textContent = classData.name;
-    document.getElementById('detail-cost').textContent = `${classData.cost} 💰`;
+    document.getElementById('detail-icon').textContent = baseClassData.icon;
 
-    // Stats grid
+    // Show variant badge in name if applicable
+    const nameEl = document.getElementById('detail-name');
+    if (variantData && variantData.badge) {
+        nameEl.innerHTML = `<span class="detail-variant-badge" style="color: ${variantData.badgeColor}">${variantData.badge}</span> ${unitData.name}`;
+    } else {
+        nameEl.textContent = unitData.name;
+    }
+
+    document.getElementById('detail-cost').textContent = `${unitData.cost} 💰`;
+
+    // Stats grid - show modified stats
     const statsEl = document.getElementById('detail-stats');
     statsEl.innerHTML = `
         <div class="shop-detail-stat">
             <span class="stat-icon">❤️</span>
             <span class="stat-label">Leben</span>
-            <span class="stat-value">${classData.hp}</span>
+            <span class="stat-value">${unitData.hp}</span>
         </div>
         <div class="shop-detail-stat">
             <span class="stat-icon">⚔️</span>
             <span class="stat-label">Schaden</span>
-            <span class="stat-value">${classData.damage}</span>
+            <span class="stat-value">${unitData.damage}</span>
         </div>
         <div class="shop-detail-stat">
             <span class="stat-icon">📍</span>
             <span class="stat-label">Bewegung</span>
-            <span class="stat-value">${classData.move}</span>
+            <span class="stat-value">${unitData.move}</span>
         </div>
         <div class="shop-detail-stat">
             <span class="stat-icon">🎯</span>
             <span class="stat-label">Reichweite</span>
-            <span class="stat-value">${classData.range}</span>
+            <span class="stat-value">${unitData.range}</span>
         </div>
-        ${classData.meleeBonus ? `
+        ${unitData.meleeBonus ? `
         <div class="shop-detail-stat">
             <span class="stat-icon">🗡️</span>
             <span class="stat-label">Nahkampf</span>
-            <span class="stat-value">+${classData.meleeBonus}</span>
+            <span class="stat-value">+${unitData.meleeBonus}</span>
         </div>
         ` : ''}
         <div class="shop-detail-stat">
             <span class="stat-icon">👁️</span>
             <span class="stat-label">Sicht</span>
-            <span class="stat-value">${classData.vision}</span>
+            <span class="stat-value">${unitData.vision}</span>
         </div>
     `;
 
     // Special ability
-    document.getElementById('detail-special-desc').textContent = classData.special;
+    let specialText = baseClassData.special;
+    if (variantData && variantData.bonusAbility) {
+        specialText += ` + ${variantData.bonusAbility}`;
+    }
+    document.getElementById('detail-special-desc').textContent = specialText;
 
-    // Playstyle
-    document.getElementById('detail-playstyle').textContent = UNIT_PLAYSTYLES[classKey] || 'Keine Beschreibung verfügbar.';
+    // Playstyle - add variant bonus description
+    let playstyleText = UNIT_PLAYSTYLES[classKey] || 'Keine Beschreibung verfügbar.';
+    if (variantData && variantData.bonusDesc) {
+        playstyleText = `<strong>Bonus:</strong> ${variantData.bonusDesc}<br><br>${playstyleText}`;
+    }
+    document.getElementById('detail-playstyle').innerHTML = playstyleText;
 
     // Update cart controls in detail view
-    updateDetailCartControls(classKey);
+    updateDetailCartControls(unitKey);
 
     // Show overlay
     overlay.classList.add('visible');
@@ -652,12 +748,13 @@ function showUnitDetails(classKey) {
 
 /**
  * Update cart controls in detail overlay
+ * Now uses unitKey format
  */
-function updateDetailCartControls(classKey) {
-    const count = currentPlayerSelection.filter(c => c === classKey).length;
-    const unitClass = UNIT_CLASSES[classKey];
+function updateDetailCartControls(unitKey) {
+    const count = currentPlayerSelection.filter(c => c === unitKey).length;
+    const cost = getUnitCost(unitKey);
     const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
-    const canAdd = unitClass && unitClass.cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
+    const canAdd = cost > 0 && cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
 
     // Update count display
     const countEl = document.getElementById('detail-cart-count');
@@ -814,19 +911,20 @@ function toggleUnitSelection(classKey, card) {
 
 /**
  * Update visual selection state of cards and cart controls
+ * Now uses unitKey format (classKey:variantKey)
  */
 function updateCardSelectionState() {
     const cards = document.querySelectorAll('.unit-card');
     cards.forEach(card => {
-        const classKey = card.dataset.class;
-        const count = currentPlayerSelection.filter(c => c === classKey).length;
-        const unitClass = UNIT_CLASSES[classKey];
+        const unitKey = card.dataset.unitKey;
+        const count = currentPlayerSelection.filter(c => c === unitKey).length;
+        const cost = getUnitCost(unitKey);
 
         card.classList.toggle('selected', count > 0);
 
         // Check if unit is affordable
         const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
-        const canAfford = unitClass && unitClass.cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
+        const canAfford = cost > 0 && cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
         card.classList.toggle('unaffordable', !canAfford && count === 0);
 
         // Update cart count display
@@ -865,6 +963,7 @@ function updateCardSelectionState() {
 
 /**
  * Update team preview slots with sprite canvases
+ * Now uses unitKey format (classKey:variantKey)
  */
 function updateTeamPreview() {
     const previewContainer = document.getElementById('team-preview-units');
@@ -874,8 +973,11 @@ function updateTeamPreview() {
     previewContainer.innerHTML = '';
 
     // Create slots for selected units with sprite preview
-    currentPlayerSelection.forEach((classKey, index) => {
-        const classData = UNIT_CLASSES[classKey];
+    currentPlayerSelection.forEach((unitKey, index) => {
+        const { classKey, variantKey } = parseUnitKey(unitKey);
+        const unitData = getUnitWithVariant(classKey, variantKey);
+        const variantData = unitData?.variantData;
+
         const slot = document.createElement('div');
         slot.className = 'team-slot filled';
 
@@ -886,12 +988,21 @@ function updateTeamPreview() {
         canvas.className = 'team-slot-canvas';
         slot.appendChild(canvas);
 
-        // Render sprite
+        // Add variant badge if not standard
+        if (variantData && variantData.badge) {
+            const badge = document.createElement('div');
+            badge.className = 'slot-variant-badge';
+            badge.textContent = variantData.badge;
+            badge.style.color = variantData.badgeColor || '#fff';
+            slot.appendChild(badge);
+        }
+
+        // Render sprite (use base class sprite)
         renderTeamSlotSprite(canvas, classKey, currentTeamSelectPlayer);
 
         slot.style.cursor = 'pointer';
         slot.onclick = () => removeFromSelection(index);
-        slot.title = `${classData.name} - Klicken zum Entfernen`;
+        slot.title = `${unitData?.name || classKey} - Klicken zum Entfernen`;
         previewContainer.appendChild(slot);
     });
 
