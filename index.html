@@ -293,6 +293,28 @@
 
         <!-- GAME AREA -->
         <div id="game-area">
+            <!-- Pause Button (top left) -->
+            <button class="pause-btn" id="pause-btn" title="Pause">
+                <span class="pause-icon">⏸️</span>
+            </button>
+
+            <!-- Pause Menu Overlay -->
+            <div class="pause-overlay" id="pause-overlay">
+                <div class="pause-menu">
+                    <h2 class="pause-title">⏸️ Pause</h2>
+                    <div class="pause-buttons">
+                        <button class="pause-menu-btn resume-btn" id="resume-btn">
+                            <span class="btn-icon">▶️</span>
+                            <span>Fortsetzen</span>
+                        </button>
+                        <button class="pause-menu-btn quit-btn" id="pause-quit-btn">
+                            <span class="btn-icon">🏠</span>
+                            <span>Zum Menü</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="top-bar">
                 <div class="player-indicator">
                     <div class="player-dot" id="current-dot"></div>
