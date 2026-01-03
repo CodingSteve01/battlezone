@@ -162,16 +162,7 @@ function updateTopBar(unit, isAiTurnHidden = false) {
         nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : getPlayerName(state.currentPlayer);
     }
 
-    const roundEl = document.getElementById('round-num');
-    if (roundEl) {
-        roundEl.textContent = state.round;
-    }
-    const roundMaxEl = document.getElementById('round-max');
-    if (roundMaxEl) {
-        roundMaxEl.textContent = CONFIG.MAX_ROUNDS;
-    }
-
-    // AP display - now shows shared pool
+    // AP display - shows shared pool
     const apDisplay = document.getElementById('ap-display');
     if (apDisplay) {
         apDisplay.innerHTML = '';
