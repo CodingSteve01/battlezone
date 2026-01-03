@@ -14,7 +14,7 @@ import {
 import { updateVisibility, updateVisibilityForPlayer, isUnitVisible, isUnitVisibleToViewer, isUnitVisibleToPlayer } from './fogOfWar.js';
 import { updateUI, showPowerupPickup } from './ui.js';
 import { render } from './renderer.js';
-import { endTurn } from './turns.js';
+import { endTurn, checkWinCondition } from './turns.js';
 import { TERRAIN, CONFIG } from './config.js';
 import { scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from './input.js';
 import { logAI, logError } from './errorLog.js';
@@ -4644,6 +4644,11 @@ async function executeAttackSequence(unit, target, renderIfVisible, hasHumanView
         aiMemory.assignedTargets.forEach((tid, uid) => {
             if (tid === target.id) aiMemory.assignedTargets.delete(uid);
         });
+
+        // Check if game is over after kill
+        if (checkWinCondition()) {
+            return; // Game over, stop AI turn
+        }
     }
 
     if (!hasHumanViewer || isUnitVisibleToViewer(unit)) {

@@ -6140,3 +6140,138 @@ button:focus:not(:focus-visible),
     font-size: 11px;
     resize: none;
 }
+
+/* ===== PAUSE MENU ===== */
+
+.pause-btn {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 2px solid rgba(100, 116, 139, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.pause-btn:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.7);
+    transform: scale(1.05);
+}
+
+.pause-btn:active {
+    transform: scale(0.95);
+}
+
+.pause-icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.pause-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.pause-overlay.visible {
+    display: flex;
+    opacity: 1;
+}
+
+.pause-menu {
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98));
+    border: 2px solid rgba(100, 116, 139, 0.4);
+    border-radius: 20px;
+    padding: 28px 36px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    transform: scale(0.9);
+    transition: transform 0.25s ease;
+    min-width: 280px;
+}
+
+.pause-overlay.visible .pause-menu {
+    transform: scale(1);
+}
+
+.pause-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin: 0 0 24px 0;
+    letter-spacing: 0.5px;
+}
+
+.pause-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.pause-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 16px 28px;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.pause-menu-btn .btn-icon {
+    font-size: 20px;
+}
+
+.pause-menu-btn.resume-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+.pause-menu-btn.resume-btn:hover {
+    background: linear-gradient(135deg, #34d399, #10b981);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.pause-menu-btn.quit-btn {
+    background: rgba(71, 85, 105, 0.5);
+    color: #e2e8f0;
+    border-color: rgba(100, 116, 139, 0.4);
+}
+
+.pause-menu-btn.quit-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+    transform: translateY(-2px);
+}
+
+.pause-menu-btn:active {
+    transform: translateY(0) scale(0.98);
+}

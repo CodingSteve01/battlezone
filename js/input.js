@@ -154,6 +154,124 @@ let initialPinchCenter = null;  // Store initial pinch center for consistent zoo
 let initialCameraX = 0;
 let initialCameraY = 0;
 
+// ===== DELTA-TIME CAMERA SMOOTHING =====
+// For frame-rate independent, smooth camera movement on slow devices
+const cameraSmooth = {
+    targetX: 0,
+    targetY: 0,
+    targetZoom: 0,
+    velocityX: 0,
+    velocityY: 0,
+    lastTime: 0,
+    active: false,
+    // Smoothing factor: higher = faster interpolation (0.1 = slow, 0.3 = fast)
+    smoothFactor: 0.25,
+    // Threshold below which we snap to target (in pixels)
+    snapThreshold: 0.5
+};
+
+/**
+ * Update camera position with delta-time interpolation
+ * Called from render loop for smooth, frame-rate independent movement
+ */
+export function updateCameraSmooth(timestamp) {
+    if (!cameraSmooth.active) return false;
+
+    // Calculate delta time (clamped to prevent huge jumps after tab switch)
+    const deltaTime = cameraSmooth.lastTime > 0
+        ? Math.min(timestamp - cameraSmooth.lastTime, 50)
+        : 16.67;
+    cameraSmooth.lastTime = timestamp;
+
+    // Normalize to 60fps for consistent feel
+    const dt = deltaTime / 16.67;
+    const lerpFactor = 1 - Math.pow(1 - cameraSmooth.smoothFactor, dt);
+
+    // Interpolate camera position
+    const dx = cameraSmooth.targetX - state.cameraX;
+    const dy = cameraSmooth.targetY - state.cameraY;
+    const dz = cameraSmooth.targetZoom - state.zoomLevel;
+
+    // Apply smoothed movement
+    state.cameraX += dx * lerpFactor;
+    state.cameraY += dy * lerpFactor;
+
+    // Smooth zoom
+    if (Math.abs(dz) > 0.001) {
+        state.zoomLevel += dz * lerpFactor;
+    }
+
+    // Check if we've essentially reached the target
+    const distSquared = dx * dx + dy * dy;
+    if (distSquared < cameraSmooth.snapThreshold * cameraSmooth.snapThreshold && Math.abs(dz) < 0.001) {
+        // Snap to exact target
+        state.cameraX = cameraSmooth.targetX;
+        state.cameraY = cameraSmooth.targetY;
+        state.zoomLevel = cameraSmooth.targetZoom;
+        cameraSmooth.active = false;
+        return false;
+    }
+
+    // Update camera offset
+    updateCameraOffset();
+    return true; // Still animating
+}
+
+/**
+ * Set target camera position for smooth interpolation
+ */
+function setCameraTarget(x, y, zoom = null) {
+    cameraSmooth.targetX = x;
+    cameraSmooth.targetY = y;
+    cameraSmooth.targetZoom = zoom !== null ? zoom : state.zoomLevel;
+    cameraSmooth.active = true;
+    if (cameraSmooth.lastTime === 0) {
+        cameraSmooth.lastTime = performance.now();
+    }
+}
+
+/**
+ * Immediately update camera (for direct drag, bypasses smoothing)
+ */
+function setCameraImmediate(x, y) {
+    state.cameraX = x;
+    state.cameraY = y;
+    cameraSmooth.targetX = x;
+    cameraSmooth.targetY = y;
+    cameraSmooth.targetZoom = state.zoomLevel;
+}
+
+// ===== RENDER THROTTLING FOR PERFORMANCE =====
+// Prevents excessive render() calls on slow devices during drag/pinch
+let lastRenderTime = 0;
+let renderPending = false;
+const MIN_RENDER_INTERVAL = 16; // ~60fps max, allows frame skipping on slow devices
+
+/**
+ * Request a throttled render - ensures we don't render more than 60fps
+ * On slow devices, this allows frames to be skipped while still feeling smooth
+ */
+function requestThrottledRender() {
+    if (renderPending) return;
+
+    const now = performance.now();
+    const elapsed = now - lastRenderTime;
+
+    if (elapsed >= MIN_RENDER_INTERVAL) {
+        // Enough time has passed, render immediately
+        lastRenderTime = now;
+        render();
+    } else {
+        // Schedule render for next available slot
+        renderPending = true;
+        requestAnimationFrame(() => {
+            renderPending = false;
+            lastRenderTime = performance.now();
+            render();
+        });
+    }
+}
+
 /**
  * Initialize input handlers
  */
@@ -249,9 +367,9 @@ function handleMouseMove(e) {
             // Limit camera to map bounds
             limitCameraBounds();
 
-            // Update offsets and re-render
+            // Update offsets and throttled render (prevents frame drops on slow devices)
             updateCameraOffset();
-            render();
+            requestThrottledRender();
         }
     }
 }
@@ -391,9 +509,9 @@ function handleTouchMove(e) {
             // Limit camera to map bounds
             limitCameraBounds();
 
-            // Update offsets and re-render
+            // Update offsets and throttled render (prevents frame drops on slow devices)
             updateCameraOffset();
-            render();
+            requestThrottledRender();
         }
     }
 }
@@ -641,7 +759,7 @@ function handleWheel(e) {
         state.cameraX -= e.deltaX;
         limitCameraBounds();
         updateCameraOffset();
-        render();
+        requestThrottledRender();
     } else {
         // Vertical scrolling - zoom
         const zoomDelta = -e.deltaY * 0.001;
@@ -2316,6 +2434,79 @@ function setupMenuButtons() {
             showScreen('menu');
         };
     }
+
+    // === PAUSE MENU ===
+    setupPauseMenu();
+}
+
+/**
+ * Setup pause menu functionality
+ */
+function setupPauseMenu() {
+    const pauseBtn = document.getElementById('pause-btn');
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const resumeBtn = document.getElementById('resume-btn');
+    const pauseQuitBtn = document.getElementById('pause-quit-btn');
+
+    if (!pauseBtn || !pauseOverlay) return;
+
+    // Open pause menu
+    pauseBtn.onclick = () => {
+        if (state.gameOver) return;
+        pauseOverlay.classList.add('visible');
+        // Pause any ongoing processes
+        state.paused = true;
+    };
+
+    // Resume game
+    if (resumeBtn) {
+        resumeBtn.onclick = () => {
+            pauseOverlay.classList.remove('visible');
+            state.paused = false;
+        };
+    }
+
+    // Quit to menu
+    if (pauseQuitBtn) {
+        pauseQuitBtn.onclick = () => {
+            // Hide pause menu
+            pauseOverlay.classList.remove('visible');
+            state.paused = false;
+
+            // Stop ambient audio
+            import('./audio.js').then(({ stopAmbient }) => {
+                stopAmbient();
+            });
+
+            // Mark game as over to prevent any further processing
+            state.gameOver = true;
+
+            // Return to menu
+            showScreen('menu');
+        };
+    }
+
+    // Close on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !state.gameOver) {
+            if (pauseOverlay.classList.contains('visible')) {
+                pauseOverlay.classList.remove('visible');
+                state.paused = false;
+            } else if (state.screen === null) {
+                // Only pause if we're in the game
+                pauseOverlay.classList.add('visible');
+                state.paused = true;
+            }
+        }
+    });
+
+    // Close when clicking outside the menu
+    pauseOverlay.onclick = (e) => {
+        if (e.target === pauseOverlay) {
+            pauseOverlay.classList.remove('visible');
+            state.paused = false;
+        }
+    };
 }
 
 /**
