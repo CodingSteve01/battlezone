@@ -23,6 +23,7 @@ import {
 import { particles } from './particles.js';
 import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames, startHealingMinigame, HEALING_RESULT_MULTIPLIERS } from './minigames.js';
 import { recordIncomingAttack, isAIPlayer } from './ai.js';
+import { isUnitVisibleToPlayer } from './fogOfWar.js';
 
 /**
  * Prüfe ob ein Angriff auf ein Ziel erlaubt ist
@@ -1566,6 +1567,12 @@ export function checkOverwatchTriggers(movedUnit) {
 
         // Ist das bewegte Ziel in Reichweite?
         if (distance <= watcher.range) {
+            // === WICHTIG: Getarnte Einheiten können NICHT von Overwatch getroffen werden! ===
+            // Man kann nicht auf etwas schießen, das man nicht sehen kann.
+            if (!isUnitVisibleToPlayer(movedUnit, watcher.player)) {
+                continue; // Einheit ist für den Watcher unsichtbar - kein Overwatch!
+            }
+
             // Prüfe Sichtlinie
             const los = hasLineOfSight(watcher.q, watcher.r, movedUnit.q, movedUnit.r);
             if (los.clear) {

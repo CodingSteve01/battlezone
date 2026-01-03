@@ -2380,46 +2380,66 @@ export function recordIncomingAttack(targetUnit, attackerUnit) {
  */
 function calculateAttackHistoryDanger(q, r) {
     let danger = 0;
+    let attackCount = 0; // Zähle wie oft wir aus dieser Richtung angegriffen wurden
 
     // Check all recorded attacks against our units
     for (const [_unitId, attacks] of aiMemory.attackHistory) {
         for (const attack of attacks) {
             // Danger decreases with age (rounds since attack)
             const roundsAgo = state.round - attack.round;
-            if (roundsAgo > 3) continue; // Ignore very old attacks
+            if (roundsAgo > 4) continue; // Etwas länger merken (war 3)
 
-            const ageFactor = 1 - (roundsAgo * 0.25); // 100%, 75%, 50%, 25%
+            // Stärkerer Zeitfaktor - neuere Angriffe sind VIEL gefährlicher
+            const ageFactor = roundsAgo === 0 ? 1.5 : (1 - (roundsAgo * 0.2)); // 150%, 80%, 60%, 40%, 20%
 
             // Calculate distance from attack origin
             const distFromAttack = hexDistance({ q, r }, { q: attack.fromQ, r: attack.fromR });
 
-            // Very high danger at the exact attack position
+            // === MASSIV ERHÖHTE STRAFEN ===
+            // Exakte Position: EXTREM gefährlich - dort ist definitiv ein Feind!
             if (distFromAttack === 0) {
-                danger += 150 * ageFactor;
+                danger += 500 * ageFactor; // WAR: 150
+                attackCount++;
             }
-            // High danger near the attack position (potential ambush area)
+            // Direkt daneben (1-2 Hexes): Sehr hohe Gefahr
             else if (distFromAttack <= 2) {
-                danger += (100 - distFromAttack * 30) * ageFactor;
+                danger += (350 - distFromAttack * 75) * ageFactor; // WAR: 100-70
+                attackCount++;
             }
-            // Moderate danger in the general direction
+            // Nah dran (3-4 Hexes): Erhöhte Vorsicht
             else if (distFromAttack <= 4) {
-                danger += (40 - distFromAttack * 8) * ageFactor;
+                danger += (150 - distFromAttack * 25) * ageFactor; // WAR: 40-16
+            }
+            // Auch weiter entfernt noch etwas Vorsicht (5-6 Hexes)
+            else if (distFromAttack <= 6) {
+                danger += (60 - distFromAttack * 8) * ageFactor;
             }
 
             // Extra danger if attack came from forest/cover (likely ambush!)
             const attackHex = getHex(attack.fromQ, attack.fromR);
             if (attackHex && (attackHex.type === 'forest' || attackHex.cover)) {
                 // The whole forest area is dangerous - there might be more enemies
-                if (distFromAttack <= 3) {
-                    danger += 60 * ageFactor;
+                if (distFromAttack <= 4) {
+                    danger += 150 * ageFactor; // WAR: 60
                 }
             }
 
             // High-damage attackers make the area more dangerous
             if (attack.attackerClass === 'sniper' || attack.attackerClass === 'assault') {
-                danger += 30 * ageFactor;
+                danger += 80 * ageFactor; // WAR: 30
             }
         }
+    }
+
+    // === KUMULATIVE STRAFE: Mehrfache Angriffe aus derselben Richtung ===
+    // Wenn wir mehrmals aus dieser Richtung angegriffen wurden, ist es ein HINTERHALT!
+    if (attackCount >= 2) {
+        danger *= 1.5; // 50% mehr Gefahr bei wiederholten Angriffen
+        danger += 200; // Extra Strafe für bekannten Hinterhalt
+    }
+    if (attackCount >= 3) {
+        danger *= 1.5; // Nochmal 50% mehr
+        danger += 300; // Das ist definitiv ein Hinterhalt!
     }
 
     return danger;
