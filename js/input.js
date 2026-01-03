@@ -123,26 +123,8 @@ export {
 let canvas;
 let pendingMoveAnimationId = null;
 
-// pixelToHexWithHeight, getUnitTilePosition now imported from ./input/handlers.js, ./input/camera.js
-// FIRST_USE_EXPLANATIONS, showFirstUseExplanation now imported from ./input/explanations.js
-
-// Scrolling/panning state
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
-let dragStartCameraX = 0;
-let dragStartCameraY = 0;
-let lastTapTime = 0;
-let hasDragged = false;
-let dragDistance = 0;
-
-// Pinch-to-zoom state
-let isPinching = false;
-let initialPinchDistance = 0;
-let initialZoomLevel = 1.0;
-let initialPinchCenter = null;  // Store initial pinch center for consistent zoom point
-let initialCameraX = 0;
-let initialCameraY = 0;
+// All handler state (isDragging, isPinching, etc.) is managed in ./input/handlers.js
+// Camera functions (limitCameraBounds, updateCameraOffset, applyZoom) are in ./input/camera.js
 
 /**
  * Initialize input handlers
@@ -154,23 +136,26 @@ export function initInput() {
         return;
     }
 
-    // Canvas interactions - mouse
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mouseleave', handleMouseUp);
+    // Initialize handlers module with canvas reference
+    initHandlers(canvas);
 
-    // Touch support - critical for mobile
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    // Canvas interactions - mouse (use module handlers)
+    canvas.addEventListener('mousedown', mouseDownHandler);
+    canvas.addEventListener('mousemove', mouseMoveHandler);
+    canvas.addEventListener('mouseup', onMouseUp);  // wrapper with callback
+    canvas.addEventListener('mouseleave', onMouseUp);
+
+    // Touch support - critical for mobile (use module handlers)
+    canvas.addEventListener('touchstart', touchStartHandler, { passive: false });
+    canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });  // wrapper with callbacks
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
     // Prevent context menu on long press
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Mouse wheel for scrolling
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    // Mouse wheel for scrolling (use module handler)
+    canvas.addEventListener('wheel', wheelHandler, { passive: false });
 
     // Menu buttons
     setupMenuButtons();
@@ -194,255 +179,25 @@ function handleResize() {
     resizeCanvas();
 }
 
-/**
- * Handle mouse down for dragging
- */
-function handleMouseDown(e) {
-    if (state.gameOver || state.animating) return;
+// Handler wrappers - import handlers from module and bind local callbacks
+import {
+    handleMouseDown as mouseDownHandler,
+    handleMouseMove as mouseMoveHandler,
+    handleMouseUp as mouseUpHandler,
+    handleTouchStart as touchStartHandler,
+    handleTouchMove as touchMoveHandler,
+    handleTouchEnd as touchEndHandler,
+    handleWheel as wheelHandler
+} from './input/handlers.js';
 
-    isDragging = true;
-    hasDragged = false;
-    dragDistance = 0;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    // Ensure valid camera values when starting drag
-    dragStartCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-    dragStartCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-
-    canvas.style.cursor = 'grabbing';
+// Wrapper functions that bind local callbacks to module handlers
+function onMouseUp(e) {
+    mouseUpHandler(e, handleTapOrClick);
 }
 
-/**
- * Handle mouse move for dragging and path preview
- */
-function handleMouseMove(e) {
-    if (state.gameOver) return;
-
-    // Block camera panning when minimap is expanded (tactical briefing mode)
-    if (isMinimapExpanded()) {
-        return;
-    }
-
-    if (isDragging) {
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
-        dragDistance = Math.sqrt(dx * dx + dy * dy);
-
-        // Only count as drag if moved more than 8 pixels
-        if (dragDistance > 8) {
-            hasDragged = true;
-
-            // Update camera position
-            state.cameraX = dragStartCameraX + dx;
-            state.cameraY = dragStartCameraY + dy;
-
-            // Limit camera to map bounds
-            limitCameraBounds();
-
-            // Update offsets and re-render
-            updateCameraOffset();
-            render();
-        }
-    }
+function onTouchEnd(e) {
+    touchEndHandler(e, handleTapOrClick, centerOnCurrentUnit);
 }
-
-/**
- * Handle mouse up
- */
-function handleMouseUp(e) {
-    if (isDragging && !hasDragged) {
-        // It was a click, not a drag
-        handleTapOrClick(e.clientX, e.clientY);
-    }
-
-    isDragging = false;
-    hasDragged = false;
-    dragDistance = 0;
-    canvas.style.cursor = 'grab';
-}
-
-/**
- * Handle touch start
- */
-function handleTouchStart(e) {
-    if (state.gameOver || state.animating) return;
-
-    // Always prevent default to avoid scrolling the page
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (e.touches.length === 2) {
-        // Two finger touch - start pinch zoom
-        isPinching = true;
-        isDragging = false;
-        initialPinchDistance = getPinchDistance(e.touches);
-        // Ensure valid zoom level before pinch
-        initialZoomLevel = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
-        initialCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-        initialCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-        // Store initial pinch center for consistent zoom point
-        const rect = canvas.getBoundingClientRect();
-        const center = getPinchCenter(e.touches);
-        initialPinchCenter = {
-            x: center.x - rect.left - rect.width / 2,
-            y: center.y - rect.top - rect.height / 2
-        };
-    } else if (e.touches.length === 1) {
-        const touch = e.touches[0];
-        isDragging = true;
-        isPinching = false;
-        hasDragged = false;
-        dragDistance = 0;
-        dragStartX = touch.clientX;
-        dragStartY = touch.clientY;
-        // Ensure valid camera values when starting touch drag
-        dragStartCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-        dragStartCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-    }
-}
-
-/**
- * Calculate distance between two touch points
- */
-function getPinchDistance(touches) {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-}
-
-/**
- * Get center point between two touches
- */
-function getPinchCenter(touches) {
-    return {
-        x: (touches[0].clientX + touches[1].clientX) / 2,
-        y: (touches[0].clientY + touches[1].clientY) / 2
-    };
-}
-
-/**
- * Handle touch move
- */
-function handleTouchMove(e) {
-    if (state.gameOver) return;
-
-    // Always prevent default
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Block camera panning/zooming when minimap is expanded (tactical briefing mode)
-    if (isMinimapExpanded()) {
-        return;
-    }
-
-    if (e.touches.length === 2 && isPinching && initialPinchCenter) {
-        // Handle pinch zoom
-        const currentDistance = getPinchDistance(e.touches);
-        const scale = currentDistance / initialPinchDistance;
-        const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, initialZoomLevel * scale));
-
-        if (newZoom !== state.zoomLevel) {
-            // Use the INITIAL pinch center for consistent zoom point
-            const relX = initialPinchCenter.x;
-            const relY = initialPinchCenter.y;
-
-            // Calculate zoom ratio from initial state
-            const zoomRatio = newZoom / initialZoomLevel;
-
-            // Adjust camera to keep the initial pinch center stationary
-            // Formula derived from: keeping world point under finger fixed
-            // newCamera = relX * (1 - zoomRatio) + initialCamera * zoomRatio
-            state.cameraX = relX * (1 - zoomRatio) + initialCameraX * zoomRatio;
-            state.cameraY = relY * (1 - zoomRatio) + initialCameraY * zoomRatio;
-
-            state.zoomLevel = newZoom;
-
-            // Update camera offset before limiting bounds (uses current hexSize)
-            updateCameraOffset();
-            // Recalculate hex size with new zoom, then limit bounds
-            resizeCanvas();
-            limitCameraBounds();
-            updateCameraOffset();
-        }
-    } else if (e.touches.length === 1 && isDragging && !isPinching) {
-        const touch = e.touches[0];
-        const dx = touch.clientX - dragStartX;
-        const dy = touch.clientY - dragStartY;
-        dragDistance = Math.sqrt(dx * dx + dy * dy);
-
-        // Lower threshold for touch - 15 pixels
-        if (dragDistance > 15) {
-            hasDragged = true;
-
-            // Update camera position
-            state.cameraX = dragStartCameraX + dx;
-            state.cameraY = dragStartCameraY + dy;
-
-            // Limit camera to map bounds
-            limitCameraBounds();
-
-            // Update offsets and re-render
-            updateCameraOffset();
-            render();
-        }
-    }
-}
-
-/**
- * Handle touch end
- */
-function handleTouchEnd(e) {
-    if (state.gameOver || state.animating) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    // If we were pinching and now have one finger, switch to drag
-    if (isPinching && e.touches.length === 1) {
-        isPinching = false;
-        initialPinchCenter = null;  // Reset pinch center
-        isDragging = true;
-        hasDragged = true;  // Prevent accidental tap
-        const touch = e.touches[0];
-        dragStartX = touch.clientX;
-        dragStartY = touch.clientY;
-        dragStartCameraX = state.cameraX;
-        dragStartCameraY = state.cameraY;
-        return;
-    }
-
-    // Get the touch that ended
-    const touch = e.changedTouches[0];
-    if (!touch) {
-        isDragging = false;
-        isPinching = false;
-        hasDragged = false;
-        return;
-    }
-
-    // Check for tap (not drag, not pinch)
-    if (!hasDragged && !isPinching && dragDistance < 15) {
-        // Double tap detection for centering
-        const now = Date.now();
-        if (now - lastTapTime < 350) {
-            // Double tap - center on current unit
-            centerOnCurrentUnit();
-            lastTapTime = 0;
-        } else {
-            lastTapTime = now;
-            // Single tap - handle as click
-            handleTapOrClick(touch.clientX, touch.clientY);
-        }
-    }
-
-    isDragging = false;
-    isPinching = false;
-    initialPinchCenter = null;  // Reset pinch center
-    hasDragged = false;
-    dragDistance = 0;
-}
-
-// limitCameraBounds and updateCameraOffset are imported from ./input/camera.js
 
 /**
  * Center view on current unit - exported for external use
@@ -469,142 +224,8 @@ export function centerOnCurrentUnit() {
     render();
 }
 
-/**
- * Center view on all player's units with slight zoom out for overview
- * @param {number} playerIndex - The player index to center on
- * @param {number} duration - Animation duration in ms
- * @returns {Promise} - Resolves when animation completes
- */
-export function centerOnTeam(playerIndex, duration = 600) {
-    return new Promise(resolve => {
-        const playerUnits = getPlayerUnits(playerIndex);
-
-        if (playerUnits.length === 0) {
-            resolve();
-            return;
-        }
-
-        // Get visible enemies for situational zoom
-        const visibleEnemies = [];
-        for (const unit of state.units) {
-            if (unit.player === playerIndex || unit.hp <= 0) continue;
-            const hex = getHex(unit.q, unit.r);
-            if (hex && hex.visible && hex.visible[playerIndex]) {
-                visibleEnemies.push(unit);
-            }
-        }
-
-        // Calculate situational zoom: show own units + visible enemies
-        // Use first player unit as reference, include all relevant units
-        const referenceUnit = playerUnits[0];
-        const allRelevantUnits = [...playerUnits.slice(1), ...visibleEnemies];
-        const situationalZoom = calculateSituationalZoom(referenceUnit, allRelevantUnits);
-        const situationalScale = zoomLevelToScale(situationalZoom);
-
-        // Clamp between 0.7 and 0.95 for turn start overview
-        const targetZoomScale = Math.max(0.7, Math.min(0.95, situationalScale));
-        const targetZoom = scaleToZoomLevel(targetZoomScale);
-        const targetHexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(targetZoom);
-        const targetTileSize = getTileSizeForHexSize(targetHexSize);
-
-        // Calculate center of units at target zoom level
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-
-        for (const unit of playerUnits) {
-            const pos = getUnitTilePosition(unit, targetTileSize);
-            minX = Math.min(minX, pos.x);
-            maxX = Math.max(maxX, pos.x);
-            minY = Math.min(minY, pos.y);
-            maxY = Math.max(maxY, pos.y);
-        }
-
-        const targetCenterX = (minX + maxX) / 2;
-        const targetCenterY = (minY + maxY) / 2;
-
-        // Animate to position and zoom
-        const startCameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-        const startCameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-        const startZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
-        const startTime = Date.now();
-
-        function animate() {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(1, elapsed / duration);
-
-            // Ease in-out cubic
-            const ease = progress < 0.5
-                ? 4 * progress * progress * progress
-                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-            // Animate zoom to 100%
-            state.zoomLevel = startZoom + (targetZoom - startZoom) * ease;
-            state.hexSize = CONFIG.BASE_HEX_SIZE * zoomLevelToScale(state.zoomLevel);
-
-            // Recalculate center at current zoom level for smooth animation
-            let newMinX = Infinity, newMaxX = -Infinity;
-            let newMinY = Infinity, newMaxY = -Infinity;
-
-            for (const unit of playerUnits) {
-                const pos = getUnitTilePosition(unit);
-                newMinX = Math.min(newMinX, pos.x);
-                newMaxX = Math.max(newMaxX, pos.x);
-                newMinY = Math.min(newMinY, pos.y);
-                newMaxY = Math.max(newMaxY, pos.y);
-            }
-
-            const newCenterX = (newMinX + newMaxX) / 2;
-            const newCenterY = (newMinY + newMaxY) / 2;
-
-            // Animate camera position
-            state.cameraX = startCameraX + (-newCenterX - startCameraX) * ease;
-            state.cameraY = startCameraY + (-newCenterY - startCameraY) * ease;
-
-            limitCameraBounds();
-            updateCameraOffset();
-            render();
-
-            if (progress < 1) {
-                requestAnimationFrame(animate);
-            } else {
-                resolve();
-            }
-        }
-
-        requestAnimationFrame(animate);
-    });
-}
-
-/**
- * Handle mouse wheel for zooming and scrolling
- */
-function handleWheel(e) {
-    e.preventDefault();
-
-    // Block zoom/scroll when minimap is expanded (tactical briefing mode)
-    if (isMinimapExpanded()) {
-        return;
-    }
-
-    // Check if ctrl/meta is held for zoom, otherwise pan
-    if (e.ctrlKey || e.metaKey) {
-        // Zoom with ctrl+scroll
-        const zoomDelta = -e.deltaY * 0.002;
-        applyZoom(zoomDelta, e.clientX, e.clientY);
-    } else if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        // Horizontal scrolling - pan
-        state.cameraX -= e.deltaX;
-        limitCameraBounds();
-        updateCameraOffset();
-        render();
-    } else {
-        // Vertical scrolling - zoom
-        const zoomDelta = -e.deltaY * 0.001;
-        applyZoom(zoomDelta, e.clientX, e.clientY);
-    }
-}
-
-// applyZoom is imported from ./input/camera.js
+// centerOnTeam is imported from ./input/camera.js and re-exported
+// handleWheel is imported from ./input/handlers.js
 
 /**
  * Check if a click/touch is on the minimap expand button (compact mode)

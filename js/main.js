@@ -610,7 +610,7 @@ function updateBudgetDisplay() {
     }
 
     // Legacy support for old budget display
-    let budgetDisplay = document.getElementById('budget-display');
+    const budgetDisplay = document.getElementById('budget-display');
     if (budgetDisplay) {
         const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
         const percentage = (currentBudgetSpent / CONFIG.TEAM_BUDGET) * 100;

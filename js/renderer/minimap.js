@@ -475,7 +475,7 @@ export function drawMinimap(ctx, w, h) {
         const heightAdjustedColor = adjustColorForHeight(terrain.color, hex.height || 0, CONFIG.HEIGHT.MAX);
 
         // Apply zone coloring if outside
-        let baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
+        const baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
 
         // Darken based on fog level (scale RGB toward black - shadow effect)
         // Minimap uses HALF the darkness of the main view for better readability

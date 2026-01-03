@@ -1302,8 +1302,8 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
     const faces = [];
     const myHeight = hex.height ?? 0;
 
-    let topColor = terrain?.color || '#6a9a58';
-    let cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
+    const topColor = terrain?.color || '#6a9a58';
+    const cliffColor = terrain?.earthColor || terrain?.colorDark || '#5a4a3b';
 
     // TOP FACE - the hex surface
     const topCorners = getHex3DCorners(cx, cy, size, myHeight);

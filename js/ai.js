@@ -198,9 +198,9 @@ function planDecoyStrategy(aiUnits, _enemies) {
     aiMemory.decoyActive = true;
 
     addMultiPartThought([
-        `Wir starten eine sichere Köder-Taktik.`,
+        'Wir starten eine sichere Köder-Taktik.',
         `Der ${CLASS_NAMES_DE[decoy.class]} lockt Feinde an, bleibt aber außerhalb der Angriffsreichweite.`,
-        `Die Hinterhalts-Einheiten warten auf den perfekten Moment zum Zuschlagen.`
+        'Die Hinterhalts-Einheiten warten auf den perfekten Moment zum Zuschlagen.'
     ], 'strategy');
 
     return true;
@@ -726,7 +726,7 @@ function analyzeAndPlan() {
         const woundedEnemies = visibleEnemies.filter(e => e.currentHp < e.maxHp);
 
         if (visibleEnemies.length === 1) {
-            const hpInfo = woundedEnemies.length > 0 ? ` Der Gegner ist verwundet.` : '';
+            const hpInfo = woundedEnemies.length > 0 ? ' Der Gegner ist verwundet.' : '';
             addAIThought(`Feindkontakt! Ein ${uniqueClasses[0]} wurde entdeckt.${hpInfo}`, 'strategy');
         } else if (visibleEnemies.length <= 3) {
             const woundedInfo = woundedEnemies.length > 0 ? ` Davon ${woundedEnemies.length} verwundet.` : '';
@@ -750,8 +750,8 @@ function analyzeAndPlan() {
         if (isEndgame) {
             addAIThought(variedPhrase([
                 `Nur noch ${totalEnemiesOnMap} Feind${totalEnemiesOnMap > 1 ? 'e' : ''} übrig! Alle Einheiten: Aufspüren und eliminieren!`,
-                `Endspiel! Der letzte Widerstand muss gebrochen werden. Voller Angriff!`,
-                `Fast geschafft! Wir jagen die letzten Überlebenden.`
+                'Endspiel! Der letzte Widerstand muss gebrochen werden. Voller Angriff!',
+                'Fast geschafft! Wir jagen die letzten Überlebenden.'
             ]), 'strategy');
         } else {
             addAIThought(variedPhrase([
@@ -3030,7 +3030,7 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         // Wenn in Nahkampf ohne AP für Angriff+Rückzug
         evaluation.scoreAdjustment -= 150;
         if (!evaluation.explanation) {
-            evaluation.explanation = `Nahkampfgefahr ohne Ausweichmöglichkeit`;
+            evaluation.explanation = 'Nahkampfgefahr ohne Ausweichmöglichkeit';
         }
     }
 
@@ -3038,7 +3038,7 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     if (evaluation.canAttackAfter && apAfterMove < 1) {
         // Kann angreifen aber hat keine AP dafür - VÖLLIG SINNLOSER ZUG
         evaluation.scoreAdjustment -= 400;
-        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff!`;
+        evaluation.explanation = '❌ Feind erreichbar, aber keine AP zum Angriff!';
     }
 
     // === POSITIVE BEWERTUNGEN ===
@@ -3054,7 +3054,7 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     if (evaluation.canAttackAfter && apAfterMove >= 2) {
         evaluation.scoreAdjustment += 50;
         if (!evaluation.explanation) {
-            evaluation.explanation = `Gute taktische Position - Angriff + Reserve`;
+            evaluation.explanation = 'Gute taktische Position - Angriff + Reserve';
         }
     }
 
@@ -3067,7 +3067,7 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
         evaluation.scoreAdjustment -= 120;
         if (!evaluation.explanation) {
-            evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
+            evaluation.explanation = 'Exponiert ohne Angriffsmöglichkeit';
         }
     }
 

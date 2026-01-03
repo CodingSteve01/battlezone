@@ -5,6 +5,7 @@ import { state, getHex, scaleToZoomLevel, getTileSize, getTileSizeForHexSize, ge
 import { pixelToHex } from '../hexMath.js';
 import { render, resizeCanvas, isMinimapExpanded } from '../renderer.js';
 import { CONFIG } from '../config.js';
+import { limitCameraBounds, updateCameraOffset, applyZoom } from './camera.js';
 
 // Drag/pan state
 let isDragging = false;
@@ -113,8 +114,6 @@ export function resetDragState() {
 /**
  * Handle mouse down for dragging
  * @param {MouseEvent} e
- * @param {Function} limitCameraBounds
- * @param {Function} updateCameraOffset
  */
 export function handleMouseDown(e) {
     if (state.gameOver || state.animating) return;
@@ -135,10 +134,8 @@ export function handleMouseDown(e) {
 /**
  * Handle mouse move for dragging and path preview
  * @param {MouseEvent} e
- * @param {Function} limitCameraBounds
- * @param {Function} updateCameraOffset
  */
-export function handleMouseMove(e, limitCameraBounds, updateCameraOffset) {
+export function handleMouseMove(e) {
     if (state.gameOver) return;
 
     // Block camera panning when minimap is expanded
@@ -251,10 +248,8 @@ export function handleTouchStart(e) {
 /**
  * Handle touch move
  * @param {TouchEvent} e
- * @param {Function} limitCameraBounds
- * @param {Function} updateCameraOffset
  */
-export function handleTouchMove(e, limitCameraBounds, updateCameraOffset) {
+export function handleTouchMove(e) {
     if (state.gameOver) return;
 
     e.preventDefault();
@@ -367,11 +362,8 @@ export function handleTouchEnd(e, onTapOrClick, onDoubleTap) {
 /**
  * Handle mouse wheel for zooming and scrolling
  * @param {WheelEvent} e
- * @param {Function} applyZoom
- * @param {Function} limitCameraBounds
- * @param {Function} updateCameraOffset
  */
-export function handleWheel(e, applyZoom, limitCameraBounds, updateCameraOffset) {
+export function handleWheel(e) {
     e.preventDefault();
 
     // Block zoom/scroll when minimap is expanded

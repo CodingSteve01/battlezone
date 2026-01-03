@@ -946,7 +946,7 @@ function showGuidedStep(stepIndex) {
 
     // Generate action buttons based on step type
     let actionsHTML = '';
-    let waitingHTML = '';
+    const waitingHTML = '';
 
     if (step.action === 'continue') {
         actionsHTML = `

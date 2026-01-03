@@ -1679,7 +1679,7 @@ function startCommandoDuelMinigame(resolve, mods = {}) {
 
             // Show counter hint based on enemy move
             let counterHint = '';
-            let counterColor = '#22c55e';
+            const counterColor = '#22c55e';
             if (enemyMove.id === 'attack') {
                 counterHint = '🛡️ BLOCK gegen Angriff!';
             } else if (enemyMove.id === 'block') {
