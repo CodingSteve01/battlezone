@@ -776,27 +776,126 @@ function calculatePositionExposure(q, r, enemies, unit) {
 }
 
 /**
- * Predict enemy threats based on movement history
- * Uses predicted positions with confidence to avoid obvious traps
+ * ERWEITERTE Vorhersage von Bedrohungen basierend auf Bewegungsmustern
+ * Berücksichtigt Hauptvorhersage UND alternative Positionen
+ * @param {number} q - Ziel-Hex Q
+ * @param {number} r - Ziel-Hex R
+ * @param {Array} enemies - Sichtbare Feinde
+ * @param {number} turnsAhead - Wie viele Züge vorausplanen (1-3)
  */
-function getPredictedThreatsAt(q, r, enemies) {
+function getPredictedThreatsAt(q, r, enemies, turnsAhead = 1) {
     const threats = [];
 
     for (const [enemyId, prediction] of aiMemory.predictedPositions) {
-        if (prediction.confidence < 0.4) continue;
+        if (prediction.confidence < 0.3) continue; // Niedrigere Schwelle für mehr Vorsicht
 
         const enemy = enemies.find(e => e.id === enemyId);
         if (!enemy) continue;
 
-        const dist = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
         const enemyRange = enemy.range || 3;
+        const enemyMove = enemy.move || 3;
 
-        if (dist <= enemyRange) {
-            threats.push({ enemy, prediction });
+        // === HAUPTVORHERSAGE ===
+        const distToPrimary = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
+        if (distToPrimary <= enemyRange) {
+            threats.push({
+                enemy,
+                prediction,
+                confidence: prediction.confidence,
+                reason: prediction.reason || 'primary',
+                turnsAway: 1
+            });
+        }
+
+        // === ALTERNATIVE POSITIONEN (geringere Konfidenz) ===
+        if (prediction.alternativePositions) {
+            for (const alt of prediction.alternativePositions) {
+                if (alt.confidence < 0.35) continue;
+                const distToAlt = hexDistance({ q, r }, { q: alt.q, r: alt.r });
+                if (distToAlt <= enemyRange) {
+                    threats.push({
+                        enemy,
+                        prediction: alt,
+                        confidence: alt.confidence * 0.8, // Etwas reduziert
+                        reason: 'alternative',
+                        turnsAway: 1
+                    });
+                }
+            }
+        }
+
+        // === MEHRSTUFIGE VORHERSAGE (2-3 Züge voraus) ===
+        if (turnsAhead >= 2) {
+            // Feind könnte sich bewegen UND dann angreifen
+            // Maximale Reichweite nach Bewegung = move + range
+            const maxThreatRange = enemyMove + enemyRange;
+            const distFromCurrent = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+
+            if (distFromCurrent <= maxThreatRange && distFromCurrent > enemyRange) {
+                // Feind ist NOCH nicht in Reichweite, aber KÖNNTE nach Bewegung sein
+                threats.push({
+                    enemy,
+                    prediction: { q: enemy.q, r: enemy.r }, // Aktuelle Position
+                    confidence: 0.4, // Geringere Konfidenz für Turn 2
+                    reason: 'move_then_attack',
+                    turnsAway: 2
+                });
+            }
+        }
+
+        if (turnsAhead >= 3) {
+            // 3 Züge voraus - sehr unsicher aber berücksichtigen
+            const farThreatRange = (enemyMove * 2) + enemyRange;
+            const distFar = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+
+            if (distFar <= farThreatRange && distFar > enemyMove + enemyRange) {
+                threats.push({
+                    enemy,
+                    prediction: { q: enemy.q, r: enemy.r },
+                    confidence: 0.25,
+                    reason: 'far_future',
+                    turnsAway: 3
+                });
+            }
         }
     }
 
+    // Sortiere nach Konfidenz
+    threats.sort((a, b) => b.confidence - a.confidence);
     return threats;
+}
+
+/**
+ * Berechne wie gefährlich eine Position in 2-3 Zügen sein wird
+ * Für strategische Langzeitplanung
+ */
+function calculateFutureDanger(q, r, enemies) {
+    let danger = 0;
+
+    for (const enemy of enemies) {
+        const dist = hexDistance({ q, r }, { q: enemy.q, r: enemy.r });
+        const enemyRange = enemy.range || 3;
+        const enemyMove = enemy.move || 3;
+        const enemyDamage = enemy.damage || 30;
+
+        // Zug 1: Kann Feind uns erreichen und angreifen?
+        if (dist <= enemyRange) {
+            danger += enemyDamage * 1.0;
+        } else if (dist <= enemyMove + enemyRange) {
+            // Zug 2: Nach Bewegung erreichbar
+            danger += enemyDamage * 0.6;
+        } else if (dist <= (enemyMove * 2) + enemyRange) {
+            // Zug 3: Nach 2x Bewegung erreichbar
+            danger += enemyDamage * 0.3;
+        }
+
+        // Bonus-Gefahr für aggressive Klassen
+        if (enemy.class === 'assault' || enemy.class === 'commando') {
+            danger *= 1.2;
+        }
+    }
+
+    return danger;
 }
 
 /**
@@ -962,7 +1061,24 @@ function shouldWaitForScout(unit, targetQ, targetR, plan) {
     const aiExplored = state.playerExploredHexes[state.currentPlayer];
     const isExplored = aiExplored && aiExplored.has(`${targetQ},${targetR}`);
 
-    if (!isForest && isExplored) return false;  // Safe enough
+    // Check if there was a recent attack from this area - DEFINITELY risky!
+    const attackDanger = calculateAttackHistoryDanger(targetQ, targetR);
+    const wasAttackedFromHere = attackDanger > 50; // Significant danger level
+
+    // If not a forest, explored, and no recent attacks: safe enough
+    if (!isForest && isExplored && !wasAttackedFromHere) return false;
+
+    // If we were attacked from this area recently, ALWAYS wait for scout if possible
+    if (wasAttackedFromHere) {
+        // Check if we have a scout that could clear this area
+        const scouts = getAllAlliedAIUnits().filter(u =>
+            u.class === 'scout' && u.alive
+        );
+        if (scouts.length > 0) {
+            return true; // Have scouts? Let them clear the danger zone first!
+        }
+        // No scouts available - be extra careful but don't block forever
+    }
 
     // Check if we have a scout that could clear this area
     const scouts = getAllAlliedAIUnits().filter(u =>
@@ -1159,6 +1275,27 @@ function analyzeAndPlan() {
                 'Achtung: Der Feind könnte sich in den Wäldern verstecken. Scouts aufklären lassen.',
                 'Gefährliches Terrain voraus. Wälder könnten Hinterhalte bergen. Vorsichtig vorgehen.',
                 'Verdächtige Waldgebiete entdeckt. Scouts gehen vor, andere folgen mit Abstand.'
+            ]), 'strategy');
+        }
+    }
+
+    // === ATTACK HISTORY AWARENESS - Avoid known danger zones ===
+    // Check if there are recorded attacks that create danger zones
+    if (aiMemory.attackHistory.size > 0) {
+        let recentDangerZones = 0;
+        for (const [_unitId, attacks] of aiMemory.attackHistory) {
+            for (const attack of attacks) {
+                if (state.round - attack.round <= 2) { // Recent attack (last 2 rounds)
+                    recentDangerZones++;
+                }
+            }
+        }
+        if (recentDangerZones >= 1) {
+            addAIThought(variedPhrase([
+                `Achtung! ${recentDangerZones} Position${recentDangerZones > 1 ? 'en' : ''} markiert, von denen wir angegriffen wurden. Dort könnte ein Hinterhalt sein!`,
+                `Wir wurden aus ${recentDangerZones > 1 ? 'mehreren Richtungen' : 'einer Richtung'} angegriffen. Diese Bereiche meiden!`,
+                `Der Feind hat aus dem Verborgenen angegriffen. Diese Zonen sind gefährlich - Scouts aufklären lassen.`,
+                `Bekannte Gefahrenzone${recentDangerZones > 1 ? 'n' : ''}: Dort wurde angegriffen. Nicht blind hineinlaufen!`
             ]), 'strategy');
         }
     }
@@ -2027,37 +2164,196 @@ function updateMemoryWithVisibleEnemies(enemies) {
 }
 
 /**
- * Vorhersage der nächsten feindlichen Position basierend auf Bewegungsmuster
+ * ERWEITERTE Vorhersage der nächsten feindlichen Position
+ * Berücksichtigt: Bewegungshistorie, Klassenverhalten, Zielrichtung, Deckungssuche
  */
 function predictEnemyNextPosition(enemyId, previousPos, currentPos) {
-    // Berechne Bewegungsvektor
+    const predictions = [];
+
+    // === 1. LINEARE EXTRAPOLATION (Grundlage) ===
     const dq = currentPos.q - previousPos.q;
     const dr = currentPos.r - previousPos.r;
 
-    // Vorhersage: Feind bewegt sich wahrscheinlich weiter in diese Richtung
-    const predictedQ = currentPos.q + dq;
-    const predictedR = currentPos.r + dr;
-
-    // Prüfe ob vorhergesagte Position gültig ist
-    const predictedHex = getHex(predictedQ, predictedR);
-    if (predictedHex && predictedHex.walkable && !predictedHex.unit) {
-        aiMemory.predictedPositions.set(enemyId, {
-            q: predictedQ,
-            r: predictedR,
-            confidence: 0.6,  // 60% Konfidenz für Vorhersage
-            basedOnRound: state.round
-        });
-    } else {
-        // Keine gültige Vorhersage möglich
-        aiMemory.predictedPositions.delete(enemyId);
+    if (dq !== 0 || dr !== 0) {
+        const linearQ = currentPos.q + dq;
+        const linearR = currentPos.r + dr;
+        const linearHex = getHex(linearQ, linearR);
+        if (linearHex && linearHex.walkable && !linearHex.unit) {
+            predictions.push({
+                q: linearQ,
+                r: linearR,
+                confidence: 0.5,
+                reason: 'linear'
+            });
+        }
     }
+
+    // === 2. BEWEGUNGSHISTORIE ANALYSIEREN ===
+    const history = aiMemory.movementHistory.get(enemyId) || [];
+    if (history.length >= 2) {
+        // Analysiere ob Feind konsistent in eine Richtung läuft
+        let avgDq = 0, avgDr = 0;
+        for (const move of history.slice(-3)) { // Letzte 3 Bewegungen
+            avgDq += (move.toQ - move.fromQ);
+            avgDr += (move.toR - move.fromR);
+        }
+        avgDq = Math.round(avgDq / Math.min(history.length, 3));
+        avgDr = Math.round(avgDr / Math.min(history.length, 3));
+
+        if (avgDq !== 0 || avgDr !== 0) {
+            const trendQ = currentPos.q + avgDq;
+            const trendR = currentPos.r + avgDr;
+            const trendHex = getHex(trendQ, trendR);
+            if (trendHex && trendHex.walkable && !trendHex.unit) {
+                // Höhere Konfidenz wenn konsistentes Bewegungsmuster
+                const consistency = history.length >= 3 ? 0.7 : 0.55;
+                predictions.push({
+                    q: trendQ,
+                    r: trendR,
+                    confidence: consistency,
+                    reason: 'trend'
+                });
+            }
+        }
+    }
+
+    // === 3. ZIELBASIERTE VORHERSAGE - Kommt Feind auf uns zu? ===
+    const aiUnits = getPlayerUnits(state.currentPlayer).filter(u => u.alive);
+    if (aiUnits.length > 0) {
+        // Finde nächste AI-Einheit zum Feind
+        let closestAIUnit = null;
+        let closestDist = Infinity;
+        for (const unit of aiUnits) {
+            const dist = hexDistance({ q: currentPos.q, r: currentPos.r }, { q: unit.q, r: unit.r });
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestAIUnit = unit;
+            }
+        }
+
+        if (closestAIUnit && closestDist <= 8) {
+            // Feind ist in Reichweite - wahrscheinlich kommt er näher
+            // Berechne Richtung zu unserer Einheit
+            const dirQ = Math.sign(closestAIUnit.q - currentPos.q);
+            const dirR = Math.sign(closestAIUnit.r - currentPos.r);
+
+            // Prüfe ob Feind tatsächlich auf uns zuläuft (letzte Bewegung in unsere Richtung)
+            const wasApproaching = (dq === dirQ || dq === 0) && (dr === dirR || dr === 0);
+
+            if (wasApproaching || closestDist <= 4) {
+                const approachQ = currentPos.q + dirQ;
+                const approachR = currentPos.r + dirR;
+                const approachHex = getHex(approachQ, approachR);
+                if (approachHex && approachHex.walkable && !approachHex.unit) {
+                    // Höhere Konfidenz wenn Feind bereits auf uns zugelaufen ist
+                    const approachConf = wasApproaching ? 0.75 : 0.5;
+                    predictions.push({
+                        q: approachQ,
+                        r: approachR,
+                        confidence: approachConf,
+                        reason: 'approaching'
+                    });
+                }
+            }
+        }
+    }
+
+    // === 4. KLASSENSPEZIFISCHES VERHALTEN ===
+    const enemyClass = currentPos.class;
+
+    // Snipers suchen oft Hügel oder bleiben auf Distanz
+    if (enemyClass === 'sniper') {
+        // Suche nach Hügeln in der Nähe
+        for (let ddq = -2; ddq <= 2; ddq++) {
+            for (let ddr = -2; ddr <= 2; ddr++) {
+                if (Math.abs(ddq + ddr) > 2) continue;
+                const hillQ = currentPos.q + ddq;
+                const hillR = currentPos.r + ddr;
+                const hillHex = getHex(hillQ, hillR);
+                if (hillHex && hillHex.type === 'hills' && hillHex.walkable && !hillHex.unit) {
+                    predictions.push({
+                        q: hillQ,
+                        r: hillR,
+                        confidence: 0.6,
+                        reason: 'sniper_hill'
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    // Commandos/Scouts suchen oft Deckung
+    if (enemyClass === 'commando' || enemyClass === 'scout') {
+        for (let ddq = -2; ddq <= 2; ddq++) {
+            for (let ddr = -2; ddr <= 2; ddr++) {
+                if (Math.abs(ddq + ddr) > 2) continue;
+                const coverQ = currentPos.q + ddq;
+                const coverR = currentPos.r + ddr;
+                const coverHex = getHex(coverQ, coverR);
+                if (coverHex && coverHex.cover && coverHex.walkable && !coverHex.unit) {
+                    predictions.push({
+                        q: coverQ,
+                        r: coverR,
+                        confidence: 0.55,
+                        reason: 'cover_seeking'
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    // === 5. BESTE VORHERSAGE AUSWÄHLEN ===
+    if (predictions.length === 0) {
+        aiMemory.predictedPositions.delete(enemyId);
+        return;
+    }
+
+    // Sortiere nach Konfidenz und wähle die beste
+    predictions.sort((a, b) => b.confidence - a.confidence);
+    const best = predictions[0];
+
+    // Kombiniere ähnliche Vorhersagen für höhere Konfidenz
+    let finalConfidence = best.confidence;
+    for (const pred of predictions.slice(1)) {
+        if (pred.q === best.q && pred.r === best.r) {
+            // Mehrere Gründe für dieselbe Position = höhere Konfidenz
+            finalConfidence = Math.min(0.9, finalConfidence + 0.15);
+        }
+    }
+
+    aiMemory.predictedPositions.set(enemyId, {
+        q: best.q,
+        r: best.r,
+        confidence: finalConfidence,
+        basedOnRound: state.round,
+        reason: best.reason,
+        alternativePositions: predictions.slice(1, 3).map(p => ({ q: p.q, r: p.r, confidence: p.confidence }))
+    });
+}
+
+/**
+ * Hole alle vorhergesagten Positionen für einen Feind (inkl. Alternativen)
+ * Nützlich für mehrstufige Planung
+ */
+function getEnemyPredictedPositions(enemyId) {
+    const prediction = aiMemory.predictedPositions.get(enemyId);
+    if (!prediction) return [];
+
+    const positions = [{ q: prediction.q, r: prediction.r, confidence: prediction.confidence }];
+    if (prediction.alternativePositions) {
+        positions.push(...prediction.alternativePositions);
+    }
+    return positions;
 }
 
 /**
  * Registriere einen empfangenen Angriff für die Erinnerung
  * Wird aufgerufen wenn eine unserer Einheiten angegriffen wird
+ * EXPORTED: Called from combat.js when AI units are attacked
  */
-function recordIncomingAttack(targetUnit, attackerUnit) {
+export function recordIncomingAttack(targetUnit, attackerUnit) {
     if (!aiMemory.attackHistory.has(targetUnit.id)) {
         aiMemory.attackHistory.set(targetUnit.id, []);
     }
@@ -2071,6 +2367,76 @@ function recordIncomingAttack(targetUnit, attackerUnit) {
     });
     // Nur die letzten 5 Angriffe speichern
     if (history.length > 5) history.shift();
+}
+
+/**
+ * Calculate danger zone penalty for a position based on attack history
+ * If we were attacked from a position recently, that area is DANGEROUS
+ * There might be more enemies waiting in ambush!
+ *
+ * @param {number} q - Target hex Q coordinate
+ * @param {number} r - Target hex R coordinate
+ * @returns {number} - Danger penalty (higher = more dangerous)
+ */
+function calculateAttackHistoryDanger(q, r) {
+    let danger = 0;
+
+    // Check all recorded attacks against our units
+    for (const [_unitId, attacks] of aiMemory.attackHistory) {
+        for (const attack of attacks) {
+            // Danger decreases with age (rounds since attack)
+            const roundsAgo = state.round - attack.round;
+            if (roundsAgo > 3) continue; // Ignore very old attacks
+
+            const ageFactor = 1 - (roundsAgo * 0.25); // 100%, 75%, 50%, 25%
+
+            // Calculate distance from attack origin
+            const distFromAttack = hexDistance({ q, r }, { q: attack.fromQ, r: attack.fromR });
+
+            // Very high danger at the exact attack position
+            if (distFromAttack === 0) {
+                danger += 150 * ageFactor;
+            }
+            // High danger near the attack position (potential ambush area)
+            else if (distFromAttack <= 2) {
+                danger += (100 - distFromAttack * 30) * ageFactor;
+            }
+            // Moderate danger in the general direction
+            else if (distFromAttack <= 4) {
+                danger += (40 - distFromAttack * 8) * ageFactor;
+            }
+
+            // Extra danger if attack came from forest/cover (likely ambush!)
+            const attackHex = getHex(attack.fromQ, attack.fromR);
+            if (attackHex && (attackHex.type === 'forest' || attackHex.cover)) {
+                // The whole forest area is dangerous - there might be more enemies
+                if (distFromAttack <= 3) {
+                    danger += 60 * ageFactor;
+                }
+            }
+
+            // High-damage attackers make the area more dangerous
+            if (attack.attackerClass === 'sniper' || attack.attackerClass === 'assault') {
+                danger += 30 * ageFactor;
+            }
+        }
+    }
+
+    return danger;
+}
+
+/**
+ * Check if approaching from a specific direction is dangerous based on attack history
+ * Used to avoid walking into known ambush positions
+ * Note: Currently unused but available for future tactical decisions
+ */
+function _isApproachDangerous(fromQ, fromR, toQ, toR) {
+    // Check if the path to the target goes through a recent attack zone
+    const dangerAtTarget = calculateAttackHistoryDanger(toQ, toR);
+    const dangerAtCurrent = calculateAttackHistoryDanger(fromQ, fromR);
+
+    // If we're moving INTO more danger, that's bad
+    return dangerAtTarget > dangerAtCurrent + 50;
 }
 
 /**
@@ -3287,6 +3653,16 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
         score -= exposurePenalty * 0.5;
     }
 
+    // === ATTACK HISTORY DANGER ===
+    // Heavily penalize positions near where we were attacked from
+    // If enemies attacked from a location, there might be an ambush!
+    const historyDanger = calculateAttackHistoryDanger(q, r);
+    if (historyDanger > 0) {
+        // Scale based on how cautious the unit should be
+        const cautionFactor = (unit.class === 'scout') ? 0.5 : 1.0; // Scouts are braver
+        score -= historyDanger * cautionFactor;
+    }
+
     // === SAFE ZONE BONUS ===
     // Reward positions with low exposure and no predicted threats
     const safeZoneInfo = getSafeZoneBonus(unit, q, r, enemies);
@@ -4256,36 +4632,80 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     }
 
     // === VORAUSBERECHNUNG: FEINDLICHE BEWEGUNGSPROGNOSEN ===
-    evaluation.predictedThreats = getPredictedThreatsAt(targetQ, targetR, enemies);
+    // Jetzt mit mehrstufiger Planung (2-3 Züge voraus)
+    evaluation.predictedThreats = getPredictedThreatsAt(targetQ, targetR, enemies, 2);
+
+    // === MEHRSTUFIGE GEFAHRENANALYSE ===
+    // Berechne wie gefährlich die Position in den nächsten 2-3 Zügen wird
+    const futureDanger = calculateFutureDanger(targetQ, targetR, enemies);
+    if (futureDanger > unit.currentHp * 0.5) {
+        // Position wird in naher Zukunft sehr gefährlich
+        evaluation.scoreAdjustment -= futureDanger * 0.5;
+        if (!evaluation.explanation && futureDanger > unit.currentHp) {
+            evaluation.explanation = `⚠️ Position wird in 2-3 Zügen sehr gefährlich!`;
+        }
+    }
 
     // === KRITISCH: INTELLIGENTES AP-MANAGEMENT ===
     // Die KI darf NIEMALS in Gefahr laufen ohne die Möglichkeit zurückzuschlagen
+    // MASSIV VERSTÄRKTE PENALTIES - Die KI soll NICHT in den Tod laufen!
 
-    // Szenario 1: In Angriffsreichweite mehrerer Feinde ohne AP für Gegenangriff
+    // Szenario 1: In Angriffsreichweite von Feinden ohne AP für Gegenangriff
+    // Dies ist quasi ein Todesurteil - EXTREMER PENALTY!
     if (evaluation.threatsInRange.length > 0 && apAfterMove < 1) {
         evaluation.exposedWithoutOptions = true;
-        // STARK erhöhter Penalty - skaliert mit Anzahl der Bedrohungen
-        const basePenalty = 300;
+        // MASSIVER Penalty - das ist der schlimmste taktische Fehler
+        const basePenalty = 500;  // Erhöht von 300
         const threatMultiplier = evaluation.threatsInRange.length;
-        const closeRangePenalty = evaluation.closeRangeThreats.length * 100;
-        evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty;
-        evaluation.explanation = `⚠️ GEFAHR: ${evaluation.threatsInRange.length} Feinde in Reichweite, keine AP übrig!`;
+        const closeRangePenalty = evaluation.closeRangeThreats.length * 200;  // Erhöht von 100
+        // Berücksichtige potentiellen Schaden der nächsten Runde
+        const expectedDamage = evaluation.threatsInRange.reduce((sum, e) => sum + (e.damage || 30), 0);
+        const survivalPenalty = expectedDamage > unit.currentHp ? 300 : 0; // Extra wenn wir sterben würden
+        evaluation.scoreAdjustment -= basePenalty * threatMultiplier + closeRangePenalty + survivalPenalty;
+        evaluation.explanation = `☠️ TÖDLICHE GEFAHR: ${evaluation.threatsInRange.length} Feinde, keine AP zum Kämpfen!`;
     }
 
     // Szenario 2: Nahkampf-Situation ohne Fluchtmöglichkeit
+    // Nahkampf ohne Gegenoptionen = sichere Niederlage
     if (evaluation.closeRangeThreats.length > 0 && apAfterMove < 2) {
-        // Wenn in Nahkampf ohne AP für Angriff+Rückzug
-        evaluation.scoreAdjustment -= 150;
+        // Wenn in Nahkampf ohne AP für Angriff+Rückzug - SEHR gefährlich
+        evaluation.scoreAdjustment -= 250;  // Erhöht von 150
+        // Extra Strafe pro nahkampf-bedrohung
+        evaluation.scoreAdjustment -= evaluation.closeRangeThreats.length * 100;
         if (!evaluation.explanation) {
-            evaluation.explanation = `Nahkampfgefahr ohne Ausweichmöglichkeit`;
+            evaluation.explanation = `⚠️ Nahkampfgefahr ohne Ausweichmöglichkeit - wir werden sterben!`;
         }
     }
 
     // Szenario 3: Bewegung zu weit - keine AP für Angriff obwohl Feind erreichbar wäre
     if (evaluation.canAttackAfter && apAfterMove < 1) {
         // Kann angreifen aber hat keine AP dafür - VÖLLIG SINNLOSER ZUG
+        evaluation.scoreAdjustment -= 500;  // Erhöht von 400
+        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff - Selbstmord!`;
+    }
+
+    // NEUES Szenario 4: Outnumbered in Angriffsreichweite
+    // Selbst MIT AP zum Angreifen: wenn wir in nächster Runde von 2+ Feinden attackiert werden können
+    // und diese uns töten können, ist das ein sehr schlechter Zug
+    if (evaluation.threatsInRange.length >= 2 && apAfterMove >= 1) {
+        const expectedDamage = evaluation.threatsInRange.reduce((sum, e) => sum + (e.damage || 30), 0);
+        // Wir greifen einen an (töten ihn vielleicht), aber die anderen töten uns
+        const damageAfterKill = expectedDamage - (evaluation.killableTargets.length > 0 ? (evaluation.killableTargets[0].damage || 30) : 0);
+        if (damageAfterKill >= unit.currentHp * 0.8) {
+            // Nach unserem Angriff werden wir wahrscheinlich sterben
+            evaluation.scoreAdjustment -= 200;
+            if (!evaluation.explanation) {
+                evaluation.explanation = `⚠️ Überzahl: ${evaluation.threatsInRange.length} Feinde können uns in der nächsten Runde töten!`;
+            }
+        }
+    }
+
+    // NEUES Szenario 5: Direkt neben Feind stehen bleiben
+    // Der Spieler kann in seiner nächsten Runde frei angreifen
+    if (evaluation.closeRangeThreats.length > 0 && !evaluation.canAttackAfter) {
+        // Wir stehen neben einem Feind aber können ihn nicht angreifen?! Todesurteil.
         evaluation.scoreAdjustment -= 400;
-        evaluation.explanation = `❌ Feind erreichbar, aber keine AP zum Angriff!`;
+        evaluation.explanation = `☠️ Direkt neben Feind ohne Angriffsmöglichkeit - sicherer Tod!`;
     }
 
     // === POSITIVE BEWERTUNGEN ===
@@ -4329,10 +4749,12 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     }
 
     // Penalty für Exposition ohne Angriffsmöglichkeit
+    // VERSTÄRKT: Das ist ein katastrophaler Fehler!
     if (evaluation.threatsInRange.length > 0 && !evaluation.canAttackAfter) {
-        evaluation.scoreAdjustment -= 120;
+        // Pro Feind der uns angreifen kann, OHNE dass wir zurückschlagen können
+        evaluation.scoreAdjustment -= 200 * evaluation.threatsInRange.length;  // Erhöht von 120
         if (!evaluation.explanation) {
-            evaluation.explanation = `Exponiert ohne Angriffsmöglichkeit`;
+            evaluation.explanation = `☠️ ${evaluation.threatsInRange.length} Feinde können uns angreifen - wir nicht!`;
         }
     }
 
@@ -5207,6 +5629,16 @@ function scoreSearchPosition(unit, q, r, plan) {
             // Heavy penalty for getting isolated during hunt mode
             const isolationPenalty = unit.class === 'scout' ? 40 : 100;
             score -= isolationPenalty;
+        }
+
+        // === ATTACK HISTORY DANGER (Hunt Mode) ===
+        // CRITICAL: If we were attacked from a position, AVOID going near it!
+        // The enemy might have set an ambush there
+        const historyDanger = calculateAttackHistoryDanger(q, r);
+        if (historyDanger > 0) {
+            // In hunt mode (no visible enemies), be EXTRA cautious about known danger zones
+            const huntCaution = unit.class === 'scout' ? 1.0 : 1.5; // Even scouts are more careful
+            score -= historyDanger * huntCaution;
         }
     }
 
