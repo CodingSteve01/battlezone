@@ -139,9 +139,9 @@ test.describe('Shop Screen', () => {
         const variantCount = firstVariant.locator('.variant-cart-count');
         await expect(variantCount).toHaveText('1');
 
-        // Cart count badge should show 1/6
+        // Cart count badge should show 1/5 (MAX_UNITS is 5)
         const cartCountBadge = page.locator('#cart-count-badge');
-        await expect(cartCountBadge).toHaveText('1/6');
+        await expect(cartCountBadge).toHaveText('1/5');
 
         expect(errors).toEqual([]);
     });
