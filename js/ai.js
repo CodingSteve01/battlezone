@@ -828,6 +828,161 @@ function getSafeZoneBonus(unit, q, r, enemies) {
     return { bonus, predictedThreats, exposure };
 }
 
+// ===== AMBUSH DETECTION SYSTEM =====
+// Detects potential ambush positions when enemies are not visible
+
+/**
+ * Calculate ambush risk for a position
+ * High risk = nearby forests/cover that are unexplored or out of vision
+ * When enemies are hidden, they're likely in cover positions
+ */
+function calculateAmbushRisk(q, r, visibleEnemies) {
+    let risk = 0;
+    const hex = getHex(q, r);
+    if (!hex) return 0;
+
+    const aiVisible = state.playerVisibleHexes[state.currentPlayer];
+    const aiExplored = state.playerExploredHexes[state.currentPlayer];
+
+    // Get all neighboring hexes in a radius of 3
+    const dangerousHexes = [];
+    for (let dq = -3; dq <= 3; dq++) {
+        for (let dr = -3; dr <= 3; dr++) {
+            if (Math.abs(dq + dr) > 3) continue;
+            const nq = q + dq;
+            const nr = r + dr;
+            const neighborHex = getHex(nq, nr);
+            if (!neighborHex) continue;
+
+            const key = `${nq},${nr}`;
+            const dist = hexDistance({ q, r }, { q: nq, r: nr });
+
+            // Check if this hex could hide an enemy
+            const isForest = neighborHex.type === 'forest' || neighborHex.cover;
+            const isVisible = aiVisible && aiVisible.has(key);
+            const isExplored = aiExplored && aiExplored.has(key);
+            const isOccupied = neighborHex.unit !== null;
+
+            // Forest that we can't see is dangerous - enemies could be hiding there
+            if (isForest && !isVisible && !isOccupied) {
+                const baseDanger = isExplored ? 15 : 25;  // Unexplored is more dangerous
+                const distFactor = Math.max(1, 4 - dist);  // Closer = more dangerous
+                dangerousHexes.push({ q: nq, r: nr, danger: baseDanger * distFactor });
+                risk += baseDanger * distFactor;
+            }
+
+            // Any unexplored hex within 2 tiles is somewhat risky
+            if (!isExplored && dist <= 2 && !isOccupied) {
+                risk += 10;
+            }
+        }
+    }
+
+    // If no enemies are visible, dramatically increase ambush awareness
+    if (visibleEnemies.length === 0 && aiMemory.huntMode) {
+        risk *= 1.5;  // Much more cautious when we can't see anyone
+    }
+
+    // Reduce risk if we have many allies nearby (safety in numbers)
+    const allies = getAllAlliedAIUnits();
+    const nearbyAllies = allies.filter(a =>
+        hexDistance({ q, r }, { q: a.q, r: a.r }) <= 3
+    ).length;
+    if (nearbyAllies >= 2) {
+        risk *= 0.6;  // 40% reduction with group support
+    } else if (nearbyAllies === 1) {
+        risk *= 0.8;  // 20% reduction with one ally
+    }
+
+    return { risk, dangerousHexes };
+}
+
+/**
+ * Check if a unit is isolated (too far from allies)
+ * Isolated units are vulnerable to ambush
+ */
+function isUnitIsolated(unit, targetQ, targetR) {
+    const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
+    if (allies.length === 0) return false;  // Can't be isolated if no allies
+
+    // Check distance to nearest ally after potential move
+    let nearestAllyDist = Infinity;
+    for (const ally of allies) {
+        const dist = hexDistance({ q: targetQ, r: targetR }, { q: ally.q, r: ally.r });
+        if (dist < nearestAllyDist) {
+            nearestAllyDist = dist;
+        }
+    }
+
+    // Consider isolated if more than 5 hexes from nearest ally
+    return nearestAllyDist > 5;
+}
+
+/**
+ * Calculate how "scouted" an area is - has a scout checked it recently?
+ * Areas cleared by scouts are safer to enter
+ */
+function isAreaScoutedRecently(q, r) {
+    // Check if this area was searched recently
+    const key = `${q},${r}`;
+    if (aiMemory.searchedAreas.has(key)) {
+        return true;
+    }
+
+    // Check if any nearby hexes were searched (within 2)
+    for (let dq = -2; dq <= 2; dq++) {
+        for (let dr = -2; dr <= 2; dr++) {
+            if (Math.abs(dq + dr) > 2) continue;
+            const neighborKey = `${q + dq},${r + dr}`;
+            if (aiMemory.searchedAreas.has(neighborKey)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Determine if unit should wait for scout to clear an area
+ * Non-scout units should be cautious entering uncleared forests
+ */
+function shouldWaitForScout(unit, targetQ, targetR, plan) {
+    // Scouts don't wait for themselves
+    if (unit.class === 'scout') return false;
+
+    // Only apply in hunt mode (no visible enemies)
+    if (!plan.inHuntMode) return false;
+
+    const targetHex = getHex(targetQ, targetR);
+    if (!targetHex) return false;
+
+    // Check if target is a risky area (forest, unexplored)
+    const isForest = targetHex.type === 'forest' || targetHex.cover;
+    const aiExplored = state.playerExploredHexes[state.currentPlayer];
+    const isExplored = aiExplored && aiExplored.has(`${targetQ},${targetR}`);
+
+    if (!isForest && isExplored) return false;  // Safe enough
+
+    // Check if we have a scout that could clear this area
+    const scouts = getAllAlliedAIUnits().filter(u =>
+        u.class === 'scout' && u.alive
+    );
+
+    if (scouts.length === 0) return false;  // No scouts, proceed with caution
+
+    // Check if a scout is nearby and could clear this area first
+    for (const scout of scouts) {
+        const scoutDist = hexDistance({ q: scout.q, r: scout.r }, { q: targetQ, r: targetR });
+        if (scoutDist <= scout.move + 2) {
+            // Scout could reach this area - non-scouts should wait
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Get all units from allied AI players (for team coordination)
  * This includes the current player and all allied AI players
@@ -963,6 +1118,49 @@ function analyzeAndPlan() {
     };
     if (aiMemory.searchPattern && patternExplanations[aiMemory.searchPattern] && visibleEnemies.length > 0) {
         addAIThought(patternExplanations[aiMemory.searchPattern], 'strategy');
+    }
+
+    // === AMBUSH AWARENESS - Detect potential ambush positions ===
+    if (aiMemory.huntMode && visibleEnemies.length === 0) {
+        // Check for potential ambush areas (unexplored forests nearby)
+        let totalAmbushRisk = 0;
+        let riskyForests = 0;
+        const aiVisible = state.playerVisibleHexes[state.currentPlayer];
+        const aiExplored = state.playerExploredHexes[state.currentPlayer];
+
+        // Scan the area around our units for dangerous forests
+        for (const unit of aiUnits.filter(u => u.alive)) {
+            for (let dq = -4; dq <= 4; dq++) {
+                for (let dr = -4; dr <= 4; dr++) {
+                    if (Math.abs(dq + dr) > 4) continue;
+                    const nq = unit.q + dq;
+                    const nr = unit.r + dr;
+                    const neighborHex = getHex(nq, nr);
+                    if (!neighborHex) continue;
+
+                    const key = `${nq},${nr}`;
+                    const isForest = neighborHex.type === 'forest' || neighborHex.cover;
+                    const isVisible = aiVisible && aiVisible.has(key);
+
+                    // Count unexplored/invisible forests as potential ambush sites
+                    if (isForest && !isVisible) {
+                        riskyForests++;
+                        const isExplored = aiExplored && aiExplored.has(key);
+                        totalAmbushRisk += isExplored ? 5 : 10;
+                    }
+                }
+            }
+        }
+
+        // Warn about potential ambush if high risk detected
+        if (riskyForests >= 5 && totalAmbushRisk > 40) {
+            addAIThought(variedPhrase([
+                'Vorsicht! Viele unerkundete Wälder in der Nähe. Möglicher Hinterhalt.',
+                'Achtung: Der Feind könnte sich in den Wäldern verstecken. Scouts aufklären lassen.',
+                'Gefährliches Terrain voraus. Wälder könnten Hinterhalte bergen. Vorsichtig vorgehen.',
+                'Verdächtige Waldgebiete entdeckt. Scouts gehen vor, andere folgen mit Abstand.'
+            ]), 'strategy');
+        }
     }
 
     // Assign targets using ALL allied units for coordinated focus fire
@@ -4969,6 +5167,47 @@ function scoreSearchPosition(unit, q, r, plan) {
     const hex = getHex(q, r);
     if (hex && hex.type === 'hills') {
         score += 40; // Hills give vision advantage during search
+    }
+
+    // === AMBUSH DETECTION - Be cautious of forests and cover ===
+    // When hunting (no visible enemies), forests could hide ambushers
+    if (plan.inHuntMode) {
+        const { risk: ambushRisk } = calculateAmbushRisk(q, r, []);
+
+        // Non-scouts should be very cautious about advancing into risky areas
+        if (unit.class !== 'scout') {
+            // Strong penalty for risky positions
+            score -= ambushRisk * 1.2;
+
+            // Extra penalty for entering forests that haven't been scouted
+            if (hex && (hex.type === 'forest' || hex.cover)) {
+                if (!isAreaScoutedRecently(q, r)) {
+                    score -= 80;  // Heavy penalty for uncleared forests
+                }
+            }
+
+            // Check if we should wait for scout
+            if (shouldWaitForScout(unit, q, r, plan)) {
+                score -= 100;  // Don't rush into danger - let scout clear first
+            }
+        } else {
+            // Scouts should explore risky areas, but carefully
+            // Scouts get a bonus for clearing dangerous areas
+            if (hex && (hex.type === 'forest' || hex.cover)) {
+                if (!isAreaScoutedRecently(q, r)) {
+                    score += 40;  // Scout bonus for clearing forests
+                }
+            }
+            // Slight penalty for very high risk (multiple unknown forests)
+            score -= ambushRisk * 0.3;
+        }
+
+        // === ISOLATION PENALTY - Stay with allies ===
+        if (isUnitIsolated(unit, q, r)) {
+            // Heavy penalty for getting isolated during hunt mode
+            const isolationPenalty = unit.class === 'scout' ? 40 : 100;
+            score -= isolationPenalty;
+        }
     }
 
     // Search pattern specific scoring
