@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.5.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.4.1...shadow-squad-v6.5.0) (2026-01-03)
+
+
+### Features
+
+* **ui:** add pause menu and improve scroll/zoom performance ([#338](https://github.com/CodingSteve01/battlezone/issues/338)) ([bcb237d](https://github.com/CodingSteve01/battlezone/commit/bcb237d0f9d3c1febb175736136ed7be331400d3))
+
 ## [6.4.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.4.0...shadow-squad-v6.4.1) (2026-01-03)
 
 
