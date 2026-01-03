@@ -14,18 +14,39 @@ let assetsLoaded = false;
 let loadingPromise = null;
 
 // Placeholder colors for missing assets
+// When sprites are not available, these colors are used as fallback
 const PLACEHOLDER_COLORS = {
+    // Basic terrain (usually has sprites)
     grass: '#6a9a58',
     forest: '#3d6a4a',
     hills: '#7a8c5a',
-    rock: '#7a7878',
+    rock: '#6a6a68',
     water: '#4a7a95',
     sand: '#d4b888',
     swamp: '#5a6a45',
     road: '#9a8a70',
     path: '#8a7860',
     river: '#4a7c9a',
-    default: '#808080'
+    snow: '#e0e8f0',
+    pine: '#2a4a35',
+    tallgrass: '#5a8a55',
+    mud: '#5a4838',
+    clearing: '#5a9a60',
+    // Extended terrain (may not have sprites yet)
+    flowers: '#5a8a60',
+    heather: '#7a5a7a',
+    ruins: '#7a7570',
+    ice: '#b8d8e8',
+    reeds: '#5a7a50',
+    cliff: '#6a6560',
+    gravel: '#9a9088',
+    shallows: '#5a9aaa',
+    deepwater: '#1a4060',
+    farmland: '#7a6545',
+    wheat: '#c8b060',
+    bridge: '#8a7060',
+    moss: '#4a6a48',
+    default: '#6a8a58'  // Default to grass-like green instead of gray
 };
 
 /**
