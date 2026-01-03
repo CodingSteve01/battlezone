@@ -1215,7 +1215,8 @@ button:focus:not(:focus-visible),
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 20px;
+    gap: 12px;
+    padding: 10px 18px;
     padding-top: max(12px, env(safe-area-inset-top));
     background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 100%);
     border-bottom: 1px solid var(--border-subtle);
@@ -1228,12 +1229,17 @@ button:focus:not(:focus-visible),
 .player-indicator {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(12, 17, 32, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .player-dot {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     box-shadow: 0 0 20px currentColor, inset 0 0 10px rgba(255,255,255,0.3);
     animation: dotPulse 2s infinite ease-in-out;
@@ -1246,17 +1252,23 @@ button:focus:not(:focus-visible),
 
 .player-name {
     font-weight: 700;
-    font-size: 16px;
-    letter-spacing: 0.5px;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
 }
 
 .round-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
     transition: transform 0.2s ease;
     position: relative;
+    padding: 6px 10px;
+    border-radius: 16px;
+    background: rgba(12, 17, 32, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .round-info:hover {
@@ -1394,29 +1406,30 @@ button:focus:not(:focus-visible),
 }
 
 .round-badge {
-    background: var(--bg-glass);
-    border: 1px solid var(--border-subtle);
-    padding: 8px 16px;
-    border-radius: 24px;
-    font-size: 13px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
     font-weight: 600;
-    backdrop-filter: blur(10px);
+    letter-spacing: 0.3px;
 }
 
 .ap-display {
     display: flex;
+    align-items: center;
     gap: 6px;
 }
 
 .ap-pip {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
     background: linear-gradient(135deg, var(--yellow-light) 0%, var(--yellow) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 800;
     color: #000;
     box-shadow: 0 4px 15px var(--yellow-glow), inset 0 1px 0 rgba(255,255,255,0.3);
@@ -1435,15 +1448,15 @@ button:focus:not(:focus-visible),
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
-    border: 2px solid var(--yellow);
-    border-radius: 12px;
-    box-shadow: 0 0 20px var(--yellow-glow);
+    padding: 6px 12px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.07) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.55);
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .ap-pool-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -1451,22 +1464,22 @@ button:focus:not(:focus-visible),
 }
 
 .ap-pool-value {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 800;
     color: var(--yellow-light);
-    text-shadow: 0 0 15px var(--yellow-glow);
+    text-shadow: 0 0 10px var(--yellow-glow);
     min-width: 30px;
     text-align: center;
 }
 
 .ap-pool-max {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-muted);
 }
 
 .ap-pool-icon {
-    font-size: 18px;
+    font-size: 16px;
     margin-left: 2px;
 }
 
