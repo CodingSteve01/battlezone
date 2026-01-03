@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.1...shadow-squad-v6.6.2) (2026-01-03)
+
+
+### Bug Fixes
+
+* **units:** support variant unitKey format in createUnits ([#354](https://github.com/CodingSteve01/battlezone/issues/354)) ([97cd0a1](https://github.com/CodingSteve01/battlezone/commit/97cd0a1d09329de9c74e5d48af7ac688bb9d609e))
+
 ## [6.6.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.0...shadow-squad-v6.6.1) (2026-01-03)
 
 
