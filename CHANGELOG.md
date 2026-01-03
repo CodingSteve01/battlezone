@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.2...shadow-squad-v6.6.3) (2026-01-03)
+
+
+### Bug Fixes
+
+* **ui:** improve variant card responsiveness for mobile devices ([#356](https://github.com/CodingSteve01/battlezone/issues/356)) ([ff0e526](https://github.com/CodingSteve01/battlezone/commit/ff0e5262c15bc587ad4de654e732dfd35987e2b1))
+
 ## [6.6.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.1...shadow-squad-v6.6.2) (2026-01-03)
 
 
