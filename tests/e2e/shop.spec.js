@@ -86,9 +86,9 @@ test.describe('Shop Screen', () => {
         const gridContainer = page.locator('.shop-grid-container');
         await expect(gridContainer).toBeVisible();
 
-        // Verify unit cards are generated - should have 6 unit classes
+        // Verify unit cards are generated - should have 18 cards (6 unit classes × 3 variants each)
         const unitCards = page.locator('.unit-card');
-        await expect(unitCards).toHaveCount(6, { timeout: 5000 });
+        await expect(unitCards).toHaveCount(18, { timeout: 5000 });
 
         // Verify each unit card is visible
         for (let i = 0; i < 6; i++) {
@@ -110,7 +110,7 @@ test.describe('Shop Screen', () => {
         expect(errors, 'No JavaScript errors should occur').toEqual([]);
     });
 
-    test('unit cards can be selected and budget updates', async ({ page }) => {
+    test('unit cards can be added via cart controls and budget updates', async ({ page }) => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
 
@@ -120,15 +120,17 @@ test.describe('Shop Screen', () => {
         const budgetCurrent = page.locator('.budget-current');
         await expect(budgetCurrent).toHaveText('0');
 
-        // Click first unit card to select it
+        // Click cart add button on first unit card to add it
         const firstCard = page.locator('.unit-card').first();
-        await firstCard.click();
+        const addBtn = firstCard.locator('.cart-add');
+        await addBtn.click();
 
         // Budget should have increased (not 0 anymore)
         await expect(budgetCurrent).not.toHaveText('0');
 
-        // Card should be marked as selected
-        await expect(firstCard).toHaveClass(/selected/);
+        // Card should show cart count of 1
+        const cartCount = firstCard.locator('.cart-count');
+        await expect(cartCount).toHaveText('1');
 
         // Team preview should show the selected unit (uses .team-slot.filled class)
         const teamPreview = page.locator('#team-preview-units');

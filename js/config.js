@@ -14,7 +14,7 @@ export const CONFIG = {
     },
 
     // Team Budget System - players spend points to build their team
-    TEAM_BUDGET: 350,         // Total points available for team composition
+    TEAM_BUDGET: 400,         // Total points available for team composition (erhöht für mehr Möglichkeiten)
     MIN_UNITS: 2,             // Minimum units required
     MAX_UNITS: 5,             // Maximum units allowed
     UNITS_PER_PLAYER: 3,      // Default/base units per player (for AP pool calculations)
@@ -491,6 +491,242 @@ export const UNIT_CLASSES = {
         armorPiercing: 0.3  // 30% Deckung ignorieren
     }
 };
+
+/**
+ * Unit Variants - Spezialisierungen für jede Einheitsklasse
+ * Jede Variante modifiziert die Basiswerte und kostet unterschiedlich viel
+ * Badge-Symbole: ★ (Veteran), ✦ (Elite), ☆ (Spezial)
+ */
+export const UNIT_VARIANTS = {
+    scout: {
+        standard: {
+            name: 'Späher',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        pathfinder: {
+            name: 'Pfadfinder',
+            badge: '★',
+            badgeColor: '#22c55e',
+            costMod: 20,  // 70 + 20 = 90
+            statMods: {
+                vision: 2,      // 8 → 10 (beste Sicht!)
+                move: 1         // 5 → 6
+            },
+            bonusDesc: '+2 Sicht, +1 Bewegung'
+        },
+        saboteur: {
+            name: 'Saboteur',
+            badge: '✦',
+            badgeColor: '#ef4444',
+            costMod: 30,  // 70 + 30 = 100
+            statMods: {
+                damage: 8,      // 22 → 30
+                stealthDetectionRange: 2  // 3 → 5
+            },
+            bonusAbility: 'Aufdecken',  // Kann getarnte Feinde sichtbar machen
+            bonusDesc: '+8 Schaden, +2 Aufspüren'
+        }
+    },
+    assault: {
+        standard: {
+            name: 'Sturmsoldat',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        heavy: {
+            name: 'Schwerer Sturm',
+            badge: '★',
+            badgeColor: '#3b82f6',
+            costMod: 25,  // 100 + 25 = 125
+            statMods: {
+                hp: 30,         // 120 → 150
+                damage: 5       // 40 → 45
+            },
+            bonusDesc: '+30 HP, +5 Schaden'
+        },
+        breacher: {
+            name: 'Brecher',
+            badge: '✦',
+            badgeColor: '#f59e0b',
+            costMod: 35,  // 100 + 35 = 135
+            statMods: {
+                damage: 10,     // 40 → 50
+                armorPiercing: 0.3  // 0.5 → 0.8 (ignoriert 80% Deckung!)
+            },
+            bonusDesc: '+10 Schaden, 80% Deckung ignorieren'
+        }
+    },
+    medic: {
+        standard: {
+            name: 'Sanitäter',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        fieldSurgeon: {
+            name: 'Feldarzt',
+            badge: '★',
+            badgeColor: '#22c55e',
+            costMod: 25,  // 80 + 25 = 105
+            statMods: {
+                healAmount: 20,   // 40 → 60
+                healRange: 2      // 4 → 6
+            },
+            bonusDesc: '+20 Heilung, +2 Reichweite'
+        },
+        combatMedic: {
+            name: 'Kampfsanitäter',
+            badge: '✦',
+            badgeColor: '#ef4444',
+            costMod: 30,  // 80 + 30 = 110
+            statMods: {
+                hp: 20,         // 90 → 110
+                damage: 10,     // 15 → 25
+                range: 1        // 3 → 4
+            },
+            bonusDesc: '+20 HP, +10 Schaden, +1 Reichweite'
+        }
+    },
+    sniper: {
+        standard: {
+            name: 'Scharfschütze',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        marksman: {
+            name: 'Präzisionsschütze',
+            badge: '★',
+            badgeColor: '#8b5cf6',
+            costMod: 25,  // 110 + 25 = 135
+            statMods: {
+                damage: 15,     // 65 → 80 (One-shot kill potential!)
+                range: 1        // 6 → 7
+            },
+            bonusDesc: '+15 Schaden, +1 Reichweite'
+        },
+        ghost: {
+            name: 'Phantom',
+            badge: '✦',
+            badgeColor: '#1e293b',
+            costMod: 35,  // 110 + 35 = 145
+            statMods: {
+                hp: 10,         // 45 → 55
+                move: 1,        // 2 → 3
+                stealthDetectionRange: -1  // Noch schwerer zu entdecken
+            },
+            bonusAbility: 'Doppeltarnung',  // Tarnung hält 2 Runden
+            bonusDesc: '+10 HP, +1 Bewegung, verbesserte Tarnung'
+        }
+    },
+    commando: {
+        standard: {
+            name: 'Kommando',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        assassin: {
+            name: 'Assassine',
+            badge: '★',
+            badgeColor: '#dc2626',
+            costMod: 25,  // 90 + 25 = 115
+            statMods: {
+                damage: 10,     // 50 → 60
+                meleeBonus: 10, // 20 → 30
+                ambushBonus: 10 // 15 → 25
+            },
+            bonusDesc: '+10 Schaden, +10 Nahkampf, +10 Hinterhalt'
+        },
+        infiltrator: {
+            name: 'Infiltrator',
+            badge: '✦',
+            badgeColor: '#6366f1',
+            costMod: 30,  // 90 + 30 = 120
+            statMods: {
+                hp: 15,         // 75 → 90
+                move: 1,        // 5 → 6
+                vision: 2       // 5 → 7
+            },
+            bonusAbility: 'Schnelltarnung',  // Tarnung kostet nur 1 AP
+            bonusDesc: '+15 HP, +1 Bewegung, +2 Sicht'
+        }
+    },
+    elitesoldat: {
+        standard: {
+            name: 'Elitesoldat',
+            badge: null,
+            costMod: 0,
+            statMods: {}
+        },
+        commander: {
+            name: 'Kommandant',
+            badge: '★',
+            badgeColor: '#eab308',
+            costMod: 30,  // 150 + 30 = 180
+            statMods: {
+                hp: 20,         // 100 → 120
+                damage: 5,      // 40 → 45
+                vision: 2       // 5 → 7
+            },
+            bonusAbility: 'Führung',  // Verbündete in Reichweite 2 kriegen +10% Trefferchance
+            bonusDesc: '+20 HP, +5 Schaden, +2 Sicht, Team-Buff'
+        },
+        juggernaut: {
+            name: 'Juggernaut',
+            badge: '✦',
+            badgeColor: '#b91c1c',
+            costMod: 40,  // 150 + 40 = 190
+            statMods: {
+                hp: 50,         // 100 → 150
+                damage: 10,     // 40 → 50
+                meleeDamage: 15,// 55 → 70
+                move: -1        // 3 → 2 (langsamer aber stärker)
+            },
+            bonusDesc: '+50 HP, +10 Schaden, -1 Bewegung'
+        }
+    }
+};
+
+/**
+ * Helper: Get full unit stats with variant modifiers applied
+ */
+export function getUnitWithVariant(classKey, variantKey = 'standard') {
+    const baseClass = UNIT_CLASSES[classKey];
+    if (!baseClass) return null;
+
+    const variants = UNIT_VARIANTS[classKey];
+    if (!variants) return { ...baseClass, variant: 'standard', variantData: null };
+
+    const variant = variants[variantKey] || variants.standard;
+
+    // Apply stat modifiers
+    const modifiedUnit = { ...baseClass };
+    modifiedUnit.cost = baseClass.cost + (variant.costMod || 0);
+    modifiedUnit.variant = variantKey;
+    modifiedUnit.variantData = variant;
+
+    // Apply stat mods
+    if (variant.statMods) {
+        for (const [stat, mod] of Object.entries(variant.statMods)) {
+            if (typeof modifiedUnit[stat] === 'number') {
+                modifiedUnit[stat] = modifiedUnit[stat] + mod;
+            } else {
+                modifiedUnit[stat] = mod;
+            }
+        }
+    }
+
+    // Override name if variant has one
+    if (variant.name) {
+        modifiedUnit.name = variant.name;
+    }
+
+    return modifiedUnit;
+}
 
 // Biome/Landscape configurations for map generation
 export const BIOMES = {
