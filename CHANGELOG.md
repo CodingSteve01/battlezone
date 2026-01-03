@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.1.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.3...shadow-squad-v6.1.0) (2026-01-03)
+
+
+### Features
+
+* **ai:** add safe-zone foresight and isolation prioritization ([#327](https://github.com/CodingSteve01/battlezone/issues/327)) ([5f56747](https://github.com/CodingSteve01/battlezone/commit/5f567471618a6ad78c091d32cdf5fd1919ab6b4a))
+
 ## [6.0.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.0.2...shadow-squad-v6.0.3) (2026-01-02)
 
 
