@@ -514,6 +514,7 @@ function generateUnitCards() {
             };
 
             // Info button click = show details
+            const infoBtn = card.querySelector('.card-info-btn');
             if (infoBtn) {
                 infoBtn.onclick = (e) => {
                     e.stopPropagation();
