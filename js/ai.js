@@ -4286,6 +4286,18 @@ function findAllVisibleEnemies() {
 function getPhantomEnemiesFromMemory() {
     const phantoms = [];
 
+    // Class-specific stats for accurate phantom creation
+    const classStats = {
+        scout:    { damage: 18, range: 4, move: 5 },
+        assault:  { damage: 35, range: 2, move: 3 },
+        medic:    { damage: 12, range: 3, move: 4 },
+        sniper:   { damage: 45, range: 6, move: 2 },
+        commando: { damage: 40, range: 1, move: 5 },
+        ninja:    { damage: 40, range: 1, move: 4 },
+        elitesoldat: { damage: 35, range: 3, move: 3 },
+        unknown:  { damage: 25, range: 3, move: 3 }  // Conservative fallback
+    };
+
     for (const [unitId, posInfo] of aiMemory.lastKnownPositions) {
         // Only use recent memories with reasonable confidence
         if (state.round - posInfo.round > 3 || posInfo.confidence < 0.3) continue;
@@ -4294,18 +4306,23 @@ function getPhantomEnemiesFromMemory() {
         const realEnemy = state.units.find(u => u.id === unitId && u.alive);
         if (realEnemy && isUnitVisibleToAlliedTeam(realEnemy)) continue;
 
+        // Get class-specific stats (use correct range/damage for each class!)
+        const unitClass = posInfo.unitClass || 'unknown';
+        const stats = classStats[unitClass] || classStats.unknown;
+
         // Create a phantom enemy at the LAST KNOWN position (not current!)
         // This is fair - the AI only knows where the enemy WAS
         phantoms.push({
             id: unitId,
             q: posInfo.q,  // Last known position
             r: posInfo.r,  // Last known position
-            class: posInfo.unitClass || 'unknown',
+            class: unitClass,
             currentHp: posInfo.hp || 50,  // Estimated HP from last sighting
             maxHp: posInfo.maxHp || 100,
-            damage: 30,  // Assumed average damage
-            range: 3,    // Assumed average range
-            isPhantom: true,  // Mark as phantom - cannot be directly attacked
+            damage: stats.damage,  // Class-specific damage
+            range: stats.range,    // Class-specific range (important for sniper!)
+            move: stats.move,      // Class-specific movement
+            isPhantom: true,       // Mark as phantom - cannot be directly attacked
             confidence: posInfo.confidence,
             lastSeenRound: posInfo.round
         });
