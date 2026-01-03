@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.5.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.1...shadow-squad-v6.5.2) (2026-01-03)
+
+
+### Styles
+
+* **header:** polish in-game top bar ([#342](https://github.com/CodingSteve01/battlezone/issues/342)) ([ed28b36](https://github.com/CodingSteve01/battlezone/commit/ed28b364a1aeaebc9280f8c548ac405b13e62b1a))
+
 ## [6.5.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.0...shadow-squad-v6.5.1) (2026-01-03)
 
 
