@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.4.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.3.0...shadow-squad-v6.4.0) (2026-01-03)
+
+
+### Features
+
+* **ai:** add attack history awareness and stronger danger penalties ([#333](https://github.com/CodingSteve01/battlezone/issues/333)) ([022909a](https://github.com/CodingSteve01/battlezone/commit/022909a09feac6543634332099efe2a2312fd01a))
+
 ## [6.3.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.2.0...shadow-squad-v6.3.0) (2026-01-03)
 
 
