@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.0...shadow-squad-v6.6.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* shop cart ([#352](https://github.com/CodingSteve01/battlezone/issues/352)) ([ed18d26](https://github.com/CodingSteve01/battlezone/commit/ed18d2661ff38c6a2a5f14ef15b2570dd78b1372))
+
 ## [6.6.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.4...shadow-squad-v6.6.0) (2026-01-03)
 
 
