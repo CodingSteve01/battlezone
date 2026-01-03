@@ -577,16 +577,13 @@ function getUnitCost(unitKey) {
  * Add one unit to cart (supports unitKey format class:variant)
  */
 function addToCart(unitKey) {
-    console.log('[addToCart] unitKey:', unitKey);
     const { classKey, variantKey } = parseUnitKey(unitKey);
     const unitData = getUnitWithVariant(classKey, variantKey);
-    console.log('[addToCart] parsed:', { classKey, variantKey, cost: unitData?.cost });
     if (!unitData) return;
 
     if (canAddUnit(unitKey)) {
         currentPlayerSelection.push(unitKey);
         currentBudgetSpent += unitData.cost;
-        console.log('[addToCart] added! selection:', [...currentPlayerSelection], 'budget:', currentBudgetSpent);
         updateCardSelectionState();
         updateTeamPreview();
         updateBudgetDisplay();
@@ -602,22 +599,15 @@ function addToCart(unitKey) {
  * Remove one unit from cart by unitKey (class:variant)
  */
 function removeFromCart(unitKey) {
-    console.log('[removeFromCart] unitKey:', unitKey);
-    console.log('[removeFromCart] current selection:', [...currentPlayerSelection]);
     const index = currentPlayerSelection.lastIndexOf(unitKey);
-    console.log('[removeFromCart] index found:', index);
     if (index !== -1) {
         const cost = getUnitCost(unitKey);
-        console.log('[removeFromCart] cost to refund:', cost);
         currentBudgetSpent -= cost;
         currentPlayerSelection.splice(index, 1);
-        console.log('[removeFromCart] removed! selection:', [...currentPlayerSelection], 'budget:', currentBudgetSpent);
         updateCardSelectionState();
         updateTeamPreview();
         updateBudgetDisplay();
         updateConfirmButton();
-    } else {
-        console.log('[removeFromCart] NOT FOUND in selection!');
     }
 }
 
@@ -1093,12 +1083,12 @@ function renderTeamSlotSprite(canvas, classKey, playerIndex) {
  * Remove unit from selection by index
  */
 function removeFromSelection(index) {
-    const removedClass = currentPlayerSelection[index];
-    const unitClass = UNIT_CLASSES[removedClass];
+    const unitKey = currentPlayerSelection[index];
+    if (!unitKey) return;
 
-    if (unitClass) {
-        currentBudgetSpent -= unitClass.cost;
-    }
+    // Use the same cost calculation as removeFromCart (supports variants)
+    const cost = getUnitCost(unitKey);
+    currentBudgetSpent -= cost;
 
     currentPlayerSelection.splice(index, 1);
     updateCardSelectionState();
