@@ -768,6 +768,59 @@ function calculatePositionExposure(q, r, enemies, unit) {
 }
 
 /**
+ * Predict enemy threats based on movement history
+ * Uses predicted positions with confidence to avoid obvious traps
+ */
+function getPredictedThreatsAt(q, r, enemies) {
+    const threats = [];
+
+    for (const [enemyId, prediction] of aiMemory.predictedPositions) {
+        if (prediction.confidence < 0.4) continue;
+
+        const enemy = enemies.find(e => e.id === enemyId);
+        if (!enemy) continue;
+
+        const dist = hexDistance({ q, r }, { q: prediction.q, r: prediction.r });
+        const enemyRange = enemy.range || 3;
+
+        if (dist <= enemyRange) {
+            threats.push({ enemy, prediction });
+        }
+    }
+
+    return threats;
+}
+
+/**
+ * Identify safe zones based on exposure and predicted enemy moves
+ */
+function getSafeZoneBonus(unit, q, r, enemies) {
+    const exposure = calculatePositionExposure(q, r, enemies, unit);
+    const predictedThreats = getPredictedThreatsAt(q, r, enemies);
+
+    let bonus = 0;
+
+    if (exposure <= 20) {
+        bonus += 40;
+    } else if (exposure <= 40) {
+        bonus += 20;
+    }
+
+    if (predictedThreats.length === 0) {
+        bonus += 15;
+    } else {
+        bonus -= predictedThreats.length * 20;
+    }
+
+    const hpRatio = unit.currentHp / unit.maxHp;
+    if (hpRatio < 0.5) {
+        bonus *= 1.2;
+    }
+
+    return { bonus, predictedThreats, exposure };
+}
+
+/**
  * Get all units from allied AI players (for team coordination)
  * This includes the current player and all allied AI players
  */
@@ -1229,6 +1282,39 @@ function updateThreatAssessment(enemies) {
 }
 
 /**
+ * Calculate how far an enemy is from allied support
+ * Larger distance means the enemy is more isolated and easier to punish
+ */
+function getEnemySupportDistance(enemy) {
+    const allies = state.units.filter(u =>
+        u.alive &&
+        u.id !== enemy.id &&
+        arePlayersAllied(enemy.player, u.player)
+    );
+
+    if (allies.length === 0) return Infinity;
+
+    return Math.min(...allies.map(ally =>
+        hexDistance({ q: enemy.q, r: enemy.r }, { q: ally.q, r: ally.r })
+    ));
+}
+
+/**
+ * Score bonus for isolated targets
+ * Encourages the AI to punish overextended units
+ */
+function getIsolationBonus(enemy) {
+    const supportDistance = getEnemySupportDistance(enemy);
+
+    if (supportDistance === Infinity) return 60;
+    if (supportDistance >= 4) return 45;
+    if (supportDistance === 3) return 30;
+    if (supportDistance === 2) return 15;
+
+    return 0;
+}
+
+/**
  * Estimate where player forces might be based on last known positions
  */
 function estimatePlayerPosition() {
@@ -1354,6 +1440,7 @@ function assignTargets(aiUnits, enemies) {
         const canKill = totalDamage >= enemy.currentHp;
         const overkill = canKill ? (totalDamage - enemy.currentHp) : 0;
         const threat = aiMemory.threatAssessment.get(enemy.id) || 50;
+        const isolationBonus = getIsolationBonus(enemy);
 
         // Prioritize:
         // 1. Enemies we can definitely kill (combined firepower)
@@ -1367,6 +1454,7 @@ function assignTargets(aiUnits, enemies) {
         }
         score += threat;
         score += (1 - enemy.currentHp / enemy.maxHp) * 100; // Lower HP = higher priority
+        score += isolationBonus;
 
         return { enemy, score, options, canKill, totalDamage };
     }).sort((a, b) => b.score - a.score);
@@ -2000,6 +2088,10 @@ async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
         const exposure = calculatePositionExposure(q, r, enemies, unit);
         score -= exposure * 2;
 
+        // Prefer safe zones that also avoid predicted threats
+        const safeZoneInfo = getSafeZoneBonus(unit, q, r, enemies);
+        score += safeZoneInfo.bonus * 0.6;
+
         // Prefer cover
         if (hex.cover) score += 30;
 
@@ -2266,6 +2358,11 @@ function scoreCombatPositionSafe(unit, q, r, enemies, plan) {
     } else {
         score -= exposurePenalty * 0.5;
     }
+
+    // === SAFE ZONE BONUS ===
+    // Reward positions with low exposure and no predicted threats
+    const safeZoneInfo = getSafeZoneBonus(unit, q, r, enemies);
+    score += safeZoneInfo.bonus;
 
     // === PREFER POSITIONS WITH COVER ===
     if (hex) {
@@ -3132,6 +3229,7 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
         killableTargets: [],
         threatsInRange: [],
         closeRangeThreats: [],  // Feinde die besonders nah sind
+        predictedThreats: [],
         scoreAdjustment: 0,
         explanation: ''
     };
@@ -3158,6 +3256,9 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
             }
         }
     }
+
+    // === VORAUSBERECHNUNG: FEINDLICHE BEWEGUNGSPROGNOSEN ===
+    evaluation.predictedThreats = getPredictedThreatsAt(targetQ, targetR, enemies);
 
     // === KRITISCH: INTELLIGENTES AP-MANAGEMENT ===
     // Die KI darf NIEMALS in Gefahr laufen ohne die Möglichkeit zurückzuschlagen
@@ -3209,6 +3310,24 @@ function evaluateMoveWithForeshadowing(unit, targetQ, targetR, moveCost, enemies
     // Ideale Position: In Angriffsreichweite, genug AP, und hat noch Fluchtoptionen
     if (evaluation.canAttackAfter && apAfterMove >= 1 && evaluation.threatsInRange.length <= 1) {
         evaluation.scoreAdjustment += 30;
+    }
+
+    // Opportunity window: Angriff ohne erwartete Gegenwehr
+    if (evaluation.canAttackAfter && apAfterMove >= 1 &&
+        evaluation.threatsInRange.length === 0 &&
+        evaluation.predictedThreats.length === 0) {
+        evaluation.scoreAdjustment += 90;
+        if (!evaluation.explanation) {
+            evaluation.explanation = '⚡ Sicheres Schussfenster ohne Gegenschlag';
+        }
+    }
+
+    // Predicted threats reduce the value of a move
+    if (evaluation.predictedThreats.length > 0) {
+        evaluation.scoreAdjustment -= evaluation.predictedThreats.length * 60;
+        if (!evaluation.explanation) {
+            evaluation.explanation = '⚠️ Erwartete Feindbewegung in Schussreichweite';
+        }
     }
 
     // Penalty für Exposition ohne Angriffsmöglichkeit
@@ -3414,7 +3533,12 @@ function selectBestTarget(attacker, targets) {
         if (aIsDanger && !bIsDanger) return -1;
         if (bIsDanger && !aIsDanger) return 1;
 
-        // Priority 6: Lower HP first
+        // Priority 6: Isolated targets (overextended enemies)
+        const aIsolation = getIsolationBonus(a);
+        const bIsolation = getIsolationBonus(b);
+        if (aIsolation !== bIsolation) return bIsolation - aIsolation;
+
+        // Priority 7: Lower HP first
         return a.currentHp - b.currentHp;
     })[0];
 }
