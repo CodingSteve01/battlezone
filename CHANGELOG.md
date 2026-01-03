@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.5.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.0...shadow-squad-v6.5.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* **ui:** hide pause button in main menu and prevent accidental activation ([#340](https://github.com/CodingSteve01/battlezone/issues/340)) ([39489c1](https://github.com/CodingSteve01/battlezone/commit/39489c1821a10d3a2a4973fa990867441c420bae))
+
 ## [6.5.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.4.1...shadow-squad-v6.5.0) (2026-01-03)
 
 
