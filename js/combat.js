@@ -22,6 +22,7 @@ import {
 } from './audio.js';
 import { particles } from './particles.js';
 import { startMinigame, RESULT_LEVELS, RESULT_MULTIPLIERS, areMinigamesEnabled, initMinigames, startHealingMinigame, HEALING_RESULT_MULTIPLIERS } from './minigames.js';
+import { recordIncomingAttack, isAIPlayer } from './ai.js';
 
 /**
  * Prüfe ob ein Angriff auf ein Ziel erlaubt ist
@@ -790,6 +791,12 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     recordShot(attacker.player, true, hasCrit);
     recordDamageDealt(attacker.player, damage);
     recordDamageTaken(defender.player, damage);
+
+    // === AI LEARNING: Record where attacks came from ===
+    // This allows AI to learn about danger zones and ambush positions
+    if (isAIPlayer(defender.player)) {
+        recordIncomingAttack(defender, attacker);
+    }
 
     // Track damage for XP and assists
     trackDamage(attacker, defender, damage);
