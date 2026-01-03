@@ -6,203 +6,27 @@ import { UNIT_CLASSES, TERRAIN } from './config.js';
 import { playClick, playTarget, playError } from './audio.js';
 import { hexDistance } from './hexMath.js';
 
-// === MINIGAME CONTEXT SYSTEM ===
-// Kontextdaten die das Minigame beeinflussen
+// Import from modular submodules
+import {
+    RESULT_LEVELS,
+    RESULT_MULTIPLIERS,
+    HEALING_RESULT_MULTIPLIERS,
+    MINIGAME_DESCRIPTIONS,
+    HEALING_MINIGAME_DESC,
+    TAP_COOLDOWN_MS
+} from './minigames/constants.js';
 
-/**
- * @typedef {Object} MinigameContext
- * @property {number} distance - Hex-Distanz zum Ziel
- * @property {number} maxRange - Max Reichweite der Unit
- * @property {string} attackerTerrain - Terrain des Angreifers
- * @property {string} targetTerrain - Terrain des Ziels
- * @property {number} alliesInRange - Verbündete in 2 Hex Radius
- * @property {number} enemiesInRange - Feinde in 2 Hex Radius (Stress-Faktor)
- * @property {boolean} isAmbush - Aus Tarnung/Hinterhalt angreifend
- * @property {boolean} targetHiding - Ziel ist versteckt
- * @property {number} attackerHP - HP-Prozent des Angreifers
- * @property {number} targetHP - HP-Prozent des Ziels
- */
+import { calculateDifficultyModifiers } from './minigames/difficulty.js';
 
-/**
- * Berechne Schwierigkeitsmodifikatoren basierend auf Kontext
- * @param {string} unitClass - Einheitsklasse
- * @param {MinigameContext} context - Kontextdaten
- * @returns {Object} Modifikatoren für das Minigame
- */
-export function calculateDifficultyModifiers(unitClass, context) {
-    if (!context) {
-        return {
-            speedMultiplier: 1.0,      // Geschwindigkeit bewegter Elemente
-            zoneMultiplier: 1.0,       // Größe von Trefferzonen
-            timeMultiplier: 1.0,       // Verfügbare Zeit
-            extraChance: 0,            // Extra Erfolgs-Chance
-            description: null          // Beschreibung für UI
-        };
-    }
-
-    const mods = {
-        speedMultiplier: 1.0,
-        zoneMultiplier: 1.0,
-        timeMultiplier: 1.0,
-        extraChance: 0,
-        description: null
-    };
-
-    // Distanz-Verhältnis (0 = nah, 1 = max Reichweite)
-    const distanceRatio = context.maxRange > 0 ? context.distance / context.maxRange : 0;
-
-    // === KLASSEN-SPEZIFISCHE MODIFIKATOREN ===
-
-    switch (unitClass) {
-        case 'scout':
-            // Scout: Schnelle Reflexe, profitiert von Verbündeten (Ablenkung)
-            // Nahkampf ist einfacher (größeres Ziel)
-            if (distanceRatio < 0.3) {
-                mods.zoneMultiplier = 1.3;  // 30% größeres Ziel bei kurzer Distanz
-                mods.description = 'Nahes Ziel - leichter zu treffen';
-            } else if (distanceRatio > 0.7) {
-                mods.speedMultiplier = 1.3; // Ziel bewegt sich schneller bei weiter Distanz
-                mods.zoneMultiplier = 0.8;
-                mods.description = 'Weites Ziel - schneller & kleiner';
-            }
-            // Verbündete lenken Feind ab
-            if (context.alliesInRange > 0) {
-                mods.timeMultiplier = 1 + (context.alliesInRange * 0.15);
-                mods.description = `Verbündete lenken ab (+${context.alliesInRange * 15}% Zeit)`;
-            }
-            break;
-
-        case 'assault':
-            // Assault: Unterdrückungsfeuer, Verbündete helfen
-            if (distanceRatio > 0.8) {
-                mods.zoneMultiplier = 0.7;  // Schwieriger auf Distanz
-                mods.description = 'Maximale Reichweite - präzises Timing nötig';
-            }
-            // Hügel-Vorteil
-            if (context.attackerTerrain === 'hills') {
-                mods.zoneMultiplier *= 1.2;
-                mods.description = 'Erhöhte Position - bessere Kontrolle';
-            }
-            // Verbündete: Unterdrückungsfeuer
-            if (context.alliesInRange > 0) {
-                mods.zoneMultiplier *= 1 + (context.alliesInRange * 0.1);
-                mods.description = `Unterdrückungsfeuer (+${context.alliesInRange * 10}% Zone)`;
-            }
-            break;
-
-        case 'sniper':
-            // Sniper: Arbeitet ALLEINE, keine Ally-Boni!
-            // Kurze Distanz ist SCHWIERIGER (Sniper braucht Abstand)
-            if (distanceRatio < 0.4) {
-                mods.speedMultiplier = 1.5;  // Mehr Wackeln bei Nahkampf
-                mods.timeMultiplier = 0.8;   // Weniger Zeit zum Zielen
-                mods.description = 'Zu nah! Schwer zu zielen';
-            } else if (distanceRatio > 0.7) {
-                // Optimale Sniper-Distanz
-                mods.speedMultiplier = 0.85;
-                mods.description = 'Optimale Schussdistanz';
-            }
-            // Hügel-Vorteil für Sniper
-            if (context.attackerTerrain === 'hills') {
-                mods.speedMultiplier *= 0.9;  // Ruhigere Hand
-                mods.description = 'Erhöhte Position - stabiler';
-            }
-            // Stress bei vielen Feinden in der Nähe
-            if (context.enemiesInRange > 1) {
-                mods.speedMultiplier *= 1 + (context.enemiesInRange * 0.1);
-                mods.description = 'Unter Druck - unruhige Hand!';
-            }
-            break;
-
-        case 'medic':
-            // Medic: Ruhiger wenn Verbündete beschützen
-            // Stress bei niedrigen HP oder wenn alleine
-            if (context.attackerHP < 0.5) {
-                mods.speedMultiplier = 1.3;  // Schnellerer Puls bei niedrigen HP
-                mods.description = 'Verletzt - erhöhter Puls!';
-            }
-            if (context.alliesInRange > 0) {
-                mods.speedMultiplier *= 0.9;  // Ruhiger mit Schutz
-                mods.timeMultiplier = 1.1;
-                mods.description = 'Beschützt - ruhigerer Puls';
-            }
-            if (context.alliesInRange === 0 && context.enemiesInRange > 0) {
-                mods.speedMultiplier = 1.4;  // Panik wenn alleine mit Feinden
-                mods.description = 'Alleine unter Feinden!';
-            }
-            break;
-
-        case 'commando':
-            // Commando: Nahkampf-Spezialist
-            // Duell wird durch Kontext beeinflusst
-            if (context.isAmbush) {
-                mods.extraChance = 0.2;      // 20% extra Erfolgschance aus Hinterhalt
-                mods.timeMultiplier = 1.3;   // Mehr Zeit für Reaktion
-                mods.description = 'Überraschungsangriff!';
-            }
-            if (context.alliesInRange > 0) {
-                mods.extraChance += context.alliesInRange * 0.1;
-                mods.description = `Verbündete lenken ab (+${context.alliesInRange * 10}% Chance)`;
-            }
-            // Feind versteckt = schwieriger
-            if (context.targetHiding) {
-                mods.timeMultiplier = 0.85;
-                mods.description = 'Feind in Deckung!';
-            }
-            break;
-        
-        case 'elitesoldat':
-            // Kommando-Soldat: Vielseitig - passt sich an Situation an
-            // Im Nahkampf (distance = 1): wie Commando
-            // Im Fernkampf: wie Assault aber stabiler
-            if (context.distance === 1) {
-                // Nahkampf: Wie Commando
-                if (context.isAmbush) {
-                    mods.extraChance = 0.15;     // Elite ist gut, aber nicht ganz so stark wie Commando
-                    mods.timeMultiplier = 1.2;
-                    mods.description = 'Nahkampf-Überraschung!';
-                }
-                if (context.alliesInRange > 0) {
-                    mods.extraChance += context.alliesInRange * 0.08;
-                    mods.description = `Taktische Unterstützung (+${context.alliesInRange * 8}% Chance)`;
-                }
-            } else {
-                // Fernkampf: Wie Assault aber mit Elite-Bonus
-                mods.zoneMultiplier = 1.1;       // Elite ist präziser
-                if (context.alliesInRange > 0) {
-                    mods.zoneMultiplier += context.alliesInRange * 0.05;
-                    mods.description = `Koordinierter Angriff (+${context.alliesInRange * 5}%)`;
-                }
-                if (context.attackerHP < 0.3) {
-                    mods.speedMultiplier = 1.2;  // Auch Eliten geraten unter Druck
-                    mods.description = 'Kritischer Zustand!';
-                }
-            }
-            break;
-    }
-
-    // === TERRAIN-EFFEKTE ===
-    if (context.targetTerrain === 'forest' && unitClass !== 'commando' && unitClass !== 'elitesoldat') {
-        mods.zoneMultiplier *= 0.85;  // Wald versteckt das Ziel leicht
-    }
-
-    return mods;
-}
-
-// Minigame result levels
-export const RESULT_LEVELS = {
-    PERFECT: 'perfect',   // 100% damage + crit chance bonus + guaranteed hit
-    GOOD: 'good',         // 100% damage + high hit chance
-    OKAY: 'okay',         // 70% damage
-    MISS: 'miss'          // 30% damage
-};
-
-// Result multipliers for damage and hit chance
-export const RESULT_MULTIPLIERS = {
-    [RESULT_LEVELS.PERFECT]: { damage: 1.0, critBonus: 0.25, hitBonus: 1.0, label: 'PERFEKT!', color: '#ffd700' },
-    [RESULT_LEVELS.GOOD]: { damage: 1.0, critBonus: 0, hitBonus: 0.15, label: 'GUT!', color: '#22c55e' },
-    [RESULT_LEVELS.OKAY]: { damage: 0.7, critBonus: 0, hitBonus: 0, label: 'OK', color: '#f59e0b' },
-    [RESULT_LEVELS.MISS]: { damage: 0.3, critBonus: 0, hitBonus: -0.2, label: 'DANEBEN', color: '#ef4444' }
+// Re-export for backward compatibility
+export {
+    RESULT_LEVELS,
+    RESULT_MULTIPLIERS,
+    HEALING_RESULT_MULTIPLIERS,
+    MINIGAME_DESCRIPTIONS,
+    HEALING_MINIGAME_DESC,
+    TAP_COOLDOWN_MS,
+    calculateDifficultyModifiers
 };
 
 // Current active minigame state
@@ -214,7 +38,7 @@ let animationFrameId = null;
 
 // Anti-cheat: Tap cooldown tracking
 let lastTapTime = 0;
-const TAP_COOLDOWN_MS = 120; // Minimum ms between taps to prevent spam
+// TAP_COOLDOWN_MS is imported from ./minigames/constants.js
 
 /**
  * Anti-cheat tap validator - returns true if tap is valid (not spam)
@@ -241,47 +65,7 @@ export function initMinigames() {
     minigameCtx = minigameCanvas?.getContext('2d');
 }
 
-// Unit-specific minigame descriptions with detailed explanations
-const MINIGAME_DESCRIPTIONS = {
-    scout: {
-        title: 'Schnellfeuer',
-        instruction: 'Tippe das bewegliche Ziel!',
-        hint: 'Je näher am Zentrum, desto besser!',
-        detailedExplanation: 'Ein rotes Ziel bewegt sich über den Bildschirm.\n\nTippe darauf, um zu treffen!\n\n💎 Perfekt = Mitte des Ziels\n✅ Gut = Nahe am Zentrum\n⚠️ OK = Rand des Ziels'
-    },
-    assault: {
-        title: 'Powerschuss',
-        instruction: 'Stoppe im grünen Bereich!',
-        hint: 'Gold = Perfekt, Grün = Gut',
-        detailedExplanation: 'Ein Balken bewegt sich hin und her.\n\nTippe, um ihn zu stoppen!\n\n💎 Gold-Zone = Perfekter Treffer\n✅ Grüne Zone = Guter Treffer\n🟠 Orange Zone = OK\n❌ Roter Rand = Daneben'
-    },
-    sniper: {
-        title: 'Präzisionsschuss',
-        instruction: 'Schieße wenn das Fadenkreuz still steht!',
-        hint: 'Warte auf den grünen Moment!',
-        detailedExplanation: 'Das Fadenkreuz wackelt ständig.\n\nWarte auf den "stillen Moment"!\n\n🔴 Rot = Wackelt - NICHT schießen!\n🟡 Gelb = Gleich ruhig...\n🟢 Grün = JETZT schießen!'
-    },
-    medic: {
-        title: 'Zielschuss',
-        instruction: 'Stoppe im grünen Bereich!',
-        hint: 'Medic greift mit Pistole an',
-        detailedExplanation: 'Ein Balken bewegt sich hin und her.\n\nTippe, um ihn zu stoppen!\n\n💎 Goldene Zone = Perfekt\n✅ Grüne Zone = Gut'
-    },
-    commando: {
-        title: 'Nahkampf-Duell',
-        instruction: 'Reagiere auf den Feind!',
-        hint: 'Stein-Schere-Papier Prinzip',
-        detailedExplanation: 'Ein 3-Runden Duell!\n\n⚔️ ANGRIFF schlägt 💨 Ausweichen\n🛡️ BLOCK schlägt ⚔️ Angriff\n💨 AUSWEICHEN schlägt 🛡️ Block\n\nBeobachte den Feind und wähle die richtige Antwort!\n2 von 3 Runden gewinnen!'
-    }
-};
-
-// Healing minigame description (separate from attack)
-const HEALING_MINIGAME_DESC = {
-    title: 'Heilungsrhythmus',
-    instruction: 'Tippe im Rhythmus des Herzschlags!',
-    hint: '4 Schläge im richtigen Timing',
-    detailedExplanation: 'Eine EKG-Linie zeigt den Herzschlag.\n\n4 Herz-Symbole erscheinen nacheinander.\nTippe GENAU wenn sie aufleuchten!\n\n🟡 Gelb = JETZT tippen!\n✅ Grün = Getroffen!\n❌ Rot = Verpasst\n\nTreffe alle 4 für Perfekt!'
-};
+// MINIGAME_DESCRIPTIONS and HEALING_MINIGAME_DESC are imported from ./minigames/constants.js
 
 /**
  * Create the minigame overlay DOM elements
@@ -1976,16 +1760,7 @@ export function areMinigamesEnabled() {
 // ===== HEALING MINIGAME =====
 // Exported function for Medic's healing ability
 // Uses the heartbeat rhythm minigame
-
-/**
- * Healing result multipliers for heal amount
- */
-export const HEALING_RESULT_MULTIPLIERS = {
-    [RESULT_LEVELS.PERFECT]: { healMultiplier: 1.5, label: 'PERFEKT!', color: '#ffd700' },  // 150% Heilung
-    [RESULT_LEVELS.GOOD]: { healMultiplier: 1.0, label: 'GUT!', color: '#22c55e' },         // 100% Heilung
-    [RESULT_LEVELS.OKAY]: { healMultiplier: 0.7, label: 'OK', color: '#f59e0b' },           // 70% Heilung
-    [RESULT_LEVELS.MISS]: { healMultiplier: 0.4, label: 'DANEBEN', color: '#ef4444' }       // 40% Heilung
-};
+// HEALING_RESULT_MULTIPLIERS is imported from ./minigames/constants.js
 
 /**
  * Start the healing minigame for Medic's special ability

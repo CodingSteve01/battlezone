@@ -17,12 +17,12 @@ export const RESULT_MULTIPLIERS = {
     [RESULT_LEVELS.MISS]: { damage: 0.3, critBonus: 0, hitBonus: -0.2, label: 'DANEBEN', color: '#ef4444' }
 };
 
-// Healing result multipliers
+// Healing result multipliers for heal amount
 export const HEALING_RESULT_MULTIPLIERS = {
-    [RESULT_LEVELS.PERFECT]: { healing: 1.0, critBonus: 0.15, label: 'PERFEKT!', color: '#ffd700' },
-    [RESULT_LEVELS.GOOD]: { healing: 0.85, critBonus: 0, label: 'GUT!', color: '#22c55e' },
-    [RESULT_LEVELS.OKAY]: { healing: 0.7, critBonus: 0, label: 'OK', color: '#f59e0b' },
-    [RESULT_LEVELS.MISS]: { healing: 0.5, critBonus: 0, label: 'SCHWACH', color: '#ef4444' }
+    [RESULT_LEVELS.PERFECT]: { healMultiplier: 1.5, label: 'PERFEKT!', color: '#ffd700' },  // 150% Heilung
+    [RESULT_LEVELS.GOOD]: { healMultiplier: 1.0, label: 'GUT!', color: '#22c55e' },         // 100% Heilung
+    [RESULT_LEVELS.OKAY]: { healMultiplier: 0.7, label: 'OK', color: '#f59e0b' },           // 70% Heilung
+    [RESULT_LEVELS.MISS]: { healMultiplier: 0.4, label: 'DANEBEN', color: '#ef4444' }       // 40% Heilung
 };
 
 // Unit-specific minigame descriptions with detailed explanations

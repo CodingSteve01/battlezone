@@ -23,118 +23,108 @@ import { playSelect, playTarget, playError, playMoveStart, playMoveEnd, playClic
 import { isAIPlayer, isSpectatorMode } from './ai.js';
 import { shouldStartTutorial, startTutorial, checkTutorialHint, showActionHint, shouldStartGuidedTutorial, startGuidedTutorial, notifyTutorialAction, isGuidedTutorialActive } from './tutorial.js';
 
+// Import from modular submodules
+import {
+    initCamera,
+    getUnitTilePosition,
+    updateCameraOffset,
+    limitCameraBounds,
+    applyZoom,
+    calculateSituationalZoom,
+    getRelevantUnitsForZoom,
+    scrollToPosition,
+    scrollToUnit,
+    followUnitInstant,
+    scrollToUnitWithZoom,
+    centerOnTeam
+} from './input/camera.js';
+
+import {
+    FIRST_USE_EXPLANATIONS,
+    showFirstUseExplanation,
+    hasSeenExplanation,
+    resetExplanations
+} from './input/explanations.js';
+
+import {
+    initHandlers,
+    getCanvas,
+    pixelToHexWithHeight,
+    getDragState,
+    getIsDragging,
+    getHasDragged,
+    getLastTapTime,
+    setLastTapTime,
+    resetDragState,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    getPinchDistance,
+    getPinchCenter,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleWheel
+} from './input/handlers.js';
+
+import {
+    continueQueuedPath,
+    executeQueuedPathsForPlayer,
+    executeQueuedPathForUnit,
+    cancelAllQueuedPaths,
+    getQueuedPathCount,
+    updateWaypointUI
+} from './input/pathQueue.js';
+
+// Re-export for backward compatibility
+export {
+    initCamera,
+    getUnitTilePosition,
+    updateCameraOffset,
+    limitCameraBounds,
+    applyZoom,
+    calculateSituationalZoom,
+    getRelevantUnitsForZoom,
+    scrollToPosition,
+    scrollToUnit,
+    followUnitInstant,
+    scrollToUnitWithZoom,
+    centerOnTeam,
+    FIRST_USE_EXPLANATIONS,
+    showFirstUseExplanation,
+    hasSeenExplanation,
+    resetExplanations,
+    initHandlers,
+    getCanvas,
+    pixelToHexWithHeight,
+    getDragState,
+    getIsDragging,
+    getHasDragged,
+    getLastTapTime,
+    setLastTapTime,
+    resetDragState,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    getPinchDistance,
+    getPinchCenter,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+    handleWheel,
+    continueQueuedPath,
+    executeQueuedPathsForPlayer,
+    executeQueuedPathForUnit,
+    cancelAllQueuedPaths,
+    getQueuedPathCount,
+    updateWaypointUI
+};
+
 let canvas;
 let pendingMoveAnimationId = null;
 
-function pixelToHexWithHeight(x, y) {
-    const tileSize = getTileSize();
-    const rough = pixelToHex(x, y, tileSize);
-    const roughHex = getHex(rough.q, rough.r);
-    if (!roughHex) return rough;
-
-    const adjustedY = y + getTileZOffset(roughHex.height, tileSize);
-    return pixelToHex(x, adjustedY, tileSize);
-}
-
-function getUnitTilePosition(unit, tileSize = getTileSize()) {
-    const hex = getHex(unit.q, unit.r);
-    return getTileScreenPosition(unit.q, unit.r, hex?.height ?? 0, tileSize);
-}
-
-// ===== FIRST-USE EXPLANATIONS FOR TACTICAL FEATURES =====
-// Shows detailed explanation the first time a player uses a feature
-
-const FIRST_USE_EXPLANATIONS = {
-    overwatch: {
-        title: '👁️ Overwatch - Deckungsfeuer',
-        message: `<b>So funktioniert Overwatch:</b><br><br>
-            ⏳ Deine Einheit wartet auf feindliche Bewegung<br>
-            🎯 Wenn ein Feind in Reichweite läuft → <b>automatischer Angriff!</b><br>
-            ⚡ Schaden: 70% des normalen Schadens (Reaktionsschuss)<br><br>
-            <b>Tipp:</b> Ideal um Engpässe und Flanken zu sichern!`
-    },
-    ambush: {
-        title: '🎯 Hinterhalt',
-        message: `<b>So funktioniert der Hinterhalt:</b><br><br>
-            🌲 Nur aus Tarnung oder Deckung möglich<br>
-            ⏳ Deine Einheit lauert auf Feinde<br>
-            💥 Feind in Reichweite → <b>automatischer Angriff mit Bonus-Schaden!</b><br><br>
-            <b>Tipp:</b> Perfekt für Commando und Sniper nach Tarnung!`
-    },
-    suppress: {
-        title: '🔥 Unterdrückungsfeuer',
-        message: `<b>So funktioniert Unterdrückung:</b><br><br>
-            🎯 Wähle ein Hex-Feld in Reichweite<br>
-            🔥 Feinde auf diesem Feld werden "festgenagelt":<br>
-            &nbsp;&nbsp;• <b>-30% Trefferchance</b> für unterdrückte Feinde<br>
-            &nbsp;&nbsp;• <b>+1 Bewegungskosten</b> zum Verlassen<br><br>
-            <b>Tipp:</b> Unterdrücke feindliche Sniper-Positionen!`
-    },
-    coordinate: {
-        title: '👥 Koordinierter Angriff',
-        message: `<b>So funktioniert koordinierter Angriff:</b><br><br>
-            🎯 Mehrere Einheiten müssen das gleiche Ziel in Reichweite haben<br>
-            💥 Alle greifen gleichzeitig an mit <b>+15% Schaden pro Angreifer!</b><br><br>
-            <b>Beispiel:</b> 3 Einheiten = +30% Bonus-Schaden für alle!<br><br>
-            <b>Tipp:</b> Ideal um starke Gegner schnell auszuschalten!`
-    }
-};
-
-// Track which explanations have been shown
-let shownExplanations = new Set();
-
-// Load from localStorage
-try {
-    const saved = localStorage.getItem('shadowSquad_tacticalExplanations');
-    if (saved) {
-        shownExplanations = new Set(JSON.parse(saved));
-    }
-} catch { /* ignore */ }
-
-/**
- * Show first-use explanation for a tactical feature
- * Returns true if explanation was shown (first time), false otherwise
- */
-function showFirstUseExplanation(featureId) {
-    if (shownExplanations.has(featureId)) {
-        return false; // Already shown
-    }
-
-    const explanation = FIRST_USE_EXPLANATIONS[featureId];
-    if (!explanation) return false;
-
-    // Mark as shown
-    shownExplanations.add(featureId);
-    try {
-        localStorage.setItem('shadowSquad_tacticalExplanations', JSON.stringify([...shownExplanations]));
-    } catch { /* ignore */ }
-
-    // Create modal overlay
-    let overlay = document.getElementById('tactical-explanation-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'tactical-explanation-overlay';
-        overlay.className = 'tutorial-overlay tutorial-center';
-        document.body.appendChild(overlay);
-    }
-
-    overlay.innerHTML = `
-        <div class="tutorial-hint tactical-hint">
-            <div class="tutorial-hint-header">
-                <span class="tutorial-hint-title">${explanation.title}</span>
-            </div>
-            <div class="tutorial-hint-message">${explanation.message}</div>
-            <div class="tutorial-hint-actions">
-                <button class="tutorial-btn tutorial-btn-ok" onclick="document.getElementById('tactical-explanation-overlay').style.display='none'">
-                    ✓ Verstanden!
-                </button>
-            </div>
-        </div>
-    `;
-
-    overlay.style.display = 'flex';
-    return true;
-}
+// pixelToHexWithHeight, getUnitTilePosition now imported from ./input/handlers.js, ./input/camera.js
+// FIRST_USE_EXPLANATIONS, showFirstUseExplanation now imported from ./input/explanations.js
 
 // Scrolling/panning state
 let isDragging = false;
@@ -452,42 +442,7 @@ function handleTouchEnd(e) {
     dragDistance = 0;
 }
 
-/**
- * Limit camera to reasonable bounds
- */
-function limitCameraBounds() {
-    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-
-    // Ensure hexSize is valid before calculating bounds
-    const hexSize = getTileSizeForHexSize(Number.isFinite(state.hexSize) && state.hexSize > 0 ? state.hexSize : CONFIG.BASE_HEX_SIZE);
-    const heightMargin = getTileZOffset(CONFIG.HEIGHT.MAX, hexSize);
-    const maxOffset = radius * hexSize * 2.5 + heightMargin;
-
-    // Ensure camera values are valid before clamping
-    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-
-    state.cameraX = Math.max(-maxOffset, Math.min(maxOffset, cameraX));
-    state.cameraY = Math.max(-maxOffset, Math.min(maxOffset, cameraY));
-}
-
-/**
- * Update camera offset after panning
- */
-function updateCameraOffset() {
-    const container = canvas?.parentElement;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-
-    // Ensure camera values are valid
-    const cameraX = Number.isFinite(state.cameraX) ? state.cameraX : 0;
-    const cameraY = Number.isFinite(state.cameraY) ? state.cameraY : 0;
-
-    state.offsetX = rect.width / 2 + cameraX;
-    state.offsetY = rect.height / 2 + cameraY;
-}
+// limitCameraBounds and updateCameraOffset are imported from ./input/camera.js
 
 /**
  * Center view on current unit - exported for external use
@@ -649,40 +604,7 @@ function handleWheel(e) {
     }
 }
 
-/**
- * Apply zoom centered on a screen position
- */
-function applyZoom(zoomDelta, screenX, screenY) {
-    // Ensure valid starting zoom level
-    const oldZoom = Number.isFinite(state.zoomLevel) && state.zoomLevel > 0 ? state.zoomLevel : scaleToZoomLevel(1.0);
-    const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, oldZoom + zoomDelta));
-
-    if (newZoom === oldZoom) return;
-
-    // Calculate mouse position relative to canvas center
-    const rect = canvas.getBoundingClientRect();
-    const canvasCenterX = rect.width / 2;
-    const canvasCenterY = rect.height / 2;
-    const relX = screenX - rect.left - canvasCenterX;
-    const relY = screenY - rect.top - canvasCenterY;
-
-    const zoomRatio = newZoom / oldZoom;
-
-    // Adjust camera to keep the point under the mouse stationary
-    // Formula derived from: keeping world point under cursor fixed
-    // newCamera = relX * (1 - zoomRatio) + oldCamera * zoomRatio
-    state.cameraX = relX * (1 - zoomRatio) + state.cameraX * zoomRatio;
-    state.cameraY = relY * (1 - zoomRatio) + state.cameraY * zoomRatio;
-
-    state.zoomLevel = newZoom;
-
-    // Update camera offset, then recalculate hex size with new zoom
-    updateCameraOffset();
-    resizeCanvas();
-    // Limit bounds AFTER hexSize is updated so bounds are calculated correctly
-    limitCameraBounds();
-    updateCameraOffset();
-}
+// applyZoom is imported from ./input/camera.js
 
 /**
  * Check if a click/touch is on the minimap expand button (compact mode)
@@ -1792,263 +1714,10 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Continue queued path for a unit if it exists
- */
-export function continueQueuedPath(unit) {
-    const queuedPath = getQueuedPath(unit.id);
-    if (!queuedPath || !queuedPath.path || queuedPath.path.length < 2) {
-        return false;
-    }
 
-    // Recalculate path from current position to target
-    // Movement limited by shared AP pool
-    const maxMoveCost = state.sharedAP;
-    const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
+// Path queue functions (continueQueuedPath, executeQueuedPathsForPlayer, executeQueuedPathForUnit,
+// cancelAllQueuedPaths, getQueuedPathCount, updateWaypointUI) are imported from ./input/pathQueue.js
 
-    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
-        // Path is no longer valid
-        clearQueuedPath(unit.id);
-        showToast('❌ Gespeicherter Pfad nicht mehr gültig', 'warning');
-        return false;
-    }
-
-    // Calculate reachable portion
-    let cumulativeCost = 0;
-    const reachablePath = [pathResult.path[0]];
-    let totalCost = 0;
-    let lastReachableIndex = 0;
-
-    for (let i = 1; i < pathResult.path.length; i++) {
-        const point = pathResult.path[i];
-        const pointHex = getHex(point.q, point.r);
-        if (!pointHex) break;
-        const prevPoint = pathResult.path[i - 1];
-        const prevHex = getHex(prevPoint.q, prevPoint.r);
-        cumulativeCost += getMoveCost(prevHex, pointHex);
-
-        if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
-            reachablePath.push(point);
-            totalCost = cumulativeCost;
-            lastReachableIndex = i;
-        } else if (pointHex.unit && pointHex.unit.id !== unit.id) {
-            break;
-        }
-    }
-
-    if (reachablePath.length < 2 || totalCost === 0) {
-        clearQueuedPath(unit.id);
-        return false;
-    }
-
-    // Check if we reached the destination
-    const isComplete = lastReachableIndex >= pathResult.path.length - 1;
-
-    // Store enemies before movement
-    const prevEnemies = getVisibleEnemies();
-    const prevEnemyIds = new Set(prevEnemies.map(e => e.id));
-
-    // Update queued path with remaining
-    if (!isComplete) {
-        const remainingPath = pathResult.path.slice(lastReachableIndex);
-        setQueuedPath(unit.id, remainingPath, queuedPath.targetQ, queuedPath.targetR);
-    } else {
-        clearQueuedPath(unit.id);
-    }
-
-    // Show the path and confirm indicator
-    state.currentPath = pathResult.path;
-    state.pendingMoveDestination = {
-        q: reachablePath[reachablePath.length - 1].q,
-        r: reachablePath[reachablePath.length - 1].r
-    };
-
-    showToast('📍 Gespeicherter Pfad wird fortgesetzt...', 'info');
-    render();
-
-    return true;
-}
-
-/**
- * Execute all queued paths for the current player automatically at turn start
- * Returns a Promise that resolves when all movements are complete
- */
-export async function executeQueuedPathsForPlayer() {
-    const playerUnits = getPlayerUnits(state.currentPlayer);
-    const unitsWithPaths = playerUnits.filter(unit => {
-        const queuedPath = getQueuedPath(unit.id);
-        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
-    });
-
-    if (unitsWithPaths.length === 0) return;
-
-    showToast(`📍 ${unitsWithPaths.length} Wegpunkt${unitsWithPaths.length > 1 ? 'e werden' : ' wird'} ausgeführt...`, 'info');
-
-    for (const unit of unitsWithPaths) {
-        if (!unit.alive) continue;
-        if (state.sharedAP <= 0) break;
-
-        const success = await executeQueuedPathForUnit(unit);
-        if (!success) continue;
-
-        // Small delay between units
-        await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    render();
-    updateUI();
-}
-
-/**
- * Execute a single queued path for a unit
- * Returns a Promise that resolves when movement is complete
- */
-async function executeQueuedPathForUnit(unit) {
-    const queuedPath = getQueuedPath(unit.id);
-    if (!queuedPath || !queuedPath.path) return false;
-
-    // Recalculate path from current position to target
-    const pathResult = findPath(unit.q, unit.r, queuedPath.targetQ, queuedPath.targetR, unit.move * 10);
-
-    if (!pathResult || !pathResult.path || pathResult.path.length < 2) {
-        // Path is blocked or invalid
-        clearQueuedPath(unit.id);
-        const blockedUnitName = UNIT_CLASSES[unit.class]?.name || unit.class;
-        showToast(`❌ Pfad für ${blockedUnitName} blockiert`, 'warning');
-        return false;
-    }
-
-    // Calculate reachable portion with current AP
-    const maxMoveCost = state.sharedAP;
-    let cumulativeCost = 0;
-    const reachablePath = [pathResult.path[0]];
-    let totalCost = 0;
-    let lastReachableIndex = 0;
-
-    for (let i = 1; i < pathResult.path.length; i++) {
-        const point = pathResult.path[i];
-        const pointHex = getHex(point.q, point.r);
-        if (!pointHex) break;
-        const prevPoint = pathResult.path[i - 1];
-        const prevHex = getHex(prevPoint.q, prevPoint.r);
-        cumulativeCost += getMoveCost(prevHex, pointHex);
-
-        if (cumulativeCost <= maxMoveCost && !pointHex.unit) {
-            reachablePath.push(point);
-            totalCost = cumulativeCost;
-            lastReachableIndex = i;
-        } else if (pointHex.unit && pointHex.unit.id !== unit.id) {
-            // Path blocked by another unit
-            break;
-        }
-    }
-
-    if (reachablePath.length < 2 || totalCost === 0) {
-        // Can't move this turn, keep the path for next turn
-        return false;
-    }
-
-    // Check if we reached the destination
-    const isComplete = lastReachableIndex >= pathResult.path.length - 1;
-
-    // Update or clear queued path
-    if (!isComplete) {
-        const remainingPath = pathResult.path.slice(lastReachableIndex);
-        setQueuedPath(unit.id, remainingPath, queuedPath.targetQ, queuedPath.targetR);
-    } else {
-        clearQueuedPath(unit.id);
-    }
-
-    // Scroll to unit before moving
-    scrollToUnit(unit, 300);
-    await new Promise(resolve => setTimeout(resolve, 350));
-
-    // Execute the movement
-    playMoveStart();
-
-    // Reveal from cover when moving
-    if (unit.hiding) {
-        unit.hiding = false;
-    }
-
-    await animateUnitMovement(unit, reachablePath, totalCost, null, render, async () => processReactiveFire(unit));
-
-    playMoveEnd();
-
-    // Bewegung beendet Stellung-halten Bonus
-    onUnitMoved(unit);
-
-    // Check for power-up pickup
-    const pickup = checkPowerupPickup(unit);
-    if (pickup) {
-        showPowerupPickup(pickup.powerup, pickup.result);
-    }
-
-    updateVisibility();
-
-    // Auto-take cover if on valid terrain
-    if (unit.alive && canAutoTakeCover(unit)) {
-        autoTakeCover(unit);
-    }
-
-    render();
-    updateUI();
-    return true;
-}
-
-/**
- * Cancel all queued paths for the current player
- */
-export function cancelAllQueuedPaths() {
-    const playerUnits = getPlayerUnits(state.currentPlayer);
-    let cancelled = 0;
-
-    playerUnits.forEach(unit => {
-        if (getQueuedPath(unit.id)) {
-            clearQueuedPath(unit.id);
-            cancelled++;
-        }
-    });
-
-    if (cancelled > 0) {
-        showToast(`🚫 ${cancelled} Wegpunkt${cancelled > 1 ? 'e' : ''} abgebrochen`, 'info');
-        render();
-    }
-
-    return cancelled;
-}
-
-/**
- * Get count of units with queued paths for current player
- */
-export function getQueuedPathCount() {
-    const playerUnits = getPlayerUnits(state.currentPlayer);
-    return playerUnits.filter(unit => {
-        const queuedPath = getQueuedPath(unit.id);
-        return queuedPath && queuedPath.path && queuedPath.path.length >= 1;
-    }).length;
-}
-
-/**
- * Update the waypoint cancel button UI based on queued path count
- */
-export function updateWaypointUI() {
-    const cancelBtn = document.getElementById('cancel-waypoints-btn');
-    const waypointCount = document.getElementById('waypoint-count');
-
-    if (!cancelBtn) return;
-
-    const count = getQueuedPathCount();
-
-    if (count > 0) {
-        cancelBtn.style.display = 'flex';
-        if (waypointCount) {
-            waypointCount.textContent = count;
-        }
-    } else {
-        cancelBtn.style.display = 'none';
-    }
-}
 
 /**
  * Start animation loop for pending move indicator

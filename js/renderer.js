@@ -12,12 +12,11 @@ import {
     drawUnit as drawUnitSprite,
     getRandomDetailSprite,
     getRandomDetailSpriteWithAnchor,
-    getShorelineSprite,
-    getShorelineVariantCount,
     hasAnimatedTexture,
     getAnimatedTexture,
     getTerrainTileInfo,
     hasIsometricTiles
+    // Note: getShorelineSprite, getShorelineVariantCount removed - shoreline feature not implemented
 } from './assetLoader.js';
 import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
@@ -499,46 +498,8 @@ function isLandForSwamp(type) {
     return !SWAMP_TYPES.has(type) && !WATER_TYPES.has(type);
 }
 
-function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
-    if (!neighborTerrains || neighborTerrains.length !== 6) return;
-
-    if (WATER_TYPES.has(terrainType) || SWAMP_TYPES.has(terrainType)) {
-        return;
-    }
-
-    const baseSeed = hexQ * 127 + hexR * 311 + hexQ * hexR * 7;
-    const spriteWidth = size * 2;
-    const spriteHeight = size * Math.sqrt(3);
-
-    for (let i = 0; i < 6; i++) {
-        const neighborType = neighborTerrains[i];
-        let subtype = null;
-        if (WATER_TYPES.has(neighborType)) {
-            subtype = 'water';
-        } else if (SWAMP_TYPES.has(neighborType)) {
-            subtype = 'swamp';
-        } else {
-            continue;
-        }
-
-        const detailType = `shore_${subtype}_${i}`;
-        const variantCount = getShorelineVariantCount(detailType);
-        const variant = variantCount > 0
-            ? Math.floor(seededRandom(baseSeed + i * 91) * variantCount)
-            : 0;
-
-        const sprite = getShorelineSprite(detailType, variant);
-        if (!sprite) continue;
-
-        ctx.drawImage(
-            sprite,
-            cx - spriteWidth / 2,
-            cy - spriteHeight / 2,
-            spriteWidth,
-            spriteHeight
-        );
-    }
-}
+// drawShorelineOverlays removed - shoreline feature not implemented
+// getShorelineSprite and getShorelineVariantCount are available in assetLoader.js if needed
 
 function initVegetationRenderer() { /* no-op */ }
 function initTerrainRenderer() { /* no-op */ }

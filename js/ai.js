@@ -22,7 +22,7 @@ import { logAI, logError } from './errorLog.js';
 import { checkPowerupPickup, getPowerupAt } from './powerups.js';
 import { getSpawnPositions } from './map.js';
 
-// === NEW: Import enhanced AI modules ===
+// === Import from modular AI submodules ===
 import {
     calculateThreatMap,
     calculateInfluenceMap,
@@ -45,196 +45,36 @@ import {
 import {
     getAIMemory,
     setAIMemory,
-    initializeTeamMemory as initTeamMemoryModule,
+    createTeamMemory,
+    getTeamMemory,
+    initializeTeamMemory,
     recordEnemyPosition,
-    recordIncomingAttack as recordAttack,
-    cleanupOldMemory
+    recordIncomingAttack,
+    cleanupOldMemory,
+    resetAIMemory as resetAIMemoryModule
 } from './ai/memory.js';
+import {
+    isSpectatorMode,
+    addAIThought,
+    addMultiPartThought,
+    variedPhrase,
+    clearAIThoughts,
+    CLASS_NAMES_DE,
+    setIsAIPlayerFn
+} from './ai/thoughts.js';
 
-// ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
-// Stores and displays AI decision explanations
+// Re-export for backward compatibility
+export { isSpectatorMode };
 
-const aiThoughts = {
-    current: null,          // Current thought being displayed
-    queue: [],              // Queue of thoughts to display
-    enabled: false,         // Only enabled in spectator mode (all AI players)
-    displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
-};
-
-/**
- * Check if spectator mode is active
- * Active when:
- * 1. All players were AI from the start, OR
- * 2. All human players have been eliminated (no units left)
- */
-export function isSpectatorMode() {
-    if (state.settings.players <= 0) return false;
-
-    // Check each player
-    for (let p = 0; p < state.settings.players; p++) {
-        if (!isAIPlayer(p)) {
-            // This is a human player - check if they still have units
-            const humanUnits = getPlayerUnits(p).filter(u => u.alive);
-            if (humanUnits.length > 0) {
-                // At least one human player still has units - not spectator mode
-                return false;
-            }
-        }
-    }
-
-    // Either all players are AI, or all human players have been eliminated
-    return true;
-}
-
-/**
- * Add an AI thought to be displayed
- */
-function addAIThought(thought, category = 'general') {
-    if (!isSpectatorMode()) return;
-
-    const thoughtObj = {
-        text: thought,
-        category: category,  // 'strategy', 'attack', 'move', 'special', 'retreat'
-        timestamp: Date.now()
-    };
-
-    aiThoughts.queue.push(thoughtObj);
-    showNextThought();
-}
-
-/**
- * Show the next thought in queue
- */
-function showNextThought() {
-    if (aiThoughts.current || aiThoughts.queue.length === 0) return;
-
-    aiThoughts.current = aiThoughts.queue.shift();
-    displayThought(aiThoughts.current);
-
-    setTimeout(() => {
-        aiThoughts.current = null;
-        showNextThought();
-    }, aiThoughts.displayTime);
-}
-
-/**
- * Display a thought in the UI (clean subtitle style, no icons)
- */
-function displayThought(thought) {
-    const existing = document.querySelector('.ai-thought-bubble');
-    if (existing) existing.remove();
-
-    const bubble = document.createElement('div');
-    bubble.className = 'ai-thought-bubble';
-    bubble.innerHTML = `<span class="thought-text">${thought.text}</span>`;
-    document.body.appendChild(bubble);
-
-    // Animate in
-    requestAnimationFrame(() => {
-        bubble.classList.add('visible');
-    });
-
-    // Animate out before removal
-    setTimeout(() => {
-        bubble.classList.remove('visible');
-        setTimeout(() => bubble.remove(), 300);
-    }, aiThoughts.displayTime - 300);
-}
-
-/**
- * Add a multi-part thought (splits long text into readable segments)
- * Each segment is shown sequentially with proper timing
- */
-function addMultiPartThought(parts, category = 'general') {
-    if (!isSpectatorMode()) return;
-
-    // Filter out empty parts and add each as a separate thought
-    const validParts = parts.filter(p => p && p.trim());
-    validParts.forEach(part => {
-        addAIThought(part.trim(), category);
-    });
-}
-
-/**
- * Generate varied phrasing for common situations
- * Returns a randomly selected phrase from the options
- */
-function variedPhrase(options) {
-    return options[Math.floor(Math.random() * options.length)];
-}
-
-/**
- * Clear all pending thoughts
- */
-function clearAIThoughts() {
-    aiThoughts.queue = [];
-    aiThoughts.current = null;
-    const existing = document.querySelector('.ai-thought-bubble');
-    if (existing) existing.remove();
-}
+// AI thought system functions (isSpectatorMode, addAIThought, addMultiPartThought,
+// variedPhrase, clearAIThoughts, CLASS_NAMES_DE) are imported from ./ai/thoughts.js
 
 // ===== AI MEMORY SYSTEM =====
-// Team-based memory shared between allied AIs for coordinated strategy
-// Allied AIs share intel and target assignments to work as one team
+// Memory functions (createTeamMemory, getTeamMemory, getAIMemory, setAIMemory,
+// initializeTeamMemory, recordEnemyPosition, recordIncomingAttack, cleanupOldMemory)
+// are imported from ./ai/memory.js
 
-/**
- * Create a fresh memory object for a team
- */
-function createTeamMemory() {
-    return {
-        lastKnownPositions: new Map(),  // unitId -> { q, r, round, confidence, direction, hp }
-        searchedAreas: new Set(),        // "q,r" keys of recently searched hexes
-        threatAssessment: new Map(),     // unitId -> threat level
-        huntMode: false,                 // True when actively hunting remaining enemies
-        lastContactRound: 0,             // Last round we saw an enemy
-        playerCenterEstimate: null,      // Estimated center of enemy forces
-        searchPattern: 'expand',         // 'expand', 'sweep', 'pincer'
-        assignedTargets: new Map(),      // unitId -> targetUnitId (for focus fire)
-        // Decoy/Bait strategy
-        decoyUnit: null,                 // Unit acting as bait
-        ambushUnits: [],                 // Units waiting to ambush
-        decoyActive: false,              // Is decoy strategy currently active
-        // Team coordination
-        lastUpdateRound: 0,              // Last round this memory was updated
-        teamPlayers: new Set(),          // Players that share this memory
-        // === ERWEITERTES ERINNERUNGSSYSTEM ===
-        attackHistory: new Map(),        // unitId -> [{ fromQ, fromR, round, attackerClass }] - Woher kamen Angriffe
-        movementHistory: new Map(),      // unitId -> [{ fromQ, fromR, toQ, toR, round }] - Letzte Bewegungen
-        predictedPositions: new Map(),   // unitId -> { q, r, confidence } - Vorhergesagte nächste Position
-        flankingTargets: new Map(),      // unitId -> { targetId, flankDirection } - Einkreisungs-Zuweisung
-    };
-}
-
-// Team-based memory storage: teamId -> memory
-// Team ID is determined by alliance - allied players share the same memory
-const teamMemories = new Map();
-
-/**
- * Get the team memory for the current AI player
- * Allied AIs share the same memory for coordinated strategy
- */
-function getTeamMemory() {
-    // Find the team ID - use the lowest player index in the alliance
-    let teamId = state.currentPlayer;
-    for (let p = 0; p < state.settings.players; p++) {
-        if (p !== state.currentPlayer && arePlayersAllied(state.currentPlayer, p)) {
-            teamId = Math.min(teamId, p);
-        }
-    }
-
-    // Get or create team memory
-    if (!teamMemories.has(teamId)) {
-        const memory = createTeamMemory();
-        memory.teamPlayers.add(state.currentPlayer);
-        teamMemories.set(teamId, memory);
-    }
-
-    const memory = teamMemories.get(teamId);
-    memory.teamPlayers.add(state.currentPlayer);
-    return memory;
-}
-
-// Reference to current team's memory (set at start of AI turn)
+// Local reference to current team's memory for convenience
 let aiMemory = createTeamMemory();
 
 function getEnemySpawnCenters() {
@@ -253,22 +93,11 @@ function getEnemySpawnCenters() {
 }
 
 /**
- * Reset AI memory for new game - clears all team memories
+ * Reset AI memory for new game - wrapper for module function
  */
 export function resetAIMemory() {
-    // Clear all team memories
-    teamMemories.clear();
-    // Reset the local reference
+    resetAIMemoryModule();
     aiMemory = createTeamMemory();
-}
-
-/**
- * Initialize AI memory for the current player's turn
- * Sets aiMemory to the shared team memory so allies coordinate
- */
-function initializeTeamMemory() {
-    aiMemory = getTeamMemory();
-    aiMemory.lastUpdateRound = state.round;
 }
 
 // ===== DECOY/BAIT STRATEGY =====
@@ -578,6 +407,9 @@ export function isAIPlayer(playerIndex = state.currentPlayer) {
     // Legacy mode: singlePlayer means all non-0 players are AI
     return state.settings.singlePlayer && playerIndex > 0;
 }
+
+// Set the isAIPlayer reference in thoughts module so isSpectatorMode works
+setIsAIPlayerFn(isAIPlayer);
 
 /**
  * Check if there are any human players in the game
@@ -1199,25 +1031,7 @@ function predictEnemyNextPosition(enemyId, previousPos, currentPos) {
     }
 }
 
-/**
- * Registriere einen empfangenen Angriff für die Erinnerung
- * Wird aufgerufen wenn eine unserer Einheiten angegriffen wird
- */
-function recordIncomingAttack(targetUnit, attackerUnit) {
-    if (!aiMemory.attackHistory.has(targetUnit.id)) {
-        aiMemory.attackHistory.set(targetUnit.id, []);
-    }
-    const history = aiMemory.attackHistory.get(targetUnit.id);
-    history.push({
-        fromQ: attackerUnit.q,
-        fromR: attackerUnit.r,
-        round: state.round,
-        attackerClass: attackerUnit.class,
-        attackerId: attackerUnit.id
-    });
-    // Nur die letzten 5 Angriffe speichern
-    if (history.length > 5) history.shift();
-}
+// recordIncomingAttack is imported from ./ai/memory.js
 
 /**
  * Learn from ghost indicators - positions where cloaked enemies attacked from
@@ -1646,6 +1460,8 @@ async function performAIActions() {
 
     // Initialize team memory - allied AIs share the same memory for coordination
     initializeTeamMemory();
+    // Sync local aiMemory reference with the module's memory
+    aiMemory = getAIMemory();
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
     const unitDelay = spectatorMode ? 800 : 400;
@@ -3053,16 +2869,7 @@ async function usePreMoveAbility(unit, enemies, _plan, context) {
     return false;
 }
 
-// German class names for display
-// Note: These should match UNIT_CLASSES[key].name from config.js
-const CLASS_NAMES_DE = {
-    scout: 'Späher',
-    assault: 'Sturmsoldat',
-    medic: 'Sanitäter',
-    sniper: 'Scharfschütze',
-    commando: 'Kommando',
-    elitesoldat: 'Elitesoldat'
-};
+// CLASS_NAMES_DE is imported from ./ai/thoughts.js
 
 /**
  * Execute attack with proper rendering
