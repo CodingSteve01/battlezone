@@ -20,7 +20,7 @@ const PLACEHOLDER_COLORS = {
     grass: '#6a9a58',
     forest: '#3d6a4a',
     hills: '#7a8c5a',
-    rock: '#6a6a68',
+    rock: '#5a8a48',  // Rocky grassland
     water: '#4a7a95',
     sand: '#d4b888',
     swamp: '#5a6a45',

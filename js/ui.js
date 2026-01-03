@@ -151,12 +151,6 @@ export function updatePlayersAlive() {
  * Update top bar (player indicator, round, AP)
  */
 function updateTopBar(unit, isAiTurnHidden = false) {
-    const dot = document.getElementById('current-dot');
-    if (dot) {
-        dot.style.backgroundColor = CONFIG.PLAYER_COLORS[state.currentPlayer];
-        dot.style.boxShadow = `0 0 15px ${CONFIG.PLAYER_COLORS[state.currentPlayer]}`;
-    }
-
     const nameEl = document.getElementById('current-name');
     if (nameEl) {
         nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : getPlayerName(state.currentPlayer);

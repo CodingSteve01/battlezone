@@ -293,11 +293,6 @@
 
         <!-- GAME AREA -->
         <div id="game-area">
-            <!-- Pause Button (top left) -->
-            <button class="pause-btn" id="pause-btn" title="Pause">
-                <span class="pause-icon">⏸️</span>
-            </button>
-
             <!-- Pause Menu Overlay -->
             <div class="pause-overlay" id="pause-overlay">
                 <div class="pause-menu">
@@ -317,12 +312,12 @@
 
             <div class="top-bar">
                 <div class="player-indicator">
-                    <div class="player-dot" id="current-dot"></div>
+                    <button class="pause-btn" id="pause-btn" title="Pause">
+                        <span class="pause-icon">⏸️</span>
+                    </button>
                     <span class="player-name" id="current-name">Spieler 1</span>
                 </div>
-                <div class="round-info" id="round-info-toggle">
-                    <div class="ap-display" id="ap-display"></div>
-                </div>
+                <div class="ap-display" id="ap-display"></div>
                 <div class="round-dropdown" id="round-dropdown">
                     <div class="dropdown-players-alive" id="dropdown-players-alive"></div>
                     <button class="dropdown-give-up-btn" id="give-up-btn">
