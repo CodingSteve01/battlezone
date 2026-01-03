@@ -14,7 +14,7 @@ export const CONFIG = {
     },
 
     // Team Budget System - players spend points to build their team
-    TEAM_BUDGET: 350,         // Total points available for team composition
+    TEAM_BUDGET: 400,         // Total points available for team composition (erhöht für mehr Möglichkeiten)
     MIN_UNITS: 2,             // Minimum units required
     MAX_UNITS: 5,             // Maximum units allowed
     UNITS_PER_PLAYER: 3,      // Default/base units per player (for AP pool calculations)

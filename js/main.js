@@ -70,71 +70,104 @@ function startTeamSelection() {
 
 // AI personality types for team selection variety - Budget-aware compositions
 const AI_PERSONALITIES = {
+    // === AGGRESSIVE TEAMS - High damage output, seeks kills ===
     aggressive: {
         name: 'Aggressor',
-        description: 'Bevorzugt offensive Einheiten und schnelle Eliminierung',
-        // Budget-aware compositions: each has a cost
+        description: 'Maximale Feuerkraft - eliminiert Feinde schnell',
         compositions: [
-            ['assault', 'commando', 'medic'],           // 100+90+80 = 270
-            ['assault', 'assault', 'medic'],            // 100+100+80 = 280
-            ['commando', 'commando', 'scout', 'medic'], // 90+90+70+80 = 330
-            ['elitesoldat', 'commando', 'medic'],       // 150+90+80 = 320
+            ['sniper', 'sniper', 'commando'],           // 110+110+90 = 310 (180 dmg!)
+            ['sniper', 'assault', 'commando'],          // 110+100+90 = 300 (155 dmg)
+            ['assault', 'assault', 'sniper'],           // 100+100+110 = 310 (145 dmg)
+            ['sniper', 'commando', 'commando'],         // 110+90+90 = 290 (165 dmg)
+            ['sniper', 'sniper', 'assault'],            // 110+110+100 = 320 (170 dmg)
+            ['commando', 'commando', 'commando', 'scout'], // 90+90+90+70 = 340 (172 dmg)
+            // NEW with 400 budget:
+            ['sniper', 'sniper', 'commando', 'scout'],  // 110+110+90+70 = 380 (202 dmg!)
+            ['sniper', 'assault', 'commando', 'commando'], // 110+100+90+90 = 390 (205 dmg!)
         ],
-        weight: 1.0
+        weight: 1.5  // HIGH weight - KI soll kämpfen!
     },
-    defensive: {
-        name: 'Defender',
-        description: 'Bevorzugt Verteidigung und Heilung',
-        compositions: [
-            ['medic', 'sniper', 'assault'],             // 80+110+100 = 290
-            ['medic', 'medic', 'assault', 'scout'],     // 80+80+100+70 = 330
-            ['sniper', 'sniper', 'medic'],              // 110+110+80 = 300
-            ['elitesoldat', 'medic', 'scout'],          // 150+80+70 = 300
-        ],
-        weight: 1.0
-    },
+    // === BALANCED BUT STILL OFFENSIVE ===
     balanced: {
         name: 'Taktiker',
-        description: 'Ausgewogene Teams mit vielseitigen Fähigkeiten',
+        description: 'Ausgewogen mit guter Feuerkraft und Unterstützung',
         compositions: [
-            ['scout', 'assault', 'medic'],              // 70+100+80 = 250
-            ['scout', 'sniper', 'medic'],               // 70+110+80 = 260
-            ['assault', 'sniper', 'medic'],             // 100+110+80 = 290
-            ['scout', 'assault', 'medic', 'commando'],  // 70+100+80+90 = 340
+            ['sniper', 'assault', 'medic'],             // 110+100+80 = 290 (120 dmg + heal)
+            ['sniper', 'commando', 'medic'],            // 110+90+80 = 280 (130 dmg + heal)
+            ['assault', 'commando', 'medic', 'scout'],  // 100+90+80+70 = 340 (127 dmg + heal)
+            ['sniper', 'sniper', 'medic'],              // 110+110+80 = 300 (145 dmg + heal)
+            ['assault', 'assault', 'medic'],            // 100+100+80 = 280 (95 dmg + heal)
+            ['sniper', 'assault', 'commando'],          // 110+100+90 = 300 (155 dmg)
+            // NEW with 400 budget:
+            ['sniper', 'assault', 'commando', 'medic'], // 110+100+90+80 = 380 (155 dmg + heal)
+            ['sniper', 'sniper', 'medic', 'scout'],     // 110+110+80+70 = 370 (167 dmg + heal)
         ],
-        weight: 1.5  // Slightly prefer balanced teams
+        weight: 1.2  // Still common
     },
+    // === ASSASSINATION TEAMS - High single-target damage ===
     stealth: {
         name: 'Schattenjäger',
-        description: 'Spezialisiert auf Hinterhalte und Überraschungsangriffe',
+        description: 'Hinterhalte und Überraschungsangriffe mit tödlicher Präzision',
         compositions: [
-            ['scout', 'commando', 'sniper'],            // 70+90+110 = 270
-            ['commando', 'sniper', 'medic'],            // 90+110+80 = 280
-            ['scout', 'commando', 'commando', 'medic'], // 70+90+90+80 = 330
+            ['sniper', 'commando', 'commando'],         // 110+90+90 = 290 (165 dmg)
+            ['commando', 'commando', 'assault'],        // 90+90+100 = 280 (140 dmg)
+            ['sniper', 'sniper', 'scout'],              // 110+110+70 = 290 (152 dmg)
+            ['commando', 'commando', 'commando'],       // 90+90+90 = 270 (150 dmg)
+            ['sniper', 'commando', 'assault'],          // 110+90+100 = 300 (155 dmg)
+            // NEW with 400 budget:
+            ['sniper', 'commando', 'commando', 'commando'], // 110+90+90+90 = 380 (215 dmg!)
+            ['sniper', 'sniper', 'commando', 'scout'],  // 110+110+90+70 = 380 (202 dmg)
+        ],
+        weight: 1.0
+    },
+    // === ELITE POWERHOUSE ===
+    elite: {
+        name: 'Elite-Kommando',
+        description: 'Weniger Einheiten, maximale Schlagkraft',
+        compositions: [
+            ['elitesoldat', 'sniper', 'scout'],         // 150+110+70 = 330 (127 dmg)
+            ['elitesoldat', 'commando', 'scout'],       // 150+90+70 = 310 (112 dmg)
+            ['elitesoldat', 'assault'],                 // 150+100 = 250 (80 dmg + versatility)
+            ['elitesoldat', 'sniper'],                  // 150+110 = 260 (105 dmg)
+            ['elitesoldat', 'commando', 'commando'],    // 150+90+90 = 330 (140 dmg)
+            // NEW with 400 budget:
+            ['elitesoldat', 'sniper', 'commando'],      // 150+110+90 = 350 (155 dmg)
+            ['elitesoldat', 'elitesoldat'],             // 150+150 = 300 (80-110 dmg each!)
+            ['elitesoldat', 'sniper', 'assault'],       // 150+110+100 = 360 (145 dmg)
         ],
         weight: 0.8
     },
-    elite: {
-        name: 'Elite-Kommando',
-        description: 'Weniger Einheiten, dafür Elite-Soldaten',
-        compositions: [
-            ['elitesoldat', 'medic'],                   // 150+80 = 230 (nur 2 Einheiten!)
-            ['elitesoldat', 'sniper'],                  // 150+110 = 260
-            ['elitesoldat', 'assault'],                 // 150+100 = 250
-            ['elitesoldat', 'elitesoldat'],             // 150+150 = 300 (zwei Elite!)
-        ],
-        weight: 0.6  // Rarer elite teams
-    },
+    // === SWARM TACTICS - Numbers advantage ===
     swarm: {
         name: 'Schwarm',
-        description: 'Viele günstige Einheiten für Überzahl',
+        description: 'Überzahl für taktische Flexibilität',
         compositions: [
-            ['scout', 'scout', 'medic', 'medic'],       // 70+70+80+80 = 300
-            ['scout', 'scout', 'scout', 'medic'],       // 70+70+70+80 = 290
-            ['commando', 'commando', 'scout', 'scout'], // 90+90+70+70 = 320
-            ['scout', 'medic', 'medic', 'commando', 'scout'], // 70+80+80+90+70 = 390 (5 Einheiten, über Budget!)
+            ['commando', 'commando', 'scout', 'scout'], // 90+90+70+70 = 320 (144 dmg)
+            ['assault', 'commando', 'scout', 'scout'],  // 100+90+70+70 = 330 (134 dmg)
+            ['commando', 'commando', 'commando'],       // 90+90+90 = 270 (150 dmg)
+            ['assault', 'assault', 'scout', 'scout'],   // 100+100+70+70 = 340 (124 dmg)
+            ['sniper', 'scout', 'scout', 'medic'],      // 110+70+70+80 = 330 (124 dmg + heal)
+            // NEW with 400 budget:
+            ['assault', 'commando', 'commando', 'scout'], // 100+90+90+70 = 350 (162 dmg)
+            ['commando', 'commando', 'commando', 'medic'], // 90+90+90+80 = 350 (165 dmg + heal)
+            ['assault', 'assault', 'commando', 'scout'],  // 100+100+90+70 = 360 (152 dmg)
         ],
         weight: 0.7
+    },
+    // === DEFENSIVE - Only if needed ===
+    defensive: {
+        name: 'Defender',
+        description: 'Verteidigung mit Fernkampf-Überlegenheit',
+        compositions: [
+            ['sniper', 'sniper', 'medic'],              // 110+110+80 = 300 (145 dmg + heal)
+            ['sniper', 'assault', 'medic'],             // 110+100+80 = 290 (120 dmg + heal)
+            ['elitesoldat', 'medic', 'commando'],       // 150+80+90 = 320 (105 dmg + heal)
+            ['assault', 'medic', 'medic', 'scout'],     // 100+80+80+70 = 330 (77 dmg + 2x heal)
+            // NEW with 400 budget:
+            ['sniper', 'sniper', 'medic', 'scout'],     // 110+110+80+70 = 370 (167 dmg + heal)
+            ['sniper', 'assault', 'medic', 'medic'],    // 110+100+80+80 = 370 (120 dmg + 2x heal)
+        ],
+        weight: 0.5  // LOW weight - KI soll angreifen!
     }
 };
 
@@ -340,6 +373,7 @@ function updateConfirmButton() {
 
 /**
  * Generate unit selection cards - Shop Style with Sprite Preview
+ * Redesigned with explicit +/- cart controls
  */
 function generateUnitCards() {
     const grid = document.getElementById('team-select-grid');
@@ -364,10 +398,10 @@ function generateUnitCards() {
         // Get player color for glow effect
         const playerColor = CONFIG.PLAYER_COLORS[currentTeamSelectPlayer] || '#22c55e';
 
-        // New card layout with sprite preview
+        // New card layout with sprite preview and cart controls
         card.innerHTML = `
             ${isElite ? '<div class="unit-elite-badge">ELITE</div>' : ''}
-            <button class="card-info-btn" data-class="${classKey}" title="Details">?</button>
+            <button class="card-info-btn" data-class="${classKey}" title="Details anzeigen">i</button>
             <div class="unit-sprite-container">
                 <div class="unit-sprite-glow" style="--player-color: ${playerColor}40;"></div>
                 <canvas class="unit-sprite-canvas" width="104" height="104" data-class="${classKey}"></canvas>
@@ -383,6 +417,11 @@ function generateUnitCards() {
                 <span class="stat-item">🎯 ${classData.range}</span>
             </div>
             <div class="unit-special">✨ ${classData.special}</div>
+            <div class="cart-controls">
+                <button class="cart-btn cart-remove" data-class="${classKey}" title="Entfernen">−</button>
+                <span class="cart-count" data-class="${classKey}">0</span>
+                <button class="cart-btn cart-add" data-class="${classKey}" title="Hinzufügen">+</button>
+            </div>
         `;
 
         // Render sprite to canvas
@@ -391,12 +430,33 @@ function generateUnitCards() {
             renderUnitSpriteToCanvas(canvas, classKey, currentTeamSelectPlayer);
         }
 
-        // Card click = select unit
+        // Add button click = add one unit
+        const addBtn = card.querySelector('.cart-add');
+        if (addBtn) {
+            addBtn.onclick = (e) => {
+                e.stopPropagation();
+                playClick();
+                addToCart(classKey);
+            };
+        }
+
+        // Remove button click = remove one unit
+        const removeBtn = card.querySelector('.cart-remove');
+        if (removeBtn) {
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                playClick();
+                removeFromCart(classKey);
+            };
+        }
+
+        // Card click (not on buttons) = show details
         card.onclick = (e) => {
-            // Don't select if clicking info button
-            if (e.target.classList.contains('card-info-btn')) return;
+            if (e.target.classList.contains('cart-btn') ||
+                e.target.classList.contains('cart-count') ||
+                e.target.classList.contains('card-info-btn')) return;
             playClick();
-            toggleUnitSelection(classKey, card);
+            showUnitDetails(classKey);
         };
 
         // Info button click = show details
@@ -414,6 +474,45 @@ function generateUnitCards() {
 
     // Setup detail overlay close handlers
     setupDetailOverlay();
+}
+
+/**
+ * Add one unit to cart
+ */
+function addToCart(classKey) {
+    const unitClass = UNIT_CLASSES[classKey];
+    if (!unitClass) return;
+
+    if (canAddUnit(classKey)) {
+        currentPlayerSelection.push(classKey);
+        currentBudgetSpent += unitClass.cost;
+        updateCardSelectionState();
+        updateTeamPreview();
+        updateBudgetDisplay();
+        updateConfirmButton();
+    } else if (currentPlayerSelection.length >= CONFIG.MAX_UNITS) {
+        import('./ui.js').then(ui => ui.showToast(`Maximum ${CONFIG.MAX_UNITS} Einheiten!`, 'error'));
+    } else {
+        import('./ui.js').then(ui => ui.showToast('Nicht genug Budget!', 'error'));
+    }
+}
+
+/**
+ * Remove one unit from cart by class
+ */
+function removeFromCart(classKey) {
+    const index = currentPlayerSelection.lastIndexOf(classKey);
+    if (index !== -1) {
+        const unitClass = UNIT_CLASSES[classKey];
+        if (unitClass) {
+            currentBudgetSpent -= unitClass.cost;
+        }
+        currentPlayerSelection.splice(index, 1);
+        updateCardSelectionState();
+        updateTeamPreview();
+        updateBudgetDisplay();
+        updateConfirmButton();
+    }
 }
 
 /**
@@ -484,7 +583,7 @@ const UNIT_PLAYSTYLES = {
 };
 
 /**
- * Show unit detail overlay
+ * Show unit detail overlay with cart controls
  */
 function showUnitDetails(classKey) {
     const classData = UNIT_CLASSES[classKey];
@@ -492,6 +591,9 @@ function showUnitDetails(classKey) {
 
     const overlay = document.getElementById('shop-detail-overlay');
     if (!overlay) return;
+
+    // Store current class for cart operations
+    overlay.dataset.currentClass = classKey;
 
     // Populate detail panel
     document.getElementById('detail-icon').textContent = classData.icon;
@@ -541,19 +643,41 @@ function showUnitDetails(classKey) {
     // Playstyle
     document.getElementById('detail-playstyle').textContent = UNIT_PLAYSTYLES[classKey] || 'Keine Beschreibung verfügbar.';
 
-    // Setup select button
-    const selectBtn = document.getElementById('detail-select-btn');
-    selectBtn.onclick = () => {
-        hideUnitDetails();
-        // Find the card and toggle selection
-        const card = document.querySelector(`.unit-card[data-class="${classKey}"]`);
-        if (card) {
-            toggleUnitSelection(classKey, card);
-        }
-    };
+    // Update cart controls in detail view
+    updateDetailCartControls(classKey);
 
     // Show overlay
     overlay.classList.add('visible');
+}
+
+/**
+ * Update cart controls in detail overlay
+ */
+function updateDetailCartControls(classKey) {
+    const count = currentPlayerSelection.filter(c => c === classKey).length;
+    const unitClass = UNIT_CLASSES[classKey];
+    const remaining = CONFIG.TEAM_BUDGET - currentBudgetSpent;
+    const canAdd = unitClass && unitClass.cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
+
+    // Update count display
+    const countEl = document.getElementById('detail-cart-count');
+    if (countEl) {
+        countEl.textContent = count;
+        countEl.classList.toggle('has-items', count > 0);
+    }
+
+    // Update button states
+    const removeBtn = document.getElementById('detail-cart-remove');
+    const addBtn = document.getElementById('detail-cart-add');
+
+    if (removeBtn) {
+        removeBtn.disabled = count === 0;
+        removeBtn.classList.toggle('disabled', count === 0);
+    }
+    if (addBtn) {
+        addBtn.disabled = !canAdd;
+        addBtn.classList.toggle('disabled', !canAdd);
+    }
 }
 
 /**
@@ -585,6 +709,34 @@ function setupDetailOverlay() {
         overlay.onclick = (e) => {
             if (e.target === overlay) {
                 hideUnitDetails();
+            }
+        };
+    }
+
+    // Cart controls in detail view
+    const detailAddBtn = document.getElementById('detail-cart-add');
+    const detailRemoveBtn = document.getElementById('detail-cart-remove');
+
+    if (detailAddBtn) {
+        detailAddBtn.onclick = (e) => {
+            e.stopPropagation();
+            playClick();
+            const classKey = overlay?.dataset.currentClass;
+            if (classKey) {
+                addToCart(classKey);
+                updateDetailCartControls(classKey);
+            }
+        };
+    }
+
+    if (detailRemoveBtn) {
+        detailRemoveBtn.onclick = (e) => {
+            e.stopPropagation();
+            playClick();
+            const classKey = overlay?.dataset.currentClass;
+            if (classKey) {
+                removeFromCart(classKey);
+                updateDetailCartControls(classKey);
             }
         };
     }
@@ -661,7 +813,7 @@ function toggleUnitSelection(classKey, card) {
 }
 
 /**
- * Update visual selection state of cards
+ * Update visual selection state of cards and cart controls
  */
 function updateCardSelectionState() {
     const cards = document.querySelectorAll('.unit-card');
@@ -677,7 +829,26 @@ function updateCardSelectionState() {
         const canAfford = unitClass && unitClass.cost <= remaining && currentPlayerSelection.length < CONFIG.MAX_UNITS;
         card.classList.toggle('unaffordable', !canAfford && count === 0);
 
-        // Update or remove count badge
+        // Update cart count display
+        const cartCount = card.querySelector('.cart-count');
+        if (cartCount) {
+            cartCount.textContent = count;
+            cartCount.classList.toggle('has-items', count > 0);
+        }
+
+        // Update button states
+        const removeBtn = card.querySelector('.cart-remove');
+        const addBtn = card.querySelector('.cart-add');
+        if (removeBtn) {
+            removeBtn.disabled = count === 0;
+            removeBtn.classList.toggle('disabled', count === 0);
+        }
+        if (addBtn) {
+            addBtn.disabled = !canAfford;
+            addBtn.classList.toggle('disabled', !canAfford);
+        }
+
+        // Keep legacy count badge for visual feedback (optional)
         let countBadge = card.querySelector('.select-count');
         if (count > 0) {
             if (!countBadge) {
