@@ -1,6 +1,6 @@
 // ===== UNIT SYSTEM =====
 
-import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
+import { CONFIG, UNIT_CLASSES, TERRAIN, getUnitWithVariant } from './config.js';
 import { state, getHex, getPlayerUnits, spendSharedAP, canUnitAttack, getRemainingAttacks, areUnitsAllied, recordMovement } from './state.js';
 import { getSpawnPositions } from './map.js';
 import { hasLineOfSight } from './combat.js';
@@ -30,8 +30,20 @@ export function createUnits() {
         console.log(`[Units] Player ${p}: Creating ${playerClasses.length} units, ${playerSpawns.length} spawn positions available`);
 
         for (let u = 0; u < playerClasses.length; u++) {
-            const classType = playerClasses[u];
-            const classData = UNIT_CLASSES[classType];
+            const unitKey = playerClasses[u];
+
+            // Parse unitKey format (classKey:variantKey or just classKey for legacy)
+            let classKey, variantKey;
+            if (unitKey && unitKey.includes(':')) {
+                [classKey, variantKey] = unitKey.split(':');
+            } else {
+                classKey = unitKey;
+                variantKey = 'standard';
+            }
+
+            // Get unit data with variant stats applied
+            const unitData = getUnitWithVariant(classKey, variantKey);
+            const baseClassData = UNIT_CLASSES[classKey];
 
             // Safety check: ensure spawn position exists
             if (!playerSpawns[u]) {
@@ -41,31 +53,32 @@ export function createUnits() {
             const spawn = playerSpawns[u];
 
             // Safety check: ensure class data exists
-            if (!classData) {
-                console.error(`[Units] Unknown unit class "${classType}" for player ${p}! Skipping unit.`);
+            if (!unitData || !baseClassData) {
+                console.error(`[Units] Unknown unit class "${unitKey}" for player ${p}! Skipping unit.`);
                 continue;
             }
 
             const unit = {
                 id: `${p}-${u}`,
                 player: p,
-                class: classType,
-                name: classData.name,
-                icon: classData.icon,
-                maxHp: classData.hp,
-                currentHp: classData.hp,
-                damage: classData.damage,
-                range: classData.range,
-                move: classData.move,
-                vision: classData.vision,
-                special: classData.special,
-                specialDesc: classData.specialDesc,
+                class: classKey,  // Store base class for sprite lookups
+                variant: variantKey,  // Store variant for reference
+                name: unitData.name,
+                icon: baseClassData.icon,
+                maxHp: unitData.hp,
+                currentHp: unitData.hp,
+                damage: unitData.damage,
+                range: unitData.range,
+                move: unitData.move,
+                vision: unitData.vision,
+                special: baseClassData.special,
+                specialDesc: baseClassData.specialDesc,
                 q: spawn.q,
                 r: spawn.r,
                 alive: true,
                 usedSpecial: false,
                 cloaked: false,           // Sniper stealth (active cloak ability)
-                stealthActive: classType === 'sniper' || classType === 'commando', // Only sniper/commando have passive stealth
+                stealthActive: classKey === 'sniper' || classKey === 'commando', // Only sniper/commando have passive stealth
                 hiding: false             // Taking cover in forest/rocks
             };
 

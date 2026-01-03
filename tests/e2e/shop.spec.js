@@ -82,27 +82,17 @@ test.describe('Shop Screen', () => {
         const budget = page.locator('#shop-budget');
         await expect(budget).toBeVisible();
 
-        // Verify shop grid container exists
-        const gridContainer = page.locator('.shop-grid-container');
-        await expect(gridContainer).toBeVisible();
+        // Verify category step is visible (Step 1: Class selection)
+        const stepClasses = page.locator('#shop-step-classes');
+        await expect(stepClasses).toBeVisible();
 
-        // Verify unit class groups are generated - should have 6 groups (one per unit class)
-        const unitGroups = page.locator('.unit-class-group');
-        await expect(unitGroups).toHaveCount(6, { timeout: 5000 });
+        // Verify 6 category cards are generated (one per unit class)
+        const categoryCards = page.locator('.category-card');
+        await expect(categoryCards).toHaveCount(6, { timeout: 5000 });
 
-        // Verify unit cards are generated - should have 18 cards (6 unit classes × 3 variants each)
-        const unitCards = page.locator('.unit-card');
-        await expect(unitCards).toHaveCount(18, { timeout: 5000 });
-
-        // Verify each group header is visible
-        const groupHeaders = page.locator('.unit-class-header');
-        for (let i = 0; i < 6; i++) {
-            await expect(groupHeaders.nth(i)).toBeVisible();
-        }
-
-        // Verify bottom bar with buttons
-        const bottomBar = page.locator('.shop-bottom-bar');
-        await expect(bottomBar).toBeVisible();
+        // Verify cart panel with buttons
+        const cartPanel = page.locator('.shop-cart-panel');
+        await expect(cartPanel).toBeVisible();
 
         const backBtn = page.locator('#team-back-btn');
         await expect(backBtn).toBeVisible();
@@ -115,7 +105,7 @@ test.describe('Shop Screen', () => {
         expect(errors, 'No JavaScript errors should occur').toEqual([]);
     });
 
-    test('unit cards can be added via cart controls and budget updates', async ({ page }) => {
+    test('clicking category shows variants and can add units', async ({ page }) => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
 
@@ -125,26 +115,33 @@ test.describe('Shop Screen', () => {
         const budgetCurrent = page.locator('.budget-current');
         await expect(budgetCurrent).toHaveText('0');
 
-        // Click cart add button on first unit card to add it
-        const firstCard = page.locator('.unit-card').first();
-        const addBtn = firstCard.locator('.cart-add');
+        // Click first category card to see variants
+        const firstCategory = page.locator('.category-card').first();
+        await firstCategory.click();
+
+        // Verify variants step is now visible
+        const stepVariants = page.locator('#shop-step-variants');
+        await expect(stepVariants).toBeVisible({ timeout: 2000 });
+
+        // Verify variant cards are shown (3 variants per class)
+        const variantCards = page.locator('.variant-card-full');
+        await expect(variantCards).toHaveCount(3, { timeout: 2000 });
+
+        // Click add button on first variant
+        const firstVariant = variantCards.first();
+        const addBtn = firstVariant.locator('[data-action="add"]');
         await addBtn.click();
 
         // Budget should have increased (not 0 anymore)
         await expect(budgetCurrent).not.toHaveText('0');
 
-        // Card should show cart count of 1
-        const cartCount = firstCard.locator('.cart-count');
-        await expect(cartCount).toHaveText('1');
+        // Variant should show count of 1
+        const variantCount = firstVariant.locator('.variant-cart-count');
+        await expect(variantCount).toHaveText('1');
 
-        // Shopping cart should show the selected unit as cart item
-        const cartItems = page.locator('#cart-items');
-        const cartItem = cartItems.locator('.cart-item');
-        await expect(cartItem).toHaveCount(1, { timeout: 2000 });
-
-        // Cart count badge should show 1/6
+        // Cart count badge should show 1/5 (MAX_UNITS is 5)
         const cartCountBadge = page.locator('#cart-count-badge');
-        await expect(cartCountBadge).toHaveText('1/6');
+        await expect(cartCountBadge).toHaveText('1/5');
 
         expect(errors).toEqual([]);
     });
