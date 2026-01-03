@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.4...shadow-squad-v6.6.0) (2026-01-03)
+
+
+### Features
+
+* **ai:** significantly improve AI aggression and combat effectiveness ([#351](https://github.com/CodingSteve01/battlezone/issues/351)) ([efb35dc](https://github.com/CodingSteve01/battlezone/commit/efb35dcfb846f49c6559e8129c91fbf62e55f337))
+
 ## [6.5.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.3...shadow-squad-v6.5.4) (2026-01-03)
 
 
