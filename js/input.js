@@ -2452,7 +2452,8 @@ function setupPauseMenu() {
 
     // Open pause menu
     pauseBtn.onclick = () => {
-        if (state.gameOver) return;
+        // Only allow pause when in active game (no screen overlay)
+        if (state.gameOver || state.screen !== null) return;
         pauseOverlay.classList.add('visible');
         // Pause any ongoing processes
         state.paused = true;
