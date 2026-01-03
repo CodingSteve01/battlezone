@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.3.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.2.0...shadow-squad-v6.3.0) (2026-01-03)
+
+
+### Features
+
+* **ai:** add ambush detection and cautious forest approach ([#331](https://github.com/CodingSteve01/battlezone/issues/331)) ([1b629de](https://github.com/CodingSteve01/battlezone/commit/1b629de56f632282aa0ed15144cf5b82428d6ac0))
+
 ## [6.2.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.1.0...shadow-squad-v6.2.0) (2026-01-03)
 
 
