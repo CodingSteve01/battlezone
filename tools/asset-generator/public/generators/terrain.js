@@ -55,16 +55,17 @@ const TerrainGenerator = {
             hasGrassOverhang: true
         },
         rock: {
-            baseColor: '#6a6a68',      // Natural stone
-            lightColor: '#8a8a85',     // Sunlit rock
-            darkColor: '#4a4a48',      // Rock shadow
-            midColor: '#5a5a58',       // Mid gray
-            accentColor: '#9a9a95',    // Light patches
+            // Rocky grassland - grass base with many stones scattered on top
+            baseColor: '#5a8a48',      // Grass green base (similar to grass terrain)
+            lightColor: '#6a9a58',     // Sunlit grass
+            darkColor: '#4a7a38',      // Shaded grass
+            midColor: '#558545',       // Mid-tone grass
+            accentColor: '#7aaa68',    // Grass highlight
             earthType: 'rock',
-            detailType: 'stone',
-            noiseScale: 0.04,
-            hasGrassOverhang: false,
-            hasRockOverhang: true
+            detailType: 'rocky_ground', // New detail type: grass with many stones
+            noiseScale: 0.025,
+            hasGrassOverhang: true,
+            hasRockOverhang: false
         },
         water: {
             // Clear blue water with visible bottom
@@ -1764,6 +1765,9 @@ const TerrainGenerator = {
             case 'rocky_grass':
                 this.renderRockyGrass(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
                 break;
+            case 'rocky_ground':
+                this.renderRockyGround(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
+                break;
             case 'stone':
                 this.renderStoneDetails(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain);
                 break;
@@ -2659,6 +2663,232 @@ const TerrainGenerator = {
                 }
             }
             if (hasPoints) ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    },
+
+    /**
+     * Render rocky ground - grass base densely covered with stones and boulders
+     * Creates an impassable rocky field that looks natural
+     */
+    renderRockyGround(ctx, noise, detailNoise, microNoise, width, height, variant, cx, cy, radius, terrain) {
+        const darkRGB = this.hexToRgb(terrain.darkColor);
+        const lightRGB = this.hexToRgb(terrain.accentColor);
+
+        // Stone colors for variety
+        const stoneColors = [
+            { base: '#6a6865', light: '#8a8885', dark: '#4a4845', highlight: '#9a9895' },
+            { base: '#7a7570', light: '#9a9590', dark: '#5a5550', highlight: '#aaa5a0' },
+            { base: '#5a5855', light: '#7a7875', dark: '#3a3835', highlight: '#8a8885' },
+            { base: '#656260', light: '#858280', dark: '#454240', highlight: '#959290' }
+        ];
+
+        // Ground color variation patches (grass showing through)
+        ctx.globalAlpha = 0.25;
+        for (let i = 0; i < 10; i++) {
+            const x = cx + (noise.noise2D(i * 4, variant) - 0.5) * radius * 1.4;
+            const y = cy + (noise.noise2D(variant, i * 4) - 0.5) * radius * 1.2;
+            const patchSize = 15 + Math.abs(microNoise.noise2D(x, y)) * 20;
+
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, patchSize);
+            gradient.addColorStop(0, i % 2 === 0 ? 'rgba(80, 110, 60, 0.5)' : 'rgba(70, 100, 50, 0.5)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, patchSize, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Sparse grass tufts between stones
+        const tuftCount = 6 + Math.floor(Math.abs(noise.noise2D(variant * 2, 0)) * 4);
+        for (let t = 0; t < tuftCount; t++) {
+            const tuftAngle = detailNoise.noise2D(t * 0.3, variant) * Math.PI * 2;
+            const tuftDist = Math.abs(detailNoise.noise2D(variant, t * 0.3)) * radius * 0.7;
+            const tuftX = cx + Math.cos(tuftAngle) * tuftDist;
+            const tuftY = cy + Math.sin(tuftAngle) * tuftDist;
+
+            const bladesInTuft = 3 + Math.floor(Math.abs(noise.noise2D(t * 5, variant)) * 3);
+            for (let b = 0; b < bladesInTuft; b++) {
+                const bladeAngle = (b / bladesInTuft) * Math.PI - Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+                const bladeHeight = 3 + microNoise.noise2D(tuftX + b, tuftY) * 5;
+                const bend = (bladeAngle - Math.PI / 2) * 0.2 + microNoise.noise2D(tuftX * 0.05, tuftY * 0.05 + b) * 0.25;
+
+                const gradient = ctx.createLinearGradient(tuftX, tuftY, tuftX + bend * bladeHeight, tuftY - bladeHeight);
+                gradient.addColorStop(0, `rgba(${darkRGB.r}, ${darkRGB.g}, ${darkRGB.b}, 0.5)`);
+                gradient.addColorStop(1, `rgba(${lightRGB.r}, ${lightRGB.g}, ${lightRGB.b}, 0.35)`);
+
+                ctx.beginPath();
+                ctx.moveTo(tuftX + (b - bladesInTuft / 2) * 0.5, tuftY);
+                ctx.quadraticCurveTo(
+                    tuftX + bend * bladeHeight * 0.5,
+                    tuftY - bladeHeight * 0.6,
+                    tuftX + bend * bladeHeight,
+                    tuftY - bladeHeight
+                );
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 0.5 + Math.random() * 0.3;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+
+        // Many small pebbles scattered densely
+        ctx.globalAlpha = 0.6;
+        for (let i = 0; i < 60; i++) {
+            const x = cx + (detailNoise.noise2D(i * 2, variant * 3) - 0.5) * radius * 1.6;
+            const y = cy + (detailNoise.noise2D(variant * 3, i * 2) - 0.5) * radius * 1.4;
+            const size = 1.5 + Math.abs(noise.noise2D(x * 0.1, y * 0.1)) * 3;
+            const colorIdx = Math.floor(Math.abs(noise.noise2D(i, variant)) * stoneColors.length);
+            const colors = stoneColors[colorIdx % stoneColors.length];
+
+            // Pebble shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.beginPath();
+            ctx.ellipse(x + size * 0.15, y + size * 0.4, size * 0.9, size * 0.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pebble
+            ctx.fillStyle = colors.base;
+            ctx.beginPath();
+            ctx.ellipse(x, y, size, size * 0.7, noise.noise2D(i, i) * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Medium stones with 3D shading
+        const mediumStoneCount = 12 + Math.floor(Math.abs(noise.noise2D(variant, 0)) * 8);
+        for (let i = 0; i < mediumStoneCount; i++) {
+            const seed = variant * 10000 + i;
+            const angle = detailNoise.noise2D(seed * 0.12, 0) * Math.PI * 2;
+            const dist = Math.abs(detailNoise.noise2D(0, seed * 0.12)) * radius * 0.85;
+
+            const x = cx + Math.cos(angle) * dist;
+            const y = cy + Math.sin(angle) * dist;
+            const stoneSize = 5 + Math.abs(microNoise.noise2D(x * 0.1, y * 0.1)) * 10;
+            const colorIdx = Math.floor(Math.abs(noise.noise2D(i * 3, variant)) * stoneColors.length);
+            const colors = stoneColors[colorIdx % stoneColors.length];
+
+            ctx.globalAlpha = 0.9;
+
+            // Stone shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+            ctx.beginPath();
+            ctx.ellipse(x + stoneSize * 0.2, y + stoneSize * 0.6, stoneSize * 0.95, stoneSize * 0.35, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Stone with gradient
+            const stoneGrad = ctx.createRadialGradient(
+                x - stoneSize * 0.3, y - stoneSize * 0.25, 0,
+                x + stoneSize * 0.15, y + stoneSize * 0.15, stoneSize * 1.1
+            );
+            stoneGrad.addColorStop(0, colors.highlight);
+            stoneGrad.addColorStop(0.3, colors.light);
+            stoneGrad.addColorStop(0.6, colors.base);
+            stoneGrad.addColorStop(1, colors.dark);
+
+            // Irregular stone shape
+            ctx.beginPath();
+            const points = 7;
+            for (let p = 0; p <= points; p++) {
+                const a = (p / points) * Math.PI * 2;
+                const irregularity = 0.75 + microNoise.noise2D(x + p * 3, y + seed) * 0.35;
+                const px = x + Math.cos(a) * stoneSize * irregularity;
+                const py = y + Math.sin(a) * stoneSize * irregularity * 0.75;
+                if (p === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = stoneGrad;
+            ctx.fill();
+
+            // Highlight on top
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+            ctx.beginPath();
+            ctx.ellipse(x - stoneSize * 0.2, y - stoneSize * 0.25, stoneSize * 0.3, stoneSize * 0.15, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // A few larger boulders
+        const boulderCount = 2 + Math.floor(Math.abs(noise.noise2D(variant * 5, 0)) * 2);
+        for (let i = 0; i < boulderCount; i++) {
+            const seed = variant * 50000 + i;
+            const angle = noise.noise2D(seed * 0.08, i) * Math.PI * 2;
+            const dist = 0.2 + Math.abs(noise.noise2D(i, seed * 0.08)) * 0.5;
+            const bx = cx + Math.cos(angle) * radius * dist;
+            const by = cy + Math.sin(angle) * radius * dist;
+            const boulderSize = radius * (0.18 + Math.abs(microNoise.noise2D(bx, by)) * 0.12);
+            const colorIdx = Math.floor(Math.abs(noise.noise2D(i * 7, variant * 3)) * stoneColors.length);
+            const colors = stoneColors[colorIdx % stoneColors.length];
+
+            ctx.globalAlpha = 1;
+
+            // Boulder shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(bx + boulderSize * 0.15, by + boulderSize * 0.7, boulderSize * 0.9, boulderSize * 0.25, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Boulder body
+            const boulderGrad = ctx.createRadialGradient(
+                bx - boulderSize * 0.35, by - boulderSize * 0.3, 0,
+                bx + boulderSize * 0.2, by + boulderSize * 0.3, boulderSize * 1.2
+            );
+            boulderGrad.addColorStop(0, colors.highlight);
+            boulderGrad.addColorStop(0.25, colors.light);
+            boulderGrad.addColorStop(0.55, colors.base);
+            boulderGrad.addColorStop(1, colors.dark);
+
+            ctx.beginPath();
+            const points = 9;
+            for (let p = 0; p <= points; p++) {
+                const a = (p / points) * Math.PI * 2;
+                const irregularity = 0.7 + microNoise.noise2D(bx + p * 5, by + seed) * 0.4;
+                const px = bx + Math.cos(a) * boulderSize * irregularity;
+                const py = by + Math.sin(a) * boulderSize * irregularity * 0.8;
+                if (p === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fillStyle = boulderGrad;
+            ctx.fill();
+
+            // Boulder highlight
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(bx - boulderSize * 0.25, by - boulderSize * 0.3, boulderSize * 0.35, boulderSize * 0.2, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Subtle cracks on boulder
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.lineWidth = 0.8;
+            const crackCount = 1 + Math.floor(Math.random() * 2);
+            for (let c = 0; c < crackCount; c++) {
+                const startA = noise.noise2D(c * 10, seed) * Math.PI * 2;
+                let cx1 = bx + Math.cos(startA) * boulderSize * 0.15;
+                let cy1 = by + Math.sin(startA) * boulderSize * 0.15;
+                ctx.beginPath();
+                ctx.moveTo(cx1, cy1);
+                const segments = 2;
+                for (let s = 0; s < segments; s++) {
+                    const crackAngle = noise.noise2D(cx1 * 0.1, cy1 * 0.1) * Math.PI;
+                    cx1 += Math.cos(crackAngle) * boulderSize * 0.25;
+                    cy1 += Math.sin(crackAngle) * boulderSize * 0.2;
+                    ctx.lineTo(cx1, cy1);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Moss patches near stones
+        ctx.globalAlpha = 0.3;
+        for (let i = 0; i < 5; i++) {
+            const x = cx + (microNoise.noise2D(i * 9, variant * 5) - 0.5) * radius * 1.1;
+            const y = cy + (microNoise.noise2D(variant * 5, i * 9) - 0.5) * radius * 0.9;
+            const size = 3 + Math.random() * 5;
+            ctx.fillStyle = i % 2 === 0 ? '#5a7a50' : '#4a6a45';
+            ctx.beginPath();
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
         }
         ctx.globalAlpha = 1;
     },

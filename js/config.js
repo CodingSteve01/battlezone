@@ -128,9 +128,9 @@ export const TERRAIN = {
         defenseBonus: 10
     },
     rock: {
-        color: '#6a6a68',      // Natural gray stone
-        colorLight: '#8a8a85', // Sunlit rock
-        colorDark: '#4a4a48',  // Rock shadow
+        color: '#5a8a48',      // Rocky grassland - grass base with stones
+        colorLight: '#6a9a58', // Sunlit grass
+        colorDark: '#4a7a38',  // Shaded grass
         earthColor: '#5a5550', // Stone base
         earthDark: '#3a3530',  // Dark crevice
         walkable: false,
