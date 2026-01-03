@@ -86,13 +86,18 @@ test.describe('Shop Screen', () => {
         const gridContainer = page.locator('.shop-grid-container');
         await expect(gridContainer).toBeVisible();
 
+        // Verify unit class groups are generated - should have 6 groups (one per unit class)
+        const unitGroups = page.locator('.unit-class-group');
+        await expect(unitGroups).toHaveCount(6, { timeout: 5000 });
+
         // Verify unit cards are generated - should have 18 cards (6 unit classes × 3 variants each)
         const unitCards = page.locator('.unit-card');
         await expect(unitCards).toHaveCount(18, { timeout: 5000 });
 
-        // Verify each unit card is visible
+        // Verify each group header is visible
+        const groupHeaders = page.locator('.unit-class-header');
         for (let i = 0; i < 6; i++) {
-            await expect(unitCards.nth(i)).toBeVisible();
+            await expect(groupHeaders.nth(i)).toBeVisible();
         }
 
         // Verify bottom bar with buttons
