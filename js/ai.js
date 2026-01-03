@@ -59,12 +59,18 @@ import {
     addMultiPartThought,
     variedPhrase,
     clearAIThoughts,
-    CLASS_NAMES_DE,
-    setIsAIPlayerFn
+    CLASS_NAMES_DE
 } from './ai/thoughts.js';
 
+// Import from ai/index.js to avoid duplicates
+// Note: resetAIMemory is imported from memory.js, analyzeAndPlan is defined locally with more features
+import {
+    isAIPlayer,
+    hasHumanPlayer
+} from './ai/index.js';
+
 // Re-export for backward compatibility
-export { isSpectatorMode };
+export { isSpectatorMode, isAIPlayer, hasHumanPlayer };
 
 // AI thought system functions (isSpectatorMode, addAIThought, addMultiPartThought,
 // variedPhrase, clearAIThoughts, CLASS_NAMES_DE) are imported from ./ai/thoughts.js
@@ -395,31 +401,7 @@ function scoreAmbushPosition(unit, q, r, enemies) {
     return score;
 }
 
-/**
- * Check if a player is AI controlled
- * Supports both legacy singlePlayer mode and new aiPlayers array
- */
-export function isAIPlayer(playerIndex = state.currentPlayer) {
-    // New mode: check aiPlayers array
-    if (state.settings.aiPlayers && state.settings.aiPlayers.length > 0) {
-        return state.settings.aiPlayers.includes(playerIndex);
-    }
-    // Legacy mode: singlePlayer means all non-0 players are AI
-    return state.settings.singlePlayer && playerIndex > 0;
-}
-
-// Set the isAIPlayer reference in thoughts module so isSpectatorMode works
-setIsAIPlayerFn(isAIPlayer);
-
-/**
- * Check if there are any human players in the game
- */
-export function hasHumanPlayer() {
-    for (let p = 0; p < state.settings.players; p++) {
-        if (!isAIPlayer(p)) return true;
-    }
-    return false;
-}
+// isAIPlayer and hasHumanPlayer are imported from ./ai/index.js
 
 /**
  * Execute AI turn
