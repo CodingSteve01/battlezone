@@ -8,7 +8,8 @@ import {
     getHoldPositionBonus, clearHoldPosition, updateHoldPosition,
     areUnitsAllied, arePlayersAllied, getAlliedPlayers, getTeamCount, hasAlliances,
     recordKill, recordDamageDealt, recordDamageTaken, recordShot, recordHealing,
-    recordSpecialUsed, recordUnitLost, getTileScreenPosition
+    recordSpecialUsed, recordUnitLost, getTileScreenPosition,
+    logRoundEvent
 } from './state.js';
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
 import { hexDistance, hexLine } from './hexMath.js';
@@ -792,6 +793,18 @@ export function executeAttack(attacker, defender, minigameResult = null) {
     recordShot(attacker.player, true, hasCrit);
     recordDamageDealt(attacker.player, damage);
     recordDamageTaken(defender.player, damage);
+
+    // === ROUND EVENTS: Log attack for round summary ===
+    const wasKilled = defender.currentHp <= 0;
+    logRoundEvent('attack', {
+        attackerPlayer: attacker.player,
+        targetPlayer: defender.player,
+        attackerClass: attacker.class,
+        targetClass: defender.class,
+        damage,
+        killed: wasKilled,
+        critical: hasCrit
+    });
 
     // === AI LEARNING: Record where attacks came from ===
     // This allows AI to learn about danger zones and ambush positions

@@ -171,6 +171,10 @@ export const state = {
     zonePhase: 0,                   // Aktuelle Zone-Schrumpf-Phase (0 = keine Schrumpfung)
     revealCooldown: 0,              // Cooldown für nächste Enthüllung versteckter Einheiten
 
+    // === ROUND EVENTS (für Runden-Zusammenfassung) ===
+    roundEvents: [],                // Array von {type, attacker, target, damage, killed, etc.}
+    lastRoundSummary: null,         // Zusammenfassung der letzten Runde für Round-Start-Screen
+
     // Canvas dimensions
     canvasWidth: 0,
     canvasHeight: 0,
@@ -298,6 +302,10 @@ export function resetState() {
     state.lastCombatRound = 0;
     state.zonePhase = 0;
     state.revealCooldown = 0;
+
+    // Round Events zurücksetzen
+    state.roundEvents = [];
+    state.lastRoundSummary = null;
 
     // Screen shake zurücksetzen
     state.screenShake = {
@@ -1337,4 +1345,152 @@ export function getPlayerRankings() {
     rankings.sort((a, b) => b.score - a.score);
 
     return rankings;
+}
+
+// === ROUND EVENTS SYSTEM ===
+// Tracks combat events during a round for the summary screen
+
+/**
+ * Log a combat event (attack, kill, heal, etc.)
+ * @param {string} type - Event type: 'attack', 'kill', 'heal', 'special'
+ * @param {Object} data - Event data
+ */
+export function logRoundEvent(type, data) {
+    state.roundEvents.push({
+        type,
+        round: state.round,
+        timestamp: Date.now(),
+        ...data
+    });
+}
+
+/**
+ * Generate round summary from collected events
+ * Called at the end of each round before starting a new one
+ */
+export function generateRoundSummary() {
+    const events = state.roundEvents;
+
+    // Count events per player
+    const playerActions = {};
+    for (let p = 0; p < state.settings.players; p++) {
+        playerActions[p] = {
+            attacks: 0,
+            kills: 0,
+            damageDealt: 0,
+            damageTaken: 0,
+            heals: 0,
+            healingDone: 0
+        };
+    }
+
+    // Process events
+    const highlights = [];
+    let totalKills = 0;
+    let totalDamage = 0;
+
+    for (const event of events) {
+        if (event.type === 'attack') {
+            if (playerActions[event.attackerPlayer] !== undefined) {
+                playerActions[event.attackerPlayer].attacks++;
+                playerActions[event.attackerPlayer].damageDealt += event.damage || 0;
+            }
+            if (playerActions[event.targetPlayer] !== undefined) {
+                playerActions[event.targetPlayer].damageTaken += event.damage || 0;
+            }
+            totalDamage += event.damage || 0;
+
+            // Track kills as highlights
+            if (event.killed) {
+                totalKills++;
+                if (playerActions[event.attackerPlayer] !== undefined) {
+                    playerActions[event.attackerPlayer].kills++;
+                }
+                highlights.push({
+                    type: 'kill',
+                    attackerPlayer: event.attackerPlayer,
+                    targetPlayer: event.targetPlayer,
+                    attackerClass: event.attackerClass,
+                    targetClass: event.targetClass
+                });
+            }
+        } else if (event.type === 'heal') {
+            if (playerActions[event.healerPlayer] !== undefined) {
+                playerActions[event.healerPlayer].heals++;
+                playerActions[event.healerPlayer].healingDone += event.amount || 0;
+            }
+        }
+    }
+
+    // Find the player who dealt the most damage
+    let mostAggressivePlayer = -1;
+    let maxDamage = 0;
+    for (let p = 0; p < state.settings.players; p++) {
+        if (playerActions[p].damageDealt > maxDamage) {
+            maxDamage = playerActions[p].damageDealt;
+            mostAggressivePlayer = p;
+        }
+    }
+
+    // Find the player who took the most damage
+    let mostDamagedPlayer = -1;
+    let maxDamageTaken = 0;
+    for (let p = 0; p < state.settings.players; p++) {
+        if (playerActions[p].damageTaken > maxDamageTaken) {
+            maxDamageTaken = playerActions[p].damageTaken;
+            mostDamagedPlayer = p;
+        }
+    }
+
+    // Determine who is in the lead (based on units alive and total HP)
+    const playerStrength = [];
+    for (let p = 0; p < state.settings.players; p++) {
+        const units = state.units.filter(u => u.player === p && u.alive);
+        const totalHP = units.reduce((sum, u) => sum + u.currentHp, 0);
+        playerStrength.push({ player: p, units: units.length, totalHP });
+    }
+    playerStrength.sort((a, b) => {
+        if (a.units !== b.units) return b.units - a.units;
+        return b.totalHP - a.totalHP;
+    });
+
+    const leadingPlayer = playerStrength.length > 0 ? playerStrength[0].player : -1;
+    const trailingPlayer = playerStrength.length > 1 ? playerStrength[playerStrength.length - 1].player : -1;
+
+    // Check if it's close (units equal or similar HP)
+    const isClose = playerStrength.length >= 2 &&
+        playerStrength[0].units === playerStrength[1].units &&
+        Math.abs(playerStrength[0].totalHP - playerStrength[1].totalHP) < 50;
+
+    state.lastRoundSummary = {
+        round: state.round,
+        totalEvents: events.length,
+        totalKills,
+        totalDamage,
+        playerActions,
+        highlights,
+        mostAggressivePlayer,
+        mostDamagedPlayer,
+        leadingPlayer,
+        trailingPlayer,
+        isClose,
+        playerStrength,
+        wasQuiet: events.length === 0
+    };
+
+    return state.lastRoundSummary;
+}
+
+/**
+ * Clear round events (called at the start of a new round)
+ */
+export function clearRoundEvents() {
+    state.roundEvents = [];
+}
+
+/**
+ * Get the last round's summary
+ */
+export function getLastRoundSummary() {
+    return state.lastRoundSummary;
 }

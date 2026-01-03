@@ -1009,6 +1009,195 @@ button:focus:not(:focus-visible),
     transform: scale(0.98);
 }
 
+/* ===== ROUND START SCREEN ===== */
+#round-start-screen {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    background:
+        radial-gradient(circle at center, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+        linear-gradient(180deg, #0f0f1a 0%, #0a0a12 100%);
+}
+
+.round-start-header {
+    margin-bottom: 16px;
+}
+
+.round-start-title {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--light);
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+.round-start-commentary {
+    max-width: 340px;
+    margin: 0 auto 20px auto;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    border-left: 4px solid var(--blue);
+}
+
+.round-start-commentary .commentary-text {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--light);
+    margin-bottom: 8px;
+}
+
+.round-start-commentary .commentary-highlight {
+    font-size: 14px;
+    color: var(--yellow);
+    font-weight: 600;
+}
+
+.round-start-commentary .commentary-quiet {
+    font-size: 14px;
+    color: var(--dim);
+    font-style: italic;
+}
+
+.round-start-players {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    max-width: 400px;
+}
+
+.round-start-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 140px;
+}
+
+.round-start-player.leading {
+    border-color: rgba(34, 197, 94, 0.6);
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.round-start-player.trailing {
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.round-start-player.eliminated {
+    opacity: 0.5;
+}
+
+.round-start-player-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.round-start-player-info {
+    flex: 1;
+    text-align: left;
+}
+
+.round-start-player-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--light);
+}
+
+.round-start-player-units {
+    font-size: 12px;
+    color: var(--dim);
+}
+
+.round-start-player-badge {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.round-start-player.leading .round-start-player-badge {
+    background: rgba(34, 197, 94, 0.3);
+    color: var(--green);
+}
+
+.round-start-player.trailing .round-start-player-badge {
+    background: rgba(239, 68, 68, 0.3);
+    color: var(--red);
+}
+
+.round-start-zone {
+    margin-bottom: 16px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+}
+
+.round-start-zone.visible {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.round-start-zone.warning {
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid rgba(251, 191, 36, 0.5);
+    color: var(--yellow);
+}
+
+.round-start-zone.shrinking {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: var(--red);
+}
+
+.round-start-zone.normal {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: var(--blue);
+}
+
+.round-start-zone-icon {
+    font-size: 20px;
+}
+
+.round-start-event {
+    margin-bottom: 20px;
+    padding: 10px 16px;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.5);
+    border-radius: 8px;
+    display: none;
+}
+
+.round-start-event.visible {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.round-start-event-icon {
+    font-size: 24px;
+}
+
+.round-start-event-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #c084fc;
+}
+
+#round-start-ready-btn {
+    margin-top: 10px;
+}
+
 /* ===== GAME AREA ===== */
 #game-area {
     flex: 1;

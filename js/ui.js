@@ -1,7 +1,7 @@
 // ===== UI MANAGEMENT =====
 
 import { CONFIG, UNIT_CLASSES, TERRAIN } from './config.js';
-import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName, getTileScreenPosition, getPlayerRankings } from './state.js';
+import { state, getPlayerUnits, getCurrentUnit, getHex, getEnemyDirection, getPlayerStats, getPlayerName, getTileScreenPosition, getPlayerRankings, getLastRoundSummary } from './state.js';
 import {
     calculateHitChance, getCoverInfo, canPrepareAmbush, getEligibleCoordinators,
     canUseSpecialAbility, getSpecialAbilityCost, canUseSuppression, canUseOverwatch
@@ -841,82 +841,187 @@ export function showEventBanner(event) {
 }
 
 /**
+ * Generate a commentary text based on round summary
+ */
+function generateRoundCommentary(summary) {
+    if (!summary || summary.wasQuiet) {
+        // Ruhige Runde - verschiedene Varianten
+        const quietMessages = [
+            'Eine ruhige Runde ohne größere Gefechte.',
+            'Die Truppen halten ihre Positionen.',
+            'Alle Seiten beobachten sich wachsam.',
+            'Taktisches Manövrieren ohne direkten Kontakt.'
+        ];
+        return {
+            text: quietMessages[Math.floor(Math.random() * quietMessages.length)],
+            highlight: null,
+            isQuiet: true
+        };
+    }
+
+    const parts = [];
+    let highlight = null;
+
+    // Kills sind am wichtigsten
+    if (summary.totalKills > 0) {
+        if (summary.totalKills === 1) {
+            const kill = summary.highlights[0];
+            const attackerName = getPlayerName(kill.attackerPlayer);
+            const targetName = getPlayerName(kill.targetPlayer);
+            parts.push(`${attackerName} hat einen ${UNIT_CLASSES[kill.targetClass]?.name || 'Soldaten'} von ${targetName} eliminiert!`);
+        } else {
+            parts.push(`${summary.totalKills} Einheiten wurden eliminiert!`);
+        }
+    }
+
+    // Wer war am aggressivsten?
+    if (summary.mostAggressivePlayer >= 0 && summary.totalDamage > 30) {
+        const aggressor = getPlayerName(summary.mostAggressivePlayer);
+        const damage = summary.playerActions[summary.mostAggressivePlayer].damageDealt;
+        if (summary.totalKills === 0) {
+            parts.push(`${aggressor} führt mit ${damage} Schaden.`);
+        }
+    }
+
+    // Wer liegt vorne?
+    if (summary.isClose) {
+        highlight = '⚔️ Es bleibt spannend - beide Seiten gleichauf!';
+    } else if (summary.leadingPlayer >= 0 && summary.trailingPlayer >= 0) {
+        const leader = getPlayerName(summary.leadingPlayer);
+        const leaderStrength = summary.playerStrength.find(p => p.player === summary.leadingPlayer);
+        if (leaderStrength && leaderStrength.units > 1) {
+            highlight = `📈 ${leader} liegt mit ${leaderStrength.units} Einheiten vorne.`;
+        }
+    }
+
+    // Kein Kampf aber Bewegung
+    if (parts.length === 0 && summary.totalDamage === 0) {
+        parts.push('Die Teams manövrieren ohne direkten Kontakt.');
+    }
+
+    return {
+        text: parts.join(' '),
+        highlight,
+        isQuiet: false
+    };
+}
+
+/**
  * Show round start screen with game status overview
- * Displays for a few seconds at the beginning of each round
+ * Now uses the dedicated screen element and waits for user confirmation
  */
 export function showRoundStartScreen(roundInfo) {
-    // Remove existing round screen
-    const existing = document.querySelector('.round-start-screen');
-    if (existing) existing.remove();
-
-    // Build player status HTML
-    const playersHTML = roundInfo.players.map(p => {
-        const statusClass = p.alive ? (p.isCurrentPlayer ? 'current' : '') : 'eliminated';
-        const unitsText = p.alive ? `${p.units} Einheit${p.units !== 1 ? 'en' : ''}` : 'Eliminiert';
-        return `
-            <div class="round-player ${statusClass}">
-                <div class="round-player-color" style="background: ${p.color}"></div>
-                <div class="round-player-info">
-                    <div class="round-player-name">${p.name}</div>
-                    <div class="round-player-units">${unitsText}</div>
-                </div>
-                ${p.isCurrentPlayer ? '<div class="round-player-turn">Am Zug</div>' : ''}
-            </div>
-        `;
-    }).join('');
-
-    // Build zone status HTML
-    let zoneHTML = '';
-    if (roundInfo.zone) {
-        const zoneClass = roundInfo.zone.warning ? 'warning' : (roundInfo.zone.shrinking ? 'shrinking' : '');
-        zoneHTML = `
-            <div class="round-zone ${zoneClass}">
-                <div class="round-zone-icon">${roundInfo.zone.warning ? '⚠️' : (roundInfo.zone.shrinking ? '🔴' : '🟢')}</div>
-                <div class="round-zone-text">${roundInfo.zone.text}</div>
-            </div>
-        `;
-    }
-
-    // Build event HTML
-    let eventHTML = '';
-    if (roundInfo.event) {
-        eventHTML = `
-            <div class="round-event">
-                <span class="round-event-icon">${roundInfo.event.icon}</span>
-                <span class="round-event-name">${roundInfo.event.name}</span>
-            </div>
-        `;
-    }
-
-    // Create the round start screen
-    const screen = document.createElement('div');
-    screen.className = 'round-start-screen';
-    screen.innerHTML = `
-        <div class="round-start-content">
-            <div class="round-number">Runde ${roundInfo.round}</div>
-            <div class="round-players">
-                ${playersHTML}
-            </div>
-            ${zoneHTML}
-            ${eventHTML}
-        </div>
-    `;
-    document.body.appendChild(screen);
-
-    // Animate in
-    requestAnimationFrame(() => {
-        screen.classList.add('show');
-    });
-
-    // Auto remove after delay
     return new Promise(resolve => {
-        setTimeout(() => {
-            screen.classList.remove('show');
-            setTimeout(() => {
-                screen.remove();
-                resolve();
-            }, 400);
-        }, roundInfo.duration || 2500);
+        // Get the round summary for commentary
+        const summary = getLastRoundSummary();
+        const commentary = generateRoundCommentary(summary);
+
+        // Update round number
+        const roundNumEl = document.getElementById('round-start-num');
+        if (roundNumEl) roundNumEl.textContent = roundInfo.round;
+
+        // Build and set commentary
+        const commentaryEl = document.getElementById('round-start-commentary');
+        if (commentaryEl) {
+            let commentaryHTML = '';
+            if (commentary.text) {
+                commentaryHTML += `<div class="${commentary.isQuiet ? 'commentary-quiet' : 'commentary-text'}">${commentary.text}</div>`;
+            }
+            if (commentary.highlight) {
+                commentaryHTML += `<div class="commentary-highlight">${commentary.highlight}</div>`;
+            }
+            commentaryEl.innerHTML = commentaryHTML;
+        }
+
+        // Build player status HTML
+        const playersEl = document.getElementById('round-start-players');
+        if (playersEl) {
+            const playersHTML = roundInfo.players.map(p => {
+                let statusClass = '';
+                let badge = '';
+
+                if (!p.alive) {
+                    statusClass = 'eliminated';
+                } else if (summary && summary.leadingPlayer === roundInfo.players.indexOf(p)) {
+                    // Find player index
+                    const playerIdx = roundInfo.players.findIndex(player => player.name === p.name);
+                    if (summary.leadingPlayer === playerIdx && !summary.isClose) {
+                        statusClass = 'leading';
+                        badge = '<div class="round-start-player-badge">Führt</div>';
+                    }
+                }
+
+                // Check if trailing
+                if (summary && !summary.isClose && p.alive) {
+                    const playerIdx = roundInfo.players.findIndex(player => player.name === p.name);
+                    if (summary.trailingPlayer === playerIdx) {
+                        statusClass = 'trailing';
+                        badge = '<div class="round-start-player-badge">Rückstand</div>';
+                    }
+                }
+
+                const unitsText = p.alive ? `${p.units} Einheit${p.units !== 1 ? 'en' : ''}` : 'Eliminiert';
+
+                return `
+                    <div class="round-start-player ${statusClass}">
+                        <div class="round-start-player-color" style="background: ${p.color}"></div>
+                        <div class="round-start-player-info">
+                            <div class="round-start-player-name">${p.name}</div>
+                            <div class="round-start-player-units">${unitsText}</div>
+                        </div>
+                        ${badge}
+                    </div>
+                `;
+            }).join('');
+            playersEl.innerHTML = playersHTML;
+        }
+
+        // Zone status
+        const zoneEl = document.getElementById('round-start-zone');
+        if (zoneEl) {
+            if (roundInfo.zone) {
+                const zoneClass = roundInfo.zone.warning ? 'warning' : (roundInfo.zone.shrinking ? 'shrinking' : 'normal');
+                const icon = roundInfo.zone.warning ? '⚠️' : (roundInfo.zone.shrinking ? '🔴' : '🟢');
+                zoneEl.className = `round-start-zone visible ${zoneClass}`;
+                zoneEl.innerHTML = `
+                    <span class="round-start-zone-icon">${icon}</span>
+                    <span>${roundInfo.zone.text}</span>
+                `;
+            } else {
+                zoneEl.className = 'round-start-zone';
+                zoneEl.innerHTML = '';
+            }
+        }
+
+        // Event info
+        const eventEl = document.getElementById('round-start-event');
+        if (eventEl) {
+            if (roundInfo.event) {
+                eventEl.className = 'round-start-event visible';
+                eventEl.innerHTML = `
+                    <span class="round-start-event-icon">${roundInfo.event.icon}</span>
+                    <span class="round-start-event-name">${roundInfo.event.name}</span>
+                `;
+            } else {
+                eventEl.className = 'round-start-event';
+                eventEl.innerHTML = '';
+            }
+        }
+
+        // Set up the ready button handler
+        const readyBtn = document.getElementById('round-start-ready-btn');
+        const handleReady = () => {
+            readyBtn.removeEventListener('click', handleReady);
+            showScreen(null);
+            resolve();
+        };
+
+        if (readyBtn) {
+            readyBtn.addEventListener('click', handleReady);
+        }
+
+        // Show the screen
+        showScreen('round-start-screen');
     });
 }
 
