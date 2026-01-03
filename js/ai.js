@@ -2095,10 +2095,6 @@ async function executeRetreatWithBudget(unit, enemies, spectatorMode, maxAP) {
         // Prefer cover
         if (hex.cover) score += 30;
 
-        // Safe zone bonus to avoid predicted enemy pressure
-        const safeZoneInfo = getSafeZoneBonus(unit, q, r, enemies);
-        score += safeZoneInfo.bonus * 0.6;
-
         // Move towards allies (for protection/healing) - includes ALL allied players
         const allies = getAllAlliedAIUnits().filter(u => u.id !== unit.id);
         if (allies.length > 0) {
