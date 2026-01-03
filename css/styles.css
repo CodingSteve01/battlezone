@@ -6156,7 +6156,7 @@ button:focus:not(:focus-visible),
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 100;
+    z-index: 50; /* Lower than screens (z-index: 100) so it's hidden behind menus */
     transition: all 0.2s ease;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
