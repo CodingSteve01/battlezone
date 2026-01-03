@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.5.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.3...shadow-squad-v6.5.4) (2026-01-03)
+
+
+### Styles
+
+* **header:** simplify top bar and fix rock terrain ([#348](https://github.com/CodingSteve01/battlezone/issues/348)) ([87b8110](https://github.com/CodingSteve01/battlezone/commit/87b8110ee7a100b78cd572be71a692a76cc53ac7))
+
 ## [6.5.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.2...shadow-squad-v6.5.3) (2026-01-03)
 
 
