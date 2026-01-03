@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.5.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.2...shadow-squad-v6.5.3) (2026-01-03)
+
+
+### Styles
+
+* **header:** remove round badge for cleaner top bar ([#344](https://github.com/CodingSteve01/battlezone/issues/344)) ([483c78c](https://github.com/CodingSteve01/battlezone/commit/483c78c0d3ac740aea0b1c9d0639e4a3de68e0c9))
+
 ## [6.5.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.5.1...shadow-squad-v6.5.2) (2026-01-03)
 
 
