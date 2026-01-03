@@ -212,6 +212,43 @@ let minigameCanvas = null;
 let minigameCtx = null;
 let animationFrameId = null;
 
+// === DELTA-TIME SYSTEM ===
+// Ensures consistent game speed regardless of device frame rate
+// All movement is normalized to 60 FPS as reference
+const TARGET_FPS = 60;
+const TARGET_FRAME_TIME = 1000 / TARGET_FPS; // ~16.67ms
+let lastFrameTime = 0;
+
+/**
+ * Calculate delta time multiplier for frame-rate independent movement
+ * Returns a multiplier where 1.0 = running at exactly 60 FPS
+ * On 30 FPS devices, this returns ~2.0 to compensate
+ * @param {number} currentTime - Current timestamp from performance.now() or Date.now()
+ * @returns {number} Delta time multiplier (1.0 at 60 FPS)
+ */
+function getDeltaMultiplier(currentTime) {
+    if (lastFrameTime === 0) {
+        lastFrameTime = currentTime;
+        return 1.0; // First frame, assume 60 FPS
+    }
+
+    const deltaTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+
+    // Clamp delta to prevent huge jumps (e.g., when tab was hidden)
+    // Min: ~120 FPS (8.3ms), Max: ~15 FPS (66.7ms)
+    const clampedDelta = Math.min(Math.max(deltaTime, 8), 67);
+
+    return clampedDelta / TARGET_FRAME_TIME;
+}
+
+/**
+ * Reset delta time tracking (call when starting a new minigame)
+ */
+function resetDeltaTime() {
+    lastFrameTime = 0;
+}
+
 // Anti-cheat: Tap cooldown tracking
 let lastTapTime = 0;
 const TAP_COOLDOWN_MS = 120; // Minimum ms between taps to prevent spam
@@ -844,6 +881,9 @@ function startScoutMinigame(resolve, mods = {}) {
     let lastDirectionChange = 0;
     const maxTime = Math.round(1200 * timeMult); // Adaptive Zeit
 
+    // Reset delta time for this minigame
+    resetDeltaTime();
+
     function spawnTarget() {
         const padding = 40;
         const baseRadius = 30 * zoneMult; // Adaptive Zielgröße
@@ -866,6 +906,9 @@ function startScoutMinigame(resolve, mods = {}) {
         const now = Date.now();
         const elapsed = now - startTime;
 
+        // Delta-time multiplier for frame-rate independent movement
+        const delta = getDeltaMultiplier(now);
+
         // VARIATION: Random direction changes every 200-400ms
         if (now - lastDirectionChange > 200 + Math.random() * 200) {
             // Slight random adjustment to direction (±30%)
@@ -878,9 +921,9 @@ function startScoutMinigame(resolve, mods = {}) {
             lastDirectionChange = now;
         }
 
-        // Move target
-        target.x += target.dx;
-        target.y += target.dy;
+        // Move target - now with delta-time compensation
+        target.x += target.dx * delta;
+        target.y += target.dy * delta;
 
         // Bounce off walls
         if (target.x < target.radius || target.x > width - target.radius) target.dx *= -1;
@@ -985,6 +1028,10 @@ function startAssaultMinigame(resolve, mods = {}) {
     let direction = 1;
     let speed = 4 * speedMult;
     let gameActive = true;
+    let bounceCount = 0; // Track bounces for speed increase
+
+    // Reset delta time for this minigame
+    resetDeltaTime();
 
     // VARIATION: Randomize zone center position (0.35-0.65 instead of always 0.5)
     const zoneCenter = 0.35 + Math.random() * 0.30;
@@ -1001,11 +1048,17 @@ function startAssaultMinigame(resolve, mods = {}) {
     function update() {
         if (!gameActive) return;
 
-        // Move bar
-        barPosition += direction * speed;
+        const now = Date.now();
+        // Delta-time multiplier for frame-rate independent movement
+        const delta = getDeltaMultiplier(now);
+
+        // Move bar - now with delta-time compensation
+        barPosition += direction * speed * delta;
         if (barPosition >= width || barPosition <= 0) {
             direction *= -1;
-            speed += 0.3; // Speed up over time
+            bounceCount++;
+            // Speed up based on bounces, not frames (consistent across devices)
+            speed = (4 + bounceCount * 0.3) * speedMult;
         }
 
         // Draw
@@ -1114,10 +1167,18 @@ function startSniperMinigame(resolve, mods = {}) {
     let stillStartTime = 1400 + Math.random() * 400; // 1400-1800ms into cycle
     let cycleStartTime = 0;
 
+    // Reset delta time for this minigame
+    resetDeltaTime();
+    let lastUpdateTime = Date.now();
+
     function update() {
         if (!gameActive) return;
 
-        wobbleTime += 16;
+        const now = Date.now();
+        // Use actual elapsed time instead of fixed 16ms assumption
+        const actualDelta = now - lastUpdateTime;
+        lastUpdateTime = now;
+        wobbleTime += actualDelta;
 
         // Calculate position within current cycle
         const cycleElapsed = wobbleTime - cycleStartTime;

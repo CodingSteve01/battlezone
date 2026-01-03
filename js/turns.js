@@ -4,7 +4,7 @@ import {
     state, getPlayerUnits, getQueuedPath, updatePreviouslyVisibleEnemies,
     initSharedAPPool, isHexInZone, setOnAPDepletedCallback,
     clearPlayerOverwatch, cleanupSuppression, hasAlliances, getPlayersInTeam,
-    getPlayerName
+    getPlayerName, generateRoundSummary, clearRoundEvents
 } from './state.js';
 import { CONFIG } from './config.js';
 import { resetUnitsForTurn, resetSpecialAbilities, killUnit } from './units.js';
@@ -273,6 +273,9 @@ export function nextPlayer() {
         // Clear previous round's event
         clearRoundEvent();
 
+        // === ROUND SUMMARY: Generate summary of last round before clearing ===
+        generateRoundSummary();
+
         // === SHRINKING ZONE MECHANIK ===
         // Store zone state before processing
         const zoneWasWarning = state.zoneShrinkWarning;
@@ -287,9 +290,12 @@ export function nextPlayer() {
         }
 
         // === ROUND START SCREEN ===
-        // Build round info for display
+        // Build round info for display and show screen (waits for user confirmation)
         const roundInfo = buildRoundInfo(zoneShrunk, zoneWasWarning, event);
-        showRoundStartScreen(roundInfo);
+        showRoundStartScreen(roundInfo).then(() => {
+            // Clear round events after user has seen the summary
+            clearRoundEvents();
+        });
 
         // Spawn new power-ups periodically
         spawnNewPowerups();
