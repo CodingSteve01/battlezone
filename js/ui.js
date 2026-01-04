@@ -894,9 +894,13 @@ function generateRoundCommentary(summary) {
 /**
  * Show round start screen with game status overview
  * Now uses the dedicated screen element and waits for user confirmation
+ * In spectator mode (AI vs AI), auto-continues after a delay
  */
 export function showRoundStartScreen(roundInfo) {
     return new Promise(resolve => {
+        // Check if we're in spectator mode (all AI players)
+        const spectatorMode = isSpectatorMode();
+
         // Get the round summary for commentary
         const summary = getLastRoundSummary();
         const commentary = generateRoundCommentary(summary);
@@ -995,8 +999,17 @@ export function showRoundStartScreen(roundInfo) {
 
         // Set up the ready button handler
         const readyBtn = document.getElementById('round-start-ready-btn');
+        let autoResolveTimer = null;
+
         const handleReady = () => {
-            readyBtn.removeEventListener('click', handleReady);
+            // Clear auto-resolve timer if it exists
+            if (autoResolveTimer) {
+                clearTimeout(autoResolveTimer);
+                autoResolveTimer = null;
+            }
+            if (readyBtn) {
+                readyBtn.removeEventListener('click', handleReady);
+            }
             showScreen(null);
             resolve();
         };
@@ -1007,6 +1020,13 @@ export function showRoundStartScreen(roundInfo) {
 
         // Show the screen
         showScreen('round-start-screen');
+
+        // In spectator mode (AI vs AI), auto-continue after displaying the screen
+        // This allows viewers to see the round info without blocking game progression
+        if (spectatorMode) {
+            const autoDelay = roundInfo.duration || 2500;
+            autoResolveTimer = setTimeout(handleReady, autoDelay);
+        }
     });
 }
 
