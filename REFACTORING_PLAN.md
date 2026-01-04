@@ -19,7 +19,8 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Functions > 40 LOC | 20+ | 20+ | 0 | ⬜ Pending |
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
-| state.js LOC | 1,496 | 1,301 | <300 | 🟡 In Progress |
+| state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
+| renderer.js LOC | 6,053 | 4,798 | <300 | 🟡 -1,255 LOC (-21%) |
 
 ### Progress Summary
 
@@ -655,9 +656,12 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PR 13 complete, PRs 14-18 pending
+**Status:** 🟡 PRs 13-15 complete, PRs 16-18 pending
 **Progress:**
-- renderer.js: 6,053 → 5,414 LOC (-639 LOC)
+- renderer.js: 6,053 → 4,798 LOC (-1,255 LOC, -21%)
+- minimapRenderer.js: 707 LOC ✅
+- unitRenderer.js: 495 LOC ✅
+- renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
 
 ---
 
@@ -691,15 +695,17 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-### PR 15: Extract rendering/unitRenderer.js
+### PR 15: Extract rendering/unitRenderer.js ✅
 
 **Estimated Diff:** ~300 LOC
+**Actual:** 495 LOC
+**Status:** ✅ COMPLETE
 
-**Functions to Extract:**
-- `drawUnit()`
-- `drawUnitHealthBar()`
-- `drawUnitStatusIndicators()`
-- Unit animation helpers
+**Functions Extracted:**
+- `drawUnit()`, `drawDeadUnit()`, `drawUnitOverlay()`
+- `drawSpeechBubble()`, `drawCamouflagePattern()`
+- `getStealthVisibilityAlpha()`
+- Unit visibility and HUD rendering
 
 ---
 
