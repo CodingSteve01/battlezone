@@ -1,53 +1,124 @@
 // ===== GAME STATE =====
 
 import { CONFIG } from './config.js';
-import { hexToPixel } from './hexMath.js';
 
-export const ZOOM_REFERENCE = 0.45;
+// Re-export camera functions from core module (for backward compatibility)
+export {
+    ZOOM_REFERENCE,
+    zoomLevelToScale,
+    scaleToZoomLevel,
+    getTileScale,
+    getTileSizeForHexSize,
+    DEFAULT_MIN_ZOOM,
+    DEFAULT_MAX_ZOOM
+} from './core/cameraState.js';
 
-export function zoomLevelToScale(zoomLevel) {
-    const safeZoom = Number.isFinite(zoomLevel) ? zoomLevel : ZOOM_REFERENCE;
-    return safeZoom / ZOOM_REFERENCE;
-}
+// Import for local use in state object initialization
+import {
+    ZOOM_REFERENCE,
+    DEFAULT_MIN_ZOOM,
+    DEFAULT_MAX_ZOOM,
+    getTileZOffset as _getTileZOffset,
+    getTileScreenPosition as _getTileScreenPosition,
+    getWorldScale as _getWorldScale,
+    getTileSize as _getTileSize
+} from './core/cameraState.js';
 
-export function scaleToZoomLevel(scale) {
-    const safeScale = Number.isFinite(scale) ? scale : 1;
-    return safeScale * ZOOM_REFERENCE;
-}
+// Import hex state functions
+import {
+    getHex as _getHex,
+    setHex as _setHex,
+    getPlayerName as _getPlayerName
+} from './core/hexState.js';
 
+// Import unit state functions
+import {
+    getPlayerUnits as _getPlayerUnits,
+    initSharedAPPool as _initSharedAPPool,
+    setOnAPDepletedCallback,
+    spendSharedAP as _spendSharedAP,
+    trackUnitAttack as _trackUnitAttack,
+    getRemainingAttacks as _getRemainingAttacks,
+    canUnitAttack as _canUnitAttack,
+    getCurrentUnit as _getCurrentUnit
+} from './core/unitState.js';
+
+// Re-export setOnAPDepletedCallback directly (no state needed)
+export { setOnAPDepletedCallback } from './core/unitState.js';
+
+// Import visibility state functions
+import {
+    switchPlayerFog as _switchPlayerFog,
+    isHexVisible as _isHexVisible,
+    isHexVisibleToPlayer as _isHexVisibleToPlayer,
+    isHexVisibleToViewer as _isHexVisibleToViewer,
+    isHexExplored as _isHexExplored
+} from './core/visibilityState.js';
+
+// Import zone state functions
+import {
+    initZone as _initZone,
+    isHexInZone as _isHexInZone,
+    markCombat as _markCombat
+} from './core/zoneState.js';
+
+// Import combat system functions
+import {
+    queueAmbush as _queueAmbush,
+    getNextAmbush as _getNextAmbush,
+    hasQueuedAmbushes as _hasQueuedAmbushes,
+    clearAmbushQueue as _clearAmbushQueue
+} from './combat/ambushSystem.js';
+
+import {
+    setOverwatch as _setOverwatch,
+    removeOverwatch as _removeOverwatch,
+    isUnitOnOverwatch as _isUnitOnOverwatch,
+    clearPlayerOverwatch as _clearPlayerOverwatch,
+    queueOverwatchTrigger as _queueOverwatchTrigger,
+    getNextOverwatchTrigger as _getNextOverwatchTrigger,
+    hasQueuedOverwatch as _hasQueuedOverwatch
+} from './combat/overwatchSystem.js';
+
+import {
+    addSuppressedHex as _addSuppressedHex,
+    isHexSuppressed as _isHexSuppressed,
+    getSuppressionInfo as _getSuppressionInfo,
+    cleanupSuppression as _cleanupSuppression,
+    isHexSuppressedForUnit as _isHexSuppressedForUnit
+} from './combat/suppressionSystem.js';
+
+import {
+    startCoordinatedAttack as _startCoordinatedAttack,
+    addCoordinatedAttacker as _addCoordinatedAttacker,
+    removeCoordinatedAttacker as _removeCoordinatedAttacker,
+    cancelCoordinatedAttack as _cancelCoordinatedAttack,
+    getCoordinatedAttackBonus as _getCoordinatedAttackBonus
+} from './combat/coordinatedAttack.js';
+
+import {
+    updateHoldPosition as _updateHoldPosition,
+    getHoldPositionRounds as _getHoldPositionRounds,
+    getHoldPositionBonus as _getHoldPositionBonus,
+    clearHoldPosition as _clearHoldPosition
+} from './combat/holdPosition.js';
+
+// Wrapper functions that pass state automatically (backward compatibility)
 export function getWorldScale() {
-    const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
-    const scale = baseSize > 0 ? state.hexSize / baseSize : 1;
-    return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
-export function getTileScale() {
-    const scale = Number.isFinite(CONFIG.TILE_SCALE) && CONFIG.TILE_SCALE > 0 ? CONFIG.TILE_SCALE : 1;
-    return scale;
+    return _getWorldScale(state);
 }
 
 export function getTileSize() {
-    return state.hexSize * getTileScale();
-}
-
-export function getTileSizeForHexSize(hexSize) {
-    const baseSize = Number.isFinite(hexSize) && hexSize > 0 ? hexSize : CONFIG.BASE_HEX_SIZE;
-    return baseSize * getTileScale();
+    return _getTileSize(state);
 }
 
 export function getTileZOffset(height, hexSize = getTileSize()) {
-    const level = Math.max(0, height ?? 0);
-    return level * hexSize * 0.18;
+    return _getTileZOffset(height, hexSize);
 }
 
 export function getTileScreenPosition(q, r, height, hexSize = getTileSize()) {
-    const pos = hexToPixel(q, r, hexSize);
-    const zOffset = getTileZOffset(height, hexSize);
-    return { x: pos.x, y: pos.y - zOffset, zOffset };
+    return _getTileScreenPosition(q, r, height, hexSize);
 }
-
-const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.6);  // Minimum 60% zoom - lower values cause performance issues
-const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 
 // Central game state object
 export const state = {
@@ -220,36 +291,17 @@ export const state = {
     }
 };
 
-/**
- * Get hex at coordinates
- */
+// Hex state wrapper functions (backward compatibility)
 export function getHex(q, r) {
-    return state.hexMap.get(`${q},${r}`);
+    return _getHex(state, q, r);
 }
 
-/**
- * Get player name (uses custom name or falls back to default)
- */
 export function getPlayerName(playerIndex) {
-    if (state.settings.playerNames && state.settings.playerNames[playerIndex]) {
-        return state.settings.playerNames[playerIndex];
-    }
-    return `Spieler ${playerIndex + 1}`;
+    return _getPlayerName(state, playerIndex);
 }
 
-/**
- * Set hex at coordinates
- */
 export function setHex(hex) {
-    const key = `${hex.q},${hex.r}`;
-    state.hexMap.set(key, hex);
-
-    const idx = state.hexes.findIndex(h => h.q === hex.q && h.r === hex.r);
-    if (idx >= 0) {
-        state.hexes[idx] = hex;
-    } else {
-        state.hexes.push(hex);
-    }
+    return _setHex(state, hex);
 }
 
 /**
@@ -421,142 +473,55 @@ export function getVisibleGhosts() {
     });
 }
 
-/**
- * Switch fog of war to current player's view
- */
+// Visibility state wrapper functions (backward compatibility)
 export function switchPlayerFog() {
-    // Save current player's explored hexes before switching
-    const prevPlayer = (state.currentPlayer - 1 + state.settings.players) % state.settings.players;
-    if (state.playerExploredHexes[prevPlayer]) {
-        // Already saved in updateVisibility
-    }
-
-    // Load current player's explored hexes
-    if (state.playerExploredHexes[state.currentPlayer]) {
-        state.exploredHexes = state.playerExploredHexes[state.currentPlayer];
-    } else {
-        state.exploredHexes = new Set();
-        state.playerExploredHexes[state.currentPlayer] = state.exploredHexes;
-    }
+    return _switchPlayerFog(state);
 }
 
-/**
- * Get units for a specific player
- */
+// Unit state wrapper functions (backward compatibility)
 export function getPlayerUnits(player) {
-    return state.units.filter(u => u.player === player && u.alive);
+    return _getPlayerUnits(state, player);
 }
 
-/**
- * Initialize the shared AP pool for a player's turn
- * Pool is constant (UNITS_PER_PLAYER × AP_PER_TURN) regardless of surviving units
- * This prevents the losing player from being at a severe disadvantage
- */
-export function initSharedAPPool(_player) {
-    // Constant pool: always based on starting unit count, not current
-    const poolSize = CONFIG.UNITS_PER_PLAYER * CONFIG.AP_PER_TURN;
-    // Add any bonus from round events (e.g., Kampfgeist)
-    const eventBonus = state.eventAPBonus || 0;
-    state.sharedAP = poolSize + eventBonus;
-    state.maxSharedAP = poolSize + eventBonus;
-    state.unitAttacksThisTurn = {};  // Reset attack tracking
+export function initSharedAPPool(player) {
+    return _initSharedAPPool(state, player);
 }
 
-// Callback for when AP is depleted (set by turns.js to avoid circular deps)
-let onAPDepleted = null;
-export function setOnAPDepletedCallback(callback) {
-    onAPDepleted = callback;
-}
-
-/**
- * Spend AP from the shared pool
- * Returns true if successful, false if not enough AP
- * Triggers auto-end turn callback when AP reaches 0
- */
 export function spendSharedAP(amount) {
-    if (state.sharedAP >= amount) {
-        state.sharedAP -= amount;
-
-        // Check for auto-end turn when AP depleted (only for human players)
-        // Check both legacy singlePlayer mode and new aiPlayers array
-        const isHumanPlayer = state.settings.aiPlayers && state.settings.aiPlayers.length > 0
-            ? !state.settings.aiPlayers.includes(state.currentPlayer)
-            : (!state.settings.singlePlayer || state.currentPlayer === 0);
-
-        if (state.sharedAP <= 0 && onAPDepleted && isHumanPlayer) {
-            // Delay to let current action complete
-            setTimeout(() => {
-                if (state.sharedAP <= 0 && onAPDepleted) {
-                    onAPDepleted();
-                }
-            }, 800);
-        }
-
-        return true;
-    }
-    return false;
+    return _spendSharedAP(state, amount);
 }
 
-/**
- * Track an attack for a unit
- */
 export function trackUnitAttack(unit) {
-    const current = state.unitAttacksThisTurn[unit.id] || 0;
-    state.unitAttacksThisTurn[unit.id] = current + 1;
+    return _trackUnitAttack(state, unit);
 }
 
-/**
- * Get remaining attacks for a unit this turn
- */
 export function getRemainingAttacks(unit) {
-    const attacksSoFar = state.unitAttacksThisTurn[unit.id] || 0;
-    return Math.max(0, CONFIG.MAX_ATTACKS_PER_UNIT - attacksSoFar);
+    return _getRemainingAttacks(state, unit);
 }
 
-/**
- * Check if unit can still attack this turn
- */
 export function canUnitAttack(unit) {
-    return getRemainingAttacks(unit) > 0;
+    return _canUnitAttack(state, unit);
 }
 
-/**
- * Get the currently selected unit
- */
 export function getCurrentUnit() {
-    if (state.selectedUnit === null) return null;
-    const units = getPlayerUnits(state.currentPlayer);
-    return units[state.selectedUnit] || null;
+    return _getCurrentUnit(state, getPlayerUnits);
 }
 
-/**
- * Check if a hex is visible to current player
- */
+// Visibility state wrapper functions (continued)
 export function isHexVisible(q, r) {
-    return state.visibleHexes.has(`${q},${r}`);
+    return _isHexVisible(state, q, r);
 }
 
-/**
- * Check if a hex is visible to a specific player
- */
 export function isHexVisibleToPlayer(q, r, player) {
-    const playerVisible = state.playerVisibleHexes[player];
-    if (!playerVisible) return false;
-    return playerVisible.has(`${q},${r}`);
+    return _isHexVisibleToPlayer(state, q, r, player);
 }
 
-/**
- * Check if a hex is visible to the viewing player (for rendering)
- */
 export function isHexVisibleToViewer(q, r) {
-    return isHexVisibleToPlayer(q, r, state.viewingPlayer);
+    return _isHexVisibleToViewer(state, q, r);
 }
 
-/**
- * Check if a hex was explored (seen before)
- */
 export function isHexExplored(q, r) {
-    return state.exploredHexes.has(`${q},${r}`);
+    return _isHexExplored(state, q, r);
 }
 
 /**
@@ -639,31 +604,17 @@ export function updateContactTracking(enemiesVisible, player = state.currentPlay
     }
 }
 
-/**
- * Initialize the shrinking zone with map radius
- */
+// Zone state wrapper functions (backward compatibility)
 export function initZone(mapRadius) {
-    state.maxZoneRadius = mapRadius;
-    state.zoneRadius = mapRadius;
-    state.zonePhase = 0;
-    state.lastCombatRound = 1;
-    state.zoneShrinkWarning = false;
-    state.revealCooldown = 0;
+    return _initZone(state, mapRadius);
 }
 
-/**
- * Check if a hex is within the safe zone
- */
 export function isHexInZone(q, r) {
-    const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
-    return dist <= state.zoneRadius;
+    return _isHexInZone(state, q, r);
 }
 
-/**
- * Mark that combat happened this round
- */
 export function markCombat() {
-    state.lastCombatRound = state.round;
+    return _markCombat(state);
 }
 
 /**
@@ -787,255 +738,109 @@ export function getEnemyDirection() {
     };
 }
 
-// === KOORDINIERTE ANGRIFFE HELPER ===
-
-/**
- * Starte den Koordinations-Modus für einen Angriff
- */
+// Coordinated attack wrapper functions (backward compatibility)
 export function startCoordinatedAttack(targetUnit) {
-    state.coordinatedAttack.active = true;
-    state.coordinatedAttack.targetUnit = targetUnit;
-    state.coordinatedAttack.attackers = [];
+    return _startCoordinatedAttack(state, targetUnit);
 }
 
-/**
- * Füge einen Angreifer zur koordinierten Attacke hinzu
- */
 export function addCoordinatedAttacker(unit) {
-    if (!state.coordinatedAttack.attackers.includes(unit.id)) {
-        state.coordinatedAttack.attackers.push(unit.id);
-    }
+    return _addCoordinatedAttacker(state, unit);
 }
 
-/**
- * Entferne einen Angreifer aus der koordinierten Attacke
- */
 export function removeCoordinatedAttacker(unitId) {
-    state.coordinatedAttack.attackers = state.coordinatedAttack.attackers.filter(id => id !== unitId);
+    return _removeCoordinatedAttacker(state, unitId);
 }
 
-/**
- * Beende den Koordinations-Modus
- */
 export function cancelCoordinatedAttack() {
-    state.coordinatedAttack.active = false;
-    state.coordinatedAttack.targetUnit = null;
-    state.coordinatedAttack.attackers = [];
+    return _cancelCoordinatedAttack(state);
 }
 
-/**
- * Berechne den Schadensbonus für koordinierte Angriffe
- */
 export function getCoordinatedAttackBonus() {
-    const attackerCount = state.coordinatedAttack.attackers.length;
-    if (attackerCount <= 1) return 0;
-    return (attackerCount - 1) * state.coordinatedAttack.bonusPerAttacker;
+    return _getCoordinatedAttackBonus(state);
 }
 
-// === HINTERHALT HELPER ===
-
-/**
- * Füge einen Hinterhalt zur Warteschlange hinzu
- */
+// Ambush system wrapper functions (backward compatibility)
 export function queueAmbush(ambusher, target) {
-    state.ambushQueue.push({
-        ambusherId: ambusher.id,
-        targetId: target.id,
-        timestamp: Date.now()
-    });
+    return _queueAmbush(state, ambusher, target);
 }
 
-/**
- * Hole den nächsten Hinterhalt aus der Warteschlange
- */
 export function getNextAmbush() {
-    return state.ambushQueue.shift() || null;
+    return _getNextAmbush(state);
 }
 
-/**
- * Prüfe ob Hinterhalte ausstehen
- */
 export function hasQueuedAmbushes() {
-    return state.ambushQueue.length > 0;
+    return _hasQueuedAmbushes(state);
 }
 
-/**
- * Leere die Hinterhalt-Warteschlange
- */
 export function clearAmbushQueue() {
-    state.ambushQueue = [];
+    return _clearAmbushQueue(state);
 }
 
-// === UNTERDRÜCKUNGSFEUER (SUPPRESSION) HELPER ===
-
-/**
- * Füge ein unterdrücktes Hex hinzu
- */
+// Suppression system wrapper functions (backward compatibility)
 export function addSuppressedHex(q, r, suppressorId, duration = 1) {
-    // Entferne existierende Unterdrückung auf diesem Hex
-    state.suppressedHexes = state.suppressedHexes.filter(s => !(s.q === q && s.r === r));
-
-    state.suppressedHexes.push({
-        q, r,
-        suppressorId,
-        expiresRound: state.round + duration
-    });
+    return _addSuppressedHex(state, q, r, suppressorId, duration);
 }
 
-/**
- * Prüfe ob ein Hex unterdrückt ist
- */
 export function isHexSuppressed(q, r) {
-    return state.suppressedHexes.some(s =>
-        s.q === q && s.r === r && s.expiresRound > state.round
-    );
+    return _isHexSuppressed(state, q, r);
 }
 
-/**
- * Hole Unterdrückungs-Info für ein Hex
- */
 export function getSuppressionInfo(q, r) {
-    return state.suppressedHexes.find(s =>
-        s.q === q && s.r === r && s.expiresRound > state.round
-    ) || null;
+    return _getSuppressionInfo(state, q, r);
 }
 
-/**
- * Entferne abgelaufene Unterdrückungen
- */
 export function cleanupSuppression() {
-    state.suppressedHexes = state.suppressedHexes.filter(s => s.expiresRound > state.round);
+    return _cleanupSuppression(state);
 }
 
-/**
- * Prüfe ob ein Hex für eine bestimmte Einheit unterdrückt ist
- * WICHTIG: Unterdrückung betrifft nur Feinde, nicht Verbündete!
- * @param {number} q - Hex-Koordinate Q
- * @param {number} r - Hex-Koordinate R
- * @param {Object} unit - Die zu prüfende Einheit
- * @returns {boolean} True wenn das Hex für diese Einheit unterdrückt ist
- */
 export function isHexSuppressedForUnit(q, r, unit) {
-    if (!unit) return isHexSuppressed(q, r);
-
-    const suppression = getSuppressionInfo(q, r);
-    if (!suppression) return false;
-
-    // Finde den Unterdrücker
-    const suppressor = state.units.find(u => u.id === suppression.suppressorId);
-    if (!suppressor) return false;
-
-    // Unterdrückung betrifft nur Feinde des Unterdrückers!
-    if (suppressor.player === unit.player) return false;
-    if (areUnitsAllied(suppressor, unit)) return false;
-
-    return true;
+    return _isHexSuppressedForUnit(state, q, r, unit, areUnitsAllied);
 }
 
-// === OVERWATCH (DECKUNGSFEUER) HELPER ===
-
-/**
- * Setze eine Einheit in Overwatch-Modus
- */
+// Overwatch system wrapper functions (backward compatibility)
 export function setOverwatch(unitId) {
-    if (!state.overwatchUnits.includes(unitId)) {
-        state.overwatchUnits.push(unitId);
-    }
+    return _setOverwatch(state, unitId);
 }
 
-/**
- * Entferne Overwatch von einer Einheit
- */
 export function removeOverwatch(unitId) {
-    state.overwatchUnits = state.overwatchUnits.filter(id => id !== unitId);
+    return _removeOverwatch(state, unitId);
 }
 
-/**
- * Prüfe ob Einheit im Overwatch ist
- */
 export function isUnitOnOverwatch(unitId) {
-    return state.overwatchUnits.includes(unitId);
+    return _isUnitOnOverwatch(state, unitId);
 }
 
-/**
- * Lösche alle Overwatch für einen Spieler (am Zugstart)
- */
 export function clearPlayerOverwatch(player) {
-    const playerUnitIds = state.units
-        .filter(u => u.player === player && u.alive)
-        .map(u => u.id);
-    state.overwatchUnits = state.overwatchUnits.filter(id => !playerUnitIds.includes(id));
+    return _clearPlayerOverwatch(state, player);
 }
 
-/**
- * Füge Overwatch-Trigger zur Queue hinzu
- */
 export function queueOverwatchTrigger(watcherId, targetId) {
-    state.overwatchQueue.push({
-        watcherId,
-        targetId,
-        timestamp: Date.now()
-    });
+    return _queueOverwatchTrigger(state, watcherId, targetId);
 }
 
-/**
- * Hole nächsten Overwatch-Trigger
- */
 export function getNextOverwatchTrigger() {
-    return state.overwatchQueue.shift() || null;
+    return _getNextOverwatchTrigger(state);
 }
 
-/**
- * Prüfe ob Overwatch-Trigger ausstehen
- */
 export function hasQueuedOverwatch() {
-    return state.overwatchQueue.length > 0;
+    return _hasQueuedOverwatch(state);
 }
 
-// === STELLUNG HALTEN HELPER ===
-
-/**
- * Aktualisiere Position-Halten Status für eine Einheit
- */
+// Hold position system wrapper functions (backward compatibility)
 export function updateHoldPosition(unit) {
-    const current = state.holdingPosition[unit.id];
-
-    if (current && current.q === unit.q && current.r === unit.r) {
-        // Einheit ist auf derselben Position geblieben
-        current.rounds++;
-    } else {
-        // Einheit hat sich bewegt oder neue Position
-        state.holdingPosition[unit.id] = {
-            q: unit.q,
-            r: unit.r,
-            rounds: 1
-        };
-    }
+    return _updateHoldPosition(state, unit);
 }
 
-/**
- * Hole die Anzahl Runden die eine Einheit Position gehalten hat
- */
 export function getHoldPositionRounds(unitId) {
-    const holding = state.holdingPosition[unitId];
-    return holding ? holding.rounds : 0;
+    return _getHoldPositionRounds(state, unitId);
 }
 
-/**
- * Berechne den Verteidigungsbonus für Stellung-Halten
- * 5% pro Runde, max 20%
- */
 export function getHoldPositionBonus(unitId) {
-    const rounds = getHoldPositionRounds(unitId);
-    if (rounds <= 1) return 0;
-    return Math.min(0.20, (rounds - 1) * 0.05); // Max 20% nach 5 Runden
+    return _getHoldPositionBonus(state, unitId);
 }
 
-/**
- * Entferne Hold-Position Status wenn Einheit sich bewegt
- */
 export function clearHoldPosition(unitId) {
-    delete state.holdingPosition[unitId];
+    return _clearHoldPosition(state, unitId);
 }
 
 // === TEAM-ALLIANZEN HELPER ===

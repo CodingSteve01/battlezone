@@ -6,7 +6,7 @@ import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
-import { isSpectatorMode } from './ai.js';
+import { isSpectatorMode, isAIPlayer } from './shared/gameMode.js';
 import {
     getTexture,
     drawUnit as drawUnitSprite,
@@ -23,55 +23,174 @@ import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
-import { isAIPlayer } from './ai.js';
 import { logRender, logError, logEntry } from './errorLog.js';
+import {
+    initMinimapRenderer,
+    drawMinimap,
+    drawHeightOverlayToggle,
+    MINIMAP_CONFIG,
+    setMinimapActive,
+    isMinimapExpanded,
+    setMinimapExpanded,
+    getMinimapBounds,
+    getToggleButtonBounds,
+    getHeightOverlayButtonBounds,
+    getCloseButtonBounds
+} from './rendering/minimapRenderer.js';
+import {
+    seededRandom,
+    areValuesFinite,
+    safeRadialGradient,
+    safeLinearGradient,
+    getClampedContentScale,
+    getSpriteDimensions,
+    getHexColorLuminance,
+    getUnitOutlineColor,
+    WATER_TYPES,
+    SWAMP_TYPES,
+    isLandForWater,
+    isLandForSwamp,
+    lightenColor,
+    darkenColor,
+    desaturateAndDarken,
+    blendWithRed,
+    adjustColorForHeight
+} from './rendering/renderUtils.js';
+import {
+    initUnitRenderer,
+    drawUnit as drawUnitFromModule,
+    drawDeadUnit as drawDeadUnitFromModule,
+    drawUnitOverlay as drawUnitOverlayFromModule,
+    drawSpeechBubble as drawSpeechBubbleFromModule,
+    drawCamouflagePattern as drawCamouflagePatternFromModule,
+    getStealthVisibilityAlpha as getStealthVisibilityAlphaFromModule
+} from './rendering/unitRenderer.js';
+import {
+    initEffectsRenderer,
+    drawHexPath as drawHexPathFromModule,
+    getHeightShadeStyle as getHeightShadeStyleFromModule,
+    drawHeightShading as drawHeightShadingFromModule,
+    getLightVector as getLightVectorFromModule,
+    getViewVector as getViewVectorFromModule,
+    isEdgeFacingViewer as isEdgeFacingViewerFromModule,
+    getShadowOffset as getShadowOffsetFromModule,
+    drawHeightExtrusion as drawHeightExtrusionFromModule,
+    getBaseSkirtDepth as getBaseSkirtDepthFromModule,
+    getSkirtFillColor as getSkirtFillColorFromModule,
+    drawBaseSkirt as drawBaseSkirtFromModule,
+    shouldRenderBaseSkirt as shouldRenderBaseSkirtFromModule,
+    drawCliffFaces as drawCliffFacesFromModule,
+    drawHeightShadow as drawHeightShadowFromModule,
+    applyTileLighting as applyTileLightingFromModule,
+    drawSpriteShadow as drawSpriteShadowFromModule,
+    drawHeightDebugOverlay as drawHeightDebugOverlayFromModule
+} from './rendering/effectsRenderer.js';
+import {
+    initUiRenderer,
+    drawScrollHint as drawScrollHintFromModule,
+    drawPowerup as drawPowerupFromModule,
+    drawEventIndicator as drawEventIndicatorFromModule,
+    drawZoomIndicator as drawZoomIndicatorFromModule
+} from './rendering/uiRenderer.js';
 
-// ===== SAFE GRADIENT HELPERS =====
-// Prevents "non-finite value" errors when coordinates are NaN/Infinity
+// Re-export minimap functions for backward compatibility
+export {
+    MINIMAP_CONFIG,
+    setMinimapActive,
+    isMinimapExpanded,
+    setMinimapExpanded,
+    getMinimapBounds,
+    getToggleButtonBounds,
+    getHeightOverlayButtonBounds,
+    getCloseButtonBounds
+};
 
-/**
- * Check if all values are finite numbers
- */
-function areValuesFinite(...values) {
-    return values.every(v => Number.isFinite(v));
-}
+// Re-export render utilities for backward compatibility
+export {
+    seededRandom,
+    areValuesFinite,
+    safeRadialGradient,
+    safeLinearGradient,
+    getClampedContentScale,
+    getSpriteDimensions,
+    getHexColorLuminance,
+    getUnitOutlineColor,
+    WATER_TYPES,
+    SWAMP_TYPES,
+    isLandForWater,
+    isLandForSwamp,
+    lightenColor,
+    darkenColor,
+    desaturateAndDarken,
+    blendWithRed,
+    adjustColorForHeight
+};
 
-/**
- * Create a radial gradient safely, returning a fallback color if values are invalid
- */
-function safeRadialGradient(ctx, x0, y0, r0, x1, y1, r1, fallbackColor = 'transparent') {
-    if (!areValuesFinite(x0, y0, r0, x1, y1, r1) || r1 <= 0) {
-        return fallbackColor;
-    }
-    return ctx.createRadialGradient(x0, y0, r0, x1, y1, r1);
-}
+// Re-export unit renderer functions for backward compatibility
+export {
+    drawUnitFromModule as drawUnit,
+    drawDeadUnitFromModule as drawDeadUnit,
+    drawUnitOverlayFromModule as drawUnitOverlay,
+    drawSpeechBubbleFromModule as drawSpeechBubble,
+    drawCamouflagePatternFromModule as drawCamouflagePattern,
+    getStealthVisibilityAlphaFromModule as getStealthVisibilityAlpha
+};
 
-/**
- * Create a linear gradient safely, returning a fallback color if values are invalid
- */
-function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') {
-    if (!areValuesFinite(x0, y0, x1, y1)) {
-        return fallbackColor;
-    }
-    // Prevent zero-length gradients
-    if (x0 === x1 && y0 === y1) {
-        return fallbackColor;
-    }
-    return ctx.createLinearGradient(x0, y0, x1, y1);
-}
+// Re-export effects renderer functions for backward compatibility
+export {
+    drawHexPathFromModule as drawHexPath,
+    getHeightShadeStyleFromModule as getHeightShadeStyle,
+    drawHeightShadingFromModule as drawHeightShading,
+    getLightVectorFromModule as getLightVector,
+    getViewVectorFromModule as getViewVector,
+    isEdgeFacingViewerFromModule as isEdgeFacingViewer,
+    getShadowOffsetFromModule as getShadowOffset,
+    drawHeightExtrusionFromModule as drawHeightExtrusion,
+    getBaseSkirtDepthFromModule as getBaseSkirtDepth,
+    getSkirtFillColorFromModule as getSkirtFillColor,
+    drawBaseSkirtFromModule as drawBaseSkirt,
+    shouldRenderBaseSkirtFromModule as shouldRenderBaseSkirt,
+    drawCliffFacesFromModule as drawCliffFaces,
+    drawHeightShadowFromModule as drawHeightShadow,
+    applyTileLightingFromModule as applyTileLighting,
+    drawSpriteShadowFromModule as drawSpriteShadow,
+    drawHeightDebugOverlayFromModule as drawHeightDebugOverlay
+};
 
-function getHexColorLuminance(color) {
-    if (!color || color[0] !== '#' || color.length < 7) return 0.5;
-    const r = parseInt(color.slice(1, 3), 16) / 255;
-    const g = parseInt(color.slice(3, 5), 16) / 255;
-    const b = parseInt(color.slice(5, 7), 16) / 255;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
+// Local aliases for internal use
+const drawHexPath = drawHexPathFromModule;
+const getHeightShadeStyle = getHeightShadeStyleFromModule;
+const drawHeightShading = drawHeightShadingFromModule;
+const getLightVector = getLightVectorFromModule;
+const getViewVector = getViewVectorFromModule;
+const isEdgeFacingViewer = isEdgeFacingViewerFromModule;
+const getShadowOffset = getShadowOffsetFromModule;
+const drawHeightExtrusion = drawHeightExtrusionFromModule;
+const getBaseSkirtDepth = getBaseSkirtDepthFromModule;
+const getSkirtFillColor = getSkirtFillColorFromModule;
+const drawBaseSkirt = drawBaseSkirtFromModule;
+const shouldRenderBaseSkirt = shouldRenderBaseSkirtFromModule;
+const drawCliffFaces = drawCliffFacesFromModule;
+const drawHeightShadow = drawHeightShadowFromModule;
+const applyTileLighting = applyTileLightingFromModule;
+const drawSpriteShadow = drawSpriteShadowFromModule;
+const drawHeightDebugOverlay = drawHeightDebugOverlayFromModule;
 
-function getUnitOutlineColor(terrainColor) {
-    const luminance = getHexColorLuminance(terrainColor);
-    return luminance > 0.5 ? 'rgba(20, 25, 30, 0.8)' : 'rgba(240, 245, 250, 0.85)';
-}
+// Re-export UI renderer functions for backward compatibility
+export {
+    drawScrollHintFromModule as drawScrollHint,
+    drawPowerupFromModule as drawPowerup,
+    drawEventIndicatorFromModule as drawEventIndicator,
+    drawZoomIndicatorFromModule as drawZoomIndicator
+};
+
+// Local aliases for UI renderer
+const drawScrollHint = drawScrollHintFromModule;
+const drawPowerup = drawPowerupFromModule;
+const drawEventIndicator = drawEventIndicatorFromModule;
+const drawZoomIndicator = drawZoomIndicatorFromModule;
+
+// ===== CLIFF TEXTURE CACHE =====
 
 function getCliffTextureCanvas(terrainType) {
     if (cliffTextureCache.has(terrainType)) {
@@ -116,318 +235,8 @@ function getCliffTextureCanvas(terrainType) {
     return canvas;
 }
 
-const HEIGHT_SHADE_COLORS = [
-    { color: 'rgba(30, 58, 95, 0.12)', text: '#93c5fd' },  // Level 0: cool shadow
-    { color: 'rgba(0, 0, 0, 0)', text: '#d1d5db' },        // Level 1: neutral
-    { color: 'rgba(254, 240, 200, 0.12)', text: '#fde68a' }, // Level 2: warm highlight
-    { color: 'rgba(253, 224, 160, 0.18)', text: '#fbbf24' }  // Level 3: bright highlight
-];
-
-function getHeightShadeStyle(height) {
-    const index = Math.max(0, Math.min(HEIGHT_SHADE_COLORS.length - 1, height ?? 0));
-    return HEIGHT_SHADE_COLORS[index];
-}
-
-function drawHeightShading(cx, cy, size, height) {
-    const style = getHeightShadeStyle(height);
-    if (!style || style.color === 'rgba(0, 0, 0, 0)') return;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size);
-    ctx.fillStyle = style.color;
-    ctx.fill();
-    ctx.restore();
-}
-
-function getLightVector() {
-    const dir = CONFIG.LIGHTING?.DIRECTION || { x: -0.6, y: -1.0 };
-    const length = Math.hypot(dir.x, dir.y) || 1;
-    return { x: dir.x / length, y: dir.y / length };
-}
-
-function getViewVector() {
-    const light = getLightVector();
-    const length = Math.hypot(light.x, light.y) || 1;
-    return { x: -light.x / length, y: -light.y / length };
-}
-
-function isEdgeFacingViewer(direction, viewDir) {
-    const faceAngle = (Math.PI / 3) * direction + Math.PI / 6;
-    const faceDirX = Math.cos(faceAngle);
-    const faceDirY = Math.sin(faceAngle);
-    const dot = faceDirX * viewDir.x + faceDirY * viewDir.y;
-    return dot > 0;
-}
-
-function getShadowOffset(height, size) {
-    const lightHeight = CONFIG.LIGHTING?.HEIGHT ?? 1.2;
-    const zOffset = getTileZOffset(height, size);
-    return zOffset * (0.6 + lightHeight * 0.4);
-}
-
-function drawHeightExtrusion(cx, cy, size, height, terrainType, fogLevel) {
-    const offset = getTileZOffset(height, size);
-    if (offset <= 0) return;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy + offset, size);
-    const fillColor = getSkirtFillColor(terrainType, fogLevel);
-    ctx.fillStyle = fillColor;
-    ctx.globalAlpha = fogLevel === 'visible' ? 0.85 : 1;
-    ctx.fill();
-    ctx.restore();
-}
-
-const MIN_SKIRT_PIXELS = 20;
-
-function getBaseSkirtDepth(size) {
-    return Math.max(MIN_SKIRT_PIXELS, size * 0.2);
-}
-
-function getSkirtFillColor(terrainType, fogLevel) {
-    const terrain = TERRAIN[terrainType];
-    const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
-
-    if (fogLevel === 'hidden') {
-        // Very dark for unexplored areas (shadow) - ~88% darkening (2x darker than before)
-        return desaturateAndDarken(baseColor, 0.3, 0.12);
-    }
-
-    if (fogLevel === 'explored') {
-        // Dark for explored but not visible (same as old hidden) - ~75% darkening
-        return desaturateAndDarken(baseColor, 0.4, 0.25);
-    }
-
-    return desaturateAndDarken(baseColor, 0.7, 0.75);
-}
-
-function drawBaseSkirt(cx, cy, size, terrainType, fogLevel) {
-    const baseDepth = getBaseSkirtDepth(size);
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy + baseDepth, size);
-    ctx.fillStyle = getSkirtFillColor(terrainType, fogLevel);
-    ctx.fill();
-    ctx.restore();
-}
-
-function shouldRenderBaseSkirt(hex) {
-    const neighbors = getNeighbors(hex.q, hex.r);
-    const forwardDirections = [0, 4, 5];
-    const myHeight = hex.height ?? 0;
-
-    return forwardDirections.some(direction => {
-        const neighbor = neighbors[direction];
-        if (!neighbor) return true;
-        const neighborHex = getHex(neighbor.q, neighbor.r);
-        if (!neighborHex) return true;
-        const neighborHeight = neighborHex.height ?? 0;
-        return neighborHeight !== myHeight;
-    });
-}
-
-/**
- * Draw cliff/slope faces between tiles of different heights
- * Creates realistic earth/ground appearance with gradient shading
- * for natural-looking height transitions
- */
-function drawCliffFaces(cx, cy, size, hex, fogLevel) {
-    if (!hex || hex.height === undefined) return;
-
-    const myHeight = hex.height ?? 0;
-    if (myHeight === 0) return; // No cliff faces for ground-level tiles
-
-    const neighbors = getNeighbors(hex.q, hex.r);
-    const light = getLightVector();
-    const viewDir = getViewVector();
-    const terrain = TERRAIN[hex.type];
-
-    const baseColor = terrain?.color || '#6a9a58';
-
-    // Draw cliff face for each neighbor that's lower than this hex
-    neighbors.forEach((neighbor, direction) => {
-        if (!isEdgeFacingViewer(direction, viewDir)) return;
-        const neighborHex = getHex(neighbor.q, neighbor.r);
-
-        const neighborHeight = neighborHex?.height ?? 0;
-        const heightDiff = myHeight - neighborHeight;
-
-        if (heightDiff <= 0) return; // Only draw cliff if we're higher
-
-        // Calculate the cliff face positions
-        // Direction 0 = right, incrementing clockwise
-        const angle1 = (Math.PI / 3) * direction;
-        const angle2 = (Math.PI / 3) * ((direction + 1) % 6);
-
-        const myOffset = getTileZOffset(myHeight, size);
-        const neighborOffset = getTileZOffset(neighborHeight, size);
-        const faceHeight = myOffset - neighborOffset;
-
-        // Points on this hex's edge (top of cliff)
-        const topX1 = cx + size * Math.cos(angle1);
-        const topY1 = cy + size * Math.sin(angle1);
-        const topX2 = cx + size * Math.cos(angle2);
-        const topY2 = cy + size * Math.sin(angle2);
-
-        // Points at bottom of cliff (aligned with lower neighbor)
-        const bottomX1 = topX1;
-        const bottomY1 = topY1 + faceHeight;
-        const bottomX2 = topX2;
-        const bottomY2 = topY2 + faceHeight;
-
-        // Calculate lighting based on face direction
-        const faceAngle = angle1 + Math.PI / 6;
-        const faceDirX = Math.cos(faceAngle);
-        const faceDirY = Math.sin(faceAngle);
-        const lightDot = -(faceDirX * light.x + faceDirY * light.y);
-        const lightFactor = Math.max(0.3, 0.6 + lightDot * 0.4);
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(topX1, topY1);
-        ctx.lineTo(topX2, topY2);
-        ctx.lineTo(bottomX2, bottomY2);
-        ctx.lineTo(bottomX1, bottomY1);
-        ctx.closePath();
-
-        // Create gradient from top (lighter) to bottom (darker) for depth
-        const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
-        const topY = Math.min(topY1, topY2);
-        const bottomY = Math.max(bottomY1, bottomY2);
-
-        // Adjust brightness based on fog level (shadow effect)
-        let fogBrightnessFactor = 1.0;
-        if (fogLevel === 'hidden') {
-            fogBrightnessFactor = 0.12;  // Very dark for unexplored areas (shadow) - 2x darker
-        } else if (fogLevel === 'explored') {
-            fogBrightnessFactor = 0.25;  // Dark for explored but not visible (same as old hidden)
-        }
-
-        const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5 * fogBrightnessFactor));
-        if (typeof gradient !== 'string') {
-            // Top edge: slightly lighter (edge highlight)
-            gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor * fogBrightnessFactor));
-            // Middle: earth tone
-            gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor * fogBrightnessFactor));
-            // Bottom: darker shadow
-            gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor * fogBrightnessFactor));
-        }
-
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Add subtle top edge highlight for definition (only for visible/explored)
-        if (fogLevel !== 'hidden') {
-            ctx.beginPath();
-            ctx.moveTo(topX1, topY1);
-            ctx.lineTo(topX2, topY2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor * fogBrightnessFactor})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-
-        ctx.restore();
-    });
-}
-
-function drawHeightShadow(cx, cy, size, height) {
-    const offset = getShadowOffset(height, size);
-    if (offset <= 0) return;
-
-    const light = getLightVector();
-    ctx.save();
-    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
-    ctx.beginPath();
-    drawHexPath(cx + light.x * offset, cy + light.y * offset + offset * 0.35, size * 0.98);
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
-    ctx.fill();
-    ctx.restore();
-}
-
-function applyTileLighting(cx, cy, size, height) {
-    if (!height) return;
-    const light = getLightVector();
-    // Reduced strength for subtler lighting that doesn't create harsh triangular artifacts
-    const strength = (CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18) * 0.5;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size);
-    ctx.clip();
-
-    // Use radial gradient centered on hex for smoother appearance
-    const grad = safeRadialGradient(
-        ctx,
-        cx - light.x * size * 0.3,
-        cy - light.y * size * 0.3,
-        0,
-        cx,
-        cy,
-        size,
-        'transparent'
-    );
-
-    if (typeof grad !== 'string') {
-        grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
-        grad.addColorStop(0.5, `rgba(255, 255, 255, ${strength * 0.3})`);
-        grad.addColorStop(1, 'transparent');
-    }
-
-    // Use soft-light for gentler blending that doesn't create harsh edges
-    ctx.globalCompositeOperation = 'soft-light';
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawSpriteShadow(x, y, width, height, heightLevel = 1) {
-    const light = getLightVector();
-    const shadowOffset = getShadowOffset(heightLevel, width * 0.25);
-    ctx.save();
-    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
-    ctx.beginPath();
-    // Draw shadow as an ellipse at the base of the sprite
-    // Width scaled down to match base of tree/object, not full sprite width
-    ctx.ellipse(
-        x + light.x * shadowOffset * 0.6,
-        y + light.y * shadowOffset * 0.6 + height * 0.05,  // Closer to ground
-        width * 0.2,   // Narrower shadow for more realistic base
-        height * 0.08, // Shorter shadow height
-        0,
-        0,
-        Math.PI * 2
-    );
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawHeightDebugOverlay(cx, cy, size, height) {
-    const style = getHeightShadeStyle(height);
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size * 0.55);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
-    ctx.fill();
-
-    ctx.fillStyle = style.text;
-    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${height ?? 0}`, cx, cy);
-    ctx.restore();
-}
-
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
-
-function seededRandom(seed) {
-    const x = Math.sin(seed * 12.9898 + seed * 78.233) * 43758.5453;
-    return x - Math.floor(x);
-}
 
 function animationTick() { /* no-op */ }
 
@@ -469,34 +278,6 @@ function buildVisibilityClearingMap(visibleUnits) {
     });
 
     return result;
-}
-
-const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
-const SWAMP_TYPES = new Set(['swamp']);
-
-function getClampedContentScale(contentScale) {
-    const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-    const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-    const clampedScaleX = Math.min(safeScaleX, 1);
-    const clampedScaleY = Math.min(safeScaleY, 1);
-    return (clampedScaleX + clampedScaleY) / 2;
-}
-
-function getSpriteDimensions(sprite, contentScale, baseHeight) {
-    const avgScale = getClampedContentScale(contentScale);
-    const spriteHeight = baseHeight * avgScale;
-    const spriteWidth = spriteHeight * (sprite.width / sprite.height);
-    return { spriteWidth, spriteHeight };
-}
-
-function isLandForWater(type) {
-    if (!type) return false;
-    return !WATER_TYPES.has(type) && !SWAMP_TYPES.has(type);
-}
-
-function isLandForSwamp(type) {
-    if (!type) return false;
-    return !SWAMP_TYPES.has(type) && !WATER_TYPES.has(type);
 }
 
 function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
@@ -2260,124 +2041,9 @@ function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
     ctx = originalCtx;
 }
 
-/**
- * Draw a subtle terrain-matched camouflage pattern for enemy cloaked units
- * This makes them barely visible, blending into the terrain without shimmering
- * @param {number} cx - Center X position
- * @param {number} cy - Center Y position
- * @param {number} size - Unit size
- * @param {Object} unit - The cloaked unit
- */
-function drawCamouflagePattern(cx, cy, size, unit) {
-    // Get terrain at unit's position
-    const hex = getHex(unit.q, unit.r);
-    if (!hex) return;
-
-    const terrainData = TERRAIN[hex.type];
-    const baseColor = terrainData?.color || '#2d5a40';
-
-    // Parse base color
-    const r = parseInt(baseColor.slice(1, 3), 16);
-    const g = parseInt(baseColor.slice(3, 5), 16);
-    const b = parseInt(baseColor.slice(5, 7), 16);
-
-    // Deterministic pseudo-random for camo shapes (stable per unit position)
-    const seed = (unit.q * 73856093) ^ (unit.r * 19349663);
-    const rand = (offset) => {
-        const x = Math.sin(seed + offset) * 43758.5453;
-        return x - Math.floor(x);
-    };
-
-    ctx.save();
-
-    // Base camouflage silhouette
-    ctx.globalAlpha = 0.22;
-
-    // Soft camo fill with terrain-tinted gradient
-    const baseGrad = safeRadialGradient(
-        ctx,
-        cx, cy - size * 0.2, 0,
-        cx, cy, size * 0.9,
-        `rgba(${r}, ${g}, ${b}, 0.2)`
-    );
-    if (typeof baseGrad !== 'string') {
-        baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
-        baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
-        baseGrad.addColorStop(1, 'transparent');
-    }
-    ctx.fillStyle = baseGrad;
-
-    // Draw subtle humanoid shape
-    ctx.beginPath();
-    // Head
-    ctx.arc(cx, cy - size * 0.5, size * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body (oval)
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, size * 0.25, size * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Add low-contrast camo blotches
-    for (let i = 0; i < 6; i++) {
-        const angle = rand(i * 11) * Math.PI * 2;
-        const radius = size * (0.1 + rand(i * 7) * 0.35);
-        const blotchX = cx + Math.cos(angle) * radius;
-        const blotchY = cy + Math.sin(angle) * radius * 0.6;
-        const blotchSize = size * (0.12 + rand(i * 17) * 0.18);
-        const shade = rand(i * 19) > 0.5 ? 18 : -12;
-        ctx.fillStyle = `rgba(${r + shade}, ${g + shade}, ${b + shade}, 0.22)`;
-        ctx.beginPath();
-        ctx.ellipse(blotchX, blotchY, blotchSize * 0.9, blotchSize * 0.6, angle, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
-}
-
-/**
- * Calculate stealth unit visibility alpha based on distance to nearest friendly unit.
- * Stealth units become more visible the closer they are to friendly non-cloaked units.
- * @param {Object} stealthUnit - The cloaked unit to calculate visibility for
- * @returns {number} Alpha value between 0 (invisible) and 0.85 (nearly visible)
- */
-function getStealthVisibilityAlpha(stealthUnit) {
-    const friendlyUnits = getPlayerUnits(stealthUnit.player);
-
-    // Find the nearest non-cloaked friendly unit
-    let minDistance = Infinity;
-    for (const unit of friendlyUnits) {
-        // Skip the stealth unit itself and other cloaked units
-        if (unit.id === stealthUnit.id || unit.cloaked) continue;
-
-        const distance = hexDistance(
-            { q: stealthUnit.q, r: stealthUnit.r },
-            { q: unit.q, r: unit.r }
-        );
-        minDistance = Math.min(minDistance, distance);
-    }
-
-    // If no friendly units nearby, use moderate visibility
-    if (minDistance === Infinity) {
-        return 0.4;
-    }
-
-    // Distance-based transparency:
-    // 0-1 hexes: High visibility (alpha 0.7-0.85)
-    // 2-3 hexes: Medium visibility (alpha 0.4-0.6)
-    // 4-5 hexes: Low visibility (alpha 0.2-0.35)
-    // 6+ hexes: Very low visibility (alpha 0.1-0.15)
-    if (minDistance <= 1) {
-        return 0.85 - minDistance * 0.15;
-    } else if (minDistance <= 3) {
-        return 0.6 - (minDistance - 1) * 0.1;
-    } else if (minDistance <= 5) {
-        return 0.35 - (minDistance - 3) * 0.075;
-    } else {
-        // Beyond 5 hexes, very low visibility with minimum floor
-        return Math.max(0.1, 0.2 - (minDistance - 5) * 0.02);
-    }
-}
+// Local aliases to unit renderer module functions for internal use
+const drawCamouflagePattern = drawCamouflagePatternFromModule;
+const getStealthVisibilityAlpha = getStealthVisibilityAlphaFromModule;
 
 /**
  * Initialize renderer
@@ -2453,6 +2119,10 @@ export async function initRenderer() {
     // Initialize sub-renderers with canvas context
     initVegetationRenderer(ctx);
     initTerrainRenderer(ctx);
+    initMinimapRenderer(ctx);
+    initUnitRenderer(ctx);
+    initEffectsRenderer(ctx);
+    initUiRenderer(ctx);
 
     // Mark textures as initialized (now handled by assetLoader)
     texturesInitialized = true;
@@ -2593,23 +2263,6 @@ export function resizeCanvas() {
     }
 
     render();
-}
-
-/**
- * Draw a hexagon with optional texture and 3D effect
- */
-/**
- * Draw just the hex path (for stroking)
- */
-function drawHexPath(cx, cy, size) {
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
 }
 
 /**
@@ -3539,494 +3192,11 @@ function drawGhostIndicator(cx, cy, ghost) {
     ctx.restore();
 }
 
-/**
- * Draw a speech bubble with text above a unit
- */
-function drawSpeechBubble(ctx, x, y, text, color, size) {
-    ctx.save();
-
-    const padding = size * 0.15;
-    const fontSize = Math.round(size * 0.28);
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    const textWidth = ctx.measureText(text).width;
-    const bubbleWidth = textWidth + padding * 2;
-    const bubbleHeight = fontSize + padding * 1.5;
-
-    // Bubble background with rounded corners
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(x - bubbleWidth / 2, y - bubbleHeight / 2, bubbleWidth, bubbleHeight, 6);
-    ctx.fill();
-
-    // Border
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Speech bubble pointer (triangle pointing down)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
-    ctx.closePath();
-    ctx.fill();
-
-    // Pointer border
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
-    ctx.stroke();
-
-    // Text
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y);
-
-    ctx.restore();
-}
-
-/**
- * Draw a human unit with equipment
- */
-function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
-    const size = state.hexSize * 0.59;  // Reduced from 0.65 to fix units being ~10% too large
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // Cloaked units visibility based on distance to nearest friendly unit
-    // Closer = more visible, farther = more transparent
-    let isCamouflagedEnemy = false;
-    if (unit.cloaked && unit.player === state.viewingPlayer) {
-        // Own cloaked units - visibility based on distance to own non-cloaked units
-        ctx.globalAlpha = getStealthVisibilityAlpha(unit);
-    } else if (unit.cloaked && unit.player !== state.viewingPlayer) {
-        // Enemy cloaked unit detected by proximity - show semi-transparent
-        const alpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
-        if (alpha > 0) {
-            ctx.globalAlpha = alpha;
-        } else {
-            // Even invisible enemies show as terrain-colored shimmer (subtle)
-            isCamouflagedEnemy = true;
-        }
-    } else if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
-        // Unit that attacked while cloaked - visible but semi-transparent until turn ends
-        ctx.globalAlpha = 0.6;
-    }
-
-    // Draw terrain camouflage pattern for enemy cloaked units not in detection range
-    if (isCamouflagedEnemy) {
-        drawCamouflagePattern(cx, cy, size, unit);
-        ctx.restore();
-        return; // Don't draw the actual unit sprite
-    }
-
-    const unitHex = getHex(unit.q, unit.r);
-    const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
-    const outlineColor = getUnitOutlineColor(terrainColor);
-
-    // Soft shadow under unit feet for grounding
-    // Shadow is centered so feet appear in the middle of the shadow ellipse
-    // The unit sprite's feet are at cy + size * 0.3, so we center shadow there
-    ctx.save();
-    ctx.globalAlpha *= 0.3;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    // Shadow ellipse: center exactly at foot position, slightly larger for visibility
-    ctx.ellipse(cx, cy + size * 0.3, size * 0.35, size * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Base ring around unit - dashed normally, solid when selected
-    // Ring size matches unit sprite footprint
-    if (isSelected) {
-        // Selected: solid thick ring in player color
-        ctx.strokeStyle = playerColor;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([]);
-    } else {
-        // Normal: thin dashed ring in player color
-        ctx.strokeStyle = playerColor;
-        ctx.globalAlpha = 0.6;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-
-    // Determine sprite status - note: 'selected' is not a sprite state, use 'normal' instead
-    // Selection is indicated by the ring around the unit, not a different sprite
-    const unitStatus = unit.hiding
-        ? 'cover'
-        : (isSelected && state.selectedAction === 'attack'
-            ? 'attack'
-            : 'normal');
-
-    // Draw the human sprite (uses static asset if available, otherwise runtime)
-    // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    // Note: Scaling is handled in assetLoader.js drawUnit() - don't scale here
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, unitStatus, isSelected, unit.player);
-
-    // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
-    // separately in drawUnitOverlay() to ensure they're always on top of trees
-
-    // Attackable indicator
-    if (isAttackable && !isSelected) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 5]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // "Target" icon
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.beginPath();
-        ctx.arc(cx, cy - size - 10, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px sans-serif';
-        ctx.fillText('!', cx, cy - size - 10);
-    }
-
-    // Targeted crosshair animation
-    if (isTargeted) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        const crossSize = size + 25;
-
-        // Crosshair lines
-        ctx.beginPath();
-        ctx.moveTo(cx - crossSize, cy);
-        ctx.lineTo(cx - size - 10, cy);
-        ctx.moveTo(cx + size + 10, cy);
-        ctx.lineTo(cx + crossSize, cy);
-        ctx.moveTo(cx, cy - crossSize);
-        ctx.lineTo(cx, cy - size - 10);
-        ctx.moveTo(cx, cy + size + 10);
-        ctx.lineTo(cx, cy + crossSize);
-        ctx.stroke();
-
-        // Outer targeting ring
-        ctx.beginPath();
-        ctx.arc(cx, cy, crossSize, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner pulsing ring
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-
-    // Blocked target indicator - in range but no line of sight
-    if (isBlocked && !isSelected) {
-        // Dimmed ring
-        ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // "No LOS" indicator with crossed lines
-        ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
-        ctx.lineWidth = 3;
-        const xSize = 8;
-        const xY = cy - size - 15;
-        ctx.beginPath();
-        ctx.moveTo(cx - xSize, xY - xSize);
-        ctx.lineTo(cx + xSize, xY + xSize);
-        ctx.moveTo(cx + xSize, xY - xSize);
-        ctx.lineTo(cx - xSize, xY + xSize);
-        ctx.stroke();
-
-        // Show what's blocking (icon)
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const blockIcon = blockedInfo && blockedInfo.blockedBy === 'rock' ? '🪨' : '🌲';
-        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - 15);
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw a dead unit as a decoration on the map
- * Uses the dedicated dead sprite (unit lying on ground)
- */
-function drawDeadUnit(unit, cx, cy) {
-    // Safety check
-    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
-        return;
-    }
-
-    const size = state.hexSize * 0.49;  // Reduced ~17% from 0.59 for proper dead unit proportions
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // Draw unit sprite with desaturation (no transparency - dead units should be fully visible)
-    ctx.filter = 'grayscale(70%) brightness(0.7)';
-
-    // Draw the dead sprite (unit lying on ground)
-    try {
-        drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, 'dead', false, unit.player);
-    } catch {
-        // Fallback: draw colored ellipse
-        ctx.fillStyle = playerColor;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw unit overlay - all HUD elements (badges, indicators, HP bar) on top of everything
- * Called after all depth-sorted elements to ensure visibility
- */
-function drawUnitOverlay(unit, cx, cy) {
-    // Safety check: bail out if coordinates are not finite (prevents NaN errors)
-    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
-        return;
-    }
-
-    const size = state.hexSize * 0.59;  // Match drawUnit size
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // === ENEMY INDICATOR ===
-    // Show a red ring around enemy units to clearly identify them
-    // The ring alone is sufficient - additional markers create visual clutter
-    const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
-    if (isEnemy) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2.5;
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-    }
-
-    // Shield indicator (if unit has shield from power-up)
-    if (unit.shield) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
-        ctx.fillText('🛡️', cx, cy - size - 5);
-        ctx.shadowBlur = 0;
-    }
-
-    // Track vertical offset for speech bubbles to prevent overlap
-    let speechBubbleOffset = 0;
-
-    // Cover status speech bubble (only for current player's units in cover)
-    // Position higher to avoid overlap with HP bar
-    if (unit.hiding && unit.player === state.currentPlayer) {
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'In Deckung', '#22c55e', size * 0.8);
-        speechBubbleOffset += size * 0.6;  // Offset next bubble
-    }
-
-    // "Spotted!" indicator - MOST IMPORTANT, draw first (highest position)
-    // This takes priority over other status indicators
-    if (unit.spotted && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Entdeckt!', '#ef4444', size * 0.8);
-        speechBubbleOffset += size * 0.6;
-    }
-
-    // Cloak indicator (visible to owner) - only show if not spotted (spotted is more important)
-    if (unit.cloaked && unit.player === state.viewingPlayer && !unit.spotted) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Getarnt!', '#a855f7', size * 0.8);
-        speechBubbleOffset += size * 0.6;
-    }
-
-    // Revealed after attack indicator
-    if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
-        ctx.globalAlpha = 0.9;
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚠️', cx + size * 0.6, cy - size * 0.6);
-        ctx.shadowBlur = 0;
-    }
-
-    // Note: Sprint/Powershot/DamageBoost indicators removed - the action buttons
-    // already show when abilities are active, no need for redundant unit overlays
-
-    ctx.restore();
-
-    // HP bar with gradient - positioned ABOVE the unit
-    // Ensure hpPct is a valid number between 0 and 1
-    const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
-    const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
-    // Compact, proportional bar sizing - reduced for cleaner look
-    const barWidth = size * 0.8;
-    const barHeight = 4;
-    // Position above unit (negative offset from center)
-    const barY = cy - size * 1.1;
-
-    // Bar background - subtle with slight shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2 - 1, barY - 1, barWidth + 2, barHeight + 2, 3);
-    ctx.fill();
-
-    // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
-    const gradientWidth = Math.max(1, barWidth * hpPct);
-    const barGradient = safeLinearGradient(ctx, cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY, '#22c55e');
-    if (typeof barGradient !== 'string') {
-        if (hpPct > 0.5) {
-            barGradient.addColorStop(0, '#22c55e');
-            barGradient.addColorStop(1, '#16a34a');
-        } else if (hpPct > 0.25) {
-            barGradient.addColorStop(0, '#eab308');
-            barGradient.addColorStop(1, '#ca8a04');
-        } else {
-            barGradient.addColorStop(0, '#ef4444');
-            barGradient.addColorStop(1, '#dc2626');
-        }
-    }
-
-    ctx.fillStyle = barGradient;
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 2);
-    ctx.fill();
-
-    // NOTE: HP text removed for cleaner HUD - bar color (green/yellow/red)
-    // and fill level intuitively show health status
-}
-
-/**
- * Lighten a hex color
- */
-function lightenColor(color, percent) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Darken a hex color
- */
-function darkenColor(color, percent) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.max(0, (num >> 16) - amt);
-    const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
-    const B = Math.max(0, (num & 0x0000FF) - amt);
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Desaturate and darken a color for shadow effect
- * @param color - Hex color string
- * @param saturation - 0 = grayscale, 1 = full saturation
- * @param brightness - 0 = black, 1 = original brightness
- */
-function desaturateAndDarken(color, saturation, brightness) {
-    const num = parseInt(color.replace('#', ''), 16);
-    let R = (num >> 16) & 0xFF;
-    let G = (num >> 8) & 0xFF;
-    let B = num & 0xFF;
-
-    // Calculate grayscale value (luminance-based)
-    const gray = Math.round(0.299 * R + 0.587 * G + 0.114 * B);
-
-    // Blend between grayscale and original color
-    R = Math.round(gray + (R - gray) * saturation);
-    G = Math.round(gray + (G - gray) * saturation);
-    B = Math.round(gray + (B - gray) * saturation);
-
-    // Apply brightness
-    R = Math.round(R * brightness);
-    G = Math.round(G * brightness);
-    B = Math.round(B * brightness);
-
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Blend a color with red for danger zone indication
- * @param color - Hex or rgb color string
- * @param amount - 0 = original, 1 = full red
- */
-function blendWithRed(color, amount) {
-    let R, G, B;
-
-    if (color.startsWith('#')) {
-        const num = parseInt(color.replace('#', ''), 16);
-        R = (num >> 16) & 0xFF;
-        G = (num >> 8) & 0xFF;
-        B = num & 0xFF;
-    } else if (color.startsWith('rgb')) {
-        const match = color.match(/\d+/g);
-        if (match) {
-            R = parseInt(match[0]);
-            G = parseInt(match[1]);
-            B = parseInt(match[2]);
-        } else {
-            return color;
-        }
-    } else {
-        return color;
-    }
-
-    // Blend toward red (239, 68, 68)
-    R = Math.round(R + (239 - R) * amount);
-    G = Math.round(G + (68 - G) * amount * 0.7); // Less green reduction
-    B = Math.round(B + (68 - B) * amount * 0.7); // Less blue reduction
-
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Adjust color brightness based on height for minimap visualization
- * Height 0 = darkest, Height 3 = brightest
- * @param color - Hex color string
- * @param height - Height value (0-3)
- * @param maxHeight - Maximum height (default 3)
- * @returns Hex color string
- */
-function adjustColorForHeight(color, height, maxHeight = 3) {
-    const num = parseInt(color.replace('#', ''), 16);
-    let R = (num >> 16) & 0xFF;
-    let G = (num >> 8) & 0xFF;
-    let B = num & 0xFF;
-
-    // Map height to brightness factor: 0.7 (low) to 1.2 (high)
-    const brightnessFactor = 0.7 + (height / maxHeight) * 0.5;
-
-    R = Math.min(255, Math.round(R * brightnessFactor));
-    G = Math.min(255, Math.round(G * brightnessFactor));
-    B = Math.min(255, Math.round(B * brightnessFactor));
-
-    // Return hex format for compatibility with other color functions
-    return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
-}
+// Local aliases to unit renderer module functions for internal use
+const drawSpeechBubble = drawSpeechBubbleFromModule;
+const drawUnit = drawUnitFromModule;
+const drawDeadUnit = drawDeadUnitFromModule;
+const drawUnitOverlay = drawUnitOverlayFromModule;
 
 /**
  * Update performance tracking and determine effective quality
@@ -5018,807 +4188,6 @@ export function render() {
     if (shouldAnimate()) {
         ensureAnimationLoop();
     }
-}
-
-/**
- * Draw scroll hint arrows if map extends beyond viewport
- */
-function drawScrollHint(w, h) {
-    if (!state.hexes.length) return;
-
-    // Check if map extends beyond viewport
-    const radius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    const tileSize = getTileSize();
-    const mapPixelRadius = radius * tileSize * 1.8 + getTileZOffset(CONFIG.HEIGHT.MAX, tileSize);
-
-    const leftEdge = state.offsetX - mapPixelRadius;
-    const rightEdge = state.offsetX + mapPixelRadius;
-    const topEdge = state.offsetY - mapPixelRadius;
-    const bottomEdge = state.offsetY + mapPixelRadius;
-
-    ctx.save();
-    ctx.font = 'bold 24px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Arrow indicators with fade effect
-    const arrowAlpha = 0.5;
-
-    if (leftEdge < 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
-        ctx.fillText('◀', 20, h / 2);
-    }
-    if (rightEdge > w) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
-        ctx.fillText('▶', w - 20, h / 2);
-    }
-    if (topEdge < 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
-        ctx.fillText('▲', w / 2, 20);
-    }
-    if (bottomEdge > h) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${arrowAlpha})`;
-        ctx.fillText('▼', w / 2, h - 20);
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw a power-up on the map
- */
-function drawPowerup(cx, cy, powerup, size) {
-    const powerupType = POWERUP_TYPES[powerup.type];
-    if (!powerupType) return;
-
-    ctx.save();
-    const powerupSize = size * 0.5;
-
-    // Floating animation offset
-    const floatOffset = Math.sin(Date.now() / 400 + powerup.q + powerup.r) * 3;
-
-    // Glow effect
-    ctx.shadowColor = powerupType.color;
-    ctx.shadowBlur = 15;
-
-    // Background circle
-    ctx.fillStyle = powerupType.color + '40';
-    ctx.beginPath();
-    ctx.arc(cx, cy + floatOffset, powerupSize * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Border
-    ctx.strokeStyle = powerupType.color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Icon
-    ctx.shadowBlur = 0;
-    ctx.font = `${Math.round(powerupSize * 0.45)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(powerupType.icon, cx, cy + floatOffset);
-
-    ctx.restore();
-}
-
-/**
- * Draw active event indicator
- */
-function drawEventIndicator(w, h) {
-    const event = getCurrentEvent();
-    if (!event) return;
-
-    ctx.save();
-
-    // Small indicator in corner
-    ctx.fillStyle = event.color + 'cc';
-    ctx.beginPath();
-    ctx.roundRect(w - 100, 10, 90, 30, 8);
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${event.icon} Aktiv`, w - 55, 25);
-
-    ctx.restore();
-}
-
-/**
- * Draw zoom indicator
- */
-function drawZoomIndicator(w, h) {
-    const zoomScale = zoomLevelToScale(state.zoomLevel);
-    // Only show if zoom is not at default
-    if (Math.abs(zoomScale - 1.0) < 0.05) return;
-
-    ctx.save();
-
-    // Position in bottom-left corner
-    const x = 15;
-    const y = h - 45;
-
-    // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(x, y, 70, 30, 6);
-    ctx.fill();
-
-    // Zoom level text
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const zoomPercent = Math.round(zoomScale * 100);
-    ctx.fillText(`🔍 ${zoomPercent}%`, x + 35, y + 15);
-
-    ctx.restore();
-}
-
-// ===== MINIMAP =====
-
-/**
- * Minimap configuration - exported for interaction handling
- */
-export const MINIMAP_CONFIG = {
-    SIZE: 90,            // Minimap size in pixels (compact for mobile)
-    PADDING: 8,          // Padding from screen edge
-    HEX_SIZE: 3,         // Size of each hex on minimap
-    OPACITY: 0.5,        // Base opacity (more transparent)
-    OPACITY_ACTIVE: 0.95, // Opacity when touched/hovered
-    POSITION: 'top-left' // Position on screen
-};
-
-// Track if minimap is being interacted with
-let minimapActive = false;
-let minimapExpanded = false;  // Track expanded/fullscreen state
-
-export function setMinimapActive(active) { minimapActive = active; }
-export function isMinimapExpanded() { return minimapExpanded; }
-export function setMinimapExpanded(expanded) {
-    minimapExpanded = expanded;
-    // Hide/show bottom UI panel in tactical briefing mode
-    const unitPanel = document.querySelector('.unit-panel');
-    if (unitPanel) {
-        unitPanel.style.display = expanded ? 'none' : '';
-    }
-}
-
-// Store last drawn minimap bounds for click detection
-let lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: false, expanded: false };
-export function getMinimapBounds() { return lastMinimapBounds; }
-
-// Store toggle button bounds for click detection
-let toggleButtonBounds = { x: 0, y: 0, size: 24 };
-export function getToggleButtonBounds() { return toggleButtonBounds; }
-
-// Store height overlay toggle bounds for click detection
-let heightOverlayButtonBounds = { x: 0, y: 0, size: 0, hidden: true };
-export function getHeightOverlayButtonBounds() { return heightOverlayButtonBounds; }
-
-// Store close button bounds for expanded minimap
-let closeButtonBounds = { x: 0, y: 0, size: 32 };
-export function getCloseButtonBounds() { return closeButtonBounds; }
-
-/**
- * Draw minimap expand button (to open expanded view)
- */
-function drawMinimapExpandButton(mapX, mapY, mapSize) {
-    const btnSize = 24;
-    const btnX = mapX + mapSize - btnSize - 4;
-    const btnY = mapY + 4;
-
-    // Store bounds for click detection
-    toggleButtonBounds = { x: btnX, y: btnY, size: btnSize };
-
-    ctx.save();
-    ctx.globalAlpha = 0.8;
-
-    // Button background
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, btnSize, btnSize, 4);
-    ctx.fill();
-
-    // Button border
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Expand icon (⤢ or similar)
-    ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    const padding = 6;
-    // Draw expand arrows (top-right and bottom-left corners)
-    ctx.beginPath();
-    // Top-right corner arrow
-    ctx.moveTo(btnX + btnSize - padding - 4, btnY + padding);
-    ctx.lineTo(btnX + btnSize - padding, btnY + padding);
-    ctx.lineTo(btnX + btnSize - padding, btnY + padding + 4);
-    // Bottom-left corner arrow
-    ctx.moveTo(btnX + padding + 4, btnY + btnSize - padding);
-    ctx.lineTo(btnX + padding, btnY + btnSize - padding);
-    ctx.lineTo(btnX + padding, btnY + btnSize - padding - 4);
-    ctx.stroke();
-
-    ctx.restore();
-}
-
-/**
- * Draw close button for expanded minimap
- */
-function drawMinimapCloseButton(mapX, mapY, mapSize) {
-    const btnSize = 32;
-    const btnX = mapX + mapSize - btnSize - 8;
-    const btnY = mapY + 8;
-
-    // Store bounds for click detection
-    closeButtonBounds = { x: btnX, y: btnY, size: btnSize };
-
-    ctx.save();
-
-    // Button background - dark with red tint
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, btnSize, btnSize, 6);
-    ctx.fill();
-
-    // Button border
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // X icon
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    const padding = 10;
-    ctx.beginPath();
-    ctx.moveTo(btnX + padding, btnY + padding);
-    ctx.lineTo(btnX + btnSize - padding, btnY + btnSize - padding);
-    ctx.moveTo(btnX + btnSize - padding, btnY + padding);
-    ctx.lineTo(btnX + padding, btnY + btnSize - padding);
-    ctx.stroke();
-
-    ctx.restore();
-}
-
-/**
- * Draw height overlay toggle button (debug overlay)
- */
-function drawHeightOverlayToggle() {
-    if (minimapExpanded) {
-        heightOverlayButtonBounds = { x: 0, y: 0, size: 0, hidden: true };
-        return;
-    }
-
-    const btnSize = 24;
-    const padding = 6;
-    const mapBounds = lastMinimapBounds;
-    const btnX = mapBounds.x;
-    const btnY = mapBounds.y + mapBounds.size + padding;
-
-    heightOverlayButtonBounds = { x: btnX, y: btnY, size: btnSize, hidden: false };
-
-    ctx.save();
-    const active = state.debug.showHeightOverlay;
-    ctx.globalAlpha = 0.85;
-
-    ctx.fillStyle = active ? 'rgba(59, 130, 246, 0.35)' : 'rgba(0, 0, 0, 0.55)';
-    ctx.beginPath();
-    ctx.roundRect(btnX, btnY, btnSize, btnSize, 5);
-    ctx.fill();
-
-    ctx.strokeStyle = active ? 'rgba(59, 130, 246, 0.9)' : 'rgba(255, 255, 255, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.fillStyle = active ? '#bfdbfe' : '#e5e7eb';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⛰', btnX + btnSize / 2, btnY + btnSize / 2 + 1);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('HÖHE', btnX + btnSize / 2, btnY + btnSize + 2);
-
-    ctx.restore();
-}
-
-/**
- * Draw legend for expanded minimap showing terrain types, units, and height
- */
-function drawMinimapLegend(ctx, legendX, legendY, availableWidth) {
-    // Only draw legend if there's enough space
-    if (availableWidth < 80) return;
-
-    const lineHeight = 18;
-    const dotSize = 6;
-    let currentY = legendY;
-
-    ctx.save();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-
-    // Title
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillText('LEGENDE', legendX, currentY);
-    currentY += lineHeight + 4;
-
-    // Terrain types
-    ctx.font = '10px sans-serif';
-    const terrainItems = [
-        { name: 'Gras', color: TERRAIN.grass.color },
-        { name: 'Wald', color: TERRAIN.forest.color },
-        { name: 'Hügel', color: TERRAIN.hills.color },
-        { name: 'Wasser', color: TERRAIN.water.color },
-        { name: 'Fels', color: TERRAIN.rock.color },
-        { name: 'Sand', color: TERRAIN.sand.color },
-        { name: 'Sumpf', color: TERRAIN.swamp.color }
-    ];
-
-    terrainItems.forEach(item => {
-        // Color dot
-        ctx.fillStyle = item.color;
-        ctx.beginPath();
-        ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Label
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.fillText(item.name, legendX + dotSize * 2 + 6, currentY);
-        currentY += lineHeight;
-    });
-
-    currentY += 8;
-
-    // Units section
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillText('EINHEITEN', legendX, currentY);
-    currentY += lineHeight;
-
-    ctx.font = '10px sans-serif';
-
-    // Own units
-    ctx.fillStyle = '#10b981';
-    ctx.beginPath();
-    ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText('Eigene', legendX + dotSize * 2 + 6, currentY);
-    currentY += lineHeight;
-
-    // Enemy units
-    ctx.fillStyle = '#ff4444';
-    ctx.beginPath();
-    ctx.arc(legendX + dotSize, currentY, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#ff0000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText('Feinde', legendX + dotSize * 2 + 6, currentY);
-    currentY += lineHeight + 8;
-
-    // Height gradient
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.fillText('HÖHE', legendX, currentY);
-    currentY += lineHeight;
-
-    // Draw height gradient bar
-    const gradientWidth = Math.min(60, availableWidth - 10);
-    const gradientHeight = 10;
-
-    // Create gradient from dark to light
-    const gradient = ctx.createLinearGradient(legendX, currentY, legendX + gradientWidth, currentY);
-    gradient.addColorStop(0, adjustColorForHeight('#4a7c4e', 0, 3));
-    gradient.addColorStop(0.5, adjustColorForHeight('#4a7c4e', 1.5, 3));
-    gradient.addColorStop(1, adjustColorForHeight('#4a7c4e', 3, 3));
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(legendX, currentY - gradientHeight / 2, gradientWidth, gradientHeight);
-
-    // Labels
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('Tief', legendX, currentY + gradientHeight);
-    ctx.textAlign = 'right';
-    ctx.fillText('Hoch', legendX + gradientWidth, currentY + gradientHeight);
-
-    ctx.restore();
-}
-
-/**
- * Draw horizontal legend for portrait mode (below the minimap)
- * Compact layout using icon groups
- */
-function drawMinimapLegendHorizontal(ctx, legendX, legendY, availableWidth) {
-    if (availableWidth < 200) return;
-
-    ctx.save();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.font = '10px sans-serif';
-
-    const dotSize = 5;
-    const itemSpacing = 50;
-    let currentX = legendX;
-    const currentY = legendY;
-
-    // Key terrain types in a row
-    const terrainItems = [
-        { name: 'Gras', color: TERRAIN.grass.color },
-        { name: 'Wald', color: TERRAIN.forest.color },
-        { name: 'Hügel', color: TERRAIN.hills.color },
-        { name: 'Wasser', color: TERRAIN.water.color },
-        { name: 'Fels', color: TERRAIN.rock.color }
-    ];
-
-    terrainItems.forEach(item => {
-        if (currentX + itemSpacing > legendX + availableWidth) return;
-
-        ctx.fillStyle = item.color;
-        ctx.beginPath();
-        ctx.arc(currentX + dotSize, currentY, dotSize, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.fillText(item.name, currentX + dotSize * 2 + 4, currentY);
-        currentX += itemSpacing;
-    });
-
-    // Unit indicators in second row
-    const unitY = legendY + 20;
-    currentX = legendX;
-
-    // Own units
-    ctx.fillStyle = '#10b981';
-    ctx.beginPath();
-    ctx.arc(currentX + dotSize, unitY, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText('Eigene', currentX + dotSize * 2 + 4, unitY);
-    currentX += itemSpacing;
-
-    // Enemy units
-    ctx.fillStyle = '#ff4444';
-    ctx.beginPath();
-    ctx.arc(currentX + dotSize, unitY, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#ff0000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.fillText('Feinde', currentX + dotSize * 2 + 4, unitY);
-
-    ctx.restore();
-}
-
-/**
- * Draw strategic minimap showing terrain, units, and zone
- * Supports both compact (corner) and expanded (center) modes
- * - Shows all terrain
- * - Shows own units (including eliminated ones marked with X)
- * - Shows enemies only when visible
- * - Shows shrinking zone boundary
- * - Shows viewport rectangle with correct zoom level
- */
-function drawMinimap(w, h) {
-    if (state.hexes.length === 0) return;
-
-    // Hide minimap during AI turn in single-player to prevent revealing enemy positions
-    const isAiTurn = isAIPlayer() && state.currentPlayer !== state.viewingPlayer;
-    if (isAiTurn) {
-        // Update bounds to indicate minimap is hidden
-        lastMinimapBounds = { x: 0, y: 0, size: 0, centerX: 0, centerY: 0, hexSize: 0, hidden: true, expanded: false };
-        return;
-    }
-
-    const config = MINIMAP_CONFIG;
-    const isExpanded = minimapExpanded;
-
-    // Determine size and position based on mode
-    let size, x, y;
-    let legendWidth = 0;  // Space reserved for legend
-    if (isExpanded) {
-        // Expanded mode: use available space between top bar and bottom UI
-        const padding = 8;  // Minimal padding from edges
-        const topOffset = 55;  // Space for top bar (player info, round, AP)
-        const isLandscape = w > h;
-        // Portrait needs more space below for hint text + horizontal legend (2 rows)
-        const bottomOffset = isLandscape ? 60 : 100;
-
-        // Reserve space for legend - on right side for landscape, below for portrait
-        legendWidth = isLandscape ? 110 : 0;
-
-        const availableWidth = Math.max(0, w - padding * 2 - legendWidth);
-        const availableHeight = Math.max(0, h - topOffset - bottomOffset);
-        // Use available space - take the smaller of width/height to maintain square aspect
-        size = Math.min(availableWidth, availableHeight);
-        if (size <= 0) return;
-
-        // Position map: left-aligned with legend on right for landscape, centered for portrait
-        if (isLandscape) {
-            x = (w - size - legendWidth) / 2;
-        } else {
-            x = (w - size) / 2;
-        }
-        y = topOffset + (availableHeight - size) / 2;
-    } else {
-        // Compact mode: top-left corner
-        size = config.SIZE;
-        x = config.PADDING;
-        y = config.PADDING + 55; // Offset for top bar
-    }
-
-    // Store bounds for interaction
-    lastMinimapBounds = {
-        x, y, size,
-        centerX: x + size / 2,
-        centerY: y + size / 2,
-        hexSize: 0,
-        hidden: false, // Compact minimap is always visible
-        expanded: isExpanded
-    };
-
-    ctx.save();
-
-    // In expanded mode, draw dark backdrop
-    if (isExpanded) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(0, 0, w, h);
-    }
-
-    // Use higher opacity for expanded mode or when interacting
-    ctx.globalAlpha = isExpanded ? 1.0 : (minimapActive ? config.OPACITY_ACTIVE : config.OPACITY);
-
-    // Background with rounded corners - solid for expanded mode
-    ctx.fillStyle = isExpanded ? 'rgba(15, 15, 25, 1.0)' : 'rgba(0, 0, 0, 0.8)';
-    ctx.beginPath();
-    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, isExpanded ? 12 : 6);
-    ctx.fill();
-
-    // Border - highlight when expanded or active
-    ctx.strokeStyle = isExpanded ? 'rgba(16, 185, 129, 0.9)' : (minimapActive ? 'rgba(16, 185, 129, 0.8)' : 'rgba(255, 255, 255, 0.25)');
-    ctx.lineWidth = isExpanded ? 3 : (minimapActive ? 2 : 1);
-    ctx.stroke();
-
-    // Calculate scale to fit map in minimap
-    const mapRadius = CONFIG.MAP_SIZES[state.settings.size] || 8;
-    const hexSize = isExpanded
-        ? Math.min(size / 2 / (mapRadius * 1.8), 8)  // Larger hexes for expanded view
-        : Math.min(config.HEX_SIZE, (size / 2) / (mapRadius * 1.8));
-
-    // Center of minimap
-    const centerX = x + size / 2;
-    const centerY = y + size / 2;
-
-    // Clip to minimap area
-    ctx.beginPath();
-    ctx.roundRect(x - 3, y - 3, size + 6, size + 6, isExpanded ? 12 : 6);
-    ctx.clip();
-
-    // Update bounds with hexSize for click detection
-    lastMinimapBounds.hexSize = hexSize;
-
-    // Draw all hexes - render terrain with visibility-based darkening
-    state.hexes.forEach(hex => {
-        const terrain = TERRAIN[hex.type];
-        if (!terrain) return;
-
-        // Convert hex coords to minimap pixel position
-        const px = centerX + hex.q * hexSize * 1.5;
-        const py = centerY + (hex.r + hex.q * 0.5) * hexSize * Math.sqrt(3);
-
-        // Check if hex is outside the safe zone
-        const outsideZone = state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius && !isHexInZone(hex.q, hex.r);
-
-        // Apply height-based brightness adjustment to terrain color
-        const heightAdjustedColor = adjustColorForHeight(terrain.color, hex.height || 0, CONFIG.HEIGHT.MAX);
-
-        // Apply zone coloring if outside
-        let baseColor = outsideZone ? blendWithRed(heightAdjustedColor, 0.3) : heightAdjustedColor;
-
-        // Darken based on fog level (scale RGB toward black - shadow effect)
-        // Minimap uses HALF the darkness of the main view for better readability
-        const fogLevel = getFogLevel(hex.q, hex.r);
-        let brightness = 1.0;
-        if (fogLevel === 'hidden') {
-            brightness = 0.5;  // Half as dark as main view (0.12 → 0.5)
-        } else if (fogLevel === 'explored') {
-            brightness = 0.6;  // Half as dark as main view (0.25 → 0.6)
-        }
-
-        // Apply brightness directly to color
-        const num = parseInt(baseColor.replace('#', ''), 16);
-        const R = Math.round(((num >> 16) & 0xFF) * brightness);
-        const G = Math.round(((num >> 8) & 0xFF) * brightness);
-        const B = Math.round((num & 0xFF) * brightness);
-        const finalColor = `rgb(${R},${G},${B})`;
-
-        const dotRadius = hexSize * (isExpanded ? 0.9 : 0.8);
-
-        ctx.beginPath();
-        ctx.arc(px, py, dotRadius, 0, Math.PI * 2);
-        ctx.fillStyle = finalColor;
-        ctx.fill();
-
-        // Add red border for hexes outside zone (only if visible enough)
-        if (outsideZone && fogLevel !== 'hidden') {
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-            ctx.lineWidth = isExpanded ? 1.5 : 1;
-            ctx.stroke();
-        }
-    });
-
-    // Draw shrinking zone boundary (if active)
-    if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
-        // Draw zone circle
-        const zoneRadiusPx = state.zoneRadius * hexSize * 1.8;
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.lineWidth = isExpanded ? 3 : 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, zoneRadiusPx, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
-
-    // Draw units
-    const currentPlayer = state.viewingPlayer;
-    const unitDotSize = isExpanded ? hexSize * 2 : hexSize * 1.5;
-
-    // First, draw eliminated friendly units (grayed out with X)
-    state.units.forEach(unit => {
-        if (unit.player !== currentPlayer) return;
-        if (unit.alive) return; // Skip alive units for now
-
-        const px = centerX + unit.q * hexSize * 1.5;
-        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
-
-        // Draw eliminated unit marker
-        ctx.fillStyle = 'rgba(100, 100, 100, 0.7)';
-        ctx.beginPath();
-        ctx.arc(px, py, hexSize * 1.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw X over eliminated unit
-        ctx.strokeStyle = '#ff4444';
-        ctx.lineWidth = isExpanded ? 2 : 1.5;
-        const xSize = hexSize * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(px - xSize, py - xSize);
-        ctx.lineTo(px + xSize, py + xSize);
-        ctx.moveTo(px + xSize, py - xSize);
-        ctx.lineTo(px - xSize, py + xSize);
-        ctx.stroke();
-    });
-
-    // Draw alive friendly units
-    state.units.forEach(unit => {
-        if (unit.player !== currentPlayer || !unit.alive) return;
-
-        const px = centerX + unit.q * hexSize * 1.5;
-        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
-
-        // Draw unit dot with player color
-        ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
-        ctx.beginPath();
-        ctx.arc(px, py, unitDotSize, 0, Math.PI * 2);
-        ctx.fill();
-
-        // White outline
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = isExpanded ? 2 : 1;
-        ctx.stroke();
-    });
-
-    // Draw visible enemy units
-    state.units.forEach(unit => {
-        if (unit.player === currentPlayer || !unit.alive) return;
-
-        // Check if enemy is visible
-        if (!isUnitVisibleToViewer(unit)) return;
-
-        const px = centerX + unit.q * hexSize * 1.5;
-        const py = centerY + (unit.r + unit.q * 0.5) * hexSize * Math.sqrt(3);
-
-        // Draw enemy unit dot
-        ctx.fillStyle = CONFIG.PLAYER_COLORS[unit.player];
-        ctx.beginPath();
-        ctx.arc(px, py, unitDotSize, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Red hostile outline
-        ctx.strokeStyle = '#ff0000';
-        ctx.lineWidth = isExpanded ? 2.5 : 1.5;
-        ctx.stroke();
-    });
-
-    // Draw current viewport indicator
-    // Scale factor from main view to minimap coordinates
-    const scale = hexSize / getTileSize();
-
-    // Viewport center position on minimap
-    const viewX = centerX - state.cameraX * scale;
-    const viewY = centerY - state.cameraY * scale;
-
-    // Viewport size on minimap (canvas dimensions scaled to minimap)
-    const viewportW = state.canvasWidth * scale;
-    const viewportH = state.canvasHeight * scale;
-
-    // Viewport rectangle - more visible in expanded mode
-    ctx.strokeStyle = isExpanded ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = isExpanded ? 2 : 1;
-    ctx.strokeRect(
-        viewX - viewportW / 2,
-        viewY - viewportH / 2,
-        viewportW,
-        viewportH
-    );
-
-    // Semi-transparent fill for viewport area in expanded mode
-    if (isExpanded) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.fillRect(
-            viewX - viewportW / 2,
-            viewY - viewportH / 2,
-            viewportW,
-            viewportH
-        );
-    }
-
-    ctx.restore();
-
-    // Draw label and close button outside the clip region
-    ctx.save();
-    if (isExpanded) {
-        const isLandscape = w > h;
-
-        // Title for expanded view
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('KARTE', x + size / 2, y - 15);
-
-        // Hint text
-        ctx.font = '12px sans-serif';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.fillText('Tippe um den Viewport zu verschieben', x + size / 2, y + size + 20);
-
-        // Draw legend - position depends on orientation
-        if (isLandscape) {
-            // Landscape: legend on the right side of the map
-            drawMinimapLegend(ctx, x + size + 15, y, legendWidth - 15);
-        } else {
-            // Portrait: legend below the map (compact horizontal layout)
-            drawMinimapLegendHorizontal(ctx, x, y + size + 40, size);
-        }
-
-        // Draw close button
-        drawMinimapCloseButton(x, y, size);
-    } else {
-        // Label for compact view
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('KARTE', x + size / 2, y - 8);
-
-        // Draw expand button for compact view
-        drawMinimapExpandButton(x, y, size);
-    }
-    ctx.restore();
 }
 
 // ===== PATH PREVIEW (drawn on top of foreground elements) =====

@@ -2,6 +2,10 @@
 // Advanced tactical AI with memory, planning, and unit coordination
 
 import { state, getHex, getPlayerUnits, spendSharedAP, isHexInZone, canUnitAttack, arePlayersAllied, getPlayerName } from './state.js';
+
+// Re-export game mode functions from shared module (for backward compatibility)
+export { isAIPlayer, isSpectatorMode, hasHumanPlayer } from './shared/gameMode.js';
+import { isAIPlayer, isSpectatorMode, hasHumanPlayer } from './shared/gameMode.js';
 import { hexDistance } from './hexMath.js';
 import { getReachableHexes, findPath } from './pathfinding.js';
 import { moveUnitInstant, getAttackableUnits } from './units.js';
@@ -30,31 +34,6 @@ const aiThoughts = {
     enabled: false,         // Only enabled in spectator mode (all AI players)
     displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
 };
-
-/**
- * Check if spectator mode is active
- * Active when:
- * 1. All players were AI from the start, OR
- * 2. All human players have been eliminated (no units left)
- */
-export function isSpectatorMode() {
-    if (state.settings.players <= 0) return false;
-
-    // Check each player
-    for (let p = 0; p < state.settings.players; p++) {
-        if (!isAIPlayer(p)) {
-            // This is a human player - check if they still have units
-            const humanUnits = getPlayerUnits(p).filter(u => u.alive);
-            if (humanUnits.length > 0) {
-                // At least one human player still has units - not spectator mode
-                return false;
-            }
-        }
-    }
-
-    // Either all players are AI, or all human players have been eliminated
-    return true;
-}
 
 /**
  * Add an AI thought to be displayed
@@ -542,29 +521,6 @@ function scoreAmbushPosition(unit, q, r, enemies) {
     }
 
     return score;
-}
-
-/**
- * Check if a player is AI controlled
- * Supports both legacy singlePlayer mode and new aiPlayers array
- */
-export function isAIPlayer(playerIndex = state.currentPlayer) {
-    // New mode: check aiPlayers array
-    if (state.settings.aiPlayers && state.settings.aiPlayers.length > 0) {
-        return state.settings.aiPlayers.includes(playerIndex);
-    }
-    // Legacy mode: singlePlayer means all non-0 players are AI
-    return state.settings.singlePlayer && playerIndex > 0;
-}
-
-/**
- * Check if there are any human players in the game
- */
-export function hasHumanPlayer() {
-    for (let p = 0; p < state.settings.players; p++) {
-        if (!isAIPlayer(p)) return true;
-    }
-    return false;
 }
 
 /**
