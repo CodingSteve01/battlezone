@@ -6,7 +6,7 @@ import { state, getHex, getPlayerUnits, arePlayersAllied } from '../state.js';
 import { CONFIG, TERRAIN } from '../config.js';
 import { hexDistance } from '../hexMath.js';
 import { getEnemyCloakedVisibilityAlpha } from '../fogOfWar.js';
-import { drawUnitSprite } from '../assetLoader.js';
+import { drawUnit as drawUnitSprite } from '../assetLoader.js';
 import { safeRadialGradient, safeLinearGradient, getUnitOutlineColor } from './renderUtils.js';
 
 // Canvas context - set by initUnitRenderer
@@ -230,7 +230,7 @@ export function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isB
 
     const unitHex = getHex(unit.q, unit.r);
     const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
-    const outlineColor = getUnitOutlineColor(terrainColor);
+    const _outlineColor = getUnitOutlineColor(terrainColor); // Reserved for future use
 
     // Soft shadow under unit feet for grounding
     ctx.save();
@@ -396,7 +396,7 @@ export function drawUnitOverlay(unit, cx, cy) {
     }
 
     const size = state.hexSize * 0.59;
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
+    const _playerColor = CONFIG.PLAYER_COLORS[unit.player]; // Reserved for future use
 
     ctx.save();
 
