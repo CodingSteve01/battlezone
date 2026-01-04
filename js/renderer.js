@@ -49,7 +49,12 @@ import {
     WATER_TYPES,
     SWAMP_TYPES,
     isLandForWater,
-    isLandForSwamp
+    isLandForSwamp,
+    lightenColor,
+    darkenColor,
+    desaturateAndDarken,
+    blendWithRed,
+    adjustColorForHeight
 } from './rendering/renderUtils.js';
 import {
     initUnitRenderer,
@@ -86,7 +91,12 @@ export {
     WATER_TYPES,
     SWAMP_TYPES,
     isLandForWater,
-    isLandForSwamp
+    isLandForSwamp,
+    lightenColor,
+    darkenColor,
+    desaturateAndDarken,
+    blendWithRed,
+    adjustColorForHeight
 };
 
 // Re-export unit renderer functions for backward compatibility
@@ -3426,117 +3436,6 @@ const drawSpeechBubble = drawSpeechBubbleFromModule;
 const drawUnit = drawUnitFromModule;
 const drawDeadUnit = drawDeadUnitFromModule;
 const drawUnitOverlay = drawUnitOverlayFromModule;
-
-/**
- * Lighten a hex color
- */
-function lightenColor(color, percent) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.min(255, (num >> 16) + amt);
-    const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
-    const B = Math.min(255, (num & 0x0000FF) + amt);
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Darken a hex color
- */
-function darkenColor(color, percent) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const amt = Math.round(2.55 * percent);
-    const R = Math.max(0, (num >> 16) - amt);
-    const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
-    const B = Math.max(0, (num & 0x0000FF) - amt);
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Desaturate and darken a color for shadow effect
- * @param color - Hex color string
- * @param saturation - 0 = grayscale, 1 = full saturation
- * @param brightness - 0 = black, 1 = original brightness
- */
-function desaturateAndDarken(color, saturation, brightness) {
-    const num = parseInt(color.replace('#', ''), 16);
-    let R = (num >> 16) & 0xFF;
-    let G = (num >> 8) & 0xFF;
-    let B = num & 0xFF;
-
-    // Calculate grayscale value (luminance-based)
-    const gray = Math.round(0.299 * R + 0.587 * G + 0.114 * B);
-
-    // Blend between grayscale and original color
-    R = Math.round(gray + (R - gray) * saturation);
-    G = Math.round(gray + (G - gray) * saturation);
-    B = Math.round(gray + (B - gray) * saturation);
-
-    // Apply brightness
-    R = Math.round(R * brightness);
-    G = Math.round(G * brightness);
-    B = Math.round(B * brightness);
-
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Blend a color with red for danger zone indication
- * @param color - Hex or rgb color string
- * @param amount - 0 = original, 1 = full red
- */
-function blendWithRed(color, amount) {
-    let R, G, B;
-
-    if (color.startsWith('#')) {
-        const num = parseInt(color.replace('#', ''), 16);
-        R = (num >> 16) & 0xFF;
-        G = (num >> 8) & 0xFF;
-        B = num & 0xFF;
-    } else if (color.startsWith('rgb')) {
-        const match = color.match(/\d+/g);
-        if (match) {
-            R = parseInt(match[0]);
-            G = parseInt(match[1]);
-            B = parseInt(match[2]);
-        } else {
-            return color;
-        }
-    } else {
-        return color;
-    }
-
-    // Blend toward red (239, 68, 68)
-    R = Math.round(R + (239 - R) * amount);
-    G = Math.round(G + (68 - G) * amount * 0.7); // Less green reduction
-    B = Math.round(B + (68 - B) * amount * 0.7); // Less blue reduction
-
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Adjust color brightness based on height for minimap visualization
- * Height 0 = darkest, Height 3 = brightest
- * @param color - Hex color string
- * @param height - Height value (0-3)
- * @param maxHeight - Maximum height (default 3)
- * @returns Hex color string
- */
-function adjustColorForHeight(color, height, maxHeight = 3) {
-    const num = parseInt(color.replace('#', ''), 16);
-    let R = (num >> 16) & 0xFF;
-    let G = (num >> 8) & 0xFF;
-    let B = num & 0xFF;
-
-    // Map height to brightness factor: 0.7 (low) to 1.2 (high)
-    const brightnessFactor = 0.7 + (height / maxHeight) * 0.5;
-
-    R = Math.min(255, Math.round(R * brightnessFactor));
-    G = Math.min(255, Math.round(G * brightnessFactor));
-    B = Math.min(255, Math.round(B * brightnessFactor));
-
-    // Return hex format for compatibility with other color functions
-    return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
-}
 
 /**
  * Update performance tracking and determine effective quality

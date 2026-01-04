@@ -6,6 +6,7 @@ import { CONFIG, TERRAIN } from '../config.js';
 import { state, isHexInZone, getTileSize } from '../state.js';
 import { getFogLevel, isUnitVisibleToViewer } from '../fogOfWar.js';
 import { isAIPlayer } from '../shared/gameMode.js';
+import { blendWithRed, adjustColorForHeight } from './renderUtils.js';
 
 // Canvas context - initialized via initMinimapRenderer()
 let ctx = null;
@@ -87,67 +88,6 @@ export function getHeightOverlayButtonBounds() {
 
 export function getCloseButtonBounds() {
     return closeButtonBounds;
-}
-
-// ===== COLOR HELPERS =====
-
-/**
- * Blend a color with red for danger zone indication
- * @param {string} color - Hex or rgb color string
- * @param {number} amount - 0 = original, 1 = full red
- * @returns {string} RGB color string
- */
-function blendWithRed(color, amount) {
-    let R, G, B;
-
-    if (color.startsWith('#')) {
-        const num = parseInt(color.replace('#', ''), 16);
-        R = (num >> 16) & 0xFF;
-        G = (num >> 8) & 0xFF;
-        B = num & 0xFF;
-    } else if (color.startsWith('rgb')) {
-        const match = color.match(/\d+/g);
-        if (match) {
-            R = parseInt(match[0]);
-            G = parseInt(match[1]);
-            B = parseInt(match[2]);
-        } else {
-            return color;
-        }
-    } else {
-        return color;
-    }
-
-    // Blend toward red (239, 68, 68)
-    R = Math.round(R + (239 - R) * amount);
-    G = Math.round(G + (68 - G) * amount * 0.7);
-    B = Math.round(B + (68 - B) * amount * 0.7);
-
-    return `rgb(${R},${G},${B})`;
-}
-
-/**
- * Adjust color brightness based on height for minimap visualization
- * Height 0 = darkest, Height 3 = brightest
- * @param {string} color - Hex color string
- * @param {number} height - Height value (0-3)
- * @param {number} maxHeight - Maximum height (default 3)
- * @returns {string} Hex color string
- */
-function adjustColorForHeight(color, height, maxHeight = 3) {
-    const num = parseInt(color.replace('#', ''), 16);
-    let R = (num >> 16) & 0xFF;
-    let G = (num >> 8) & 0xFF;
-    let B = num & 0xFF;
-
-    // Map height to brightness factor: 0.7 (low) to 1.2 (high)
-    const brightnessFactor = 0.7 + (height / maxHeight) * 0.5;
-
-    R = Math.min(255, Math.round(R * brightnessFactor));
-    G = Math.min(255, Math.round(G * brightnessFactor));
-    B = Math.min(255, Math.round(B * brightnessFactor));
-
-    return '#' + ((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1);
 }
 
 // ===== BUTTON DRAWING =====
