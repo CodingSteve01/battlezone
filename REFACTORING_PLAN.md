@@ -1,34 +1,40 @@
 # Shadow Squad Refactoring Plan
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Created:** 2026-01-04
-**Status:** Draft - Pending Review
+**Last Updated:** 2026-01-04
+**Status:** In Progress - Phase 3
 
 ---
 
 ## Executive Summary
 
-This document outlines a comprehensive refactoring plan to bring the Shadow Squad codebase into compliance with the architectural guidelines defined in AGENTS.md. The plan is structured as **25+ individual PRs**, each under 400 LOC diff, designed to be merged incrementally without breaking functionality.
+This document outlines a comprehensive refactoring plan to bring the Shadow Squad codebase into compliance with the architectural guidelines defined in AGENTS.md. The plan is structured as **35 individual PRs**, each under 400 LOC diff, designed to be merged incrementally without breaking functionality.
 
 ### Current State
 
-| Metric | Current | Target | Gap |
-|--------|---------|--------|-----|
-| Files > 300 LOC | 11 | 0 | -11 |
-| Functions > 40 LOC | 20+ | 0 | -20+ |
-| Circular dependencies | 1 | 0 | -1 |
-| Max nesting depth | 5+ | 3 | -2+ |
-| Total JS LOC | 34,111 | ~34,000* | Restructure |
+| Metric | Before | Current | Target | Status |
+|--------|--------|---------|--------|--------|
+| Files > 300 LOC | 11 | 10 | 0 | 🟡 In Progress |
+| Functions > 40 LOC | 20+ | 20+ | 0 | ⬜ Pending |
+| Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
+| Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
+| state.js LOC | 1,496 | 1,301 | <300 | 🟡 In Progress |
 
-*Total LOC may increase slightly due to module boundaries, but individual files will be within limits.
+### Progress Summary
 
-### Key Violations
+- **Phase 1:** ✅ Complete (PRs 1-4)
+- **Phase 2:** ✅ Complete (PRs 5-11)
+- **Phase 3:** 🟡 In Progress (PRs 13-18)
+- **Phases 4-6:** ⬜ Pending
 
-1. **ai.js** (6,272 LOC) - 20x over file limit
-2. **renderer.js** (6,053 LOC) - 20x over file limit
-3. **state.js** (1,496 LOC) - God object with 93 exports
-4. **Circular dependency** between ai.js ↔ renderer.js
-5. **Deep nesting** (4-5 levels) in critical functions
+### Key Violations (Updated)
+
+1. **ai.js** (6,272 LOC) - 🔴 20x over file limit
+2. **renderer.js** (6,053 LOC) - 🔴 20x over file limit
+3. **state.js** (1,301 LOC) - 🟡 4x over (was 1,496 LOC, -195 LOC)
+4. **Circular dependency** between ai.js ↔ renderer.js - ✅ FIXED
+5. **Deep nesting** (4-5 levels) in critical functions - ⬜ Pending
 
 ---
 
@@ -271,17 +277,22 @@ js/
 
 ---
 
-## 4. Phase 1: Foundation (PRs 1-4)
+## 4. Phase 1: Foundation (PRs 1-4) ✅ COMPLETE
 
 **Goal:** Fix critical blockers and establish infrastructure for further refactoring.
 
+**Status:** ✅ All PRs merged
+**Completed:** 2026-01-04
+
 ---
 
-### PR 1: Create shared/gameMode.js (Fix Circular Dependency)
+### PR 1: Create shared/gameMode.js (Fix Circular Dependency) ✅
 
 **Priority:** P0 - CRITICAL
 **Estimated Diff:** ~80 LOC
+**Actual:** 89 LOC
 **Risk:** Low
+**Status:** ✅ COMPLETE
 
 **Problem:**
 ```javascript
@@ -346,19 +357,21 @@ export function getHumanPlayers() {
 ```
 
 **Acceptance Criteria:**
-- [ ] No circular dependency warning in console
-- [ ] `isAIPlayer()` works identically to before
-- [ ] `isSpectatorMode()` works identically to before
-- [ ] All existing tests pass
-- [ ] Game runs without errors
+- [x] No circular dependency warning in console
+- [x] `isAIPlayer()` works identically to before
+- [x] `isSpectatorMode()` works identically to before
+- [x] All existing tests pass
+- [x] Game runs without errors
 
 ---
 
-### PR 2: Create Directory Structure
+### PR 2: Create Directory Structure ✅
 
 **Priority:** P0
 **Estimated Diff:** ~20 LOC (index files only)
+**Actual:** 24 LOC
 **Risk:** Very Low
+**Status:** ✅ COMPLETE
 
 **Create directories and index files:**
 
@@ -387,18 +400,20 @@ export * from '../state.js';
 ```
 
 **Acceptance Criteria:**
-- [ ] All directories created
-- [ ] Index files provide backward-compatible exports
-- [ ] No import errors
-- [ ] All tests pass
+- [x] All directories created
+- [x] Index files provide backward-compatible exports
+- [x] No import errors
+- [x] All tests pass
 
 ---
 
-### PR 3: Extract core/cameraState.js from state.js
+### PR 3: Extract core/cameraState.js from state.js ✅
 
 **Priority:** P0
 **Estimated Diff:** ~150 LOC
+**Actual:** 97 LOC
 **Risk:** Low
+**Status:** ✅ COMPLETE
 
 **Functions to Extract (from state.js lines 6-52):**
 
@@ -428,18 +443,20 @@ export * from './core/cameraState.js';
 ```
 
 **Acceptance Criteria:**
-- [ ] Camera functions work identically
-- [ ] All zoom/pan operations work
-- [ ] Existing imports don't break
-- [ ] Tests pass
+- [x] Camera functions work identically
+- [x] All zoom/pan operations work
+- [x] Existing imports don't break
+- [x] Tests pass
 
 ---
 
-### PR 4: Extract core/hexState.js from state.js
+### PR 4: Extract core/hexState.js from state.js ✅
 
 **Priority:** P0
 **Estimated Diff:** ~120 LOC
+**Actual:** 71 LOC
 **Risk:** Low
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 
@@ -451,22 +468,32 @@ export function setHex(hex) { ... }
 ```
 
 **Acceptance Criteria:**
-- [ ] `getHex()` and `setHex()` work identically
-- [ ] Map generation works
-- [ ] Pathfinding works
-- [ ] Tests pass
+- [x] `getHex()` and `setHex()` work identically
+- [x] Map generation works
+- [x] Pathfinding works
+- [x] Tests pass
 
 ---
 
-## 5. Phase 2: State Decomposition (PRs 5-12)
+## 5. Phase 2: State Decomposition (PRs 5-12) ✅ COMPLETE
 
 **Goal:** Split the state.js god object into focused modules.
 
+**Status:** ✅ PRs 5-11 merged (PR 12 deferred to later phase)
+**Completed:** 2026-01-04
+**Results:**
+- state.js reduced from 1,496 LOC → 1,301 LOC (-195 LOC)
+- Created 5 core modules: cameraState, hexState, unitState, visibilityState, zoneState
+- Created 5 combat modules: ambushSystem, overwatchSystem, suppressionSystem, coordinatedAttack, holdPosition
+- All 270 tests passing
+
 ---
 
-### PR 5: Extract core/unitState.js
+### PR 5: Extract core/unitState.js ✅
 
 **Estimated Diff:** ~180 LOC
+**Actual:** 118 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -479,9 +506,11 @@ export function trackUnitAttack(unit) { ... }
 
 ---
 
-### PR 6: Extract core/visibilityState.js
+### PR 6: Extract core/visibilityState.js ✅
 
 **Estimated Diff:** ~150 LOC
+**Actual:** 70 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -494,9 +523,11 @@ export function switchPlayerFog() { ... }
 
 ---
 
-### PR 7: Extract core/zoneState.js
+### PR 7: Extract core/zoneState.js ✅
 
 **Estimated Diff:** ~80 LOC
+**Actual:** 37 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -506,9 +537,11 @@ export function isHexInZone(q, r) { ... }
 
 ---
 
-### PR 8: Extract combat/ambushSystem.js
+### PR 8: Extract combat/ambushSystem.js ✅
 
 **Estimated Diff:** ~100 LOC
+**Actual:** 43 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -520,9 +553,11 @@ export function clearAmbushQueue() { ... }
 
 ---
 
-### PR 9: Extract combat/overwatchSystem.js
+### PR 9: Extract combat/overwatchSystem.js ✅
 
 **Estimated Diff:** ~120 LOC
+**Actual:** 77 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -537,9 +572,11 @@ export function hasQueuedOverwatch() { ... }
 
 ---
 
-### PR 10: Extract combat/suppressionSystem.js
+### PR 10: Extract combat/suppressionSystem.js ✅
 
 **Estimated Diff:** ~100 LOC
+**Actual:** 83 LOC
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -552,9 +589,11 @@ export function isHexSuppressedForUnit(q, r, unit) { ... }
 
 ---
 
-### PR 11: Extract combat/coordinatedAttack.js & holdPosition.js
+### PR 11: Extract combat/coordinatedAttack.js & holdPosition.js ✅
 
 **Estimated Diff:** ~180 LOC
+**Actual:** 112 LOC (55 + 57)
+**Status:** ✅ COMPLETE
 
 **Functions to Extract:**
 ```javascript
@@ -1030,15 +1069,15 @@ If multiple PRs cause issues:
 
 ### 12.1 Quantitative Goals
 
-| Metric | Before | After | Status |
-|--------|--------|-------|--------|
-| Files > 300 LOC | 11 | 0 | ⬜ |
-| Functions > 40 LOC | 20+ | 0 | ⬜ |
-| Circular dependencies | 1 | 0 | ⬜ |
-| Max nesting depth | 5+ | 3 | ⬜ |
-| state.js exports | 93 | <20 | ⬜ |
-| render() LOC | 775 | <150 | ⬜ |
-| performUnitAI() LOC | 246 | <50 | ⬜ |
+| Metric | Before | Current | Target | Status |
+|--------|--------|---------|--------|--------|
+| Files > 300 LOC | 11 | 10 | 0 | 🟡 In Progress |
+| Functions > 40 LOC | 20+ | 20+ | 0 | ⬜ Pending |
+| Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
+| Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
+| state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
+| render() LOC | 775 | 775 | <150 | ⬜ Phase 3 |
+| performUnitAI() LOC | 246 | 246 | <50 | ⬜ Phase 4 |
 
 ### 12.2 Qualitative Goals
 
