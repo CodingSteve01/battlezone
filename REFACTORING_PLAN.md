@@ -1,6 +1,6 @@
 # Shadow Squad Refactoring Plan
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Created:** 2026-01-04
 **Last Updated:** 2026-01-04
 **Status:** In Progress - Phase 3
@@ -20,7 +20,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
 | state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
-| renderer.js LOC | 6,053 | 4,422 | <300 | 🟡 -1,631 LOC (-27%) |
+| renderer.js LOC | 6,053 | 4,017 | <300 | 🟡 -2,036 LOC (-34%) |
 
 ### Progress Summary
 
@@ -32,7 +32,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 ### Key Violations (Updated)
 
 1. **ai.js** (6,272 LOC) - 🔴 20x over file limit
-2. **renderer.js** (6,053 LOC) - 🔴 20x over file limit
+2. **renderer.js** (4,017 LOC) - 🔴 13x over file limit (was 6,053, -34%)
 3. **state.js** (1,301 LOC) - 🟡 4x over (was 1,496 LOC, -195 LOC)
 4. **Circular dependency** between ai.js ↔ renderer.js - ✅ FIXED
 5. **Deep nesting** (4-5 levels) in critical functions - ⬜ Pending
@@ -656,14 +656,15 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PRs 13-17 complete, PR 18 pending
+**Status:** 🟡 PRs 13-17 complete, PR 14a (vegetation) complete, PR 18 pending
 **Progress:**
-- renderer.js: 6,053 → 4,422 LOC (-1,631 LOC, -27%)
+- renderer.js: 6,053 → 4,017 LOC (-2,036 LOC, -34%)
 - minimapRenderer.js: 707 LOC ✅
 - unitRenderer.js: 495 LOC ✅
 - effectsRenderer.js: 441 LOC ✅ (height/lighting effects)
 - uiRenderer.js: 175 LOC ✅ (UI overlay elements)
 - renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
+- vegetationRenderer.js: 491 LOC ✅ (biome trees, bushes, rocks)
 
 ---
 
@@ -684,16 +685,35 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-### PR 14: Extract rendering/terrainRenderer.js
+### PR 14a: Extract rendering/vegetationRenderer.js ✅
 
-**Estimated Diff:** ~400 LOC (may split)
+**Estimated Diff:** ~400 LOC
+**Actual:** 491 LOC
+**Status:** ✅ COMPLETE
+
+**Functions Extracted:**
+- `TREE_TYPE_NAMES`, `getBiomeTreePool()`, `pickTreeTypeForBiome()`
+- `getTreeDetailType()`, `getSpriteBounds()`, `getTreeSpriteBounds()`
+- `getBushSpriteBounds()`, `getShrubSpriteBounds()`, `getRockBounds()`
+- `getElementBounds()` - unified bounds calculation for all vegetation
+- `drawTree2D5()`, `drawBush2D5()`, `drawSmallShrub()`
+- `drawFlowerCluster()`, `drawRockFormation2D5()`
+- `applyBiomeVegetationTint()` - biome-specific color tinting
+
+**Note:** Split PR 14 into vegetation (14a) and terrain caching (14b) to stay under 400 LOC diff.
+
+---
+
+### PR 14b: Extract terrain caching (PENDING)
+
+**Estimated Diff:** ~350 LOC
 
 **Functions to Extract:**
 - `drawHexToContext()`
 - `getCachedHexTile()`
-- `drawTerrainDetails()`
-- `drawTree2D5()`, `drawBush2D5()`, etc.
-- Terrain-specific drawing helpers
+- `createHexTileCanvas()`
+- `shouldSkipCache()`
+- Hex tile caching system
 
 ---
 
