@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.4...shadow-squad-v6.6.5) (2026-01-04)
+
+
+### Documentation
+
+* **manifest:** align agent docs to English manifest ([#360](https://github.com/CodingSteve01/battlezone/issues/360)) ([167684f](https://github.com/CodingSteve01/battlezone/commit/167684f837ad299543f592d9555ea1b8620a6f47))
+
 ## [6.6.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.3...shadow-squad-v6.6.4) (2026-01-04)
 
 
