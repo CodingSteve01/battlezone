@@ -1,27 +1,19 @@
 // ===== CANVAS RENDERING =====
 
-import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition, arePlayersAllied } from './state.js';
+import { CONFIG, TERRAIN } from './config.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileScreenPosition } from './state.js';
 import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
+import { getFogLevel, isUnitVisibleToViewer, updateVisibilityForPlayer } from './fogOfWar.js';
 import { isSpectatorMode, isAIPlayer } from './shared/gameMode.js';
 import {
-    getTexture,
-    drawUnit as drawUnitSprite,
-    getRandomDetailSprite,
-    getRandomDetailSpriteWithAnchor,
     getShorelineSprite,
     getShorelineVariantCount,
-    hasAnimatedTexture,
-    getAnimatedTexture,
-    getTerrainTileInfo,
-    hasIsometricTiles
+    getTerrainTileInfo
 } from './assetLoader.js';
-import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
+import { getPowerupAt } from './powerups.js';
 import { getCurrentEvent } from './events.js';
-import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { logRender, logError, logEntry } from './errorLog.js';
 import {
@@ -118,10 +110,8 @@ import {
 } from './rendering/hexCacheRenderer.js';
 import {
     renderBackground,
-    collectVisibleHexData,
     drawZoneDangerOverlay,
     drawZoneWarningBorder,
-    getMovementRangeColors,
     drawMovementRangeHighlight,
     drawAttackLine,
     drawAttackRangeIndicator,
