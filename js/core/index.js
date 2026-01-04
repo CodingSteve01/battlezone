@@ -1,6 +1,11 @@
 // ===== CORE STATE MODULES INDEX =====
 // Re-exports for backward compatibility during refactoring
-// This file will grow as state.js is decomposed
 
-// For now, re-export everything from state.js
+export * from './cameraState.js';
+export * from './hexState.js';
+export * from './unitState.js';
+export * from './visibilityState.js';
+export * from './zoneState.js';
+
+// Also re-export main state for convenience
 export * from '../state.js';

@@ -1,5 +1,8 @@
 // ===== COMBAT MODULES INDEX =====
 // Re-exports for convenient importing
-// This file will grow as combat systems are extracted
 
-// Placeholder - modules will be added as they are extracted
+export * from './ambushSystem.js';
+export * from './overwatchSystem.js';
+export * from './suppressionSystem.js';
+export * from './coordinatedAttack.js';
+export * from './holdPosition.js';
