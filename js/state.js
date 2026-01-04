@@ -1,53 +1,52 @@
 // ===== GAME STATE =====
 
 import { CONFIG } from './config.js';
-import { hexToPixel } from './hexMath.js';
 
-export const ZOOM_REFERENCE = 0.45;
+// Re-export camera functions from core module (for backward compatibility)
+export {
+    ZOOM_REFERENCE,
+    zoomLevelToScale,
+    scaleToZoomLevel,
+    getTileScale,
+    getTileSizeForHexSize,
+    DEFAULT_MIN_ZOOM,
+    DEFAULT_MAX_ZOOM
+} from './core/cameraState.js';
 
-export function zoomLevelToScale(zoomLevel) {
-    const safeZoom = Number.isFinite(zoomLevel) ? zoomLevel : ZOOM_REFERENCE;
-    return safeZoom / ZOOM_REFERENCE;
-}
+// Import for local use in state object initialization
+import {
+    ZOOM_REFERENCE,
+    DEFAULT_MIN_ZOOM,
+    DEFAULT_MAX_ZOOM,
+    getTileZOffset as _getTileZOffset,
+    getTileScreenPosition as _getTileScreenPosition,
+    getWorldScale as _getWorldScale,
+    getTileSize as _getTileSize
+} from './core/cameraState.js';
 
-export function scaleToZoomLevel(scale) {
-    const safeScale = Number.isFinite(scale) ? scale : 1;
-    return safeScale * ZOOM_REFERENCE;
-}
+// Import hex state functions
+import {
+    getHex as _getHex,
+    setHex as _setHex,
+    getPlayerName as _getPlayerName
+} from './core/hexState.js';
 
+// Wrapper functions that pass state automatically (backward compatibility)
 export function getWorldScale() {
-    const baseSize = CONFIG.BASE_HEX_SIZE * CONFIG.HEX_SIZE_SCALE;
-    const scale = baseSize > 0 ? state.hexSize / baseSize : 1;
-    return Number.isFinite(scale) && scale > 0 ? scale : 1;
-}
-
-export function getTileScale() {
-    const scale = Number.isFinite(CONFIG.TILE_SCALE) && CONFIG.TILE_SCALE > 0 ? CONFIG.TILE_SCALE : 1;
-    return scale;
+    return _getWorldScale(state);
 }
 
 export function getTileSize() {
-    return state.hexSize * getTileScale();
-}
-
-export function getTileSizeForHexSize(hexSize) {
-    const baseSize = Number.isFinite(hexSize) && hexSize > 0 ? hexSize : CONFIG.BASE_HEX_SIZE;
-    return baseSize * getTileScale();
+    return _getTileSize(state);
 }
 
 export function getTileZOffset(height, hexSize = getTileSize()) {
-    const level = Math.max(0, height ?? 0);
-    return level * hexSize * 0.18;
+    return _getTileZOffset(height, hexSize);
 }
 
 export function getTileScreenPosition(q, r, height, hexSize = getTileSize()) {
-    const pos = hexToPixel(q, r, hexSize);
-    const zOffset = getTileZOffset(height, hexSize);
-    return { x: pos.x, y: pos.y - zOffset, zOffset };
+    return _getTileScreenPosition(q, r, height, hexSize);
 }
-
-const DEFAULT_MIN_ZOOM = scaleToZoomLevel(0.6);  // Minimum 60% zoom - lower values cause performance issues
-const DEFAULT_MAX_ZOOM = scaleToZoomLevel(1.2);
 
 // Central game state object
 export const state = {
@@ -220,36 +219,17 @@ export const state = {
     }
 };
 
-/**
- * Get hex at coordinates
- */
+// Hex state wrapper functions (backward compatibility)
 export function getHex(q, r) {
-    return state.hexMap.get(`${q},${r}`);
+    return _getHex(state, q, r);
 }
 
-/**
- * Get player name (uses custom name or falls back to default)
- */
 export function getPlayerName(playerIndex) {
-    if (state.settings.playerNames && state.settings.playerNames[playerIndex]) {
-        return state.settings.playerNames[playerIndex];
-    }
-    return `Spieler ${playerIndex + 1}`;
+    return _getPlayerName(state, playerIndex);
 }
 
-/**
- * Set hex at coordinates
- */
 export function setHex(hex) {
-    const key = `${hex.q},${hex.r}`;
-    state.hexMap.set(key, hex);
-
-    const idx = state.hexes.findIndex(h => h.q === hex.q && h.r === hex.r);
-    if (idx >= 0) {
-        state.hexes[idx] = hex;
-    } else {
-        state.hexes.push(hex);
-    }
+    return _setHex(state, hex);
 }
 
 /**

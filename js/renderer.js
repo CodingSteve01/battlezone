@@ -6,7 +6,7 @@ import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
 import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
-import { isSpectatorMode } from './ai.js';
+import { isSpectatorMode, isAIPlayer } from './shared/gameMode.js';
 import {
     getTexture,
     drawUnit as drawUnitSprite,
@@ -23,7 +23,6 @@ import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
 import { getCurrentEvent } from './events.js';
 import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
-import { isAIPlayer } from './ai.js';
 import { logRender, logError, logEntry } from './errorLog.js';
 
 // ===== SAFE GRADIENT HELPERS =====
