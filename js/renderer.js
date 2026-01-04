@@ -65,6 +65,26 @@ import {
     drawCamouflagePattern as drawCamouflagePatternFromModule,
     getStealthVisibilityAlpha as getStealthVisibilityAlphaFromModule
 } from './rendering/unitRenderer.js';
+import {
+    initEffectsRenderer,
+    drawHexPath as drawHexPathFromModule,
+    getHeightShadeStyle as getHeightShadeStyleFromModule,
+    drawHeightShading as drawHeightShadingFromModule,
+    getLightVector as getLightVectorFromModule,
+    getViewVector as getViewVectorFromModule,
+    isEdgeFacingViewer as isEdgeFacingViewerFromModule,
+    getShadowOffset as getShadowOffsetFromModule,
+    drawHeightExtrusion as drawHeightExtrusionFromModule,
+    getBaseSkirtDepth as getBaseSkirtDepthFromModule,
+    getSkirtFillColor as getSkirtFillColorFromModule,
+    drawBaseSkirt as drawBaseSkirtFromModule,
+    shouldRenderBaseSkirt as shouldRenderBaseSkirtFromModule,
+    drawCliffFaces as drawCliffFacesFromModule,
+    drawHeightShadow as drawHeightShadowFromModule,
+    applyTileLighting as applyTileLightingFromModule,
+    drawSpriteShadow as drawSpriteShadowFromModule,
+    drawHeightDebugOverlay as drawHeightDebugOverlayFromModule
+} from './rendering/effectsRenderer.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -109,6 +129,46 @@ export {
     getStealthVisibilityAlphaFromModule as getStealthVisibilityAlpha
 };
 
+// Re-export effects renderer functions for backward compatibility
+export {
+    drawHexPathFromModule as drawHexPath,
+    getHeightShadeStyleFromModule as getHeightShadeStyle,
+    drawHeightShadingFromModule as drawHeightShading,
+    getLightVectorFromModule as getLightVector,
+    getViewVectorFromModule as getViewVector,
+    isEdgeFacingViewerFromModule as isEdgeFacingViewer,
+    getShadowOffsetFromModule as getShadowOffset,
+    drawHeightExtrusionFromModule as drawHeightExtrusion,
+    getBaseSkirtDepthFromModule as getBaseSkirtDepth,
+    getSkirtFillColorFromModule as getSkirtFillColor,
+    drawBaseSkirtFromModule as drawBaseSkirt,
+    shouldRenderBaseSkirtFromModule as shouldRenderBaseSkirt,
+    drawCliffFacesFromModule as drawCliffFaces,
+    drawHeightShadowFromModule as drawHeightShadow,
+    applyTileLightingFromModule as applyTileLighting,
+    drawSpriteShadowFromModule as drawSpriteShadow,
+    drawHeightDebugOverlayFromModule as drawHeightDebugOverlay
+};
+
+// Local aliases for internal use
+const drawHexPath = drawHexPathFromModule;
+const getHeightShadeStyle = getHeightShadeStyleFromModule;
+const drawHeightShading = drawHeightShadingFromModule;
+const getLightVector = getLightVectorFromModule;
+const getViewVector = getViewVectorFromModule;
+const isEdgeFacingViewer = isEdgeFacingViewerFromModule;
+const getShadowOffset = getShadowOffsetFromModule;
+const drawHeightExtrusion = drawHeightExtrusionFromModule;
+const getBaseSkirtDepth = getBaseSkirtDepthFromModule;
+const getSkirtFillColor = getSkirtFillColorFromModule;
+const drawBaseSkirt = drawBaseSkirtFromModule;
+const shouldRenderBaseSkirt = shouldRenderBaseSkirtFromModule;
+const drawCliffFaces = drawCliffFacesFromModule;
+const drawHeightShadow = drawHeightShadowFromModule;
+const applyTileLighting = applyTileLightingFromModule;
+const drawSpriteShadow = drawSpriteShadowFromModule;
+const drawHeightDebugOverlay = drawHeightDebugOverlayFromModule;
+
 // ===== CLIFF TEXTURE CACHE =====
 
 function getCliffTextureCanvas(terrainType) {
@@ -152,311 +212,6 @@ function getCliffTextureCanvas(terrainType) {
     textureCtx.globalAlpha = 1;
     cliffTextureCache.set(terrainType, canvas);
     return canvas;
-}
-
-const HEIGHT_SHADE_COLORS = [
-    { color: 'rgba(30, 58, 95, 0.12)', text: '#93c5fd' },  // Level 0: cool shadow
-    { color: 'rgba(0, 0, 0, 0)', text: '#d1d5db' },        // Level 1: neutral
-    { color: 'rgba(254, 240, 200, 0.12)', text: '#fde68a' }, // Level 2: warm highlight
-    { color: 'rgba(253, 224, 160, 0.18)', text: '#fbbf24' }  // Level 3: bright highlight
-];
-
-function getHeightShadeStyle(height) {
-    const index = Math.max(0, Math.min(HEIGHT_SHADE_COLORS.length - 1, height ?? 0));
-    return HEIGHT_SHADE_COLORS[index];
-}
-
-function drawHeightShading(cx, cy, size, height) {
-    const style = getHeightShadeStyle(height);
-    if (!style || style.color === 'rgba(0, 0, 0, 0)') return;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size);
-    ctx.fillStyle = style.color;
-    ctx.fill();
-    ctx.restore();
-}
-
-function getLightVector() {
-    const dir = CONFIG.LIGHTING?.DIRECTION || { x: -0.6, y: -1.0 };
-    const length = Math.hypot(dir.x, dir.y) || 1;
-    return { x: dir.x / length, y: dir.y / length };
-}
-
-function getViewVector() {
-    const light = getLightVector();
-    const length = Math.hypot(light.x, light.y) || 1;
-    return { x: -light.x / length, y: -light.y / length };
-}
-
-function isEdgeFacingViewer(direction, viewDir) {
-    const faceAngle = (Math.PI / 3) * direction + Math.PI / 6;
-    const faceDirX = Math.cos(faceAngle);
-    const faceDirY = Math.sin(faceAngle);
-    const dot = faceDirX * viewDir.x + faceDirY * viewDir.y;
-    return dot > 0;
-}
-
-function getShadowOffset(height, size) {
-    const lightHeight = CONFIG.LIGHTING?.HEIGHT ?? 1.2;
-    const zOffset = getTileZOffset(height, size);
-    return zOffset * (0.6 + lightHeight * 0.4);
-}
-
-function drawHeightExtrusion(cx, cy, size, height, terrainType, fogLevel) {
-    const offset = getTileZOffset(height, size);
-    if (offset <= 0) return;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy + offset, size);
-    const fillColor = getSkirtFillColor(terrainType, fogLevel);
-    ctx.fillStyle = fillColor;
-    ctx.globalAlpha = fogLevel === 'visible' ? 0.85 : 1;
-    ctx.fill();
-    ctx.restore();
-}
-
-const MIN_SKIRT_PIXELS = 20;
-
-function getBaseSkirtDepth(size) {
-    return Math.max(MIN_SKIRT_PIXELS, size * 0.2);
-}
-
-function getSkirtFillColor(terrainType, fogLevel) {
-    const terrain = TERRAIN[terrainType];
-    const baseColor = terrain?.colorDark || terrain?.color || '#2f3b2e';
-
-    if (fogLevel === 'hidden') {
-        // Very dark for unexplored areas (shadow) - ~88% darkening (2x darker than before)
-        return desaturateAndDarken(baseColor, 0.3, 0.12);
-    }
-
-    if (fogLevel === 'explored') {
-        // Dark for explored but not visible (same as old hidden) - ~75% darkening
-        return desaturateAndDarken(baseColor, 0.4, 0.25);
-    }
-
-    return desaturateAndDarken(baseColor, 0.7, 0.75);
-}
-
-function drawBaseSkirt(cx, cy, size, terrainType, fogLevel) {
-    const baseDepth = getBaseSkirtDepth(size);
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy + baseDepth, size);
-    ctx.fillStyle = getSkirtFillColor(terrainType, fogLevel);
-    ctx.fill();
-    ctx.restore();
-}
-
-function shouldRenderBaseSkirt(hex) {
-    const neighbors = getNeighbors(hex.q, hex.r);
-    const forwardDirections = [0, 4, 5];
-    const myHeight = hex.height ?? 0;
-
-    return forwardDirections.some(direction => {
-        const neighbor = neighbors[direction];
-        if (!neighbor) return true;
-        const neighborHex = getHex(neighbor.q, neighbor.r);
-        if (!neighborHex) return true;
-        const neighborHeight = neighborHex.height ?? 0;
-        return neighborHeight !== myHeight;
-    });
-}
-
-/**
- * Draw cliff/slope faces between tiles of different heights
- * Creates realistic earth/ground appearance with gradient shading
- * for natural-looking height transitions
- */
-function drawCliffFaces(cx, cy, size, hex, fogLevel) {
-    if (!hex || hex.height === undefined) return;
-
-    const myHeight = hex.height ?? 0;
-    if (myHeight === 0) return; // No cliff faces for ground-level tiles
-
-    const neighbors = getNeighbors(hex.q, hex.r);
-    const light = getLightVector();
-    const viewDir = getViewVector();
-    const terrain = TERRAIN[hex.type];
-
-    const baseColor = terrain?.color || '#6a9a58';
-
-    // Draw cliff face for each neighbor that's lower than this hex
-    neighbors.forEach((neighbor, direction) => {
-        if (!isEdgeFacingViewer(direction, viewDir)) return;
-        const neighborHex = getHex(neighbor.q, neighbor.r);
-
-        const neighborHeight = neighborHex?.height ?? 0;
-        const heightDiff = myHeight - neighborHeight;
-
-        if (heightDiff <= 0) return; // Only draw cliff if we're higher
-
-        // Calculate the cliff face positions
-        // Direction 0 = right, incrementing clockwise
-        const angle1 = (Math.PI / 3) * direction;
-        const angle2 = (Math.PI / 3) * ((direction + 1) % 6);
-
-        const myOffset = getTileZOffset(myHeight, size);
-        const neighborOffset = getTileZOffset(neighborHeight, size);
-        const faceHeight = myOffset - neighborOffset;
-
-        // Points on this hex's edge (top of cliff)
-        const topX1 = cx + size * Math.cos(angle1);
-        const topY1 = cy + size * Math.sin(angle1);
-        const topX2 = cx + size * Math.cos(angle2);
-        const topY2 = cy + size * Math.sin(angle2);
-
-        // Points at bottom of cliff (aligned with lower neighbor)
-        const bottomX1 = topX1;
-        const bottomY1 = topY1 + faceHeight;
-        const bottomX2 = topX2;
-        const bottomY2 = topY2 + faceHeight;
-
-        // Calculate lighting based on face direction
-        const faceAngle = angle1 + Math.PI / 6;
-        const faceDirX = Math.cos(faceAngle);
-        const faceDirY = Math.sin(faceAngle);
-        const lightDot = -(faceDirX * light.x + faceDirY * light.y);
-        const lightFactor = Math.max(0.3, 0.6 + lightDot * 0.4);
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(topX1, topY1);
-        ctx.lineTo(topX2, topY2);
-        ctx.lineTo(bottomX2, bottomY2);
-        ctx.lineTo(bottomX1, bottomY1);
-        ctx.closePath();
-
-        // Create gradient from top (lighter) to bottom (darker) for depth
-        const midX = (topX1 + topX2 + bottomX1 + bottomX2) / 4;
-        const topY = Math.min(topY1, topY2);
-        const bottomY = Math.max(bottomY1, bottomY2);
-
-        // Adjust brightness based on fog level (shadow effect)
-        let fogBrightnessFactor = 1.0;
-        if (fogLevel === 'hidden') {
-            fogBrightnessFactor = 0.12;  // Very dark for unexplored areas (shadow) - 2x darker
-        } else if (fogLevel === 'explored') {
-            fogBrightnessFactor = 0.25;  // Dark for explored but not visible (same as old hidden)
-        }
-
-        const gradient = safeLinearGradient(ctx, midX, topY, midX, bottomY, desaturateAndDarken(baseColor, 0.5, 0.5 * fogBrightnessFactor));
-        if (typeof gradient !== 'string') {
-            // Top edge: slightly lighter (edge highlight)
-            gradient.addColorStop(0, desaturateAndDarken(baseColor, 0.4, 0.65 * lightFactor * fogBrightnessFactor));
-            // Middle: earth tone
-            gradient.addColorStop(0.4, desaturateAndDarken(baseColor, 0.55, 0.5 * lightFactor * fogBrightnessFactor));
-            // Bottom: darker shadow
-            gradient.addColorStop(1, desaturateAndDarken(baseColor, 0.7, 0.35 * lightFactor * fogBrightnessFactor));
-        }
-
-        ctx.fillStyle = gradient;
-        ctx.fill();
-
-        // Add subtle top edge highlight for definition (only for visible/explored)
-        if (fogLevel !== 'hidden') {
-            ctx.beginPath();
-            ctx.moveTo(topX1, topY1);
-            ctx.lineTo(topX2, topY2);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 * lightFactor * fogBrightnessFactor})`;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-
-        ctx.restore();
-    });
-}
-
-function drawHeightShadow(cx, cy, size, height) {
-    const offset = getShadowOffset(height, size);
-    if (offset <= 0) return;
-
-    const light = getLightVector();
-    ctx.save();
-    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
-    ctx.beginPath();
-    drawHexPath(cx + light.x * offset, cy + light.y * offset + offset * 0.35, size * 0.98);
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
-    ctx.fill();
-    ctx.restore();
-}
-
-function applyTileLighting(cx, cy, size, height) {
-    if (!height) return;
-    const light = getLightVector();
-    // Reduced strength for subtler lighting that doesn't create harsh triangular artifacts
-    const strength = (CONFIG.LIGHTING?.HIGHLIGHT_STRENGTH ?? 0.18) * 0.5;
-
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size);
-    ctx.clip();
-
-    // Use radial gradient centered on hex for smoother appearance
-    const grad = safeRadialGradient(
-        ctx,
-        cx - light.x * size * 0.3,
-        cy - light.y * size * 0.3,
-        0,
-        cx,
-        cy,
-        size,
-        'transparent'
-    );
-
-    if (typeof grad !== 'string') {
-        grad.addColorStop(0, `rgba(255, 255, 255, ${strength})`);
-        grad.addColorStop(0.5, `rgba(255, 255, 255, ${strength * 0.3})`);
-        grad.addColorStop(1, 'transparent');
-    }
-
-    // Use soft-light for gentler blending that doesn't create harsh edges
-    ctx.globalCompositeOperation = 'soft-light';
-    ctx.fillStyle = grad;
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawSpriteShadow(x, y, width, height, heightLevel = 1) {
-    const light = getLightVector();
-    const shadowOffset = getShadowOffset(heightLevel, width * 0.25);
-    ctx.save();
-    ctx.globalAlpha = CONFIG.LIGHTING?.SHADOW_STRENGTH ?? 0.25;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.5)';
-    ctx.beginPath();
-    // Draw shadow as an ellipse at the base of the sprite
-    // Width scaled down to match base of tree/object, not full sprite width
-    ctx.ellipse(
-        x + light.x * shadowOffset * 0.6,
-        y + light.y * shadowOffset * 0.6 + height * 0.05,  // Closer to ground
-        width * 0.2,   // Narrower shadow for more realistic base
-        height * 0.08, // Shorter shadow height
-        0,
-        0,
-        Math.PI * 2
-    );
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawHeightDebugOverlay(cx, cy, size, height) {
-    const style = getHeightShadeStyle(height);
-    ctx.save();
-    ctx.beginPath();
-    drawHexPath(cx, cy, size * 0.55);
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
-    ctx.fill();
-
-    ctx.fillStyle = style.text;
-    ctx.font = `bold ${Math.round(size * 0.32)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${height ?? 0}`, cx, cy);
-    ctx.restore();
 }
 
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
@@ -2345,6 +2100,7 @@ export async function initRenderer() {
     initTerrainRenderer(ctx);
     initMinimapRenderer(ctx);
     initUnitRenderer(ctx);
+    initEffectsRenderer(ctx);
 
     // Mark textures as initialized (now handled by assetLoader)
     texturesInitialized = true;
@@ -2485,23 +2241,6 @@ export function resizeCanvas() {
     }
 
     render();
-}
-
-/**
- * Draw a hexagon with optional texture and 3D effect
- */
-/**
- * Draw just the hex path (for stroking)
- */
-function drawHexPath(cx, cy, size) {
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
 }
 
 /**

@@ -5,3 +5,4 @@
 export * from './minimapRenderer.js';
 export * from './renderUtils.js';
 export * from './unitRenderer.js';
+export * from './effectsRenderer.js';
