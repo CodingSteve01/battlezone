@@ -94,17 +94,8 @@ import {
 } from './rendering/uiRenderer.js';
 import {
     initVegetationRenderer,
-    TREE_TYPE_NAMES,
-    getBiomeTreePool,
     pickTreeTypeForBiome,
-    getTreeDetailType,
-    getSpriteBounds,
-    getTreeSpriteBounds,
-    getBushSpriteBounds,
-    getShrubSpriteBounds,
-    getRockBounds,
     getElementBounds,
-    applyBiomeVegetationTint,
     drawTree2D5,
     drawBush2D5,
     drawSmallShrub,
