@@ -153,7 +153,7 @@ export function updatePlayersAlive() {
 function updateTopBar(unit, isAiTurnHidden = false) {
     const nameEl = document.getElementById('current-name');
     if (nameEl) {
-        nameEl.textContent = isAiTurnHidden ? 'KI am Zug' : getPlayerName(state.currentPlayer);
+        nameEl.textContent = getPlayerName(state.currentPlayer);
     }
 
     // AP display - shows shared pool
