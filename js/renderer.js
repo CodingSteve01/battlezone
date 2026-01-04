@@ -37,6 +37,20 @@ import {
     getHeightOverlayButtonBounds,
     getCloseButtonBounds
 } from './rendering/minimapRenderer.js';
+import {
+    seededRandom,
+    areValuesFinite,
+    safeRadialGradient,
+    safeLinearGradient,
+    getClampedContentScale,
+    getSpriteDimensions,
+    getHexColorLuminance,
+    getUnitOutlineColor,
+    WATER_TYPES,
+    SWAMP_TYPES,
+    isLandForWater,
+    isLandForSwamp
+} from './rendering/renderUtils.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -50,52 +64,23 @@ export {
     getCloseButtonBounds
 };
 
-// ===== SAFE GRADIENT HELPERS =====
-// Prevents "non-finite value" errors when coordinates are NaN/Infinity
+// Re-export render utilities for backward compatibility
+export {
+    seededRandom,
+    areValuesFinite,
+    safeRadialGradient,
+    safeLinearGradient,
+    getClampedContentScale,
+    getSpriteDimensions,
+    getHexColorLuminance,
+    getUnitOutlineColor,
+    WATER_TYPES,
+    SWAMP_TYPES,
+    isLandForWater,
+    isLandForSwamp
+};
 
-/**
- * Check if all values are finite numbers
- */
-function areValuesFinite(...values) {
-    return values.every(v => Number.isFinite(v));
-}
-
-/**
- * Create a radial gradient safely, returning a fallback color if values are invalid
- */
-function safeRadialGradient(ctx, x0, y0, r0, x1, y1, r1, fallbackColor = 'transparent') {
-    if (!areValuesFinite(x0, y0, r0, x1, y1, r1) || r1 <= 0) {
-        return fallbackColor;
-    }
-    return ctx.createRadialGradient(x0, y0, r0, x1, y1, r1);
-}
-
-/**
- * Create a linear gradient safely, returning a fallback color if values are invalid
- */
-function safeLinearGradient(ctx, x0, y0, x1, y1, fallbackColor = 'transparent') {
-    if (!areValuesFinite(x0, y0, x1, y1)) {
-        return fallbackColor;
-    }
-    // Prevent zero-length gradients
-    if (x0 === x1 && y0 === y1) {
-        return fallbackColor;
-    }
-    return ctx.createLinearGradient(x0, y0, x1, y1);
-}
-
-function getHexColorLuminance(color) {
-    if (!color || color[0] !== '#' || color.length < 7) return 0.5;
-    const r = parseInt(color.slice(1, 3), 16) / 255;
-    const g = parseInt(color.slice(3, 5), 16) / 255;
-    const b = parseInt(color.slice(5, 7), 16) / 255;
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function getUnitOutlineColor(terrainColor) {
-    const luminance = getHexColorLuminance(terrainColor);
-    return luminance > 0.5 ? 'rgba(20, 25, 30, 0.8)' : 'rgba(240, 245, 250, 0.85)';
-}
+// ===== CLIFF TEXTURE CACHE =====
 
 function getCliffTextureCanvas(terrainType) {
     if (cliffTextureCache.has(terrainType)) {
@@ -448,11 +433,6 @@ function drawHeightDebugOverlay(cx, cy, size, height) {
 // ===== STUB FUNCTIONS FOR REMOVED MODULES =====
 // These replace the old procedural rendering with simple alternatives
 
-function seededRandom(seed) {
-    const x = Math.sin(seed * 12.9898 + seed * 78.233) * 43758.5453;
-    return x - Math.floor(x);
-}
-
 function animationTick() { /* no-op */ }
 
 /**
@@ -493,34 +473,6 @@ function buildVisibilityClearingMap(visibleUnits) {
     });
 
     return result;
-}
-
-const WATER_TYPES = new Set(['water', 'river', 'deepwater']);
-const SWAMP_TYPES = new Set(['swamp']);
-
-function getClampedContentScale(contentScale) {
-    const safeScaleX = contentScale.scaleX > 0 ? contentScale.scaleX : 1;
-    const safeScaleY = contentScale.scaleY > 0 ? contentScale.scaleY : 1;
-    const clampedScaleX = Math.min(safeScaleX, 1);
-    const clampedScaleY = Math.min(safeScaleY, 1);
-    return (clampedScaleX + clampedScaleY) / 2;
-}
-
-function getSpriteDimensions(sprite, contentScale, baseHeight) {
-    const avgScale = getClampedContentScale(contentScale);
-    const spriteHeight = baseHeight * avgScale;
-    const spriteWidth = spriteHeight * (sprite.width / sprite.height);
-    return { spriteWidth, spriteHeight };
-}
-
-function isLandForWater(type) {
-    if (!type) return false;
-    return !WATER_TYPES.has(type) && !SWAMP_TYPES.has(type);
-}
-
-function isLandForSwamp(type) {
-    if (!type) return false;
-    return !SWAMP_TYPES.has(type) && !WATER_TYPES.has(type);
 }
 
 function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains, hexQ, hexR) {
