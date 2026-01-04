@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.5...shadow-squad-v6.6.6) (2026-01-04)
+
+
+### Code Refactoring
+
+* **renderer:** extract vegetation rendering to dedicated module ([#363](https://github.com/CodingSteve01/battlezone/issues/363)) ([c15a4d1](https://github.com/CodingSteve01/battlezone/commit/c15a4d17b440276d5238dd9e4529ae855718a8d7))
+
 ## [6.6.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.4...shadow-squad-v6.6.5) (2026-01-04)
 
 
