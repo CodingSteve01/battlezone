@@ -1,27 +1,19 @@
 // ===== CANVAS RENDERING =====
 
-import { CONFIG, TERRAIN, UNIT_CLASSES } from './config.js';
-import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, getPlayerUnits, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileZOffset, getTileScreenPosition, arePlayersAllied } from './state.js';
+import { CONFIG, TERRAIN } from './config.js';
+import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, isHexInZone, updateScreenShake, zoomLevelToScale, scaleToZoomLevel, getTileSize, getTileScreenPosition } from './state.js';
 import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisible, isUnitVisibleToViewer, getEnemyCloakedVisibilityAlpha, updateVisibilityForPlayer } from './fogOfWar.js';
+import { getFogLevel, isUnitVisibleToViewer, updateVisibilityForPlayer } from './fogOfWar.js';
 import { isSpectatorMode, isAIPlayer } from './shared/gameMode.js';
 import {
-    getTexture,
-    drawUnit as drawUnitSprite,
-    getRandomDetailSprite,
-    getRandomDetailSpriteWithAnchor,
     getShorelineSprite,
     getShorelineVariantCount,
-    hasAnimatedTexture,
-    getAnimatedTexture,
-    getTerrainTileInfo,
-    hasIsometricTiles
+    getTerrainTileInfo
 } from './assetLoader.js';
-import { getPowerupAt, POWERUP_TYPES } from './powerups.js';
+import { getPowerupAt } from './powerups.js';
 import { getCurrentEvent } from './events.js';
-import { getRankName } from './progression.js';
 import { particles, updateParticles, drawParticles } from './particles.js';
 import { logRender, logError, logEntry } from './errorLog.js';
 import {
@@ -92,6 +84,40 @@ import {
     drawEventIndicator as drawEventIndicatorFromModule,
     drawZoomIndicator as drawZoomIndicatorFromModule
 } from './rendering/uiRenderer.js';
+import {
+    initVegetationRenderer,
+    pickTreeTypeForBiome,
+    getElementBounds,
+    drawTree2D5,
+    drawBush2D5,
+    drawSmallShrub,
+    drawFlowerCluster,
+    drawRockFormation2D5
+} from './rendering/vegetationRenderer.js';
+import {
+    CACHE_BASE_HEX_SIZE,
+    DETAIL_DENSITY_SCALE,
+    MAX_CACHE_SIZE,
+    hexTileCache,
+    foregroundCache,
+    clearRenderCaches,
+    getTerrainTexture,
+    shouldSkipCache,
+    getCachedHexTile,
+    createHexTileCanvas,
+    drawHexPathToContext,
+    drawHexToContext
+} from './rendering/hexCacheRenderer.js';
+import {
+    renderBackground,
+    drawZoneDangerOverlay,
+    drawZoneWarningBorder,
+    drawMovementRangeHighlight,
+    drawAttackLine,
+    drawAttackRangeIndicator,
+    drawCoverIcon,
+    drawAPCostOverlay
+} from './rendering/terrainRenderer.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -189,6 +215,22 @@ const drawScrollHint = drawScrollHintFromModule;
 const drawPowerup = drawPowerupFromModule;
 const drawEventIndicator = drawEventIndicatorFromModule;
 const drawZoomIndicator = drawZoomIndicatorFromModule;
+
+// Re-export hex cache functions for backward compatibility
+export {
+    CACHE_BASE_HEX_SIZE,
+    DETAIL_DENSITY_SCALE,
+    MAX_CACHE_SIZE,
+    hexTileCache,
+    foregroundCache,
+    clearRenderCaches,
+    getTerrainTexture,
+    shouldSkipCache,
+    getCachedHexTile,
+    createHexTileCanvas,
+    drawHexPathToContext,
+    drawHexToContext
+};
 
 // ===== CLIFF TEXTURE CACHE =====
 
@@ -321,51 +363,7 @@ function drawShorelineOverlays(ctx, cx, cy, size, terrainType, neighborTerrains,
     }
 }
 
-function initVegetationRenderer() { /* no-op */ }
 function initTerrainRenderer() { /* no-op */ }
-
-/**
- * Get biome-appropriate tree types for realistic vegetation
- */
-function getBiomeTreePool(terrainType) {
-    const biome = state.activeBiome || 'temperate';
-
-    // Terrain-specific overrides
-    if (terrainType === 'pine' || terrainType === 'snow') {
-        return ['pine', 'pine', 'birch', 'dead', 'pine'];
-    }
-
-    if (terrainType === 'swamp') {
-        return ['willow', 'willow', 'dead', 'oak', 'willow'];
-    }
-
-    if (terrainType === 'sand') {
-        return ['dead', 'dead', 'dead', 'oak'];  // Sparse dead trees
-    }
-
-    // Biome-specific tree pools for more realistic vegetation
-    switch (biome) {
-        case 'tundra':
-            return ['pine', 'birch', 'dead', 'pine'];
-        case 'highland':
-            return ['pine', 'birch', 'oak', 'pine'];
-        case 'tropical':
-            return ['palm', 'datepalm', 'fanpalm', 'willow', 'maple', 'palm', 'fanpalm'];
-        case 'wetland':
-            return ['willow', 'oak', 'dead', 'birch', 'willow'];
-        case 'desert':
-            return ['dead', 'palm', 'datepalm', 'dead', 'fanpalm'];
-        case 'temperate':
-        default:
-            return ['oak', 'birch', 'maple', 'oak', 'maple'];
-    }
-}
-
-function pickTreeTypeForBiome(seed, terrainType) {
-    const pool = getBiomeTreePool(terrainType);
-    const pick = pool[Math.floor(seededRandom(seed) * pool.length)] || 'oak';
-    return TREE_TYPE_NAMES.indexOf(pick) >= 0 ? TREE_TYPE_NAMES.indexOf(pick) : 0;
-}
 
 // Terrain detail stubs - draw nothing (use sprites instead)
 function drawAnimatedGrass() { }
@@ -388,387 +386,7 @@ function drawRoadDetails() { }
 function drawPathDetails() { }
 function drawRiverDetails() { }
 
-// Vegetation functions - draw sprites from sprite sheet with variation
-const TREE_TYPE_NAMES = ['oak', 'pine', 'birch', 'willow', 'maple', 'dead', 'palm', 'datepalm', 'fanpalm'];
-
-function getTreeDetailType(treeType) {
-    const typeName = TREE_TYPE_NAMES[treeType] || 'oak';
-    return `tree_${typeName}`;
-}
-
-function getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint) {
-    const drawX = x - spriteWidth * anchorPoint.x;
-    const drawY = y - spriteHeight * anchorPoint.y;
-    return {
-        minX: drawX,
-        maxX: drawX + spriteWidth,
-        minY: drawY,
-        maxY: drawY + spriteHeight
-    };
-}
-
-function getTreeSpriteBounds(x, y, size, treeType, seed) {
-    const detailType = getTreeDetailType(treeType);
-    const result = getRandomDetailSpriteWithAnchor(detailType, seed * 0.001)
-        || getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
-    if (!result) return null;
-
-    const { sprite, contentScale, anchor } = result;
-    const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
-    // Reduced from 2.8x to 1.6x for better unit visibility
-    const baseHeight = size * 1.6 * sizeVariation;
-    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
-    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
-}
-
-function getBushSpriteBounds(x, y, size, seed) {
-    const result = getRandomDetailSpriteWithAnchor('bush', seed * 0.001);
-    if (!result) return null;
-
-    const { sprite, contentScale, anchor } = result;
-    const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-    // Reduced from 1.6x to 1.1x for better visual balance with smaller trees
-    const baseSize = size * 1.1 * sizeVariation;
-    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
-    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
-}
-
-function getShrubSpriteBounds(x, y, size, seed) {
-    const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
-    if (!result) return null;
-
-    const { sprite, contentScale, anchor } = result;
-    const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-    // Reduced from 1.3x to 0.9x for better visual balance
-    const baseSize = size * 0.9 * sizeVariation;
-    const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
-    const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-    return getSpriteBounds(x, y, spriteWidth, spriteHeight, anchorPoint);
-}
-
-function getRockBounds(x, y, size, seed) {
-    const sizeVariation = 0.5 + seededRandom(seed) * 0.8;
-    const rockSize = size * 0.6 * sizeVariation;
-    return {
-        minX: x - rockSize,
-        maxX: x + rockSize,
-        minY: y - rockSize * 0.9,
-        maxY: y + rockSize * 0.6
-    };
-}
-
-function getElementBounds(type, x, y, size, params) {
-    switch (type) {
-        case 'tree':
-        case 'tree-edge':
-        case 'tree-solitary':
-        case 'dead-tree':
-            return getTreeSpriteBounds(x, y, size, params.treeType ?? 0, params.seed ?? 0);
-        case 'bush':
-            return getBushSpriteBounds(x, y, size, params.seed ?? 0);
-        case 'shrub':
-        case 'shrub-hills':
-        case 'shrub-ruins':
-        case 'reeds':
-            return getShrubSpriteBounds(x, y, size, params.seed ?? 0);
-        case 'rock':
-        case 'rock-small':
-        case 'rock-hills':
-        case 'rock-sand':
-            return getRockBounds(x, y, size, params.seed ?? 0);
-        default:
-            return null;
-    }
-}
-
-function drawTree2D5(x, y, size, treeType, seed) {
-    const detailType = getTreeDetailType(treeType);
-    const result = getRandomDetailSpriteWithAnchor(detailType, seed * 0.001)
-        || getRandomDetailSpriteWithAnchor('tree', seed * 0.001);
-    if (result) {
-        const { sprite, contentScale, anchor } = result;
-
-        // Size variation: 0.7x to 1.3x base size
-        const sizeVariation = 0.7 + seededRandom(seed * 1.1) * 0.6;
-
-        // Base target size (what the sprite should be at 100% in original cell)
-        // Reduced from 2.8x to 1.6x for better unit visibility and visual balance
-        const baseHeight = size * 1.6 * sizeVariation;
-
-        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseHeight);
-
-        // Random horizontal mirror (50% chance)
-        const shouldMirror = seededRandom(seed * 2.2) > 0.5;
-
-        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-        const drawX = x - spriteWidth * anchorPoint.x;
-        const drawY = y - spriteHeight * anchorPoint.y;
-
-        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 2);
-        ctx.save();
-        if (shouldMirror) {
-            ctx.translate(x, y);
-            ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-        } else {
-            ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-        }
-        ctx.restore();
-    }
-}
-
-function drawBush2D5(x, y, size, seed) {
-    const result = getRandomDetailSpriteWithAnchor('bush', seed * 0.001);
-    if (result) {
-        const { sprite, contentScale, anchor } = result;
-
-        // Size variation: 0.6x to 1.4x
-        const sizeVariation = 0.6 + seededRandom(seed * 1.3) * 0.8;
-        // Reduced from 1.6x to 1.1x for better visual balance
-        const baseSize = size * 1.1 * sizeVariation;
-
-        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
-
-        // Random horizontal mirror
-        const shouldMirror = seededRandom(seed * 2.4) > 0.5;
-
-        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-        const drawX = x - spriteWidth * anchorPoint.x;
-        const drawY = y - spriteHeight * anchorPoint.y;
-
-        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 1);
-        ctx.save();
-        if (shouldMirror) {
-            ctx.translate(x, y);
-            ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-        } else {
-            ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-        }
-
-        // Apply biome-appropriate color tint for realism
-        applyBiomeVegetationTint(drawX, drawY, spriteWidth, spriteHeight);
-
-        ctx.restore();
-    }
-}
-
-function drawSmallShrub(x, y, size, seed) {
-    const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
-    if (result) {
-        const { sprite, contentScale, anchor } = result;
-
-        const sizeVariation = 0.7 + seededRandom(seed * 1.5) * 0.6;
-        // Reduced from 1.3x to 0.9x for better visual balance
-        const baseSize = size * 0.9 * sizeVariation;
-
-        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
-        const shouldMirror = seededRandom(seed * 2.6) > 0.5;
-
-        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-        const drawX = x - spriteWidth * anchorPoint.x;
-        const drawY = y - spriteHeight * anchorPoint.y;
-
-        drawSpriteShadow(x, y, spriteWidth, spriteHeight, 1);
-        ctx.save();
-        if (shouldMirror) {
-            ctx.translate(x, y);
-            ctx.scale(-1, 1);
-            ctx.drawImage(sprite, -spriteWidth * anchorPoint.x, -spriteHeight * anchorPoint.y, spriteWidth, spriteHeight);
-        } else {
-            ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-        }
-
-        // Apply biome-appropriate color tint for realism
-        applyBiomeVegetationTint(drawX, drawY, spriteWidth, spriteHeight);
-
-        ctx.restore();
-    }
-}
-
-/**
- * Apply biome-appropriate color tinting to vegetation sprites
- * This creates more cohesive and realistic environments
- */
-function applyBiomeVegetationTint(x, y, width, height) {
-    const biome = state.activeBiome || 'temperate';
-
-    // Biome-specific tints for vegetation
-    const biomeTints = {
-        desert: { color: 'rgba(200, 180, 120, 0.12)', blend: 'multiply' },       // Yellower, sun-bleached
-        tropical: { color: 'rgba(40, 120, 60, 0.1)', blend: 'overlay' },         // Vibrant deep green
-        tundra: { color: 'rgba(100, 120, 140, 0.12)', blend: 'multiply' },       // Cool bluish
-        wetland: { color: 'rgba(60, 90, 70, 0.1)', blend: 'multiply' },          // Dark green, mossy
-        highland: { color: 'rgba(110, 120, 100, 0.08)', blend: 'multiply' },     // Subtle gray-green
-        temperate: null                                                           // No tint - natural colors
-    };
-
-    const tintConfig = biomeTints[biome];
-    if (tintConfig) {
-        ctx.globalCompositeOperation = tintConfig.blend;
-        ctx.fillStyle = tintConfig.color;
-        ctx.fillRect(x, y, width, height);
-        ctx.globalCompositeOperation = 'source-over';
-    }
-}
-
-function drawFlowerCluster(x, y, size, seed) {
-    const result = getRandomDetailSpriteWithAnchor('grass', seed * 0.001);
-    if (result) {
-        const { sprite, contentScale, anchor } = result;
-
-        const sizeVariation = 0.5 + seededRandom(seed * 1.7) * 0.5;
-        const baseSize = size * 0.9 * sizeVariation;
-
-        const { spriteWidth, spriteHeight } = getSpriteDimensions(sprite, contentScale, baseSize);
-
-        const anchorPoint = anchor || { x: 0.5, y: 1.0 };
-        const drawX = x - spriteWidth * anchorPoint.x;
-        const drawY = y - spriteHeight * anchorPoint.y;
-        ctx.drawImage(sprite, drawX, drawY, spriteWidth, spriteHeight);
-    }
-}
-
-function drawRockFormation2D5(x, y, size, seed) {
-    // Draw procedural rock with realistic details
-    const sizeVariation = 0.4 + seededRandom(seed) * 0.5;
-    // Keep rock size reasonable so it stays within tile bounds
-    const rockSize = Math.min(size * 0.5 * sizeVariation, size * 0.4);
-
-    ctx.save();
-    ctx.translate(x, y);
-
-    // Get biome for color matching
-    const biome = state.activeBiome || 'temperate';
-
-    // Biome-appropriate rock colors (warmer, more natural tones)
-    const rockColors = {
-        temperate: { r: 95, g: 88, b: 78 },      // Warm gray-brown
-        tropical: { r: 85, g: 80, b: 70 },       // Darker warm
-        desert: { r: 140, g: 120, b: 95 },       // Sandy brown
-        tundra: { r: 100, g: 100, b: 105 },      // Cool gray
-        wetland: { r: 80, g: 78, b: 72 },        // Dark mossy
-        highland: { r: 90, g: 85, b: 80 }        // Mountain gray
-    };
-    const baseColor = rockColors[biome] || rockColors.temperate;
-
-    // Add variation to base color
-    const colorVar = seededRandom(seed * 3) * 20 - 10;
-    const r = Math.max(0, Math.min(255, baseColor.r + colorVar));
-    const g = Math.max(0, Math.min(255, baseColor.g + colorVar - 3));
-    const b = Math.max(0, Math.min(255, baseColor.b + colorVar - 5));
-
-    // Draw ground shadow first
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-    ctx.beginPath();
-    ctx.ellipse(rockSize * 0.1, rockSize * 0.35, rockSize * 0.9, rockSize * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Rock main body gradient for 3D depth
-    const rockGrad = ctx.createRadialGradient(
-        -rockSize * 0.3, -rockSize * 0.2, 0,
-        rockSize * 0.1, rockSize * 0.1, rockSize
-    );
-    rockGrad.addColorStop(0, `rgb(${r + 25}, ${g + 25}, ${b + 20})`);  // Light face
-    rockGrad.addColorStop(0.4, `rgb(${r}, ${g}, ${b})`);               // Mid tone
-    rockGrad.addColorStop(1, `rgb(${r - 25}, ${g - 25}, ${b - 20})`);   // Shadow
-
-    // Draw irregular rock shape (kept within bounds)
-    ctx.fillStyle = rockGrad;
-    ctx.beginPath();
-    const points = 7 + Math.floor(seededRandom(seed * 4) * 4);
-    for (let i = 0; i < points; i++) {
-        const angle = (i / points) * Math.PI * 2;
-        const dist = rockSize * (0.65 + seededRandom(seed + i * 7) * 0.35);
-        const px = Math.cos(angle) * dist;
-        // Constrain Y to stay within bounds (flatter at bottom, taller at sides)
-        const yScale = Math.abs(Math.cos(angle)) < 0.3 ? 0.4 : 0.55;
-        const py = Math.sin(angle) * dist * yScale;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-
-    // Rock surface details - cracks and texture
-    ctx.strokeStyle = `rgba(${r - 30}, ${g - 30}, ${b - 25}, 0.3)`;
-    ctx.lineWidth = 0.8;
-
-    // Main crack
-    ctx.beginPath();
-    ctx.moveTo(-rockSize * 0.2, -rockSize * 0.25);
-    ctx.quadraticCurveTo(0, 0, rockSize * 0.15, rockSize * 0.2);
-    ctx.stroke();
-
-    // Secondary cracks
-    for (let i = 0; i < 3; i++) {
-        const crackSeed = seed + i * 100;
-        const startX = (seededRandom(crackSeed) - 0.5) * rockSize * 1.2;
-        const startY = (seededRandom(crackSeed + 1) - 0.5) * rockSize * 0.5;
-        const length = rockSize * 0.2 + seededRandom(crackSeed + 2) * rockSize * 0.2;
-        const angle = seededRandom(crackSeed + 3) * Math.PI * 2;
-
-        ctx.strokeStyle = `rgba(${r - 35}, ${g - 35}, ${b - 30}, 0.25)`;
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length * 0.5);
-        ctx.stroke();
-    }
-
-    // Highlight on top/left
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.beginPath();
-    ctx.ellipse(-rockSize * 0.25, -rockSize * 0.15, rockSize * 0.35, rockSize * 0.18, -0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Smaller specular highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.beginPath();
-    ctx.ellipse(-rockSize * 0.15, -rockSize * 0.2, rockSize * 0.12, rockSize * 0.08, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Moss patches (more in wetland/temperate, less in desert)
-    const mossChance = biome === 'wetland' ? 0.7 : biome === 'desert' ? 0.1 : 0.4;
-    if (seededRandom(seed * 5) < mossChance) {
-        const mossColor = biome === 'wetland'
-            ? 'rgba(60, 85, 50, 0.4)'
-            : 'rgba(70, 90, 55, 0.3)';
-
-        // Moss on shaded side
-        ctx.fillStyle = mossColor;
-        const mossCount = 2 + Math.floor(seededRandom(seed * 6) * 3);
-        for (let i = 0; i < mossCount; i++) {
-            const mx = rockSize * 0.2 + seededRandom(seed + i * 50) * rockSize * 0.4;
-            const my = seededRandom(seed + i * 51) * rockSize * 0.3 - rockSize * 0.05;
-            const mSize = rockSize * 0.1 + seededRandom(seed + i * 52) * rockSize * 0.1;
-
-            ctx.beginPath();
-            ctx.ellipse(mx, my, mSize, mSize * 0.6, seededRandom(seed + i * 53) * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    // Edge definition
-    ctx.strokeStyle = `rgba(${r - 40}, ${g - 40}, ${b - 35}, 0.2)`;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    for (let i = 0; i < points; i++) {
-        const angle = (i / points) * Math.PI * 2;
-        const dist = rockSize * (0.65 + seededRandom(seed + i * 7) * 0.35);
-        const px = Math.cos(angle) * dist;
-        const yScale = Math.abs(Math.cos(angle)) < 0.3 ? 0.4 : 0.55;
-        const py = Math.sin(angle) * dist * yScale;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.stroke();
-
-    ctx.restore();
-}
+// Vegetation functions - now imported from vegetationRenderer.js
 
 function applyDetailLighting(cx, cy, size, seed) {
     ctx.save();
@@ -862,59 +480,14 @@ export function getPresetList() { return ['default']; }
 let canvas, ctx;
 let texturesInitialized = false;
 
-// ===== HEX TILE CACHING SYSTEM =====
-// Pre-renders hex tiles with terrain details for improved performance
-
-/**
- * Cache for pre-rendered hex tiles.
- * Key format: "${q},${r}_${fogLevel}_${quality}"
- * Value: OffscreenCanvas or regular Canvas with the pre-rendered hex
- */
-const hexTileCache = new Map();
-
-/**
- * Cache for pre-rendered foreground elements (trees, rocks, bushes).
- * Key format: "${q},${r}"
- * Value: { canvas, elements } where elements contains position data for sorting
- */
-const foregroundCache = new Map();
-
-/**
- * Track the current quality level for cache invalidation
- */
-let cachedQualityLevel = null;
-
-/**
- * Base hex size for caching - tiles are cached at this size and scaled when drawn
- * This prevents cache invalidation during zoom operations
- */
-const CACHE_BASE_HEX_SIZE = 60;
-
-// Detail scaling for larger base tiles (tile ~ human size)
-const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
+// Hex tile caching system - now imported from hexCacheRenderer.js
+// Local constants for detail rendering
 const DETAIL_SPRITE_SCALE = 0.85;
 const DETAIL_CLEARANCE_EDGE = 0.2;
 const cliffTextureCache = new Map();
 
 function scaleDetailCount(count, min = 1) {
     return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
-}
-
-/**
- * Maximum number of cached tiles to prevent memory issues
- */
-// Increased cache size to prevent eviction during scrolling/zoom
-// A large map with full visibility needs ~500 tiles, plus 3 fog levels = 1500
-// Increased from 2000 to accommodate separate earth/surface caches for two-pass rendering
-const MAX_CACHE_SIZE = 3000;
-
-/**
- * Clear all caches (call when map regenerates or quality changes significantly)
- */
-export function clearRenderCaches() {
-    hexTileCache.clear();
-    foregroundCache.clear();
-    cachedQualityLevel = null;
 }
 
 // ===== 3D HEX MESH RENDERING SYSTEM =====
@@ -1761,272 +1334,6 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     }
 
     return elements;
-}
-
-/**
- * Get the appropriate texture for a terrain type
- * Uses animated frame if available, otherwise falls back to static texture
- * @param {string} terrainType - The terrain type (e.g., 'water', 'grass')
- * @param {number} q - Hex q coordinate (for static variant selection)
- * @param {number} r - Hex r coordinate (for static variant selection)
- * @returns {Image|Canvas|null} The texture to use
- */
-function getTerrainTexture(terrainType, q, r) {
-    // Check if this terrain type has animated frames loaded
-    if (hasAnimatedTexture(terrainType)) {
-        const animFrame = getAnimatedTexture(terrainType, state.terrainAnimationFrame);
-        if (animFrame) {
-            return animFrame;
-        }
-    }
-
-    // Fall back to static texture
-    return getTexture(terrainType, q, r);
-}
-
-/**
- * Check if a terrain type should skip caching (animated terrain)
- */
-function shouldSkipCache(hexType) {
-    // Skip caching for animated terrain that has loaded animation frames
-    return hasAnimatedTexture(hexType);
-}
-
-/**
- * Get or create a cached hex tile with terrain details
- * Tiles are cached at a fixed base size and scaled when drawn to avoid
- * cache invalidation during zoom operations
- * @param {Object} hex - The hex object
- * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @param {string} renderPass - 'full' (default), 'earth', or 'surface'
- * @returns {Object|null} { canvas, scale } or null if caching disabled
- */
-function getCachedHexTile(hex, fogLevel, renderPass = 'full') {
-    // Only cache on medium/high quality - low quality is simple enough
-    if (state.effectiveQuality === 'low') {
-        return null;
-    }
-
-    // Skip caching for animated terrain types (they need to update each frame)
-    if (fogLevel === 'visible' && shouldSkipCache(hex.type)) {
-        return null;
-    }
-
-    // Invalidate cache if quality changed
-    if (cachedQualityLevel !== state.effectiveQuality) {
-        hexTileCache.clear();
-        foregroundCache.clear();
-        cachedQualityLevel = state.effectiveQuality;
-    }
-
-    // Use fixed base size for caching - zoom independent!
-    // Include renderPass in cache key to separate earth/surface caches
-    const cacheKey = `${hex.q},${hex.r}_${fogLevel}_${state.effectiveQuality}_${renderPass}`;
-
-    if (hexTileCache.has(cacheKey)) {
-        return hexTileCache.get(cacheKey);
-    }
-
-    // Enforce cache size limit using LRU-style eviction
-    if (hexTileCache.size >= MAX_CACHE_SIZE) {
-        // Remove oldest entries (first 20% of cache)
-        const keysToRemove = Array.from(hexTileCache.keys()).slice(0, MAX_CACHE_SIZE / 5);
-        keysToRemove.forEach(key => hexTileCache.delete(key));
-    }
-
-    // Create new cached tile at fixed base size
-    const tileCanvas = createHexTileCanvas(hex, fogLevel, CACHE_BASE_HEX_SIZE, renderPass);
-    const cacheEntry = { canvas: tileCanvas, baseSize: CACHE_BASE_HEX_SIZE };
-    hexTileCache.set(cacheKey, cacheEntry);
-
-    return cacheEntry;
-}
-
-/**
- * Create a canvas with the pre-rendered hex tile
- * @param {Object} hex - The hex object
- * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @param {number} hexSize - Current hex size
- * @param {string} renderPass - 'full' (default), 'earth', or 'surface'
- * @returns {HTMLCanvasElement} Canvas with rendered hex
- */
-function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
-    void fogLevel;
-    // Canvas size needs margin for effects
-    const margin = hexSize * 0.2;
-    const canvasSize = hexSize * 2 + margin * 2;
-
-    const tileCanvas = document.createElement('canvas');
-    tileCanvas.width = canvasSize;
-    tileCanvas.height = canvasSize;
-    const tileCtx = tileCanvas.getContext('2d');
-
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-
-    const terrain = TERRAIN[hex.type];
-    const fillColor = terrain.color;
-    const texture = getTerrainTexture(hex.type, hex.q, hex.r);
-
-    // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
-    const terrainData = terrain;
-
-    // Pass null for strokeColor - grid overlay is drawn separately when needed
-    // Pass renderPass to control which portion of the tile is drawn
-    drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r, renderPass);
-
-    // Terrain details are drawn in the main render pass to keep asset sizing consistent
-
-    return tileCanvas;
-}
-
-
-/**
- * Draw hex path to a specific context
- */
-function drawHexPathToContext(context, cx, cy, size) {
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-    }
-    context.closePath();
-}
-
-/**
- * Draw hex with texture to a specific context (for caching)
- * Now includes 3D bevel effect for realistic raised border appearance
- * @param {string} renderPass - 'full' (default), 'earth' (only cliff face), or 'surface' (only hex surface)
- */
-function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWidth, texture, terrain, hexQ, hexR, renderPass = 'full') {
-    context.beginPath();
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-    }
-    context.closePath();
-
-    // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
-    if (texture) {
-        // Check if using isometric tiles with earth layer
-        const tileInfo = getTerrainTileInfo();
-
-        if (tileInfo && tileInfo.earthLayerHeight > 0) {
-            // Isometric tiles: draw tile with two-pass rendering support
-            // Position so hex surface center aligns with (cx, cy)
-            const buffer = Math.max(6, size * 0.06);
-            const spriteWidth = size * 2 + buffer;
-            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
-            const hexTopOffset = tileInfo.hexTopOffset || 0;
-            // The actual hex content height is hexHeight minus any top padding
-            const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
-            // Scale the content height proportionally
-            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
-            const scaleRatio = hexSurfaceHeight / sourceContentHeight;
-            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
-
-            // Position: center hex surface at (cx, cy), earth layer extends below
-            const drawX = cx - spriteWidth / 2;
-            const drawY = cy - hexSurfaceHeight / 2;  // Hex surface starts here
-
-            if (renderPass === 'earth') {
-                // Pass 1: Draw only the earth layer (cliff face)
-                // In the source sprite, earth layer starts at hex CENTER (hexHeight/2),
-                // NOT at hexHeight! The cliff faces extend from hex center downward.
-                // The hex surface will be drawn on top in pass 2 to cover the overlap.
-                const sourceEarthY = Math.floor(tileInfo.hexHeight / 2);
-                const sourceEarthHeight = tileInfo.totalHeight - sourceEarthY;
-
-                // Scale the earth layer height proportionally
-                const earthPortionScaled = sourceEarthHeight * scaleRatio;
-
-                // Destination: from hex center (cy) downward
-                const destY = cy;
-
-                context.drawImage(
-                    texture,
-                    0, sourceEarthY,                           // Source: from hex center in sprite
-                    texture.width, sourceEarthHeight,          // Source: to bottom of sprite
-                    drawX, destY,                              // Dest: start at hex center
-                    spriteWidth, earthPortionScaled            // Dest: scaled height
-                );
-            } else if (renderPass === 'surface') {
-                // Pass 2: Draw only the hex surface (top portion)
-                // In the source sprite: hex surface content starts at hexTopOffset
-                context.drawImage(
-                    texture,
-                    0, hexTopOffset,                           // Source: start at hex content
-                    texture.width, sourceContentHeight,        // Source: hex surface dimensions
-                    drawX, drawY,                              // Dest: normal position
-                    spriteWidth, hexSurfaceHeight              // Dest: scaled hex surface
-                );
-            } else {
-                // Full render (backwards compatible) - draw entire sprite
-                context.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
-            }
-        } else {
-            // Non-isometric tiles: clip to hex shape as before
-            // These don't have earth layers, so ignore renderPass
-            if (renderPass !== 'earth') {
-                context.save();
-                context.clip();
-                // Hex dimensions: width = 2*size, height = sqrt(3)*size
-                // Increased buffer to completely eliminate anti-aliasing seams between tiles
-                const buffer = Math.max(12, size * 0.12);
-                const spriteWidth = size * 2 + buffer;
-                const spriteHeight = size * Math.sqrt(3) + buffer;
-                context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-                context.restore();
-            }
-        }
-
-        // Restore hex path for border drawing (only for surface pass or full)
-        if (renderPass !== 'earth') {
-            context.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 3 * i;
-                const px = cx + size * Math.cos(angle);
-                const py = cy + size * Math.sin(angle);
-                if (i === 0) context.moveTo(px, py);
-                else context.lineTo(px, py);
-            }
-            context.closePath();
-        }
-    } else if (renderPass !== 'earth' && terrain && terrain.colorLight && terrain.colorDark) {
-        // Fallback: gradient fill
-        const gradient = safeLinearGradient(context, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
-        if (typeof gradient !== 'string') {
-            gradient.addColorStop(0, terrain.colorLight);
-            gradient.addColorStop(0.5, terrain.color);
-            gradient.addColorStop(1, terrain.colorDark);
-        }
-        context.fillStyle = gradient;
-        context.fill();
-    } else if (renderPass !== 'earth') {
-        // Final fallback: solid color (skip for earth pass as there's nothing to draw)
-        context.fillStyle = fillColor;
-        context.fill();
-    }
-
-    if (strokeColor && renderPass !== 'earth') {
-        context.strokeStyle = strokeColor;
-        context.lineWidth = lineWidth;
-        context.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * Math.cos(angle);
-            const py = cy + size * Math.sin(angle);
-            if (i === 0) context.moveTo(px, py);
-            else context.lineTo(px, py);
-        }
-        context.closePath();
-        context.stroke();
-    }
 }
 
 /**
@@ -3510,35 +2817,8 @@ export function render() {
     // Track performance for auto-quality adjustment
     updatePerformance();
 
-    // Background - simplified on low quality
-    if (state.effectiveQuality === 'low') {
-        ctx.fillStyle = '#12122b';
-        ctx.fillRect(0, 0, w, h);
-    } else {
-        // Background with modern gradient
-        const bgGradient = safeRadialGradient(ctx, w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8, '#12122b');
-        if (typeof bgGradient !== 'string') {
-            bgGradient.addColorStop(0, '#1a1a3e');
-            bgGradient.addColorStop(0.5, '#12122b');
-            bgGradient.addColorStop(1, '#0c0c1d');
-        }
-        ctx.fillStyle = bgGradient;
-        ctx.fillRect(0, 0, w, h);
-
-        // Subtle ambient glow - only on high quality
-        if (state.effectiveQuality === 'high') {
-            ctx.save();
-            ctx.globalAlpha = 0.1;
-            const ambientGlow = safeRadialGradient(ctx, w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5, 'transparent');
-            if (typeof ambientGlow !== 'string') {
-                ambientGlow.addColorStop(0, '#10b981');
-                ambientGlow.addColorStop(1, 'transparent');
-            }
-            ctx.fillStyle = ambientGlow;
-            ctx.fillRect(0, 0, w, h);
-            ctx.restore();
-        }
-    }
+    // Background - delegated to terrainRenderer
+    renderBackground(ctx, w, h);
 
     // Update screen shake and get current offset
     const shakeOffset = updateScreenShake();
@@ -3706,25 +2986,7 @@ export function render() {
         // Draw red overlay on hexes outside the safe zone
         if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
             if (!isHexInZone(hex.q, hex.r)) {
-                // Red danger zone overlay
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, tileSize, 'rgba(220, 38, 38, 0.25)');
-                if (typeof zoneGradient !== 'string') {
-                    zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
-                    zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
-                    zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
-                }
-                ctx.fillStyle = zoneGradient;
-                ctx.fill();
-
-                // Pulsing red border for danger zone edge
-                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
-                ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulse * 0.3})`;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
+                drawZoneDangerOverlay(ctx, sx, sy, tileSize);
             }
         }
 
@@ -3733,58 +2995,21 @@ export function render() {
             const hexDist = Math.max(Math.abs(hex.q), Math.abs(hex.r), Math.abs(-hex.q - hex.r));
             // Hexes that will be outside after next shrink
             if (hexDist > state.zoneRadius - 2 && hexDist <= state.zoneRadius) {
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
-                ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.4})`;
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                ctx.restore();
+                drawZoneWarningBorder(ctx, sx, sy, tileSize);
             }
         }
 
-        // Highlight reachable hexes for movement - traffic light color system based on cumulative path cost
-        // Only show colored overlays when a path is being planned (currentPath exists)
+        // Highlight reachable hexes for movement - traffic light color system
         const isPathPlanning = state.currentPath && state.currentPath.length > 0;
         if (reachableHexes.size > 0 && fogLevel === 'visible' && isPathPlanning) {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && !hex.unit) {
-                // Check if this hex offers cover
                 const hexTerrain = TERRAIN[hex.type];
                 const offersCover = hexTerrain && hexTerrain.canHide;
 
-                // Traffic light color system based on cumulative path cost (total AP to reach):
-                // Green (1-2 AP): Close/easy to reach
-                // Yellow (3-4 AP): Medium distance
-                // Red (5+ AP): Far/expensive to reach
-                const totalPathCost = pathData.cost;
-                let fillColor, strokeColor;
-                if (totalPathCost <= 2) {
-                    // Green - close/cheap to reach
-                    fillColor = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
-                    strokeColor = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
-                } else if (totalPathCost <= 4) {
-                    // Yellow/Orange - medium distance
-                    fillColor = offersCover ? 'rgba(234, 179, 8, 0.45)' : 'rgba(251, 191, 36, 0.35)';
-                    strokeColor = offersCover ? 'rgba(234, 179, 8, 0.9)' : 'rgba(251, 191, 36, 0.75)';
-                } else {
-                    // Red - far/expensive (5+ AP)
-                    fillColor = offersCover ? 'rgba(239, 68, 68, 0.45)' : 'rgba(248, 113, 113, 0.35)';
-                    strokeColor = offersCover ? 'rgba(239, 68, 68, 0.9)' : 'rgba(248, 113, 113, 0.75)';
-                }
-
-                // Draw movement range highlight with traffic light colors
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize * 0.88);
-                ctx.fillStyle = fillColor;
-                ctx.fill();
-
-                // Clear visible border
-                ctx.strokeStyle = strokeColor;
-                ctx.lineWidth = offersCover ? 3 : 2.5;
-                ctx.stroke();
+                // Draw movement highlight using terrainRenderer helper
+                drawMovementRangeHighlight(ctx, sx, sy, tileSize, pathData.cost, offersCover);
 
                 // Collect cover positions for later (show only the best ones)
                 if (offersCover) {
@@ -3814,29 +3039,10 @@ export function render() {
         const fromPos = getTileScreenPosition(currentUnit.q, currentUnit.r, fromHex?.height ?? 0, tileSize);
         const toPos = getTileScreenPosition(state.targetedUnit.q, state.targetedUnit.r, toHex?.height ?? 0, tileSize);
 
-        // Gradient attack line
-        const gradient = safeLinearGradient(
-            ctx,
+        drawAttackLine(ctx,
             state.offsetX + fromPos.x, state.offsetY + fromPos.y,
-            state.offsetX + toPos.x, state.offsetY + toPos.y,
-            'rgba(239, 68, 68, 0.6)'
+            state.offsetX + toPos.x, state.offsetY + toPos.y
         );
-        if (typeof gradient !== 'string') {
-            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
-            gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
-            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
-        }
-
-        ctx.save();
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 4;
-        ctx.setLineDash([12, 6]);
-        ctx.beginPath();
-        ctx.moveTo(state.offsetX + fromPos.x, state.offsetY + fromPos.y);
-        ctx.lineTo(state.offsetX + toPos.x, state.offsetY + toPos.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
     }
 
     // Draw ghost indicators for cloaked enemy attacks
@@ -4047,47 +3253,13 @@ export function render() {
     });
 
     // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
-    // Note: Using canvas-drawn shield instead of emoji for consistent cross-platform rendering
     if (coverPositions.length > 0) {
         const bestCoverPositions = coverPositions
             .sort((a, b) => a.cost - b.cost)
             .slice(0, 4);
 
         bestCoverPositions.forEach(({ sx, sy }) => {
-            const iconSize = assetSize * 0.22;
-            const iconY = sy - assetSize * 0.3;
-
-            ctx.save();
-
-            // Drop shadow
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 2;
-
-            // Shield shape path
-            ctx.beginPath();
-            ctx.moveTo(sx, iconY - iconSize);
-            ctx.lineTo(sx + iconSize * 0.85, iconY - iconSize * 0.6);
-            ctx.lineTo(sx + iconSize * 0.85, iconY + iconSize * 0.2);
-            ctx.quadraticCurveTo(sx + iconSize * 0.4, iconY + iconSize * 0.8, sx, iconY + iconSize);
-            ctx.quadraticCurveTo(sx - iconSize * 0.4, iconY + iconSize * 0.8, sx - iconSize * 0.85, iconY + iconSize * 0.2);
-            ctx.lineTo(sx - iconSize * 0.85, iconY - iconSize * 0.6);
-            ctx.closePath();
-
-            // Fill with gradient
-            const gradient = ctx.createLinearGradient(sx - iconSize, iconY - iconSize, sx + iconSize, iconY + iconSize);
-            gradient.addColorStop(0, '#4ade80');
-            gradient.addColorStop(1, '#16a34a');
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // Border
-            ctx.strokeStyle = '#15803d';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.restore();
+            drawCoverIcon(ctx, sx, sy, assetSize);
         });
     }
 
@@ -4105,44 +3277,13 @@ export function render() {
         const sy = state.offsetY + pos.y;
         const rangeRadius = getEffectiveRange(currentUnit) * tileSize * 1.75;
 
-        // Fill area for better visibility
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Gradient range circle - more visible
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([15, 8]);
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Inner glow - stronger
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius - 5, 0, Math.PI * 2);
-        ctx.stroke();
+        drawAttackRangeIndicator(ctx, sx, sy, rangeRadius);
     }
 
     // Draw AP cost overlays - only when a path is being planned
     if (apCostOverlays.length > 0 && state.currentPath && state.currentPath.length > 0) {
         apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
-            // Background pill for cost
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.beginPath();
-            ctx.roundRect(sx - tileSize * 0.2, sy + tileSize * 0.35, tileSize * 0.4, tileSize * 0.26, 5);
-            ctx.fill();
-
-            // Cost number
-            ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
-            ctx.font = `bold ${Math.round(tileSize * 0.22)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${cost}`, sx, sy + tileSize * 0.48);
+            drawAPCostOverlay(ctx, sx, sy, tileSize, cost, offersCover);
         });
     }
 
