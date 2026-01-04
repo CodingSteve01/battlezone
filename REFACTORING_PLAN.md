@@ -20,7 +20,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
 | state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
-| renderer.js LOC | 6,053 | 3,727 | <300 | 🟡 -2,326 LOC (-38%) |
+| renderer.js LOC | 6,053 | 3,573 | <300 | 🟡 -2,480 LOC (-41%) |
 
 ### Progress Summary
 
@@ -656,9 +656,9 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PRs 13-17 complete, PR 14a-14b complete, PR 18 pending
+**Status:** 🟡 PRs 13-17 complete, PR 14a-14b complete, PR 18 in progress
 **Progress:**
-- renderer.js: 6,053 → 3,727 LOC (-2,326 LOC, -38%)
+- renderer.js: 6,053 → 3,573 LOC (-2,480 LOC, -41%)
 - minimapRenderer.js: 707 LOC ✅
 - unitRenderer.js: 495 LOC ✅
 - effectsRenderer.js: 441 LOC ✅ (height/lighting effects)
@@ -666,6 +666,7 @@ export function getLastRoundSummary() { ... }
 - renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
 - vegetationRenderer.js: 491 LOC ✅ (biome trees, bushes, rocks)
 - hexCacheRenderer.js: 336 LOC ✅ (hex tile caching, terrain textures)
+- terrainRenderer.js: 331 LOC ✅ (background, zones, movement highlights)
 
 ---
 
