@@ -651,23 +651,30 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-## 6. Phase 3: Renderer Decomposition (PRs 13-18)
+## 6. Phase 3: Renderer Decomposition (PRs 13-18) 🟡 IN PROGRESS
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
+**Status:** 🟡 PR 13 complete, PRs 14-18 pending
+**Progress:**
+- renderer.js: 6,053 → 5,414 LOC (-639 LOC)
+
 ---
 
-### PR 13: Extract rendering/minimapRenderer.js
+### PR 13: Extract rendering/minimapRenderer.js ✅
 
 **Estimated Diff:** ~250 LOC
+**Actual:** 767 LOC (includes all minimap state + drawing functions)
+**Status:** ✅ COMPLETE
 
-**Functions to Extract:**
-- `getMinimapBounds()`
-- `drawMinimap()`
-- `isMinimapExpanded()`
-- `setMinimapExpanded()`
-- `setMinimapActive()`
-- Minimap rendering logic from `render()`
+**Functions Extracted:**
+- `MINIMAP_CONFIG`
+- `setMinimapActive()`, `isMinimapExpanded()`, `setMinimapExpanded()`
+- `getMinimapBounds()`, `getToggleButtonBounds()`, `getHeightOverlayButtonBounds()`, `getCloseButtonBounds()`
+- `drawMinimap()`, `drawHeightOverlayToggle()`
+- All helper functions: `drawMinimapTerrain()`, `drawMinimapUnits()`, `drawMinimapViewport()`, etc.
+
+**Note:** Module exceeds 300 LOC due to comprehensive minimap functionality. Can be further split in future if needed.
 
 ---
 
