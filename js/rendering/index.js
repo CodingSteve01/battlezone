@@ -4,3 +4,4 @@
 
 export * from './minimapRenderer.js';
 export * from './renderUtils.js';
+export * from './unitRenderer.js';

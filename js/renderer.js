@@ -51,6 +51,15 @@ import {
     isLandForWater,
     isLandForSwamp
 } from './rendering/renderUtils.js';
+import {
+    initUnitRenderer,
+    drawUnit as drawUnitFromModule,
+    drawDeadUnit as drawDeadUnitFromModule,
+    drawUnitOverlay as drawUnitOverlayFromModule,
+    drawSpeechBubble as drawSpeechBubbleFromModule,
+    drawCamouflagePattern as drawCamouflagePatternFromModule,
+    getStealthVisibilityAlpha as getStealthVisibilityAlphaFromModule
+} from './rendering/unitRenderer.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -78,6 +87,16 @@ export {
     SWAMP_TYPES,
     isLandForWater,
     isLandForSwamp
+};
+
+// Re-export unit renderer functions for backward compatibility
+export {
+    drawUnitFromModule as drawUnit,
+    drawDeadUnitFromModule as drawDeadUnit,
+    drawUnitOverlayFromModule as drawUnitOverlay,
+    drawSpeechBubbleFromModule as drawSpeechBubble,
+    drawCamouflagePatternFromModule as drawCamouflagePattern,
+    getStealthVisibilityAlphaFromModule as getStealthVisibilityAlpha
 };
 
 // ===== CLIFF TEXTURE CACHE =====
@@ -2236,124 +2255,9 @@ function drawTerrainDetailsToContext(context, cx, cy, size, type, hexQ, hexR) {
     ctx = originalCtx;
 }
 
-/**
- * Draw a subtle terrain-matched camouflage pattern for enemy cloaked units
- * This makes them barely visible, blending into the terrain without shimmering
- * @param {number} cx - Center X position
- * @param {number} cy - Center Y position
- * @param {number} size - Unit size
- * @param {Object} unit - The cloaked unit
- */
-function drawCamouflagePattern(cx, cy, size, unit) {
-    // Get terrain at unit's position
-    const hex = getHex(unit.q, unit.r);
-    if (!hex) return;
-
-    const terrainData = TERRAIN[hex.type];
-    const baseColor = terrainData?.color || '#2d5a40';
-
-    // Parse base color
-    const r = parseInt(baseColor.slice(1, 3), 16);
-    const g = parseInt(baseColor.slice(3, 5), 16);
-    const b = parseInt(baseColor.slice(5, 7), 16);
-
-    // Deterministic pseudo-random for camo shapes (stable per unit position)
-    const seed = (unit.q * 73856093) ^ (unit.r * 19349663);
-    const rand = (offset) => {
-        const x = Math.sin(seed + offset) * 43758.5453;
-        return x - Math.floor(x);
-    };
-
-    ctx.save();
-
-    // Base camouflage silhouette
-    ctx.globalAlpha = 0.22;
-
-    // Soft camo fill with terrain-tinted gradient
-    const baseGrad = safeRadialGradient(
-        ctx,
-        cx, cy - size * 0.2, 0,
-        cx, cy, size * 0.9,
-        `rgba(${r}, ${g}, ${b}, 0.2)`
-    );
-    if (typeof baseGrad !== 'string') {
-        baseGrad.addColorStop(0, `rgba(${r + 20}, ${g + 20}, ${b + 20}, 0.3)`);
-        baseGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.18)`);
-        baseGrad.addColorStop(1, 'transparent');
-    }
-    ctx.fillStyle = baseGrad;
-
-    // Draw subtle humanoid shape
-    ctx.beginPath();
-    // Head
-    ctx.arc(cx, cy - size * 0.5, size * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Body (oval)
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, size * 0.25, size * 0.4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Add low-contrast camo blotches
-    for (let i = 0; i < 6; i++) {
-        const angle = rand(i * 11) * Math.PI * 2;
-        const radius = size * (0.1 + rand(i * 7) * 0.35);
-        const blotchX = cx + Math.cos(angle) * radius;
-        const blotchY = cy + Math.sin(angle) * radius * 0.6;
-        const blotchSize = size * (0.12 + rand(i * 17) * 0.18);
-        const shade = rand(i * 19) > 0.5 ? 18 : -12;
-        ctx.fillStyle = `rgba(${r + shade}, ${g + shade}, ${b + shade}, 0.22)`;
-        ctx.beginPath();
-        ctx.ellipse(blotchX, blotchY, blotchSize * 0.9, blotchSize * 0.6, angle, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
-}
-
-/**
- * Calculate stealth unit visibility alpha based on distance to nearest friendly unit.
- * Stealth units become more visible the closer they are to friendly non-cloaked units.
- * @param {Object} stealthUnit - The cloaked unit to calculate visibility for
- * @returns {number} Alpha value between 0 (invisible) and 0.85 (nearly visible)
- */
-function getStealthVisibilityAlpha(stealthUnit) {
-    const friendlyUnits = getPlayerUnits(stealthUnit.player);
-
-    // Find the nearest non-cloaked friendly unit
-    let minDistance = Infinity;
-    for (const unit of friendlyUnits) {
-        // Skip the stealth unit itself and other cloaked units
-        if (unit.id === stealthUnit.id || unit.cloaked) continue;
-
-        const distance = hexDistance(
-            { q: stealthUnit.q, r: stealthUnit.r },
-            { q: unit.q, r: unit.r }
-        );
-        minDistance = Math.min(minDistance, distance);
-    }
-
-    // If no friendly units nearby, use moderate visibility
-    if (minDistance === Infinity) {
-        return 0.4;
-    }
-
-    // Distance-based transparency:
-    // 0-1 hexes: High visibility (alpha 0.7-0.85)
-    // 2-3 hexes: Medium visibility (alpha 0.4-0.6)
-    // 4-5 hexes: Low visibility (alpha 0.2-0.35)
-    // 6+ hexes: Very low visibility (alpha 0.1-0.15)
-    if (minDistance <= 1) {
-        return 0.85 - minDistance * 0.15;
-    } else if (minDistance <= 3) {
-        return 0.6 - (minDistance - 1) * 0.1;
-    } else if (minDistance <= 5) {
-        return 0.35 - (minDistance - 3) * 0.075;
-    } else {
-        // Beyond 5 hexes, very low visibility with minimum floor
-        return Math.max(0.1, 0.2 - (minDistance - 5) * 0.02);
-    }
-}
+// Local aliases to unit renderer module functions for internal use
+const drawCamouflagePattern = drawCamouflagePatternFromModule;
+const getStealthVisibilityAlpha = getStealthVisibilityAlphaFromModule;
 
 /**
  * Initialize renderer
@@ -2430,6 +2334,7 @@ export async function initRenderer() {
     initVegetationRenderer(ctx);
     initTerrainRenderer(ctx);
     initMinimapRenderer(ctx);
+    initUnitRenderer(ctx);
 
     // Mark textures as initialized (now handled by assetLoader)
     texturesInitialized = true;
@@ -3516,383 +3421,11 @@ function drawGhostIndicator(cx, cy, ghost) {
     ctx.restore();
 }
 
-/**
- * Draw a speech bubble with text above a unit
- */
-function drawSpeechBubble(ctx, x, y, text, color, size) {
-    ctx.save();
-
-    const padding = size * 0.15;
-    const fontSize = Math.round(size * 0.28);
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    const textWidth = ctx.measureText(text).width;
-    const bubbleWidth = textWidth + padding * 2;
-    const bubbleHeight = fontSize + padding * 1.5;
-
-    // Bubble background with rounded corners
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.beginPath();
-    ctx.roundRect(x - bubbleWidth / 2, y - bubbleHeight / 2, bubbleWidth, bubbleHeight, 6);
-    ctx.fill();
-
-    // Border
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Speech bubble pointer (triangle pointing down)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
-    ctx.closePath();
-    ctx.fill();
-
-    // Pointer border
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x - 8, y + bubbleHeight / 2);
-    ctx.lineTo(x, y + bubbleHeight / 2 + 10);
-    ctx.lineTo(x + 8, y + bubbleHeight / 2);
-    ctx.stroke();
-
-    // Text
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, x, y);
-
-    ctx.restore();
-}
-
-/**
- * Draw a human unit with equipment
- */
-function drawUnit(unit, cx, cy, isSelected, isTargeted, isAttackable, isBlocked = false, blockedInfo = null) {
-    const size = state.hexSize * 0.59;  // Reduced from 0.65 to fix units being ~10% too large
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // Cloaked units visibility based on distance to nearest friendly unit
-    // Closer = more visible, farther = more transparent
-    let isCamouflagedEnemy = false;
-    if (unit.cloaked && unit.player === state.viewingPlayer) {
-        // Own cloaked units - visibility based on distance to own non-cloaked units
-        ctx.globalAlpha = getStealthVisibilityAlpha(unit);
-    } else if (unit.cloaked && unit.player !== state.viewingPlayer) {
-        // Enemy cloaked unit detected by proximity - show semi-transparent
-        const alpha = getEnemyCloakedVisibilityAlpha(unit, state.viewingPlayer);
-        if (alpha > 0) {
-            ctx.globalAlpha = alpha;
-        } else {
-            // Even invisible enemies show as terrain-colored shimmer (subtle)
-            isCamouflagedEnemy = true;
-        }
-    } else if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
-        // Unit that attacked while cloaked - visible but semi-transparent until turn ends
-        ctx.globalAlpha = 0.6;
-    }
-
-    // Draw terrain camouflage pattern for enemy cloaked units not in detection range
-    if (isCamouflagedEnemy) {
-        drawCamouflagePattern(cx, cy, size, unit);
-        ctx.restore();
-        return; // Don't draw the actual unit sprite
-    }
-
-    const unitHex = getHex(unit.q, unit.r);
-    const terrainColor = TERRAIN[unitHex?.type]?.color || '#2d5a40';
-    const outlineColor = getUnitOutlineColor(terrainColor);
-
-    // Soft shadow under unit feet for grounding
-    // Shadow is centered so feet appear in the middle of the shadow ellipse
-    // The unit sprite's feet are at cy + size * 0.3, so we center shadow there
-    ctx.save();
-    ctx.globalAlpha *= 0.3;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    // Shadow ellipse: center exactly at foot position, slightly larger for visibility
-    ctx.ellipse(cx, cy + size * 0.3, size * 0.35, size * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Base ring around unit - dashed normally, solid when selected
-    // Ring size matches unit sprite footprint
-    if (isSelected) {
-        // Selected: solid thick ring in player color
-        ctx.strokeStyle = playerColor;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([]);
-    } else {
-        // Normal: thin dashed ring in player color
-        ctx.strokeStyle = playerColor;
-        ctx.globalAlpha = 0.6;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 3]);
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.55, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1;
-
-    // Determine sprite status - note: 'selected' is not a sprite state, use 'normal' instead
-    // Selection is indicated by the ring around the unit, not a different sprite
-    const unitStatus = unit.hiding
-        ? 'cover'
-        : (isSelected && state.selectedAction === 'attack'
-            ? 'attack'
-            : 'normal');
-
-    // Draw the human sprite (uses static asset if available, otherwise runtime)
-    // Position: cx is center, cy + size * 0.3 is ground level (bottom of unit)
-    // Note: Scaling is handled in assetLoader.js drawUnit() - don't scale here
-    drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, unitStatus, isSelected, unit.player);
-
-    // NOTE: All HUD elements (badges, indicators, speech bubbles, HP bar) are now drawn
-    // separately in drawUnitOverlay() to ensure they're always on top of trees
-
-    // Attackable indicator
-    if (isAttackable && !isSelected) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([8, 5]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // "Target" icon
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.beginPath();
-        ctx.arc(cx, cy - size - 10, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 10px sans-serif';
-        ctx.fillText('!', cx, cy - size - 10);
-    }
-
-    // Targeted crosshair animation
-    if (isTargeted) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 3;
-        const crossSize = size + 25;
-
-        // Crosshair lines
-        ctx.beginPath();
-        ctx.moveTo(cx - crossSize, cy);
-        ctx.lineTo(cx - size - 10, cy);
-        ctx.moveTo(cx + size + 10, cy);
-        ctx.lineTo(cx + crossSize, cy);
-        ctx.moveTo(cx, cy - crossSize);
-        ctx.lineTo(cx, cy - size - 10);
-        ctx.moveTo(cx, cy + size + 10);
-        ctx.lineTo(cx, cy + crossSize);
-        ctx.stroke();
-
-        // Outer targeting ring
-        ctx.beginPath();
-        ctx.arc(cx, cy, crossSize, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner pulsing ring
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 5, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-
-    // Blocked target indicator - in range but no line of sight
-    if (isBlocked && !isSelected) {
-        // Dimmed ring
-        ctx.strokeStyle = 'rgba(156, 163, 175, 0.6)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, size + 15, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // "No LOS" indicator with crossed lines
-        ctx.strokeStyle = 'rgba(156, 163, 175, 0.8)';
-        ctx.lineWidth = 3;
-        const xSize = 8;
-        const xY = cy - size - 15;
-        ctx.beginPath();
-        ctx.moveTo(cx - xSize, xY - xSize);
-        ctx.lineTo(cx + xSize, xY + xSize);
-        ctx.moveTo(cx + xSize, xY - xSize);
-        ctx.lineTo(cx - xSize, xY + xSize);
-        ctx.stroke();
-
-        // Show what's blocking (icon)
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const blockIcon = blockedInfo && blockedInfo.blockedBy === 'rock' ? '🪨' : '🌲';
-        ctx.fillText(blockIcon, cx + size * 0.7, cy - size - 15);
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw a dead unit as a decoration on the map
- * Uses the dedicated dead sprite (unit lying on ground)
- */
-function drawDeadUnit(unit, cx, cy) {
-    // Safety check
-    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
-        return;
-    }
-
-    const size = state.hexSize * 0.49;  // Reduced ~17% from 0.59 for proper dead unit proportions
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // Draw unit sprite with desaturation (no transparency - dead units should be fully visible)
-    ctx.filter = 'grayscale(70%) brightness(0.7)';
-
-    // Draw the dead sprite (unit lying on ground)
-    try {
-        drawUnitSprite(ctx, cx, cy + size * 0.3, size, playerColor, unit.class, 'dead', false, unit.player);
-    } catch {
-        // Fallback: draw colored ellipse
-        ctx.fillStyle = playerColor;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, size * 0.5, size * 0.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    ctx.restore();
-}
-
-/**
- * Draw unit overlay - all HUD elements (badges, indicators, HP bar) on top of everything
- * Called after all depth-sorted elements to ensure visibility
- */
-function drawUnitOverlay(unit, cx, cy) {
-    // Safety check: bail out if coordinates are not finite (prevents NaN errors)
-    if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(state.hexSize) || state.hexSize <= 0) {
-        return;
-    }
-
-    const size = state.hexSize * 0.59;  // Match drawUnit size
-    const playerColor = CONFIG.PLAYER_COLORS[unit.player];
-
-    ctx.save();
-
-    // === ENEMY INDICATOR ===
-    // Show a red ring around enemy units to clearly identify them
-    // The ring alone is sufficient - additional markers create visual clutter
-    const isEnemy = unit.player !== state.viewingPlayer && !arePlayersAllied(unit.player, state.viewingPlayer);
-    if (isEnemy) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2.5;
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath();
-        ctx.arc(cx, cy, size * 0.75, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-    }
-
-    // Shield indicator (if unit has shield from power-up)
-    if (unit.shield) {
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = '#3b82f6';
-        ctx.shadowBlur = 10;
-        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
-        ctx.fillText('🛡️', cx, cy - size - 5);
-        ctx.shadowBlur = 0;
-    }
-
-    // Track vertical offset for speech bubbles to prevent overlap
-    let speechBubbleOffset = 0;
-
-    // Cover status speech bubble (only for current player's units in cover)
-    // Position higher to avoid overlap with HP bar
-    if (unit.hiding && unit.player === state.currentPlayer) {
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'In Deckung', '#22c55e', size * 0.8);
-        speechBubbleOffset += size * 0.6;  // Offset next bubble
-    }
-
-    // "Spotted!" indicator - MOST IMPORTANT, draw first (highest position)
-    // This takes priority over other status indicators
-    if (unit.spotted && unit.player === state.currentPlayer) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Entdeckt!', '#ef4444', size * 0.8);
-        speechBubbleOffset += size * 0.6;
-    }
-
-    // Cloak indicator (visible to owner) - only show if not spotted (spotted is more important)
-    if (unit.cloaked && unit.player === state.viewingPlayer && !unit.spotted) {
-        ctx.globalAlpha = 1;
-        drawSpeechBubble(ctx, cx + size * 0.6, cy - size * 1.8 - speechBubbleOffset, 'Getarnt!', '#a855f7', size * 0.8);
-        speechBubbleOffset += size * 0.6;
-    }
-
-    // Revealed after attack indicator
-    if (unit.revealedUntilEndOfTurn && unit.player !== state.viewingPlayer) {
-        ctx.globalAlpha = 0.9;
-        ctx.shadowColor = '#ef4444';
-        ctx.shadowBlur = 8;
-        ctx.font = `${Math.round(size * 0.35)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚠️', cx + size * 0.6, cy - size * 0.6);
-        ctx.shadowBlur = 0;
-    }
-
-    // Note: Sprint/Powershot/DamageBoost indicators removed - the action buttons
-    // already show when abilities are active, no need for redundant unit overlays
-
-    ctx.restore();
-
-    // HP bar with gradient - positioned ABOVE the unit
-    // Ensure hpPct is a valid number between 0 and 1
-    const rawHpPct = unit.maxHp > 0 ? unit.currentHp / unit.maxHp : 0;
-    const hpPct = Number.isFinite(rawHpPct) ? Math.max(0, Math.min(1, rawHpPct)) : 0;
-    // Compact, proportional bar sizing - reduced for cleaner look
-    const barWidth = size * 0.8;
-    const barHeight = 4;
-    // Position above unit (negative offset from center)
-    const barY = cy - size * 1.1;
-
-    // Bar background - subtle with slight shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2 - 1, barY - 1, barWidth + 2, barHeight + 2, 3);
-    ctx.fill();
-
-    // HP bar fill with gradient (use minimum width of 1 to prevent zero-width gradient)
-    const gradientWidth = Math.max(1, barWidth * hpPct);
-    const barGradient = safeLinearGradient(ctx, cx - barWidth / 2, barY, cx - barWidth / 2 + gradientWidth, barY, '#22c55e');
-    if (typeof barGradient !== 'string') {
-        if (hpPct > 0.5) {
-            barGradient.addColorStop(0, '#22c55e');
-            barGradient.addColorStop(1, '#16a34a');
-        } else if (hpPct > 0.25) {
-            barGradient.addColorStop(0, '#eab308');
-            barGradient.addColorStop(1, '#ca8a04');
-        } else {
-            barGradient.addColorStop(0, '#ef4444');
-            barGradient.addColorStop(1, '#dc2626');
-        }
-    }
-
-    ctx.fillStyle = barGradient;
-    ctx.beginPath();
-    ctx.roundRect(cx - barWidth / 2, barY, barWidth * hpPct, barHeight, 2);
-    ctx.fill();
-
-    // NOTE: HP text removed for cleaner HUD - bar color (green/yellow/red)
-    // and fill level intuitively show health status
-}
+// Local aliases to unit renderer module functions for internal use
+const drawSpeechBubble = drawSpeechBubbleFromModule;
+const drawUnit = drawUnitFromModule;
+const drawDeadUnit = drawDeadUnitFromModule;
+const drawUnitOverlay = drawUnitOverlayFromModule;
 
 /**
  * Lighten a hex color
