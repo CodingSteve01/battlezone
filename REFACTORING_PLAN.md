@@ -20,7 +20,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
 | state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
-| renderer.js LOC | 6,053 | 4,798 | <300 | 🟡 -1,255 LOC (-21%) |
+| renderer.js LOC | 6,053 | 4,537 | <300 | 🟡 -1,516 LOC (-25%) |
 
 ### Progress Summary
 
@@ -656,11 +656,12 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PRs 13-15 complete, PRs 16-18 pending
+**Status:** 🟡 PRs 13-16 complete, PRs 17-18 pending
 **Progress:**
-- renderer.js: 6,053 → 4,798 LOC (-1,255 LOC, -21%)
+- renderer.js: 6,053 → 4,537 LOC (-1,516 LOC, -25%)
 - minimapRenderer.js: 707 LOC ✅
 - unitRenderer.js: 495 LOC ✅
+- effectsRenderer.js: 441 LOC ✅ (height/lighting effects)
 - renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
 
 ---
@@ -709,16 +710,22 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-### PR 16: Extract rendering/effectsRenderer.js
+### PR 16: Extract rendering/effectsRenderer.js ✅
 
 **Estimated Diff:** ~350 LOC
+**Actual:** 441 LOC
+**Status:** ✅ COMPLETE
 
-**Functions to Extract:**
-- `drawHeightShading()`
-- `draw3DFace()`
-- 3D/isometric effects
-- Lighting calculations
-- Screen shake rendering
+**Functions Extracted:**
+- `drawHexPath()` - Core hex path drawing helper
+- `getHeightShadeStyle()`, `drawHeightShading()` - Height-based shading
+- `getLightVector()`, `getViewVector()`, `isEdgeFacingViewer()` - Lighting calculation
+- `getShadowOffset()`, `drawHeightShadow()`, `applyTileLighting()` - Shadow effects
+- `drawHeightExtrusion()`, `drawBaseSkirt()`, `drawCliffFaces()` - Height/cliff rendering
+- `drawSpriteShadow()` - Sprite shadow rendering
+- `drawHeightDebugOverlay()` - Debug visualization
+
+**Note:** 3D mesh system (draw3DFace, collectHex3DFaces, etc.) remains in renderer.js for now due to tight coupling with hex rendering loop.
 
 ---
 
