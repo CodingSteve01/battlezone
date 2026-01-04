@@ -116,6 +116,18 @@ import {
     drawHexPathToContext,
     drawHexToContext
 } from './rendering/hexCacheRenderer.js';
+import {
+    renderBackground,
+    collectVisibleHexData,
+    drawZoneDangerOverlay,
+    drawZoneWarningBorder,
+    getMovementRangeColors,
+    drawMovementRangeHighlight,
+    drawAttackLine,
+    drawAttackRangeIndicator,
+    drawCoverIcon,
+    drawAPCostOverlay
+} from './rendering/terrainRenderer.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -2815,35 +2827,8 @@ export function render() {
     // Track performance for auto-quality adjustment
     updatePerformance();
 
-    // Background - simplified on low quality
-    if (state.effectiveQuality === 'low') {
-        ctx.fillStyle = '#12122b';
-        ctx.fillRect(0, 0, w, h);
-    } else {
-        // Background with modern gradient
-        const bgGradient = safeRadialGradient(ctx, w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8, '#12122b');
-        if (typeof bgGradient !== 'string') {
-            bgGradient.addColorStop(0, '#1a1a3e');
-            bgGradient.addColorStop(0.5, '#12122b');
-            bgGradient.addColorStop(1, '#0c0c1d');
-        }
-        ctx.fillStyle = bgGradient;
-        ctx.fillRect(0, 0, w, h);
-
-        // Subtle ambient glow - only on high quality
-        if (state.effectiveQuality === 'high') {
-            ctx.save();
-            ctx.globalAlpha = 0.1;
-            const ambientGlow = safeRadialGradient(ctx, w * 0.3, h * 0.3, 0, w * 0.3, h * 0.3, w * 0.5, 'transparent');
-            if (typeof ambientGlow !== 'string') {
-                ambientGlow.addColorStop(0, '#10b981');
-                ambientGlow.addColorStop(1, 'transparent');
-            }
-            ctx.fillStyle = ambientGlow;
-            ctx.fillRect(0, 0, w, h);
-            ctx.restore();
-        }
-    }
+    // Background - delegated to terrainRenderer
+    renderBackground(ctx, w, h);
 
     // Update screen shake and get current offset
     const shakeOffset = updateScreenShake();
@@ -3011,25 +2996,7 @@ export function render() {
         // Draw red overlay on hexes outside the safe zone
         if (state.zoneRadius > 0 && state.zoneRadius < state.maxZoneRadius) {
             if (!isHexInZone(hex.q, hex.r)) {
-                // Red danger zone overlay
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                const zoneGradient = safeRadialGradient(ctx, sx, sy, 0, sx, sy, tileSize, 'rgba(220, 38, 38, 0.25)');
-                if (typeof zoneGradient !== 'string') {
-                    zoneGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
-                    zoneGradient.addColorStop(0.6, 'rgba(220, 38, 38, 0.25)');
-                    zoneGradient.addColorStop(1, 'rgba(185, 28, 28, 0.35)');
-                }
-                ctx.fillStyle = zoneGradient;
-                ctx.fill();
-
-                // Pulsing red border for danger zone edge
-                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 500);
-                ctx.strokeStyle = `rgba(239, 68, 68, ${0.4 + pulse * 0.3})`;
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                ctx.restore();
+                drawZoneDangerOverlay(ctx, sx, sy, tileSize);
             }
         }
 
@@ -3038,58 +3005,21 @@ export function render() {
             const hexDist = Math.max(Math.abs(hex.q), Math.abs(hex.r), Math.abs(-hex.q - hex.r));
             // Hexes that will be outside after next shrink
             if (hexDist > state.zoneRadius - 2 && hexDist <= state.zoneRadius) {
-                ctx.save();
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize);
-                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
-                ctx.strokeStyle = `rgba(251, 191, 36, ${0.5 + pulse * 0.4})`;
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                ctx.restore();
+                drawZoneWarningBorder(ctx, sx, sy, tileSize);
             }
         }
 
-        // Highlight reachable hexes for movement - traffic light color system based on cumulative path cost
-        // Only show colored overlays when a path is being planned (currentPath exists)
+        // Highlight reachable hexes for movement - traffic light color system
         const isPathPlanning = state.currentPath && state.currentPath.length > 0;
         if (reachableHexes.size > 0 && fogLevel === 'visible' && isPathPlanning) {
             const hexKey = `${hex.q},${hex.r}`;
             const pathData = reachableHexes.get(hexKey);
             if (pathData && !hex.unit) {
-                // Check if this hex offers cover
                 const hexTerrain = TERRAIN[hex.type];
                 const offersCover = hexTerrain && hexTerrain.canHide;
 
-                // Traffic light color system based on cumulative path cost (total AP to reach):
-                // Green (1-2 AP): Close/easy to reach
-                // Yellow (3-4 AP): Medium distance
-                // Red (5+ AP): Far/expensive to reach
-                const totalPathCost = pathData.cost;
-                let fillColor, strokeColor;
-                if (totalPathCost <= 2) {
-                    // Green - close/cheap to reach
-                    fillColor = offersCover ? 'rgba(16, 185, 129, 0.4)' : 'rgba(34, 197, 94, 0.3)';
-                    strokeColor = offersCover ? 'rgba(16, 185, 129, 0.85)' : 'rgba(34, 197, 94, 0.7)';
-                } else if (totalPathCost <= 4) {
-                    // Yellow/Orange - medium distance
-                    fillColor = offersCover ? 'rgba(234, 179, 8, 0.45)' : 'rgba(251, 191, 36, 0.35)';
-                    strokeColor = offersCover ? 'rgba(234, 179, 8, 0.9)' : 'rgba(251, 191, 36, 0.75)';
-                } else {
-                    // Red - far/expensive (5+ AP)
-                    fillColor = offersCover ? 'rgba(239, 68, 68, 0.45)' : 'rgba(248, 113, 113, 0.35)';
-                    strokeColor = offersCover ? 'rgba(239, 68, 68, 0.9)' : 'rgba(248, 113, 113, 0.75)';
-                }
-
-                // Draw movement range highlight with traffic light colors
-                ctx.beginPath();
-                drawHexPath(sx, sy, tileSize * 0.88);
-                ctx.fillStyle = fillColor;
-                ctx.fill();
-
-                // Clear visible border
-                ctx.strokeStyle = strokeColor;
-                ctx.lineWidth = offersCover ? 3 : 2.5;
-                ctx.stroke();
+                // Draw movement highlight using terrainRenderer helper
+                drawMovementRangeHighlight(ctx, sx, sy, tileSize, pathData.cost, offersCover);
 
                 // Collect cover positions for later (show only the best ones)
                 if (offersCover) {
@@ -3119,29 +3049,10 @@ export function render() {
         const fromPos = getTileScreenPosition(currentUnit.q, currentUnit.r, fromHex?.height ?? 0, tileSize);
         const toPos = getTileScreenPosition(state.targetedUnit.q, state.targetedUnit.r, toHex?.height ?? 0, tileSize);
 
-        // Gradient attack line
-        const gradient = safeLinearGradient(
-            ctx,
+        drawAttackLine(ctx,
             state.offsetX + fromPos.x, state.offsetY + fromPos.y,
-            state.offsetX + toPos.x, state.offsetY + toPos.y,
-            'rgba(239, 68, 68, 0.6)'
+            state.offsetX + toPos.x, state.offsetY + toPos.y
         );
-        if (typeof gradient !== 'string') {
-            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
-            gradient.addColorStop(0.5, 'rgba(239, 68, 68, 0.8)');
-            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)');
-        }
-
-        ctx.save();
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 4;
-        ctx.setLineDash([12, 6]);
-        ctx.beginPath();
-        ctx.moveTo(state.offsetX + fromPos.x, state.offsetY + fromPos.y);
-        ctx.lineTo(state.offsetX + toPos.x, state.offsetY + toPos.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
     }
 
     // Draw ghost indicators for cloaked enemy attacks
@@ -3352,47 +3263,13 @@ export function render() {
     });
 
     // Draw cover icons on top of all terrain and foreground elements (max 4 best positions)
-    // Note: Using canvas-drawn shield instead of emoji for consistent cross-platform rendering
     if (coverPositions.length > 0) {
         const bestCoverPositions = coverPositions
             .sort((a, b) => a.cost - b.cost)
             .slice(0, 4);
 
         bestCoverPositions.forEach(({ sx, sy }) => {
-            const iconSize = assetSize * 0.22;
-            const iconY = sy - assetSize * 0.3;
-
-            ctx.save();
-
-            // Drop shadow
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 2;
-
-            // Shield shape path
-            ctx.beginPath();
-            ctx.moveTo(sx, iconY - iconSize);
-            ctx.lineTo(sx + iconSize * 0.85, iconY - iconSize * 0.6);
-            ctx.lineTo(sx + iconSize * 0.85, iconY + iconSize * 0.2);
-            ctx.quadraticCurveTo(sx + iconSize * 0.4, iconY + iconSize * 0.8, sx, iconY + iconSize);
-            ctx.quadraticCurveTo(sx - iconSize * 0.4, iconY + iconSize * 0.8, sx - iconSize * 0.85, iconY + iconSize * 0.2);
-            ctx.lineTo(sx - iconSize * 0.85, iconY - iconSize * 0.6);
-            ctx.closePath();
-
-            // Fill with gradient
-            const gradient = ctx.createLinearGradient(sx - iconSize, iconY - iconSize, sx + iconSize, iconY + iconSize);
-            gradient.addColorStop(0, '#4ade80');
-            gradient.addColorStop(1, '#16a34a');
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // Border
-            ctx.strokeStyle = '#15803d';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-
-            ctx.restore();
+            drawCoverIcon(ctx, sx, sy, assetSize);
         });
     }
 
@@ -3410,44 +3287,13 @@ export function render() {
         const sy = state.offsetY + pos.y;
         const rangeRadius = getEffectiveRange(currentUnit) * tileSize * 1.75;
 
-        // Fill area for better visibility
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.08)';
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Gradient range circle - more visible
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.7)';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([15, 8]);
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Inner glow - stronger
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.arc(sx, sy, rangeRadius - 5, 0, Math.PI * 2);
-        ctx.stroke();
+        drawAttackRangeIndicator(ctx, sx, sy, rangeRadius);
     }
 
     // Draw AP cost overlays - only when a path is being planned
     if (apCostOverlays.length > 0 && state.currentPath && state.currentPath.length > 0) {
         apCostOverlays.forEach(({ sx, sy, cost, offersCover }) => {
-            // Background pill for cost
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-            ctx.beginPath();
-            ctx.roundRect(sx - tileSize * 0.2, sy + tileSize * 0.35, tileSize * 0.4, tileSize * 0.26, 5);
-            ctx.fill();
-
-            // Cost number
-            ctx.fillStyle = offersCover ? '#10b981' : '#22c55e';
-            ctx.font = `bold ${Math.round(tileSize * 0.22)}px sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(`${cost}`, sx, sy + tileSize * 0.48);
+            drawAPCostOverlay(ctx, sx, sy, tileSize, cost, offersCover);
         });
     }
 
