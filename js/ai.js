@@ -32,19 +32,48 @@ const aiThoughts = {
     current: null,          // Current thought being displayed
     queue: [],              // Queue of thoughts to display
     enabled: false,         // Only enabled in spectator mode (all AI players)
-    displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
+    displayTime: 5500,      // How long each thought is displayed (ms) - longer for readability
+    lastDetailTime: 0,      // Timestamp of last detail message (for rate limiting)
+    detailCooldown: 4000,   // Minimum ms between detail messages (attack, move, etc.)
+    shownThisTurn: new Set(), // Track similar messages shown this turn to avoid repetition
 };
 
 /**
  * Add an AI thought to be displayed
+ * Strategy messages are always shown, detail messages are rate-limited
  */
 function addAIThought(thought, category = 'general') {
     if (!isSpectatorMode()) return;
 
+    const now = Date.now();
+    const isDetailCategory = ['attack', 'move', 'special', 'retreat'].includes(category);
+
+    // Rate-limit detail messages to avoid spam
+    if (isDetailCategory) {
+        // Check cooldown
+        if (now - aiThoughts.lastDetailTime < aiThoughts.detailCooldown) {
+            return; // Skip this detail message
+        }
+
+        // Check for similar messages (first 30 chars)
+        const messageKey = thought.substring(0, 30);
+        if (aiThoughts.shownThisTurn.has(messageKey)) {
+            return; // Skip repetitive message
+        }
+        aiThoughts.shownThisTurn.add(messageKey);
+        aiThoughts.lastDetailTime = now;
+    }
+
+    // Limit queue size to prevent buildup
+    if (aiThoughts.queue.length >= 3) {
+        // Keep only strategy messages in queue
+        aiThoughts.queue = aiThoughts.queue.filter(t => t.category === 'strategy');
+    }
+
     const thoughtObj = {
         text: thought,
-        category: category,  // 'strategy', 'attack', 'move', 'special', 'retreat'
-        timestamp: Date.now()
+        category: category,
+        timestamp: now
     };
 
     aiThoughts.queue.push(thoughtObj);
@@ -113,13 +142,62 @@ function variedPhrase(options) {
 }
 
 /**
- * Clear all pending thoughts
+ * Clear all pending thoughts and reset turn tracking
  */
 function clearAIThoughts() {
     aiThoughts.queue = [];
     aiThoughts.current = null;
+    aiThoughts.shownThisTurn.clear();
+    aiThoughts.lastDetailTime = 0;
     const existing = document.querySelector('.ai-thought-bubble');
     if (existing) existing.remove();
+}
+
+/**
+ * Show a strategic overview at the start of an AI turn
+ * Summarizes the AI's overall plan without repetitive unit-by-unit details
+ */
+function showTurnStrategyOverview(plan, sortedUnits) {
+    const playerName = getPlayerName(state.currentPlayer);
+    const aliveUnits = sortedUnits.filter(u => u.alive).length;
+    const enemies = plan.visibleEnemies || [];
+    const totalAP = state.sharedAP || 0;
+
+    // Determine overall strategy based on situation
+    let strategyMessage = '';
+
+    if (enemies.length === 0) {
+        // No enemies visible - exploration mode
+        if (aiMemory.huntMode) {
+            strategyMessage = `${playerName} startet Suchmodus. ${aliveUnits} Einheiten schwärmen aus, um den Feind zu finden.`;
+        } else {
+            strategyMessage = `${playerName} erkundet das Terrain mit ${aliveUnits} Einheiten. Noch kein Feindkontakt.`;
+        }
+    } else if (enemies.length === 1) {
+        // Single enemy - focus fire
+        const enemyClass = CLASS_NAMES_DE[enemies[0].class] || enemies[0].class;
+        const enemyHp = Math.round((enemies[0].currentHp / enemies[0].maxHp) * 100);
+        if (enemyHp <= 30) {
+            strategyMessage = `${playerName} hat einen verwundeten ${enemyClass} entdeckt. Koordinierter Angriff zur Eliminierung.`;
+        } else {
+            strategyMessage = `${playerName} konzentriert alle ${aliveUnits} Einheiten auf den ${enemyClass}.`;
+        }
+    } else {
+        // Multiple enemies - tactical assessment
+        const woundedEnemies = enemies.filter(e => e.currentHp < e.maxHp * 0.5).length;
+        const threatLevel = enemies.length >= aliveUnits ? 'hoch' : 'mittel';
+
+        if (woundedEnemies > 0) {
+            strategyMessage = `${playerName} sieht ${enemies.length} Feinde (${woundedEnemies} verwundet). Priorität: Verwundete ausschalten.`;
+        } else if (aiMemory.flankingTargets && aiMemory.flankingTargets.size > 0) {
+            strategyMessage = `${playerName} plant Umzingelung. ${aliveUnits} Einheiten rücken in Formation vor.`;
+        } else {
+            strategyMessage = `${playerName} gegen ${enemies.length} Feinde. Bedrohungsstufe: ${threatLevel}. ${totalAP} AP verfügbar.`;
+        }
+    }
+
+    // Add the overview as a strategy message (always shown)
+    addAIThought(strategyMessage, 'strategy');
 }
 
 // ===== AI MEMORY SYSTEM =====
@@ -3088,7 +3166,8 @@ async function performAIActions() {
     initializeTeamMemory();
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
-    const unitDelay = spectatorMode ? 800 : 400;
+    // Increased delay allows time to read thoughts and follow actions
+    const unitDelay = spectatorMode ? 1800 : 400;
 
     // Wrap entire AI execution in try/catch to ensure endTurn is ALWAYS called
     // This prevents the game from hanging if any async operation fails
@@ -3115,10 +3194,11 @@ async function performAIActions() {
         // Sort units by role priority for this turn
         const sortedUnits = sortUnitsForExecution(plan);
 
-        // In spectator mode, hide the thinking overlay once AI starts executing
-        // so the viewer can watch the action without obstruction
+        // In spectator mode, show strategic overview before actions
         if (spectatorMode) {
+            showTurnStrategyOverview(plan, sortedUnits);
             hideAIThinking();
+            await delay(1500); // Give time to read the overview
         }
 
         // Track units processed for debugging
