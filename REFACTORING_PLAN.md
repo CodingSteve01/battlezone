@@ -20,7 +20,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
 | state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
-| renderer.js LOC | 6,053 | 4,537 | <300 | 🟡 -1,516 LOC (-25%) |
+| renderer.js LOC | 6,053 | 4,422 | <300 | 🟡 -1,631 LOC (-27%) |
 
 ### Progress Summary
 
@@ -656,12 +656,13 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PRs 13-16 complete, PRs 17-18 pending
+**Status:** 🟡 PRs 13-17 complete, PR 18 pending
 **Progress:**
-- renderer.js: 6,053 → 4,537 LOC (-1,516 LOC, -25%)
+- renderer.js: 6,053 → 4,422 LOC (-1,631 LOC, -27%)
 - minimapRenderer.js: 707 LOC ✅
 - unitRenderer.js: 495 LOC ✅
 - effectsRenderer.js: 441 LOC ✅ (height/lighting effects)
+- uiRenderer.js: 175 LOC ✅ (UI overlay elements)
 - renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
 
 ---
@@ -729,16 +730,19 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-### PR 17: Extract rendering/uiRenderer.js
+### PR 17: Extract rendering/uiRenderer.js ✅
 
 **Estimated Diff:** ~200 LOC
+**Actual:** 175 LOC
+**Status:** ✅ COMPLETE
 
-**Functions to Extract:**
-- `drawScrollHint()`
-- `drawEventIndicator()`
-- `drawToggleButton()`
-- `drawCloseButton()`
-- UI overlay rendering
+**Functions Extracted:**
+- `drawScrollHint()` - Scroll hint arrows at viewport edges
+- `drawPowerup()` - Power-up rendering with glow and animation
+- `drawEventIndicator()` - Active event indicator in corner
+- `drawZoomIndicator()` - Zoom level display
+
+**Note:** `drawPathPreviewOnTop()` remains in renderer.js due to tight integration with movement system and significant complexity (~220 LOC).
 
 ---
 
