@@ -20,7 +20,7 @@ This document outlines a comprehensive refactoring plan to bring the Shadow Squa
 | Circular dependencies | 1 | 0 | 0 | ✅ Fixed |
 | Max nesting depth | 5+ | 5+ | 3 | ⬜ Pending |
 | state.js LOC | 1,496 | 1,301 | <300 | 🟡 -195 LOC |
-| renderer.js LOC | 6,053 | 4,017 | <300 | 🟡 -2,036 LOC (-34%) |
+| renderer.js LOC | 6,053 | 3,727 | <300 | 🟡 -2,326 LOC (-38%) |
 
 ### Progress Summary
 
@@ -656,15 +656,16 @@ export function getLastRoundSummary() { ... }
 
 **Goal:** Split renderer.js (6,053 LOC) into focused modules under 300 LOC each.
 
-**Status:** 🟡 PRs 13-17 complete, PR 14a (vegetation) complete, PR 18 pending
+**Status:** 🟡 PRs 13-17 complete, PR 14a-14b complete, PR 18 pending
 **Progress:**
-- renderer.js: 6,053 → 4,017 LOC (-2,036 LOC, -34%)
+- renderer.js: 6,053 → 3,727 LOC (-2,326 LOC, -38%)
 - minimapRenderer.js: 707 LOC ✅
 - unitRenderer.js: 495 LOC ✅
 - effectsRenderer.js: 441 LOC ✅ (height/lighting effects)
 - uiRenderer.js: 175 LOC ✅ (UI overlay elements)
 - renderUtils.js: 273 LOC ✅ (shared utilities + color manipulation)
 - vegetationRenderer.js: 491 LOC ✅ (biome trees, bushes, rocks)
+- hexCacheRenderer.js: 336 LOC ✅ (hex tile caching, terrain textures)
 
 ---
 
@@ -704,16 +705,18 @@ export function getLastRoundSummary() { ... }
 
 ---
 
-### PR 14b: Extract terrain caching (PENDING)
+### PR 14b: Extract rendering/hexCacheRenderer.js ✅
 
 **Estimated Diff:** ~350 LOC
+**Actual:** 336 LOC
+**Status:** ✅ COMPLETE
 
-**Functions to Extract:**
-- `drawHexToContext()`
-- `getCachedHexTile()`
-- `createHexTileCanvas()`
-- `shouldSkipCache()`
-- Hex tile caching system
+**Functions Extracted:**
+- Cache configuration (`CACHE_BASE_HEX_SIZE`, `MAX_CACHE_SIZE`, `DETAIL_DENSITY_SCALE`)
+- Cache storage (`hexTileCache`, `foregroundCache`, `clearRenderCaches()`)
+- `getTerrainTexture()`, `shouldSkipCache()`
+- `getCachedHexTile()`, `createHexTileCanvas()`
+- `drawHexPathToContext()`, `drawHexToContext()`
 
 ---
 
