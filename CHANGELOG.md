@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.3...shadow-squad-v6.6.4) (2026-01-04)
+
+
+### Bug Fixes
+
+* **ui:** show player name during AI turns ([#358](https://github.com/CodingSteve01/battlezone/issues/358)) ([3579927](https://github.com/CodingSteve01/battlezone/commit/3579927d62d66a6dfde1a6f6c1ab54e4b7d53f99))
+
 ## [6.6.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.2...shadow-squad-v6.6.3) (2026-01-03)
 
 
