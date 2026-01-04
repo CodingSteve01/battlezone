@@ -8,3 +8,4 @@ export * from './unitRenderer.js';
 export * from './effectsRenderer.js';
 export * from './uiRenderer.js';
 export * from './vegetationRenderer.js';
+export * from './hexCacheRenderer.js';

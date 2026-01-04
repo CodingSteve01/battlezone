@@ -102,6 +102,20 @@ import {
     drawFlowerCluster,
     drawRockFormation2D5
 } from './rendering/vegetationRenderer.js';
+import {
+    CACHE_BASE_HEX_SIZE,
+    DETAIL_DENSITY_SCALE,
+    MAX_CACHE_SIZE,
+    hexTileCache,
+    foregroundCache,
+    clearRenderCaches,
+    getTerrainTexture,
+    shouldSkipCache,
+    getCachedHexTile,
+    createHexTileCanvas,
+    drawHexPathToContext,
+    drawHexToContext
+} from './rendering/hexCacheRenderer.js';
 
 // Re-export minimap functions for backward compatibility
 export {
@@ -199,6 +213,22 @@ const drawScrollHint = drawScrollHintFromModule;
 const drawPowerup = drawPowerupFromModule;
 const drawEventIndicator = drawEventIndicatorFromModule;
 const drawZoomIndicator = drawZoomIndicatorFromModule;
+
+// Re-export hex cache functions for backward compatibility
+export {
+    CACHE_BASE_HEX_SIZE,
+    DETAIL_DENSITY_SCALE,
+    MAX_CACHE_SIZE,
+    hexTileCache,
+    foregroundCache,
+    clearRenderCaches,
+    getTerrainTexture,
+    shouldSkipCache,
+    getCachedHexTile,
+    createHexTileCanvas,
+    drawHexPathToContext,
+    drawHexToContext
+};
 
 // ===== CLIFF TEXTURE CACHE =====
 
@@ -448,59 +478,14 @@ export function getPresetList() { return ['default']; }
 let canvas, ctx;
 let texturesInitialized = false;
 
-// ===== HEX TILE CACHING SYSTEM =====
-// Pre-renders hex tiles with terrain details for improved performance
-
-/**
- * Cache for pre-rendered hex tiles.
- * Key format: "${q},${r}_${fogLevel}_${quality}"
- * Value: OffscreenCanvas or regular Canvas with the pre-rendered hex
- */
-const hexTileCache = new Map();
-
-/**
- * Cache for pre-rendered foreground elements (trees, rocks, bushes).
- * Key format: "${q},${r}"
- * Value: { canvas, elements } where elements contains position data for sorting
- */
-const foregroundCache = new Map();
-
-/**
- * Track the current quality level for cache invalidation
- */
-let cachedQualityLevel = null;
-
-/**
- * Base hex size for caching - tiles are cached at this size and scaled when drawn
- * This prevents cache invalidation during zoom operations
- */
-const CACHE_BASE_HEX_SIZE = 60;
-
-// Detail scaling for larger base tiles (tile ~ human size)
-const DETAIL_DENSITY_SCALE = Math.min(1, CACHE_BASE_HEX_SIZE / CONFIG.BASE_HEX_SIZE);
+// Hex tile caching system - now imported from hexCacheRenderer.js
+// Local constants for detail rendering
 const DETAIL_SPRITE_SCALE = 0.85;
 const DETAIL_CLEARANCE_EDGE = 0.2;
 const cliffTextureCache = new Map();
 
 function scaleDetailCount(count, min = 1) {
     return Math.max(min, Math.round(count * DETAIL_DENSITY_SCALE));
-}
-
-/**
- * Maximum number of cached tiles to prevent memory issues
- */
-// Increased cache size to prevent eviction during scrolling/zoom
-// A large map with full visibility needs ~500 tiles, plus 3 fog levels = 1500
-// Increased from 2000 to accommodate separate earth/surface caches for two-pass rendering
-const MAX_CACHE_SIZE = 3000;
-
-/**
- * Clear all caches (call when map regenerates or quality changes significantly)
- */
-export function clearRenderCaches() {
-    hexTileCache.clear();
-    foregroundCache.clear();
-    cachedQualityLevel = null;
 }
 
 // ===== 3D HEX MESH RENDERING SYSTEM =====
@@ -1347,272 +1332,6 @@ function collectForegroundElementDefinitions(size, type, hexQ, hexR) {
     }
 
     return elements;
-}
-
-/**
- * Get the appropriate texture for a terrain type
- * Uses animated frame if available, otherwise falls back to static texture
- * @param {string} terrainType - The terrain type (e.g., 'water', 'grass')
- * @param {number} q - Hex q coordinate (for static variant selection)
- * @param {number} r - Hex r coordinate (for static variant selection)
- * @returns {Image|Canvas|null} The texture to use
- */
-function getTerrainTexture(terrainType, q, r) {
-    // Check if this terrain type has animated frames loaded
-    if (hasAnimatedTexture(terrainType)) {
-        const animFrame = getAnimatedTexture(terrainType, state.terrainAnimationFrame);
-        if (animFrame) {
-            return animFrame;
-        }
-    }
-
-    // Fall back to static texture
-    return getTexture(terrainType, q, r);
-}
-
-/**
- * Check if a terrain type should skip caching (animated terrain)
- */
-function shouldSkipCache(hexType) {
-    // Skip caching for animated terrain that has loaded animation frames
-    return hasAnimatedTexture(hexType);
-}
-
-/**
- * Get or create a cached hex tile with terrain details
- * Tiles are cached at a fixed base size and scaled when drawn to avoid
- * cache invalidation during zoom operations
- * @param {Object} hex - The hex object
- * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @param {string} renderPass - 'full' (default), 'earth', or 'surface'
- * @returns {Object|null} { canvas, scale } or null if caching disabled
- */
-function getCachedHexTile(hex, fogLevel, renderPass = 'full') {
-    // Only cache on medium/high quality - low quality is simple enough
-    if (state.effectiveQuality === 'low') {
-        return null;
-    }
-
-    // Skip caching for animated terrain types (they need to update each frame)
-    if (fogLevel === 'visible' && shouldSkipCache(hex.type)) {
-        return null;
-    }
-
-    // Invalidate cache if quality changed
-    if (cachedQualityLevel !== state.effectiveQuality) {
-        hexTileCache.clear();
-        foregroundCache.clear();
-        cachedQualityLevel = state.effectiveQuality;
-    }
-
-    // Use fixed base size for caching - zoom independent!
-    // Include renderPass in cache key to separate earth/surface caches
-    const cacheKey = `${hex.q},${hex.r}_${fogLevel}_${state.effectiveQuality}_${renderPass}`;
-
-    if (hexTileCache.has(cacheKey)) {
-        return hexTileCache.get(cacheKey);
-    }
-
-    // Enforce cache size limit using LRU-style eviction
-    if (hexTileCache.size >= MAX_CACHE_SIZE) {
-        // Remove oldest entries (first 20% of cache)
-        const keysToRemove = Array.from(hexTileCache.keys()).slice(0, MAX_CACHE_SIZE / 5);
-        keysToRemove.forEach(key => hexTileCache.delete(key));
-    }
-
-    // Create new cached tile at fixed base size
-    const tileCanvas = createHexTileCanvas(hex, fogLevel, CACHE_BASE_HEX_SIZE, renderPass);
-    const cacheEntry = { canvas: tileCanvas, baseSize: CACHE_BASE_HEX_SIZE };
-    hexTileCache.set(cacheKey, cacheEntry);
-
-    return cacheEntry;
-}
-
-/**
- * Create a canvas with the pre-rendered hex tile
- * @param {Object} hex - The hex object
- * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @param {number} hexSize - Current hex size
- * @param {string} renderPass - 'full' (default), 'earth', or 'surface'
- * @returns {HTMLCanvasElement} Canvas with rendered hex
- */
-function createHexTileCanvas(hex, fogLevel, hexSize, renderPass = 'full') {
-    void fogLevel;
-    // Canvas size needs margin for effects
-    const margin = hexSize * 0.2;
-    const canvasSize = hexSize * 2 + margin * 2;
-
-    const tileCanvas = document.createElement('canvas');
-    tileCanvas.width = canvasSize;
-    tileCanvas.height = canvasSize;
-    const tileCtx = tileCanvas.getContext('2d');
-
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-
-    const terrain = TERRAIN[hex.type];
-    const fillColor = terrain.color;
-    const texture = getTerrainTexture(hex.type, hex.q, hex.r);
-
-    // Draw hex with texture - NO grid lines in cached tiles for seamless terrain
-    const terrainData = terrain;
-
-    // Pass null for strokeColor - grid overlay is drawn separately when needed
-    // Pass renderPass to control which portion of the tile is drawn
-    drawHexToContext(tileCtx, cx, cy, hexSize, fillColor, null, 1, texture, terrainData, hex.q, hex.r, renderPass);
-
-    // Terrain details are drawn in the main render pass to keep asset sizing consistent
-
-    return tileCanvas;
-}
-
-
-/**
- * Draw hex path to a specific context
- */
-function drawHexPathToContext(context, cx, cy, size) {
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-    }
-    context.closePath();
-}
-
-/**
- * Draw hex with texture to a specific context (for caching)
- * Now includes 3D bevel effect for realistic raised border appearance
- * @param {string} renderPass - 'full' (default), 'earth' (only cliff face), or 'surface' (only hex surface)
- */
-function drawHexToContext(context, cx, cy, size, fillColor, strokeColor, lineWidth, texture, terrain, hexQ, hexR, renderPass = 'full') {
-    context.beginPath();
-    for (let i = 0; i < 6; i++) {
-        const angle = Math.PI / 3 * i;
-        const px = cx + size * Math.cos(angle);
-        const py = cy + size * Math.sin(angle);
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-    }
-    context.closePath();
-
-    // Priority: 1) Texture sprite, 2) Gradient, 3) Solid color
-    if (texture) {
-        // Check if using isometric tiles with earth layer
-        const tileInfo = getTerrainTileInfo();
-
-        if (tileInfo && tileInfo.earthLayerHeight > 0) {
-            // Isometric tiles: draw tile with two-pass rendering support
-            // Position so hex surface center aligns with (cx, cy)
-            const buffer = Math.max(6, size * 0.06);
-            const spriteWidth = size * 2 + buffer;
-            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
-            const hexTopOffset = tileInfo.hexTopOffset || 0;
-            // The actual hex content height is hexHeight minus any top padding
-            const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
-            // Scale the content height proportionally
-            const hexSurfaceHeight = size * Math.sqrt(3) + buffer;
-            const scaleRatio = hexSurfaceHeight / sourceContentHeight;
-            const totalSpriteHeight = tileInfo.totalHeight * scaleRatio;
-
-            // Position: center hex surface at (cx, cy), earth layer extends below
-            const drawX = cx - spriteWidth / 2;
-            const drawY = cy - hexSurfaceHeight / 2;  // Hex surface starts here
-
-            if (renderPass === 'earth') {
-                // Pass 1: Draw only the earth layer (cliff face)
-                // In the source sprite, earth layer starts at hex CENTER (hexHeight/2),
-                // NOT at hexHeight! The cliff faces extend from hex center downward.
-                // The hex surface will be drawn on top in pass 2 to cover the overlap.
-                const sourceEarthY = Math.floor(tileInfo.hexHeight / 2);
-                const sourceEarthHeight = tileInfo.totalHeight - sourceEarthY;
-
-                // Scale the earth layer height proportionally
-                const earthPortionScaled = sourceEarthHeight * scaleRatio;
-
-                // Destination: from hex center (cy) downward
-                const destY = cy;
-
-                context.drawImage(
-                    texture,
-                    0, sourceEarthY,                           // Source: from hex center in sprite
-                    texture.width, sourceEarthHeight,          // Source: to bottom of sprite
-                    drawX, destY,                              // Dest: start at hex center
-                    spriteWidth, earthPortionScaled            // Dest: scaled height
-                );
-            } else if (renderPass === 'surface') {
-                // Pass 2: Draw only the hex surface (top portion)
-                // In the source sprite: hex surface content starts at hexTopOffset
-                context.drawImage(
-                    texture,
-                    0, hexTopOffset,                           // Source: start at hex content
-                    texture.width, sourceContentHeight,        // Source: hex surface dimensions
-                    drawX, drawY,                              // Dest: normal position
-                    spriteWidth, hexSurfaceHeight              // Dest: scaled hex surface
-                );
-            } else {
-                // Full render (backwards compatible) - draw entire sprite
-                context.drawImage(texture, drawX, drawY, spriteWidth, totalSpriteHeight);
-            }
-        } else {
-            // Non-isometric tiles: clip to hex shape as before
-            // These don't have earth layers, so ignore renderPass
-            if (renderPass !== 'earth') {
-                context.save();
-                context.clip();
-                // Hex dimensions: width = 2*size, height = sqrt(3)*size
-                // Increased buffer to completely eliminate anti-aliasing seams between tiles
-                const buffer = Math.max(12, size * 0.12);
-                const spriteWidth = size * 2 + buffer;
-                const spriteHeight = size * Math.sqrt(3) + buffer;
-                context.drawImage(texture, cx - spriteWidth / 2, cy - spriteHeight / 2, spriteWidth, spriteHeight);
-                context.restore();
-            }
-        }
-
-        // Restore hex path for border drawing (only for surface pass or full)
-        if (renderPass !== 'earth') {
-            context.beginPath();
-            for (let i = 0; i < 6; i++) {
-                const angle = Math.PI / 3 * i;
-                const px = cx + size * Math.cos(angle);
-                const py = cy + size * Math.sin(angle);
-                if (i === 0) context.moveTo(px, py);
-                else context.lineTo(px, py);
-            }
-            context.closePath();
-        }
-    } else if (renderPass !== 'earth' && terrain && terrain.colorLight && terrain.colorDark) {
-        // Fallback: gradient fill
-        const gradient = safeLinearGradient(context, cx - size * 0.7, cy - size * 0.7, cx + size * 0.7, cy + size * 0.7, terrain.color);
-        if (typeof gradient !== 'string') {
-            gradient.addColorStop(0, terrain.colorLight);
-            gradient.addColorStop(0.5, terrain.color);
-            gradient.addColorStop(1, terrain.colorDark);
-        }
-        context.fillStyle = gradient;
-        context.fill();
-    } else if (renderPass !== 'earth') {
-        // Final fallback: solid color (skip for earth pass as there's nothing to draw)
-        context.fillStyle = fillColor;
-        context.fill();
-    }
-
-    if (strokeColor && renderPass !== 'earth') {
-        context.strokeStyle = strokeColor;
-        context.lineWidth = lineWidth;
-        context.beginPath();
-        for (let i = 0; i < 6; i++) {
-            const angle = Math.PI / 3 * i;
-            const px = cx + size * Math.cos(angle);
-            const py = cy + size * Math.sin(angle);
-            if (i === 0) context.moveTo(px, py);
-            else context.lineTo(px, py);
-        }
-        context.closePath();
-        context.stroke();
-    }
 }
 
 /**
