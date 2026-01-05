@@ -147,26 +147,14 @@ test.describe.skip('AI vs AI Spectator Mode', () => {
         return { error: `Zero dimensions: ${canvas.width}x${canvas.height}` };
       }
 
-      // Try to get 2D context for pixel analysis (works for Canvas 2D renderer)
+      // Get 2D context for pixel analysis
       const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
-      
-      // Try to get WebGL context (works for WebGL renderer)
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-      
-      if (!ctx2d && !gl) {
-        return { error: 'Cannot get any rendering context (neither 2D nor WebGL)' };
+
+      if (!ctx2d) {
+        return { error: 'Cannot get 2D rendering context' };
       }
 
-      // If WebGL is active, we can't easily sample pixels, so just check dimensions
-      if (gl && !ctx2d) {
-        return {
-          renderer: 'webgl',
-          dimensions: `${canvas.width}x${canvas.height}`,
-          isBlack: false // Assume WebGL is rendering correctly if context exists
-        };
-      }
-
-      // For 2D context, sample 5 points
+      // Sample 5 points to check for black screen
       const points = [
         [canvas.width / 2, canvas.height / 2],
         [canvas.width / 4, canvas.height / 4],
@@ -184,7 +172,6 @@ test.describe.skip('AI vs AI Spectator Mode', () => {
       }
 
       return {
-        renderer: 'canvas2d',
         dimensions: `${canvas.width}x${canvas.height}`,
         blackPixels: blackCount,
         isBlack: blackCount >= 4
