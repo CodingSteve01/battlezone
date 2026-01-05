@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.7](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.6...shadow-squad-v6.6.7) (2026-01-05)
+
+
+### Bug Fixes
+
+* **ai:** Fix AI vs AI game speed issue ([#365](https://github.com/CodingSteve01/battlezone/issues/365)) ([5b32c47](https://github.com/CodingSteve01/battlezone/commit/5b32c475e725797c190a7ce5173a8387fed74158))
+
 ## [6.6.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.5...shadow-squad-v6.6.6) (2026-01-04)
 
 
