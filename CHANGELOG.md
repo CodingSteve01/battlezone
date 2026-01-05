@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.9](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.8...shadow-squad-v6.6.9) (2026-01-05)
+
+
+### Bug Fixes
+
+* **spectator:** speed up ai pacing and simplify summary ([#370](https://github.com/CodingSteve01/battlezone/issues/370)) ([25b9b56](https://github.com/CodingSteve01/battlezone/commit/25b9b565174c22bec51f3a2c31ca7c3bb3dc6185))
+
 ## [6.6.8](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.7...shadow-squad-v6.6.8) (2026-01-05)
 
 
