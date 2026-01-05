@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.6.8](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.7...shadow-squad-v6.6.8) (2026-01-05)
+
+
+### Bug Fixes
+
+* **ui:** Fix black rendering on rocks and palms ([#368](https://github.com/CodingSteve01/battlezone/issues/368)) ([5d9bb85](https://github.com/CodingSteve01/battlezone/commit/5d9bb850c8b32566d023418d860bac920df6114c))
+
 ## [6.6.7](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.6...shadow-squad-v6.6.7) (2026-01-05)
 
 
