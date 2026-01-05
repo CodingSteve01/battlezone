@@ -24,6 +24,7 @@ import { scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from
 import { logAI, logError } from './errorLog.js';
 import { checkPowerupPickup, getPowerupAt } from './powerups.js';
 import { getSpawnPositions } from './map.js';
+import { generateTurnCommentary, resetCommentaryHistory } from './aiCommentary.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -155,49 +156,17 @@ function clearAIThoughts() {
 
 /**
  * Show a strategic overview at the start of an AI turn
- * Summarizes the AI's overall plan without repetitive unit-by-unit details
+ * Uses the aiCommentary module for human-like situational messages
+ * Returns the recommended pause duration
  */
-function showTurnStrategyOverview(plan, sortedUnits) {
-    const playerName = getPlayerName(state.currentPlayer);
-    const aliveUnits = sortedUnits.filter(u => u.alive).length;
-    const enemies = plan.visibleEnemies || [];
-    const totalAP = state.sharedAP || 0;
+function showTurnStrategyOverview(plan, _sortedUnits) {
+    const commentary = generateTurnCommentary(plan, state.currentPlayer);
 
-    // Determine overall strategy based on situation
-    let strategyMessage = '';
+    // Add the commentary as a strategy message (always shown, bypasses rate limiting)
+    addAIThought(commentary.message, 'strategy');
 
-    if (enemies.length === 0) {
-        // No enemies visible - exploration mode
-        if (aiMemory.huntMode) {
-            strategyMessage = `${playerName} startet Suchmodus. ${aliveUnits} Einheiten schwärmen aus, um den Feind zu finden.`;
-        } else {
-            strategyMessage = `${playerName} erkundet das Terrain mit ${aliveUnits} Einheiten. Noch kein Feindkontakt.`;
-        }
-    } else if (enemies.length === 1) {
-        // Single enemy - focus fire
-        const enemyClass = CLASS_NAMES_DE[enemies[0].class] || enemies[0].class;
-        const enemyHp = Math.round((enemies[0].currentHp / enemies[0].maxHp) * 100);
-        if (enemyHp <= 30) {
-            strategyMessage = `${playerName} hat einen verwundeten ${enemyClass} entdeckt. Koordinierter Angriff zur Eliminierung.`;
-        } else {
-            strategyMessage = `${playerName} konzentriert alle ${aliveUnits} Einheiten auf den ${enemyClass}.`;
-        }
-    } else {
-        // Multiple enemies - tactical assessment
-        const woundedEnemies = enemies.filter(e => e.currentHp < e.maxHp * 0.5).length;
-        const threatLevel = enemies.length >= aliveUnits ? 'hoch' : 'mittel';
-
-        if (woundedEnemies > 0) {
-            strategyMessage = `${playerName} sieht ${enemies.length} Feinde (${woundedEnemies} verwundet). Priorität: Verwundete ausschalten.`;
-        } else if (aiMemory.flankingTargets && aiMemory.flankingTargets.size > 0) {
-            strategyMessage = `${playerName} plant Umzingelung. ${aliveUnits} Einheiten rücken in Formation vor.`;
-        } else {
-            strategyMessage = `${playerName} gegen ${enemies.length} Feinde. Bedrohungsstufe: ${threatLevel}. ${totalAP} AP verfügbar.`;
-        }
-    }
-
-    // Add the overview as a strategy message (always shown)
-    addAIThought(strategyMessage, 'strategy');
+    // Return pause duration for caller to await
+    return commentary.pauseDuration;
 }
 
 // ===== AI MEMORY SYSTEM =====
@@ -3196,9 +3165,9 @@ async function performAIActions() {
 
         // In spectator mode, show strategic overview before actions
         if (spectatorMode) {
-            showTurnStrategyOverview(plan, sortedUnits);
+            const pauseDuration = showTurnStrategyOverview(plan, sortedUnits);
             hideAIThinking();
-            await delay(1500); // Give time to read the overview
+            await delay(pauseDuration); // Dynamic pause based on message complexity
         }
 
         // Track units processed for debugging
