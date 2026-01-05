@@ -13,6 +13,7 @@ import { updateVisibility } from './fogOfWar.js';
 import { generatePowerups } from './powerups.js';
 import { initUnitProgression } from './progression.js';
 import { isAIPlayer, executeAITurn, resetAIMemory, isSpectatorMode } from './ai.js';
+import { resetCommentaryHistory } from './aiCommentary.js';
 import { initAudio, resumeAudio, playClick, startAmbient, setMasterVolume, toggleAudio, audioSettings } from './audio.js';
 import { initAssetLoader, isUsingStaticAssets, getUnitSprite } from './assetLoader.js';
 import { resetTutorial, startTeamSelectTutorial, showUnitClassHint, hideTeamSelectTutorial, shouldStartTutorial } from './tutorial.js';
@@ -1323,6 +1324,7 @@ function startGameWithTeams() {
     const aiPlayers = [...state.settings.aiPlayers];
     resetState();
     resetAIMemory();  // Reset AI's strategic memory for new game
+    resetCommentaryHistory();  // Reset AI commentary history for new game
     state.teamSelections = savedSelections;
     state.settings.aiPlayers = aiPlayers;
 

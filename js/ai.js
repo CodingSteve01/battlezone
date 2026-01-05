@@ -24,6 +24,7 @@ import { scrollToUnitWithZoom, getRelevantUnitsForZoom, followUnitInstant } from
 import { logAI, logError } from './errorLog.js';
 import { checkPowerupPickup, getPowerupAt } from './powerups.js';
 import { getSpawnPositions } from './map.js';
+import { generateTurnCommentary, resetCommentaryHistory } from './aiCommentary.js';
 
 // ===== AI THOUGHT SYSTEM (for Spectator Mode) =====
 // Stores and displays AI decision explanations
@@ -32,19 +33,48 @@ const aiThoughts = {
     current: null,          // Current thought being displayed
     queue: [],              // Queue of thoughts to display
     enabled: false,         // Only enabled in spectator mode (all AI players)
-    displayTime: 3500,      // How long each thought is displayed (ms) - länger für bessere Lesbarkeit
+    displayTime: 5500,      // How long each thought is displayed (ms) - longer for readability
+    lastDetailTime: 0,      // Timestamp of last detail message (for rate limiting)
+    detailCooldown: 4000,   // Minimum ms between detail messages (attack, move, etc.)
+    shownThisTurn: new Set(), // Track similar messages shown this turn to avoid repetition
 };
 
 /**
  * Add an AI thought to be displayed
+ * Strategy messages are always shown, detail messages are rate-limited
  */
 function addAIThought(thought, category = 'general') {
     if (!isSpectatorMode()) return;
 
+    const now = Date.now();
+    const isDetailCategory = ['attack', 'move', 'special', 'retreat'].includes(category);
+
+    // Rate-limit detail messages to avoid spam
+    if (isDetailCategory) {
+        // Check cooldown
+        if (now - aiThoughts.lastDetailTime < aiThoughts.detailCooldown) {
+            return; // Skip this detail message
+        }
+
+        // Check for similar messages (first 30 chars)
+        const messageKey = thought.substring(0, 30);
+        if (aiThoughts.shownThisTurn.has(messageKey)) {
+            return; // Skip repetitive message
+        }
+        aiThoughts.shownThisTurn.add(messageKey);
+        aiThoughts.lastDetailTime = now;
+    }
+
+    // Limit queue size to prevent buildup
+    if (aiThoughts.queue.length >= 3) {
+        // Keep only strategy messages in queue
+        aiThoughts.queue = aiThoughts.queue.filter(t => t.category === 'strategy');
+    }
+
     const thoughtObj = {
         text: thought,
-        category: category,  // 'strategy', 'attack', 'move', 'special', 'retreat'
-        timestamp: Date.now()
+        category: category,
+        timestamp: now
     };
 
     aiThoughts.queue.push(thoughtObj);
@@ -113,13 +143,30 @@ function variedPhrase(options) {
 }
 
 /**
- * Clear all pending thoughts
+ * Clear all pending thoughts and reset turn tracking
  */
 function clearAIThoughts() {
     aiThoughts.queue = [];
     aiThoughts.current = null;
+    aiThoughts.shownThisTurn.clear();
+    aiThoughts.lastDetailTime = 0;
     const existing = document.querySelector('.ai-thought-bubble');
     if (existing) existing.remove();
+}
+
+/**
+ * Show a strategic overview at the start of an AI turn
+ * Uses the aiCommentary module for human-like situational messages
+ * Returns the recommended pause duration
+ */
+function showTurnStrategyOverview(plan, _sortedUnits) {
+    const commentary = generateTurnCommentary(plan, state.currentPlayer);
+
+    // Add the commentary as a strategy message (always shown, bypasses rate limiting)
+    addAIThought(commentary.message, 'strategy');
+
+    // Return pause duration for caller to await
+    return commentary.pauseDuration;
 }
 
 // ===== AI MEMORY SYSTEM =====
@@ -3088,7 +3135,8 @@ async function performAIActions() {
     initializeTeamMemory();
 
     // Spectator mode: slow down AI to human-like speed so viewer can follow
-    const unitDelay = spectatorMode ? 800 : 400;
+    // Increased delay allows time to read thoughts and follow actions
+    const unitDelay = spectatorMode ? 1800 : 400;
 
     // Wrap entire AI execution in try/catch to ensure endTurn is ALWAYS called
     // This prevents the game from hanging if any async operation fails
@@ -3115,10 +3163,11 @@ async function performAIActions() {
         // Sort units by role priority for this turn
         const sortedUnits = sortUnitsForExecution(plan);
 
-        // In spectator mode, hide the thinking overlay once AI starts executing
-        // so the viewer can watch the action without obstruction
+        // In spectator mode, show strategic overview before actions
         if (spectatorMode) {
+            const pauseDuration = showTurnStrategyOverview(plan, sortedUnits);
             hideAIThinking();
+            await delay(pauseDuration); // Dynamic pause based on message complexity
         }
 
         // Track units processed for debugging

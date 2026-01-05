@@ -242,8 +242,9 @@ export function endTurn() {
 
 /**
  * Move to next player
+ * Now async to properly wait for round start screen in spectator mode
  */
-export function nextPlayer() {
+export async function nextPlayer() {
     // Clear AI watchdog since we're moving to next player
     clearAIWatchdog();
 
@@ -290,12 +291,13 @@ export function nextPlayer() {
         }
 
         // === ROUND START SCREEN ===
-        // Build round info for display and show screen (waits for user confirmation)
+        // Build round info for display and show screen
+        // IMPORTANT: Wait for user confirmation (or auto-continue in spectator mode)
+        // This prevents rapid round progression in AI vs AI games
         const roundInfo = buildRoundInfo(zoneShrunk, zoneWasWarning, event);
-        showRoundStartScreen(roundInfo).then(() => {
-            // Clear round events after user has seen the summary
-            clearRoundEvents();
-        });
+        await showRoundStartScreen(roundInfo);
+        // Clear round events after user has seen the summary
+        clearRoundEvents();
 
         // Spawn new power-ups periodically
         spawnNewPowerups();
@@ -318,7 +320,7 @@ export function nextPlayer() {
         }
 
         // Skip to next player
-        nextPlayer();
+        await nextPlayer();
         return;
     }
 
