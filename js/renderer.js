@@ -1555,8 +1555,7 @@ export function resizeCanvas() {
     canvas.style.width = rect.width + 'px';
     canvas.style.height = rect.height + 'px';
 
-    // Only apply transforms if we have a 2D context
-    // (WebGL mode may not have 2D context for overlay)
+    // Apply transforms if context is available
     if (ctx) {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
