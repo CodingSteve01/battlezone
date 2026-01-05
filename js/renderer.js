@@ -625,14 +625,27 @@ function getDarkestNeighborFogLevel(q, r) {
     if (centerFog === 'hidden') return 'hidden';
 
     // Check all 6 neighbors for darker fog levels
+    // Only consider neighbors that actually exist on the map
     const neighbors = getNeighbors(q, r);
     let darkest = centerFog;
 
     for (const neighbor of neighbors) {
+        // Skip neighbors that don't exist on the map (edge of map)
+        const neighborHex = getHex(neighbor.q, neighbor.r);
+        if (!neighborHex) continue;
+
         const neighborFog = getFogLevel(neighbor.q, neighbor.r);
         // Priority: hidden > explored > visible
+        // But cap the darkening based on center hex visibility:
+        // - If center is 'visible', max darkness is 'explored' (never completely black)
+        // - If center is 'explored', can go to 'hidden'
         if (neighborFog === 'hidden') {
-            return 'hidden';  // Can't get darker than this
+            if (centerFog === 'visible') {
+                // Cap at explored - don't go completely black if center is visible
+                darkest = 'explored';
+            } else {
+                return 'hidden';  // Can't get darker than this
+            }
         }
         if (neighborFog === 'explored' && darkest === 'visible') {
             darkest = 'explored';
