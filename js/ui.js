@@ -845,7 +845,6 @@ function generateRoundCommentary(summary) {
     }
 
     const parts = [];
-    let highlight = null;
 
     // Kills sind am wichtigsten
     if (summary.totalKills > 0) {
@@ -870,12 +869,12 @@ function generateRoundCommentary(summary) {
 
     // Wer liegt vorne?
     if (summary.isClose) {
-        highlight = '⚔️ Es bleibt spannend - beide Seiten gleichauf!';
+        parts.push('Es bleibt spannend - beide Seiten gleichauf.');
     } else if (summary.leadingPlayer >= 0 && summary.trailingPlayer >= 0) {
         const leader = getPlayerName(summary.leadingPlayer);
         const leaderStrength = summary.playerStrength.find(p => p.player === summary.leadingPlayer);
         if (leaderStrength && leaderStrength.units > 1) {
-            highlight = `📈 ${leader} liegt mit ${leaderStrength.units} Einheiten vorne.`;
+            parts.push(`${leader} liegt mit ${leaderStrength.units} Einheiten vorne.`);
         }
     }
 
@@ -886,7 +885,6 @@ function generateRoundCommentary(summary) {
 
     return {
         text: parts.join(' '),
-        highlight,
         isQuiet: false
     };
 }
@@ -912,14 +910,8 @@ export function showRoundStartScreen(roundInfo) {
         // Build and set commentary
         const commentaryEl = document.getElementById('round-start-commentary');
         if (commentaryEl) {
-            let commentaryHTML = '';
-            if (commentary.text) {
-                commentaryHTML += `<div class="${commentary.isQuiet ? 'commentary-quiet' : 'commentary-text'}">${commentary.text}</div>`;
-            }
-            if (commentary.highlight) {
-                commentaryHTML += `<div class="commentary-highlight">${commentary.highlight}</div>`;
-            }
-            commentaryEl.innerHTML = commentaryHTML;
+            commentaryEl.textContent = commentary.text || '';
+            commentaryEl.classList.toggle('is-quiet', commentary.isQuiet);
         }
 
         // Build player status HTML
