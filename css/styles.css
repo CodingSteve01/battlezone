@@ -1032,29 +1032,18 @@ button:focus:not(:focus-visible),
 }
 
 .round-start-commentary {
-    max-width: 340px;
-    margin: 0 auto 20px auto;
-    padding: 16px;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 12px;
-    border-left: 4px solid var(--blue);
-}
-
-.round-start-commentary .commentary-text {
-    font-size: 15px;
+    max-width: 420px;
+    margin: 0 auto 18px auto;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    border-left: none;
+    font-size: 14px;
     line-height: 1.5;
     color: var(--light);
-    margin-bottom: 8px;
 }
 
-.round-start-commentary .commentary-highlight {
-    font-size: 14px;
-    color: var(--yellow);
-    font-weight: 600;
-}
-
-.round-start-commentary .commentary-quiet {
-    font-size: 14px;
+.round-start-commentary.is-quiet {
     color: var(--dim);
     font-style: italic;
 }
