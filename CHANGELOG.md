@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.9...shadow-squad-v6.7.0) (2026-03-05)
+
+
+### Features
+
+* **fog:** implement fog level caching for improved performance and rendering ([895f3cd](https://github.com/CodingSteve01/battlezone/commit/895f3cdec49093e053e0c38982c923c601746a30))
+
 ## [6.6.9](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.8...shadow-squad-v6.6.9) (2026-01-05)
 
 
