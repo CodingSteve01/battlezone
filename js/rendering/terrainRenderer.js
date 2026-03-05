@@ -3,7 +3,7 @@
 
 import { state, getTileScreenPosition } from '../state.js';
 import { TERRAIN } from '../config.js';
-import { getFogLevel } from '../fogOfWar.js';
+import { getCachedFogLevel } from './fogCache.js';
 import { getTerrainTileInfo } from '../assetLoader.js';
 import { safeRadialGradient, safeLinearGradient } from './renderUtils.js';
 import { drawHexPath } from './effectsRenderer.js';
@@ -80,7 +80,7 @@ export function collectVisibleHexData(w, h, tileSize) {
             continue;
         }
 
-        const fogLevel = getFogLevel(hex.q, hex.r);
+        const fogLevel = getCachedFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
 
         visibleHexData.push({

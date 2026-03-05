@@ -4,7 +4,8 @@
 
 import { CONFIG, TERRAIN } from '../config.js';
 import { state, isHexInZone, getTileSize } from '../state.js';
-import { getFogLevel, isUnitVisibleToViewer } from '../fogOfWar.js';
+import { isUnitVisibleToViewer } from '../fogOfWar.js';
+import { getCachedFogLevel } from './fogCache.js';
 import { isAIPlayer } from '../shared/gameMode.js';
 import { blendWithRed, adjustColorForHeight } from './renderUtils.js';
 
@@ -532,7 +533,7 @@ function drawMinimapTerrain(centerX, centerY, hexSize, isExpanded) {
             : heightAdjustedColor;
 
         // Apply fog darkness (minimap uses half the main view darkness)
-        const fogLevel = getFogLevel(hex.q, hex.r);
+        const fogLevel = getCachedFogLevel(hex.q, hex.r);
         let brightness = 1.0;
         if (fogLevel === 'hidden') {
             brightness = 0.5;

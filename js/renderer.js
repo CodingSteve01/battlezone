@@ -5,7 +5,8 @@ import { state, getHex, getCurrentUnit, getVisibleGhosts, getQueuedPath, isHexIn
 import { hexDistance, getHexesInRange, getNeighbors } from './hexMath.js';
 import { getReachableHexes, getMoveCost } from './pathfinding.js';
 import { getAttackableUnits, getEffectiveRange, getBlockedTargets } from './units.js';
-import { getFogLevel, isUnitVisibleToViewer, updateVisibilityForPlayer } from './fogOfWar.js';
+import { isUnitVisibleToViewer, updateVisibilityForPlayer } from './fogOfWar.js';
+import { buildFogCache, getCachedFogLevel, getCachedNeighborFogLevel, invalidateFogCache } from './rendering/fogCache.js';
 import { isSpectatorMode, isAIPlayer } from './shared/gameMode.js';
 import {
     getShorelineSprite,
@@ -594,66 +595,13 @@ function getFogBrightness(fogLevel) {
 }
 
 /**
- * Get CSS filter string for fog of war effect
- * Combines brightness reduction with slight saturation reduction for a more natural shadow look
- * @param {string} fogLevel - 'visible', 'explored', or 'hidden'
- * @returns {string} CSS filter string or empty string for visible areas
- */
-function getFogFilter(fogLevel) {
-    if (fogLevel === 'hidden') {
-        // Very dark shadow effect: reduced brightness and saturation - 2x darker than before
-        return 'brightness(0.12) saturate(0.3)';
-    }
-    if (fogLevel === 'explored') {
-        // Dark effect for explored but not visible - same as old hidden
-        return 'brightness(0.25) saturate(0.5)';
-    }
-    return '';  // No filter for visible areas
-}
-
-/**
  * Get the darkest fog level among a hex and its neighbors
  * Used for large elements (trees, rocks) that visually span hex boundaries
  * @param {number} q - Hex q coordinate
  * @param {number} r - Hex r coordinate
  * @returns {string} The darkest fog level ('hidden' > 'explored' > 'visible')
  */
-function getDarkestNeighborFogLevel(q, r) {
-    const centerFog = getFogLevel(q, r);
-
-    // If center is already hidden, no need to check neighbors
-    if (centerFog === 'hidden') return 'hidden';
-
-    // Check all 6 neighbors for darker fog levels
-    // Only consider neighbors that actually exist on the map
-    const neighbors = getNeighbors(q, r);
-    let darkest = centerFog;
-
-    for (const neighbor of neighbors) {
-        // Skip neighbors that don't exist on the map (edge of map)
-        const neighborHex = getHex(neighbor.q, neighbor.r);
-        if (!neighborHex) continue;
-
-        const neighborFog = getFogLevel(neighbor.q, neighbor.r);
-        // Priority: hidden > explored > visible
-        // But cap the darkening based on center hex visibility:
-        // - If center is 'visible', max darkness is 'explored' (never completely black)
-        // - If center is 'explored', can go to 'hidden'
-        if (neighborFog === 'hidden') {
-            if (centerFog === 'visible') {
-                // Cap at explored - don't go completely black if center is visible
-                darkest = 'explored';
-            } else {
-                return 'hidden';  // Can't get darker than this
-            }
-        }
-        if (neighborFog === 'explored' && darkest === 'visible') {
-            darkest = 'explored';
-        }
-    }
-
-    return darkest;
-}
+// getDarkestNeighborFogLevel is now handled by fogCache.js (getCachedNeighborFogLevel)
 
 /**
  * Draw fog of war overlays on all non-visible hexes
@@ -819,12 +767,10 @@ function collectHex3DFaces(hex, cx, cy, size, fogLevel, terrain) {
  */
 function draw3DFace(face, texture = null) {
     const litColor = applyLightingToColor(face.color, face.lighting);
-    const fogFilter = getFogFilter(face.fogLevel);
-
-    if (fogFilter) {
-        ctx.save();
-        ctx.filter = fogFilter;
-    }
+    // Fog darkening alpha: replaces expensive CSS filter with a simple overlay
+    const fogAlpha = face.fogLevel === 'hidden' ? 0.88
+        : face.fogLevel === 'explored' ? 0.75
+            : 0;
 
     ctx.beginPath();
     ctx.moveTo(face.vertices[0].x, face.vertices[0].y);
@@ -848,17 +794,14 @@ function draw3DFace(face, texture = null) {
         // Check if using isometric tiles with earth layer
         const tileInfo = getTerrainTileInfo();
         if (tileInfo && tileInfo.earthLayerHeight > 0) {
-            // For isometric tiles, only draw the hex surface portion (crop out earth layer)
-            // Account for hexTopOffset - the hex content starts at this Y offset in the sprite
             const hexTopOffset = tileInfo.hexTopOffset || 0;
             const sourceContentHeight = tileInfo.hexHeight - hexTopOffset;
             ctx.drawImage(
                 texture,
-                0, hexTopOffset, texture.width, sourceContentHeight,  // Source: hex content only
-                minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2  // Dest
+                0, hexTopOffset, texture.width, sourceContentHeight,
+                minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2
             );
         } else {
-            // Non-isometric tiles: draw full texture
             ctx.drawImage(texture, minX - width * 0.1, minY - height * 0.1, width * 1.2, height * 1.2);
         }
 
@@ -867,26 +810,34 @@ function draw3DFace(face, texture = null) {
             ? `rgba(0, 0, 0, ${(1 - face.lighting) * 0.4})`
             : `rgba(255, 255, 200, ${(face.lighting - 0.9) * 0.3})`;
         ctx.fill();
+
+        // Apply fog darkening overlay (replaces CSS filter)
+        if (fogAlpha > 0) {
+            ctx.fillStyle = `rgba(5, 8, 20, ${fogAlpha})`;
+            ctx.fill();
+        }
+
         ctx.restore();
     } else if (face.type === 'top') {
-        // Solid color fill with lighting
         ctx.fillStyle = litColor;
         ctx.fill();
+        if (fogAlpha > 0) {
+            ctx.fillStyle = `rgba(5, 8, 20, ${fogAlpha})`;
+            ctx.fill();
+        }
     }
 
     // Cliff faces: fill with color, then add subtle edge
     if (face.type === 'cliff') {
-        // Fill the cliff face with the lit color
         ctx.fillStyle = litColor;
         ctx.fill();
-        // Subtle darker edge for definition
         ctx.strokeStyle = applyLightingToColor(face.color, face.lighting * 0.7);
         ctx.lineWidth = 0.5;
         ctx.stroke();
-    }
-
-    if (fogFilter) {
-        ctx.restore();
+        if (fogAlpha > 0) {
+            ctx.fillStyle = `rgba(5, 8, 20, ${fogAlpha})`;
+            ctx.fill();
+        }
     }
 }
 
@@ -1457,6 +1408,11 @@ export async function initRenderer() {
 }
 
 function getTargetFps() {
+    // When nothing has changed, use a low idle FPS for ambient animations only
+    if (!renderDirty && !state.animating && particles.getActiveCount() === 0) {
+        return 10;  // Low FPS for idle ambient animations (grass sway, water ripples)
+    }
+
     switch (state.effectiveQuality) {
         case 'low':
             return 20;
@@ -1468,14 +1424,23 @@ function getTargetFps() {
     }
 }
 
+/** Dirty flag — set when scene needs a re-render */
+let renderDirty = true;
+
+/**
+ * Mark the scene as needing a re-render.
+ * Call this from any module that modifies visible state (camera, units, UI).
+ */
+export function markRenderDirty() {
+    renderDirty = true;
+    ensureAnimationLoop();
+}
+
 function shouldAnimate() {
     // Don't animate if a menu screen is showing or no map exists
     if (state.screen !== null || state.hexes.length === 0) return false;
 
-    // ALWAYS animate when game is active (hexes exist and no menu showing)
-    // This ensures the render loop keeps running even when there are no
-    // active animations or particles. Without this, the game shows a black
-    // screen because the render loop stops immediately after the first frame.
+    // Always run the loop — we throttle the actual rendering via FPS
     return true;
 }
 
@@ -1548,8 +1513,8 @@ export function resizeCanvas() {
     state.canvasWidth = rect.width;
     state.canvasHeight = rect.height;
 
-    // Set canvas resolution
-    const dpr = window.devicePixelRatio || 1;
+    // Set canvas resolution (cap DPR to avoid excessive pixel counts on HiDPI displays)
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     canvas.style.width = rect.width + 'px';
@@ -2710,7 +2675,7 @@ function drawHexGridOverlay(w, h, reachableHexes, attackableUnits, currentUnit) 
             return;
         }
 
-        const fogLevel = getFogLevel(hex.q, hex.r);
+        const fogLevel = getCachedFogLevel(hex.q, hex.r);
 
         // Draw grid lines - more visible for better gameplay clarity
         ctx.beginPath();
@@ -2823,6 +2788,9 @@ export function render() {
         }
     }
 
+    // Build fog level cache for this frame (avoids repeated Set lookups)
+    buildFogCache(state.hexes);
+
     // Update animations
     animationTick(performance.now());
 
@@ -2899,7 +2867,7 @@ export function render() {
             continue;
         }
 
-        const fogLevel = getFogLevel(hex.q, hex.r);
+        const fogLevel = getCachedFogLevel(hex.q, hex.r);
         const terrain = TERRAIN[hex.type];
 
         visibleHexData.push({
@@ -2925,60 +2893,42 @@ export function render() {
     // Sort by Y for proper layering of overlays
     visibleHexData.sort((a, b) => a.sy - b.sy);
 
-    for (const { hex, sx, sy, fogLevel, terrain } of visibleHexData) {
-        // NOTE: Static terrain details (grass, rocks, etc.) are already baked into
-        // the terrain sprite sheet tiles - no need to render them again
-        // Removed: drawStaticTerrainDetails() call
+    // Element type sets for fog and transparency — defined outside loop to avoid re-creation
+    const largeElementTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'rock', 'rock-formation'];
+    const vegetationTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'bush', 'shrub', 'shrub-hills', 'shrub-ruins', 'tallgrass'];
+    const doAnimations = shouldRenderAnimations();
 
-        // Height-based lighting and shading - always apply subtle height shading
-        const fogFilter = getFogFilter(fogLevel);
-        if (fogFilter) {
-            ctx.save();
-            ctx.filter = fogFilter;
+    for (const { hex, sx, sy, fogLevel } of visibleHexData) {
+        const isVisible = fogLevel === 'visible';
+
+        if (isVisible) {
+            // Height-based lighting and shading (only for visible hexes)
+            drawHeightShading(sx, sy, tileSize, hex.height);
         }
-
-        // Permanent subtle height shading (cool shadows for low, warm highlights for high)
-        drawHeightShading(sx, sy, tileSize, hex.height);
 
         // Debug number overlay (only when explicitly enabled)
         if (state.debug.showHeightOverlay) {
             drawHeightDebugOverlay(sx, sy, tileSize, hex.height);
         }
 
-        if (fogFilter) {
-            ctx.restore();
-        }
-
-        // Draw animated terrain overlays (grass swaying, water ripples, etc.)
-        // These are drawn on top of cached/static terrain for dynamic effects
-        if (shouldRenderAnimations()) {
-            if (fogFilter) {
-                ctx.save();
-                ctx.filter = fogFilter;
-            }
+        // Draw animated terrain overlays only for visible hexes
+        if (isVisible && doAnimations) {
             drawAnimatedTerrainOverlay(sx, sy, tileSize, hex.type, hex.q, hex.r);
-            if (fogFilter) {
-                ctx.restore();
-            }
         }
 
         // Collect foreground elements for 2.5D sorting
         const elements = getCachedForegroundElements(hex.q, hex.r, sx, sy, assetSize, hex.type);
         const adjusted = applyVisibilityClearing(elements, visibilityClearingMap);
-        // Apply fog level darkening to foreground elements (store filter for later application)
-        // Large elements (trees, rocks) use the darkest fog level of neighboring hexes
-        // to prevent bright elements appearing at fog boundaries
-        const largeElementTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'rock', 'rock-formation'];
-        const vegetationTypes = ['tree', 'tree-edge', 'tree-solitary', 'dead-tree', 'bush', 'shrub', 'shrub-hills', 'shrub-ruins', 'tallgrass'];
+        const hexFogBrightness = getFogBrightness(fogLevel);
         const hexKey = `${hex.q},${hex.r}`;
         const isInReachableArea = reachableHexes.has(hexKey);
         adjusted.forEach(element => {
             if (largeElementTypes.includes(element.type)) {
-                // Use darkest neighbor fog for large elements that span hex boundaries
-                const darkestFog = getDarkestNeighborFogLevel(hex.q, hex.r);
-                element.fogFilter = getFogFilter(darkestFog);
+                // Use cached darkest neighbor fog for large elements that span hex boundaries
+                const darkestFog = getCachedNeighborFogLevel(hex.q, hex.r);
+                element.fogBrightness = getFogBrightness(darkestFog);
             } else {
-                element.fogFilter = fogFilter;
+                element.fogBrightness = hexFogBrightness;
             }
             // Mark vegetation in reachable area for transparency during movement planning
             // This helps visibility especially in dense jungle/forest biomes
@@ -2991,7 +2941,7 @@ export function render() {
         // Collect power-up positions for drawing on top of foreground elements
         const powerup = getPowerupAt(hex.q, hex.r);
         if (powerup) {
-            powerupPositions.push({ sx, sy, powerup, fogFilter });
+            powerupPositions.push({ sx, sy, powerup, fogBrightness: hexFogBrightness });
         }
 
         // === SHRINKING ZONE VISUAL INDICATOR ===
@@ -3216,7 +3166,7 @@ export function render() {
         }
 
         const visibilityAlpha = drawable.visibilityAlpha ?? 1;
-        const fogFilter = drawable.fogFilter ?? '';
+        const fogBrightness = drawable.fogBrightness ?? 1.0;
         const needsTransparency = obscuringTiles.size > 0 && shouldBeTransparent(drawable, obscuringTiles);
         // Trees stay mostly visible (80% opacity) - units show as outlines behind them
         let finalAlpha = needsTransparency ? visibilityAlpha * 0.8 : visibilityAlpha;
@@ -3227,19 +3177,14 @@ export function render() {
             finalAlpha *= 0.5;  // 50% opacity for vegetation in reachable area
         }
 
-        // Apply fog of war darkening using filter (brightness + saturation)
-        const needsFogDarkening = !!fogFilter;
+        // Apply fog darkening via globalAlpha (much cheaper than CSS filter)
+        finalAlpha *= fogBrightness;
+
         const needsAlpha = finalAlpha < 0.99;
 
-        if (needsFogDarkening || needsAlpha) {
+        if (needsAlpha) {
             ctx.save();
-            if (needsAlpha) {
-                ctx.globalAlpha = finalAlpha;
-            }
-            if (needsFogDarkening) {
-                // Use combined brightness + saturation filter for fog darkening
-                ctx.filter = fogFilter;
-            }
+            ctx.globalAlpha = finalAlpha;
             drawable.draw();
             ctx.restore();
         } else {
@@ -3253,14 +3198,14 @@ export function render() {
     });
 
     // Draw powerups on top of all terrain and foreground elements
-    powerupPositions.forEach(({ sx, sy, powerup, fogFilter }) => {
-        if (fogFilter) {
+    powerupPositions.forEach(({ sx, sy, powerup, fogBrightness }) => {
+        if (fogBrightness < 1.0) {
             ctx.save();
-            ctx.filter = fogFilter;
-        }
-        drawPowerup(sx, sy, powerup, assetSize);
-        if (fogFilter) {
+            ctx.globalAlpha = fogBrightness;
+            drawPowerup(sx, sy, powerup, assetSize);
             ctx.restore();
+        } else {
+            drawPowerup(sx, sy, powerup, assetSize);
         }
     });
 
@@ -3337,6 +3282,9 @@ export function render() {
 
     // Restore canvas state (removes screen shake transform)
     ctx.restore();
+
+    // Clear dirty flag after successful render
+    renderDirty = false;
 
     if (shouldAnimate()) {
         ensureAnimationLoop();

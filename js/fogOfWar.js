@@ -5,6 +5,7 @@ import { state, getHex, getPlayerUnits, isHexVisible, isHexVisibleToPlayer, mark
 import { CONFIG, UNIT_CLASSES } from './config.js';
 import { getFogEventModifier } from './events.js';
 import { hasLineOfSight } from './combat.js';
+import { invalidateFogCache } from './rendering/fogCache.js';
 
 /**
  * Calculate visible hexes for a single unit
@@ -69,6 +70,9 @@ export function updateVisibilityForPlayer(player) {
             });
         }
     }
+
+    // Invalidate fog render cache so next frame picks up changes
+    invalidateFogCache();
 }
 
 /**
@@ -112,6 +116,9 @@ export function updateVisibility() {
 
     // Update spotted status for current player's units
     updateSpottedStatus();
+
+    // Invalidate fog render cache so next frame picks up changes
+    invalidateFogCache();
 }
 
 /**
