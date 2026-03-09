@@ -1497,6 +1497,14 @@ function calculateHexSize() {
 }
 
 /**
+ * Get effective device pixel ratio used by the game canvas.
+ * Must stay consistent between resize and render calculations.
+ */
+function getCanvasDpr() {
+    return Math.min(window.devicePixelRatio || 1, 2.0);
+}
+
+/**
  * Resize canvas to container
  */
 export function resizeCanvas() {
@@ -1514,7 +1522,7 @@ export function resizeCanvas() {
     state.canvasHeight = rect.height;
 
     // Set canvas resolution (cap DPR to avoid excessive pixel counts on HiDPI displays)
-    const dpr = Math.min(window.devicePixelRatio || 1, 2.0);
+    const dpr = getCanvasDpr();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     canvas.style.width = rect.width + 'px';
@@ -2717,7 +2725,7 @@ export function render() {
         return;
     }
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = getCanvasDpr();
     const w = canvas.width / dpr;
     const h = canvas.height / dpr;
 
