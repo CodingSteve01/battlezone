@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.0...shadow-squad-v6.7.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* **renderer:** align canvas DPR handling to prevent undersized overlay on zoom ([#376](https://github.com/CodingSteve01/battlezone/issues/376)) ([b4ce3a7](https://github.com/CodingSteve01/battlezone/commit/b4ce3a7e0b867336fc63c68b79b09c22ae63f258))
+
 ## [6.7.0](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.6.9...shadow-squad-v6.7.0) (2026-03-05)
 
 
