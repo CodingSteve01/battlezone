@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.4...shadow-squad-v6.7.5) (2026-08-25)
+
+
+### CI/CD
+
+* revert the release-branch push trigger, it never runs ([#395](https://github.com/CodingSteve01/battlezone/issues/395)) ([64a5c81](https://github.com/CodingSteve01/battlezone/commit/64a5c81f383f7ce831e31d068379372e147e6e31))
+
 ## [6.7.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.3...shadow-squad-v6.7.4) (2026-08-25)
 
 
