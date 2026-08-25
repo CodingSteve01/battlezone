@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.7.6](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.5...shadow-squad-v6.7.6) (2026-08-25)
+
+
+### CI/CD
+
+* let release-please authenticate as a GitHub App ([#397](https://github.com/CodingSteve01/battlezone/issues/397)) ([f385a55](https://github.com/CodingSteve01/battlezone/commit/f385a55371b3a3d884fd1653dcbd705d4ce5110b))
+* survive a release App that is registered but not installed ([#399](https://github.com/CodingSteve01/battlezone/issues/399)) ([a8b3eee](https://github.com/CodingSteve01/battlezone/commit/a8b3eee6d4df7bcb5ee6ac914089899297f30f7a))
+
 ## [6.7.5](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.4...shadow-squad-v6.7.5) (2026-08-25)
 
 
