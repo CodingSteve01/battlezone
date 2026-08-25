@@ -163,3 +163,5 @@ MIT License - Feel free to modify and share!
 ---
 
 *Built with JavaScript and Vite.*
+
+# gate proof, wird nicht gemergt
