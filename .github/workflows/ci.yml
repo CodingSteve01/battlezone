@@ -5,16 +5,6 @@ on:
   pull_request:
     branches: [main]
 
-  # release-please opens its release pull request with GITHUB_TOKEN, and GitHub
-  # deliberately does not start workflows for those: the run is recorded as
-  # action_required and never reports. With Validate required on main, that left
-  # every release pull request permanently unmergeable. Running on a push to the
-  # release branch produces the same check runs on the same head commit, which is
-  # what the required check is evaluated against, so releases pass the gate on
-  # their own merit instead of through an admin override.
-  push:
-    branches: ['release-please--**']
-
 jobs:
   yamllint:
     name: YAML Lint
@@ -52,23 +42,15 @@ jobs:
       # next version from that subject alone. An unchecked title does not fail
       # anything, it silently produces no release, so it is checked first.
       - name: Lint the pull request title
-        if: github.event_name == 'pull_request'
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: printf '%s' "$TITLE" | npx --no-install commitlint
 
       - name: Lint the commits
-        if: github.event_name == 'pull_request'
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: npx --no-install commitlint --from "$BASE" --to "$HEAD"
-
-      # A release branch carries exactly one commit on top of main, and it has no
-      # pull request context to read a title from.
-      - name: Lint the release commit
-        if: github.event_name == 'push'
-        run: npx --no-install commitlint --from HEAD~1 --to HEAD
 
   lint:
     name: Lint
