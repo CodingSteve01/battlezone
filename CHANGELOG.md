@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.2...shadow-squad-v6.7.3) (2026-08-25)
+
+
+### CI/CD
+
+* run on node 22 and gate merges on commit lint ([#390](https://github.com/CodingSteve01/battlezone/issues/390)) ([9e15b85](https://github.com/CodingSteve01/battlezone/commit/9e15b8500974195846076cbfe92dd5aa35c39a31))
+
 ## [6.7.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.1...shadow-squad-v6.7.2) (2026-08-25)
 
 
