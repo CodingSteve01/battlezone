@@ -1,6 +1,6 @@
 {
   "name": "shadow-squad",
-  "version": "6.7.2",
+  "version": "6.7.3",
   "description": "Browser-based tactical turn-based strategy game",
   "type": "module",
   "scripts": {
