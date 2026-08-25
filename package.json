@@ -19,6 +19,8 @@
     "generate-assets:headed": "node scripts/generate-assets.js --headed"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.1.0",
     "@eslint/js": "^9.15.0",
     "@playwright/test": "^1.57.0",
     "@vitest/coverage-v8": "^4.1.9",

@@ -33,8 +33,11 @@ export default defineConfig({
         assetsDir: 'bundled',
         // Generate source maps for debugging
         sourcemap: false,
-        // Minify for production
-        minify: 'esbuild',
+        // Minify for production.
+        // Vite 8 bundles with Rolldown and no longer ships esbuild, so 'esbuild'
+        // here loads a transform that fails with "Cannot find package 'esbuild'".
+        // 'oxc' is Rolldown's own minifier and what Vite 8 uses by default.
+        minify: 'oxc',
         // Copy static assets that aren't imported
         copyPublicDir: true,
         // Asset handling with content hashes for cache busting

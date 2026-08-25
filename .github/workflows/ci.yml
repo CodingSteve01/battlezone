@@ -25,11 +25,32 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Lint commits
-        uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: commitlint.config.cjs
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The pull request title is what actually lands: the repository squash-merges
+      # with squash_merge_commit_title = PR_TITLE, and release-please derives the
+      # next version from that subject alone. An unchecked title does not fail
+      # anything, it silently produces no release, so it is checked first.
+      - name: Lint the pull request title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$TITLE" | npx --no-install commitlint
+
+      - name: Lint the commits
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: npx --no-install commitlint --from "$BASE" --to "$HEAD"
 
   lint:
     name: Lint
