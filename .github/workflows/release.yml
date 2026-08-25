@@ -18,13 +18,35 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      #
+      # GITHUB_TOKEN cannot be used here: GitHub refuses to start workflows for
+      # anything it authors, so the release pull request arrives with no checks
+      # and can never satisfy the Validate requirement on main. An App identity
+      # is a different actor, and its pull request runs CI like any other.
+      #
+      # Optional on purpose. Until the App credentials exist the step is skipped
+      # and release-please falls back to GITHUB_TOKEN, which is exactly today's
+      # behaviour: releases keep working through the ruleset's admin bypass. The
+      # moment RELEASE_APP_ID is set, the App takes over with no further change,
+      # and the bypass can be removed.
+      #
+      # Set up with: bash scripts/setup-release-app.sh <app-id> <key.pem>
+      #
+      - name: Mint a release token
+        id: app_token
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app_token.outputs.token || secrets.GITHUB_TOKEN }}
 
   publish:
     name: Publish Release Assets

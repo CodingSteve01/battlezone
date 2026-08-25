@@ -73,6 +73,31 @@ This project uses [release-please](https://github.com/googleapis/release-please)
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
+### Who release-please authenticates as
+
+`main` requires the `Validate` check. GitHub refuses to start workflows for anything
+`GITHUB_TOKEN` authors, so a release pull request opened with it arrives with **no checks
+at all** and can never satisfy that requirement — it only merges through the ruleset's
+admin bypass.
+
+The fix is a GitHub App, because an App is a different actor and its pull requests run CI
+like any other. It needs *Contents: Read & write* and *Pull requests: Read & write*, and
+nothing else.
+
+```sh
+bash scripts/setup-release-app.sh <app-id> ~/Downloads/battlezone-release.*.pem
+```
+
+That stores `RELEASE_APP_ID` as a variable and `RELEASE_APP_PRIVATE_KEY` as a secret;
+delete the `.pem` afterwards. The workflow picks the App up on its own — the token step is
+skipped while `RELEASE_APP_ID` is unset and release-please falls back to `GITHUB_TOKEN`, so
+there is no flag day and nothing to coordinate. Once the App is live, the admin bypass on
+the ruleset can be removed.
+
+Note the event trigger is *not* the lever here: a `push` trigger on the release branch is
+refused for the same reason, because release-please pushes that branch with `GITHUB_TOKEN`
+as well. It is the identity that matters, not the event.
+
 ## Project Documentation
 
 - [README.md](README.md) - Project overview and quick start
