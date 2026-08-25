@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.4](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.3...shadow-squad-v6.7.4) (2026-08-25)
+
+
+### CI/CD
+
+* report checks on release-please branches ([#393](https://github.com/CodingSteve01/battlezone/issues/393)) ([7ffc1a8](https://github.com/CodingSteve01/battlezone/commit/7ffc1a8a2a1e08c311130785ab1b0e70e0fa9596))
+
 ## [6.7.3](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.2...shadow-squad-v6.7.3) (2026-08-25)
 
 
