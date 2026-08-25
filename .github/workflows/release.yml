@@ -35,10 +35,29 @@ jobs:
       - name: Mint a release token
         id: app_token
         if: vars.RELEASE_APP_ID != ''
+        continue-on-error: true
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      #
+      # Registering the App and installing it are two separate steps, and an App
+      # that exists but is installed nowhere cannot mint a token. Without
+      # continue-on-error above, that gap turns a release into a failed workflow
+      # instead of falling back the way an unset variable does. Say which
+      # identity is in use, so a silent fallback is not mistaken for the App
+      # working.
+      #
+      - name: Report the identity
+        run: |
+          if [ -n "${{ steps.app_token.outputs.token }}" ]; then
+            echo "Authenticating as the GitHub App; its pull request will run CI."
+          else
+            echo "::warning::No App token. Falling back to GITHUB_TOKEN, whose" \
+              "pull request gets no checks and needs the ruleset bypass to merge." \
+              "Install the App at https://github.com/apps/battlezone-release"
+          fi
 
       - name: Release Please
         id: release
