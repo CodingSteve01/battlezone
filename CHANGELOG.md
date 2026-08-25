@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.2](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.1...shadow-squad-v6.7.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **ci:** unbreak the Pages build and stop failing generated commits ([#388](https://github.com/CodingSteve01/battlezone/issues/388)) ([cf97806](https://github.com/CodingSteve01/battlezone/commit/cf978068a10da1e529aacf82e205fc7c966050e5))
+
 ## [6.7.1](https://github.com/CodingSteve01/battlezone/compare/shadow-squad-v6.7.0...shadow-squad-v6.7.1) (2026-04-01)
 
 
